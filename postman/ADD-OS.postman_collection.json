@@ -1,0 +1,744 @@
+{
+  "info": {
+    "_postman_id": "a1d0c0de-0001-4a1b-9c1e-add0scollection",
+    "name": "ADD OS — Identity & Content",
+    "description": "Member app auth (phone + WhatsApp OTP, Sanctum token), Ops dashboard auth (Fortify session + 2FA, Sanctum SPA), admin-managed site content (Founders/Partners/Community), and the public read-only feed of that same content.\n\nImport the companion environment (ADD OS - Local) and select it — base_url, admin_email, admin_password, member_phone all live there.\n\nEverything under /api lives under /api/v1 — the whole API is versioned from day one.\n\nBefore using Admin/*: run the app locally with `php artisan serve --port=8000` — Sanctum's stateful-domain check only recognizes 127.0.0.1:8000 by default.\n\nMember flow: Member/Auth/Request OTP → read the code from storage/logs/laravel.log (mock WhatsApp driver) → Member/Auth/Verify OTP — the token is captured automatically into {{member_token}}.\n\nAdmin flow: Admin/Auth/Get CSRF Cookie once, then Admin/Auth/Login — every other Admin/* request reads the XSRF token from the cookie jar automatically. Each Admin/Content/* \"Create\" request captures the new row's id into a variable ({{founder_id}}, {{partner_id}}, {{community_member_id}}) so the Get/Update/Delete requests right below it work with no manual editing.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "member_token", "value": "", "type": "string" },
+    { "key": "founder_id", "value": "", "type": "string" },
+    { "key": "partner_id", "value": "", "type": "string" },
+    { "key": "community_member_id", "value": "", "type": "string" }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.upsert({ key: 'Accept', value: 'application/json' });"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Member (App)",
+      "description": "Phone + OTP over WhatsApp (mock driver for now) → Sanctum bearer token.",
+      "item": [
+        {
+          "name": "Auth",
+          "description": "The login lifecycle: request a code, verify it, log out.",
+          "item": [
+            {
+              "name": "Request OTP",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/otp/request",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "otp", "request"]
+                },
+                "description": "Rate-limited (1 per cooldown window per phone, plus a 10/min per-IP throttle). Code is dispatched via the mock WhatsApp driver — check storage/logs/laravel.log for the value until a real gateway is wired up."
+              }
+            },
+            {
+              "name": "Verify OTP",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    const token = pm.response.json().token;",
+                      "    pm.collectionVariables.set('member_token', token);",
+                      "    console.log('member_token captured');",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/otp/verify",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "otp", "verify"]
+                },
+                "description": "On success: creates the user on first verification (assigns the 'member' role) and returns a Sanctum token, captured into {{member_token}}."
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/logout",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "logout"]
+                },
+                "description": "Revokes the current access token. Calling Account/Get Me again afterwards should return 401."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account",
+          "description": "Anything about the already-authenticated member, as opposed to the act of logging in.",
+          "item": [
+            {
+              "name": "Get Me",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "me"]
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin (Dashboard)",
+      "description": "Fortify (session + 2FA) + Sanctum SPA. Public registration is disabled on purpose — accounts are created by an existing admin (see database/seeders/AdminUserSeeder.php for the first one).",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const xsrf = pm.cookies.get('XSRF-TOKEN');",
+              "if (xsrf) {",
+              "    pm.request.headers.upsert({ key: 'X-XSRF-TOKEN', value: decodeURIComponent(xsrf) });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "item": [
+        {
+          "name": "Auth",
+          "description": "The login lifecycle: CSRF cookie, login (with optional 2FA challenge), log out.",
+          "item": [
+            {
+              "name": "Get CSRF Cookie",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/sanctum/csrf-cookie",
+                  "host": ["{{base_url}}"],
+                  "path": ["sanctum", "csrf-cookie"]
+                },
+                "description": "Run this first — sets the XSRF-TOKEN cookie that every other request in Admin/* reads automatically."
+              }
+            },
+            {
+              "name": "Login",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["login"]
+                },
+                "description": "Returns {\"two_factor\": false} and logs the session in directly if 2FA isn't confirmed yet, or {\"two_factor\": true} and expects Two-Factor Challenge next."
+              }
+            },
+            {
+              "name": "Two-Factor Challenge",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/two-factor-challenge",
+                  "host": ["{{base_url}}"],
+                  "path": ["two-factor-challenge"]
+                },
+                "description": "Only needed if Login responded with two_factor: true. Use {\"recovery_code\": \"...\"} instead of \"code\" to fall back to a recovery code."
+              }
+            },
+            {
+              "name": "Logout",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/logout",
+                  "host": ["{{base_url}}"],
+                  "path": ["logout"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Account",
+          "description": "Anything about the already-authenticated admin/staff user.",
+          "item": [
+            {
+              "name": "Get Me",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/me",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "me"]
+                },
+                "description": "Guarded by role:admin|staff — a logged-in member-only account gets 403 here, not 401."
+              }
+            },
+            {
+              "name": "Update Profile Information",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"ADD Admin\",\n  \"email\": \"{{admin_email}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/user/profile-information",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "profile-information"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Two-Factor Authentication",
+          "description": "Setup and management of TOTP 2FA — separate from Auth because these calls happen while already logged in, not while logging in.",
+          "item": [
+            {
+              "name": "Enable",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/two-factor-authentication",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "two-factor-authentication"]
+                },
+                "description": "Generates a secret + recovery codes but leaves 2FA unconfirmed until Confirm succeeds."
+              }
+            },
+            {
+              "name": "Get QR Code",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/two-factor-qr-code",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "two-factor-qr-code"]
+                }
+              }
+            },
+            {
+              "name": "Confirm",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"code\": \"123456\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/user/confirmed-two-factor-authentication",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "confirmed-two-factor-authentication"]
+                },
+                "description": "Code from an authenticator app scanning the QR code above. Once confirmed, future logins require Auth/Two-Factor Challenge."
+              }
+            },
+            {
+              "name": "Get Recovery Codes",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/two-factor-recovery-codes",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "two-factor-recovery-codes"]
+                }
+              }
+            },
+            {
+              "name": "Regenerate Recovery Codes",
+              "request": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/two-factor-recovery-codes",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "two-factor-recovery-codes"]
+                }
+              }
+            },
+            {
+              "name": "Disable",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/two-factor-authentication",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "two-factor-authentication"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Password",
+          "description": "Password confirmation gate, change, and the forgot/reset recovery flow.",
+          "item": [
+            {
+              "name": "Confirm Password",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"password\": \"{{admin_password}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/user/confirm-password",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "confirm-password"]
+                },
+                "description": "Fortify requires a fresh password confirmation (session-timed) before sensitive actions like changing the password or disabling 2FA."
+              }
+            },
+            {
+              "name": "Confirmed Password Status",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/user/confirmed-password-status",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "confirmed-password-status"]
+                }
+              }
+            },
+            {
+              "name": "Update Password",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"current_password\": \"{{admin_password}}\",\n  \"password\": \"new-password\",\n  \"password_confirmation\": \"new-password\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/user/password",
+                  "host": ["{{base_url}}"],
+                  "path": ["user", "password"]
+                }
+              }
+            },
+            {
+              "name": "Forgot Password",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"email\": \"{{admin_email}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/forgot-password",
+                  "host": ["{{base_url}}"],
+                  "path": ["forgot-password"]
+                },
+                "description": "MAIL_MAILER=log by default — check storage/logs/laravel.log for the reset link/token."
+              }
+            },
+            {
+              "name": "Reset Password",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"token\": \"REPLACE_WITH_TOKEN_FROM_LOG\",\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"new-password\",\n  \"password_confirmation\": \"new-password\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/reset-password",
+                  "host": ["{{base_url}}"],
+                  "path": ["reset-password"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Content",
+          "description": "Admin-managed site content — Founders, Partners, Community. Each 'Create' below auto-captures the new row's id for the requests under it.",
+          "item": [
+            {
+              "name": "Founders",
+              "item": [
+                {
+                  "name": "List Founders",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/founders",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "founders"]
+                    }
+                  }
+                },
+                {
+                  "name": "Create Founder",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('founder_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"أحمد الشامي\", \"en\": \"Ahmad Al-Shami\" },\n  \"role\": { \"ar\": \"المؤسس والمدير التنفيذي\", \"en\": \"Founder & CEO\" },\n  \"bio\": { \"ar\": \"خبرة 10 سنوات بريادة الأعمال\", \"en\": \"10 years in entrepreneurship\" },\n  \"photo_url\": \"https://example.com/ahmad.jpg\",\n  \"linkedin_url\": \"https://linkedin.com/in/ahmad\",\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/founders",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "founders"]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Founder",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Founder",
+                  "request": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"أحمد الشامي\", \"en\": \"Ahmad Al-Shami\" },\n  \"role\": { \"ar\": \"الرئيس التنفيذي\", \"en\": \"CEO\" },\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Delete Founder",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Partners",
+              "item": [
+                {
+                  "name": "List Partners",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/partners",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "partners"]
+                    }
+                  }
+                },
+                {
+                  "name": "Create Partner",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('partner_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"بنك سوريا\", \"en\": \"Bank of Syria\" },\n  \"description\": { \"ar\": \"شريك مصرفي\", \"en\": \"Banking partner\" },\n  \"category\": \"local\",\n  \"is_active\": true,\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/partners",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "partners"]
+                    },
+                    "description": "category must be \"local\" or \"global\"."
+                  }
+                },
+                {
+                  "name": "Get Partner",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Partner",
+                  "request": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"بنك سوريا\", \"en\": \"Bank of Syria\" },\n  \"category\": \"local\",\n  \"is_active\": false,\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Delete Partner",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Community Members",
+              "item": [
+                {
+                  "name": "List Community Members",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/community-members",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "community-members"]
+                    }
+                  }
+                },
+                {
+                  "name": "Create Community Member",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('community_member_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"لينا حداد\", \"en\": \"Lina Haddad\" },\n  \"category\": \"investors\",\n  \"company\": { \"ar\": \"صندوق النمو\", \"en\": \"Growth Fund\" },\n  \"title\": { \"ar\": \"شريكة استثمار\", \"en\": \"Investment Partner\" },\n  \"skills\": [\"Fintech\", \"Venture Capital\"],\n  \"social_links\": { \"linkedin\": \"https://linkedin.com/in/lina\" },\n  \"published\": true,\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/community-members",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "community-members"]
+                    },
+                    "description": "category must be one of: pioneers, growth_partners, investors, impact_partners."
+                  }
+                },
+                {
+                  "name": "Get Community Member",
+                  "request": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Community Member",
+                  "request": {
+                    "method": "PUT",
+                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"لينا حداد\", \"en\": \"Lina Haddad\" },\n  \"category\": \"investors\",\n  \"published\": false,\n  \"order\": 1\n}",
+                      "options": { "raw": { "language": "json" } }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                    }
+                  }
+                },
+                {
+                  "name": "Delete Community Member",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
+                      "host": ["{{base_url}}"],
+                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Public (Site)",
+      "description": "Unauthenticated reads for the marketing website — only published/active rows are ever returned here.",
+      "item": [
+        {
+          "name": "Get Founders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/founders",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "founders"]
+            }
+          }
+        },
+        {
+          "name": "Get Partners",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/partners",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "partners"]
+            },
+            "description": "Only partners with is_active = true are returned."
+          }
+        },
+        {
+          "name": "Get Community Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/community-members",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "community-members"],
+              "query": [
+                { "key": "category", "value": "investors", "disabled": true }
+              ]
+            },
+            "description": "Only published = true rows are returned. Enable the ?category= query param to filter by pioneers/growth_partners/investors/impact_partners."
+          }
+        }
+      ]
+    }
+  ]
+}

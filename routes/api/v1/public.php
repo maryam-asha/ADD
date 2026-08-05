@@ -1,0 +1,12 @@
+<?php
+
+use App\Http\Controllers\Api\V1\Public\CommunityMemberController;
+use App\Http\Controllers\Api\V1\Public\FounderController;
+use App\Http\Controllers\Api\V1\Public\PartnerController;
+use Illuminate\Support\Facades\Route;
+
+// Public, unauthenticated reads for the marketing site (and RSVP writes)
+// — filled in per-resource as each is built.
+Route::get('founders', [FounderController::class, 'index']);
+Route::get('partners', [PartnerController::class, 'index']);
+Route::get('community-members', [CommunityMemberController::class, 'index']);

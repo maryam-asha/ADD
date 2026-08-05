@@ -1,0 +1,47 @@
+<?php
+
+return [
+
+    /*
+    |--------------------------------------------------------------------------
+    | Cross-Origin Resource Sharing (CORS) Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Here you may configure your settings for cross-origin resource sharing
+    | or "CORS". This determines what cross-origin operations may execute
+    | in web browsers. You are free to adjust these settings as needed.
+    |
+    | To learn more: https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS
+    |
+    */
+
+    // Fortify's session routes (login, logout, 2FA, password) live outside
+    // /api/* at the root — the AddDashboard SPA calls those cross-origin too.
+    'paths' => [
+        'api/*',
+        'sanctum/csrf-cookie',
+        'login',
+        'logout',
+        'forgot-password',
+        'reset-password',
+        'two-factor-challenge',
+        'user/*',
+    ],
+
+    'allowed_methods' => ['*'],
+
+    // Wildcard is incompatible with supports_credentials below (the browser
+    // rejects it) — every origin allowed to hold a session must be listed.
+    'allowed_origins' => array_filter(explode(',', env('CORS_ALLOWED_ORIGINS', 'http://localhost:5173,http://127.0.0.1:5173'))),
+
+    'allowed_origins_patterns' => [],
+
+    'allowed_headers' => ['*'],
+
+    'exposed_headers' => [],
+
+    'max_age' => 0,
+
+    'supports_credentials' => true,
+
+];

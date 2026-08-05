@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php artisan test)",
+      "Bash(php artisan test *)",
+      "Bash(php artisan route:list)",
+      "Bash(php artisan route:list *)",
+      "Bash(php artisan migrate)",
+      "Bash(php artisan migrate --seed)",
+      "Bash(php artisan db:seed)",
+      "Bash(php artisan config:clear)",
+      "Bash(php artisan cache:clear)",
+      "Bash(php artisan make:*)",
+      "Bash(composer install)",
+      "Bash(composer dump-autoload)",
+      "Bash(composer test)",
+      "Bash(./vendor/bin/pint)",
+      "Bash(./vendor/bin/pint --test)",
+      "Bash(vendor/bin/pint)",
+      "Bash(vendor/bin/pint --test)",
+      "Bash(npm install)",
+      "Bash(npm run build)",
+      "Bash(git status)",
+      "Bash(git diff)",
+      "Bash(git diff *)",
+      "Bash(git log)",
+      "Bash(git log *)"
+    ]
+  }
+}
