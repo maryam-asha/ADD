@@ -5,17 +5,18 @@ namespace App\Domain\Foundation\Models;
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Building extends Model
+/**
+ * Top of the eight-level spatial hierarchy (PRD decision #1). One real row
+ * from day one; meaningful only once a second Branch exists.
+ */
+class District extends Model
 {
     use HasFactory, HasTranslations;
 
     protected $fillable = [
-        'branch_id',
         'name',
-        'floor_count',
     ];
 
     protected function casts(): array
@@ -25,18 +26,8 @@ class Building extends Model
         ];
     }
 
-    public function branch(): BelongsTo
+    public function branches(): HasMany
     {
-        return $this->belongsTo(Branch::class);
-    }
-
-    public function spaces(): HasMany
-    {
-        return $this->hasMany(Space::class);
-    }
-
-    public function floors(): HasMany
-    {
-        return $this->hasMany(Floor::class);
+        return $this->hasMany(Branch::class);
     }
 }

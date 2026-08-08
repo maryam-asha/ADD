@@ -85,17 +85,24 @@ First guard tests: no `float`/`double` in any migration (#15) · no external hos
 
 Acceptance: `php artisan test` green, `pint --test` clean, every guard test failing loudly if its invariant is removed. **DONE** — `tests/Guards/` has 7 checks, `php artisan test` is green (19 tests), `pint --test` is clean apart from 6 files that already failed before this work started (confirmed via `git stash` against `HEAD`).
 
-### Phase 1 — Foundation: the eight-level spatial hierarchy
+### Phase 1 — Foundation: the eight-level spatial hierarchy · **DONE**
 
-**Tables:** `districts` (new) · `branches` (+`district_id` nullable) · `buildings` · `floors` (new) · `zones` (new) · `spaces` (+`zone_id`, `event_hall`, `allocation_model`, `status_reason`, `status_from`, `status_until`) · `resources` (new) · `seats_desks` (new; `qr_point_id` nullable until Phase 7).
+**Tables:** `districts` (new) · `branches` (+`district_id` nullable) · `buildings` · `floors` (new) · `zones` (new) · `spaces` (+`zone_id`, `event_hall`, `allocation_model`, `pricing_currency`, `status_reason`, `status_from`, `status_until`) · `resources` (new, +operational status per D.11) · `seats_desks` (new; `qr_point_id` nullable until Phase 7).
 
 **Locked decisions:** #1 eight levels, `Branch` keeps its name · #2 Floor/Zone are classification only · #3 Resource is metadata, never booked · #4 Seat/Desk is an address, not a seat map · #8 operational status at Space level, no hierarchical escalation · #13 `is_lockable` true only for room / business / event_hall.
 
-**Placeholders:** `districts` gets exactly one row and `branches.district_id` stays nullable — it becomes meaningful at the second branch, and must not grow logic before then.
+**Non-blocking items resolved on arrival** (per [space-type-and-resource-status.md](../decisions/space-type-and-resource-status.md)): D.7 `space_type` follows ERD v2.0 naming (`co_space|room|business|event_hall`) · D.11 `resources` gets the same four operational-status columns as `spaces`, since PRD §5.6/#8 name "the space and the resource" literally.
 
-**Acceptance:** the full hierarchy is creatable; maintenance can be set on one space without touching its floor; a space whose `status != active` disappears from availability results regardless of calendar availability.
+**Placeholders:** `districts` gets exactly one row and `branches.district_id` stays nullable — it becomes meaningful at the second branch, and must not grow logic before then · `spaces.allocation_model` is nullable — the space_type → allocation_model mapping is Phase 5 business logic, not this structural phase.
 
-**Guards:** no booking or lock FK may point at `floors` or `zones` · every spatial table resolves to a `branch_id` · setting status on a floor never writes to its spaces.
+**Acceptance:** the full hierarchy is creatable; maintenance can be set on one space without touching its floor; a space whose `status != active` disappears from availability results regardless of calendar availability. All three verified in [tests/Feature/Foundation/SpatialHierarchyTest.php](../../tests/Feature/Foundation/SpatialHierarchyTest.php) (6 tests) against both SQLite (test suite) and the real dev MySQL database (manual `tinker` walkthrough + `migrate`/`migrate:rollback`/`migrate:fresh` all verified clean).
+
+**Guards:** [`SpatialHierarchyGuardTest`](../../tests/Guards/SpatialHierarchyGuardTest.php) — `floors`/`zones` carry no `status` column and no device/lock/booking FK, ever. (Every spatial table resolving to a `branch_id` is verified behaviourally in the acceptance test above rather than as a schema guard — the chain is fixed and known today, not a generic rule new domains must satisfy.)
+
+**Implementation notes for later phases:**
+- `space_type` moved off a MySQL `ENUM` onto `string` + PHP backed enum cast in the *same* migration that needed to add `event_hall` — the "documented deviation with a migration path" from §A.4, exercised on the one column that actually needed to change. `spaces.status` was left as the legacy `ENUM` (untouched, so [`NoNewMysqlEnumColumnsTest`](../../tests/Guards/NoNewMysqlEnumColumnsTest.php) doesn't apply) but still gets a PHP enum cast on the model — a DB column can be `ENUM` and still be cast to a backed enum in Eloquent; the two are independent.
+- Confirmed Laravel 12 can `->change()` a column (enum→string) on MySQL without `doctrine/dbal` installed — tested against the real dev DB, not just SQLite.
+- `SeatDesk` needs an explicit `protected $table = 'seats_desks'` — Eloquent's naming convention guesses `seat_desks` from the class name.
 
 ### Phase 2 — Identity, RBAC, companies, guests, audit
 
