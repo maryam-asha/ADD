@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignRoleRequest;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Hash;
  */
 class UserController extends Controller
 {
+    use LogsSensitiveActions;
+
     public function index(Request $request): AnonymousResourceCollection
     {
         $query = User::query()->with('roles')->latest();
@@ -42,6 +45,8 @@ class UserController extends Controller
 
         $user->assignRole($request->validated('role'));
 
+        $this->logSensitiveAction('user_created', $user, ['role' => $request->validated('role')]);
+
         return new UserResource($user);
     }
 
@@ -59,14 +64,28 @@ class UserController extends Controller
 
     public function updateStatus(UpdateUserStatusRequest $request, User $user): UserResource
     {
+        $before = $user->status;
+
         $user->update($request->validated());
+
+        $this->logSensitiveAction('user_status_changed', $user, [
+            'before' => $before,
+            'after' => $user->status,
+        ]);
 
         return new UserResource($user);
     }
 
     public function assignRole(AssignRoleRequest $request, User $user): UserResource
     {
+        $before = $user->getRoleNames();
+
         $user->syncRoles([$request->validated('role')]);
+
+        $this->logSensitiveAction('user_role_changed', $user, [
+            'before' => $before,
+            'after' => $user->getRoleNames(),
+        ]);
 
         return new UserResource($user);
     }

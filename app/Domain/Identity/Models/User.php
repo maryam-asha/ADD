@@ -73,6 +73,19 @@ class User extends Authenticatable
         return $this->hasMany(NotificationLog::class);
     }
 
+    public function companies(): BelongsToMany
+    {
+        return $this->belongsToMany(Company::class, 'company_user')
+            ->using(CompanyUser::class)
+            ->withPivot('door_access_enabled')
+            ->withTimestamps();
+    }
+
+    public function hostedGuests(): HasMany
+    {
+        return $this->hasMany(Guest::class, 'hosting_user_id');
+    }
+
     /**
      * Sanctum's default plain-text token is "{id}|{40 random chars}" — the id
      * prefix is just a lookup optimization. We skip it for a plain 64-char hex

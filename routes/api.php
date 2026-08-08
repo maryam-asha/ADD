@@ -11,7 +11,11 @@ Route::prefix('v1')->group(function () {
     require base_path('routes/api/v1/auth.php');
     require base_path('routes/api/v1/public.php');
 
-    Route::middleware(['auth:sanctum', 'role:admin|staff'])
+    Route::middleware(['auth:sanctum', 'role:admin|operations'])
         ->prefix('admin')
         ->group(base_path('routes/api/v1/admin.php'));
+
+    Route::middleware(['auth:sanctum', 'role:member'])
+        ->prefix('member')
+        ->group(base_path('routes/api/v1/member.php'));
 });

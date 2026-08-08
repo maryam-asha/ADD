@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class AssignRoleRequest extends FormRequest
+class UpdateCompanyStatusRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,7 +18,7 @@ class AssignRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::in(['member', 'operations', 'admin'])],
+            'status' => ['required', Rule::in(['active', 'inactive'])],
         ];
     }
 }

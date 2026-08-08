@@ -15,9 +15,9 @@ class StoreUserRequest extends FormRequest
     }
 
     /**
-     * Only staff/admin accounts are created here — members self-register via
-     * phone + OTP (see Api\V1\Auth\MemberAuthController), never through the
-     * dashboard.
+     * Only operations/admin accounts are created here — members self-register
+     * via phone + OTP (see Api\V1\Auth\MemberAuthController), never through
+     * the dashboard.
      *
      * @return array<string, mixed>
      */
@@ -28,7 +28,7 @@ class StoreUserRequest extends FormRequest
             'phone' => ['required', 'string', 'unique:users,phone', new SyrianPhoneNumber],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::in(['staff', 'admin'])],
+            'role' => ['required', Rule::in(['operations', 'admin'])],
         ];
     }
 }

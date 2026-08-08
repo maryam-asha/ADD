@@ -13,6 +13,9 @@ decided, and what enforces it now.
 - [money-model.md](money-model.md) — per-price-point currency, `usd_equivalent` non-authoritative
 - [access-control-tables.md](access-control-tables.md) — generic `devices`, not split `gateways`/`locks`
 - [wallet-subscription-ownership.md](wallet-subscription-ownership.md) — `owner_type` extension on `wallets`/`subscriptions`
+- [space-type-and-resource-status.md](space-type-and-resource-status.md) — `space_type` naming (D.7) and operational status on `resources` (D.11)
+- [rbac-scoping.md](rbac-scoping.md) — D.8: flat spatie roles kept; company door access via one Policy, not a scope system
+- [staff-operations-rename.md](staff-operations-rename.md) — `staff` role renamed to `operations` to match PRD §4 exactly
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
@@ -28,7 +31,7 @@ no table surface yet and nothing to guard.
 | 6 | Hot Desk package selection creates a real booking, 24h free cancellation | — (Phase 5) | 5 |
 | 7 | Meeting rooms auto-confirm; only the event hall is manual | — (Phase 5) | 5 |
 | 8 | Operational status at Space/Resource level, no hierarchical escalation; affected-bookings on maintenance conflict | — (Phase 1 status, Phase 5 affected_bookings) | 1, 5 |
-| 9 | Guest requests go through the host exclusively | — (Phase 7) | 7 |
+| 9 | Guest requests go through the host exclusively | Partial — `guests` scoped to `hosting_user_id` end-to-end, tested in [`GuestTest`](../../tests/Feature/Identity/GuestTest.php); the service-ticket half completes in Phase 7 | 2 (base), 7 (tickets) |
 | 10 | Every service ticket carries the scanning member's identity | — (Phase 7) | 7 |
 | 11 | 24/7 access; no duration cap | [`NoAccessHoursWindowTest`](../../tests/Guards/NoAccessHoursWindowTest.php) | 0 (done) |
 | 12 | Gateway + custom codes primary; offline algorithmic is a documented degraded mode | — (Phase 6) | 6 |

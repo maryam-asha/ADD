@@ -9,7 +9,7 @@ class AdminUserSeeder extends Seeder
 {
     /**
      * Bootstraps the first admin account. Public registration is disabled
-     * on purpose (Fortify::registration() is off) — every staff/admin
+     * on purpose (Fortify::registration() is off) — every operations/admin
      * account originates from an existing admin, and this seeder exists
      * only to create that very first one for local development.
      *

@@ -3,9 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
-use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Http\Response;
 
 /**
  * The part of admin CRUD that's identical for every resource here (list,
@@ -37,7 +37,7 @@ abstract class AdminResourceController extends Controller
         return new ($this->resourceClass())($model);
     }
 
-    public function destroy(int $id): JsonResponse
+    public function destroy(int $id): Response
     {
         ($this->modelClass())::findOrFail($id)->delete();
 
