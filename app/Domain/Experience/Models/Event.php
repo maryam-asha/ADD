@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Experience\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Domain\Foundation\Models\Branch;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

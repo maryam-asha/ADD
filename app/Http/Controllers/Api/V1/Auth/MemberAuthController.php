@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RequestOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
 use App\Http\Resources\UserResource;
-use App\Models\User;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpService;
 use Illuminate\Http\JsonResponse;

@@ -2,7 +2,7 @@
 
 namespace App\Services\Otp;
 
-use App\Models\OtpVerification;
+use App\Domain\Identity\Models\OtpVerification;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;

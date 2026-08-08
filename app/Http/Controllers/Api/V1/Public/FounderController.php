@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Public;
 
+use App\Domain\Ecosystem\Models\Founder;
 use App\Http\Resources\FounderResource;
-use App\Models\Founder;
 use Illuminate\Database\Eloquent\Builder;
 
 class FounderController extends PublicResourceController

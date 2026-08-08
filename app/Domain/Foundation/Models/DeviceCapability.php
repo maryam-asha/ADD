@@ -1,24 +1,22 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Foundation\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class NotificationLog extends Model
+class DeviceCapability extends Model
 {
     use HasFactory;
 
     protected $fillable = [
-        'user_id',
-        'channel',
-        'template_key',
-        'status',
+        'device_id',
+        'capability',
     ];
 
-    public function user(): BelongsTo
+    public function device(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(Device::class);
     }
 }

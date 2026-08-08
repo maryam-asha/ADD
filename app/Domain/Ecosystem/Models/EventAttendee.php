@@ -1,7 +1,8 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Ecosystem\Models;
 
+use App\Domain\Experience\Models\Event;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;

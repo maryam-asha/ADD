@@ -1,8 +1,10 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Foundation\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Models\UserBranchMembership;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;

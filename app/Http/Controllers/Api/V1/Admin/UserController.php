@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignRoleRequest;
 use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
 use App\Http\Resources\UserResource;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Hash;

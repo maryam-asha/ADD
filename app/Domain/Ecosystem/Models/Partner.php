@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Ecosystem\Models;
 
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;

@@ -2,7 +2,7 @@
 
 namespace Database\Seeders;
 
-use App\Models\User;
+use App\Domain\Identity\Models\User;
 use Illuminate\Database\Seeder;
 
 class AdminUserSeeder extends Seeder

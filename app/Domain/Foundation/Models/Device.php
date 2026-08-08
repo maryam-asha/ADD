@@ -1,27 +1,29 @@
 <?php
 
-namespace App\Models;
+namespace App\Domain\Foundation\Models;
 
-use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class Building extends Model
+class Device extends Model
 {
-    use HasFactory, HasTranslations;
+    use HasFactory;
 
     protected $fillable = [
         'branch_id',
-        'name',
-        'floor_count',
+        'space_id',
+        'type',
+        'external_ref',
+        'metadata',
+        'status',
     ];
 
     protected function casts(): array
     {
         return [
-            'name' => 'array',
+            'metadata' => 'array',
         ];
     }
 
@@ -30,8 +32,13 @@ class Building extends Model
         return $this->belongsTo(Branch::class);
     }
 
-    public function spaces(): HasMany
+    public function space(): BelongsTo
     {
-        return $this->hasMany(Space::class);
+        return $this->belongsTo(Space::class);
+    }
+
+    public function capabilities(): HasMany
+    {
+        return $this->hasMany(DeviceCapability::class);
     }
 }

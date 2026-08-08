@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Ecosystem\Models\CommunityMember;
 use App\Http\Requests\Admin\StoreCommunityMemberRequest;
 use App\Http\Requests\Admin\UpdateCommunityMemberRequest;
 use App\Http\Resources\CommunityMemberResource;
-use App\Models\CommunityMember;
 
 class CommunityMemberController extends AdminResourceController
 {

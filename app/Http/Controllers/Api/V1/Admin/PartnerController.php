@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Ecosystem\Models\Partner;
 use App\Http\Requests\Admin\StorePartnerRequest;
 use App\Http\Requests\Admin\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
-use App\Models\Partner;
 
 class PartnerController extends AdminResourceController
 {

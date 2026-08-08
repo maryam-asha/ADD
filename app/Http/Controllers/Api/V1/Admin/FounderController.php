@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Ecosystem\Models\Founder;
 use App\Http\Requests\Admin\StoreFounderRequest;
 use App\Http\Requests\Admin\UpdateFounderRequest;
 use App\Http\Resources\FounderResource;
-use App\Models\Founder;
 
 class FounderController extends AdminResourceController
 {

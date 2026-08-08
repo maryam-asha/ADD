@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Public;
 
+use App\Domain\Ecosystem\Models\CommunityMember;
 use App\Http\Resources\CommunityMemberResource;
-use App\Models\CommunityMember;
 use Illuminate\Database\Eloquent\Builder;
 
 class CommunityMemberController extends PublicResourceController
