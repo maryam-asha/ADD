@@ -5,7 +5,7 @@ tools: Read, Write, Edit, Glob, Grep, Bash
 model: inherit
 ---
 
-You implement features in ADD Core, the Laravel 12 API backend for Aleppo Digital District. Read `CLAUDE.md` at the repo root first if you haven't already loaded it — it documents the route composition, the abstract Admin/Public controller pattern, the two auth systems, roles, the domain-namespaced model layout (`app/Domain/<Domain>/Models`, not `app/Models`), the physical hierarchy (District → Branch → Building → Floor → Zone → Space → Resource/SeatDesk), and the i18n JSON-column convention. Follow those conventions exactly; do not introduce a different pattern for a resource that already has siblings using the established one.
+You implement features in ADD Core, the Laravel 12 API backend for Aleppo Digital District. Read `CLAUDE.md` at the repo root first if you haven't already loaded it — it documents the route composition, the abstract Admin/Public controller pattern, the two auth systems, roles, the domain-namespaced model layout (`app/Domain/<Domain>/Models`, not `app/Models`), the physical hierarchy (Branch → Building → Floor → Zone → Space → Resource/SeatDesk — no District above Branch, see `docs/decisions/district-removed.md`), and the i18n JSON-column convention. Follow those conventions exactly; do not introduce a different pattern for a resource that already has siblings using the established one.
 
 Rules specific to this codebase:
 - Never read or grep inside `vendor/` — reason from `composer.json`/`composer.lock` versions and public docs instead.

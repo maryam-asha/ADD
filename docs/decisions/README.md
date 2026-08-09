@@ -16,6 +16,7 @@ decided, and what enforces it now.
 - [space-type-and-resource-status.md](space-type-and-resource-status.md) — `space_type` naming (D.7) and operational status on `resources` (D.11)
 - [rbac-scoping.md](rbac-scoping.md) — D.8: flat spatie roles kept; company door access via one Policy, not a scope system
 - [staff-operations-rename.md](staff-operations-rename.md) — `staff` role renamed to `operations` to match PRD §4 exactly
+- [district-removed.md](district-removed.md) — deliberate rollback: `District` dropped from the spatial hierarchy after Phase 1 shipped it
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
@@ -23,7 +24,7 @@ no table surface yet and nothing to guard.
 
 | # | PRD §7.1 decision | Guard test | Phase |
 |---|---|---|---|
-| 1 | Eight-level spatial hierarchy, `Branch` keeps its name | — (structural, Phase 1) | 1 |
+| 1 | Eight-level spatial hierarchy, `Branch` keeps its name | Deviated — seven levels; `District` shipped in Phase 1 then deliberately removed, see [district-removed.md](district-removed.md) | 1 |
 | 2 | Floor/Zone are classification only | — (Phase 1) | 1 |
 | 3 | Resource is metadata, never booked independently | — (Phase 1) | 1 |
 | 4 | Seat/Desk is an address, not a seat map | — (Phase 1) | 1 |

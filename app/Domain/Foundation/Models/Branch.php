@@ -7,16 +7,20 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Models\UserBranchMembership;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Top of the spatial hierarchy (docs/decisions/district-removed.md) —
+ * Branch itself carries the name and geography that would distinguish a
+ * future city or region, so a new branch is the unit that scales, not a
+ * District above it.
+ */
 class Branch extends Model
 {
     use HasFactory, HasTranslations;
 
     protected $fillable = [
-        'district_id',
         'name',
         'city',
         'timezone',
@@ -30,11 +34,6 @@ class Branch extends Model
             'city' => 'array',
             'is_active' => 'boolean',
         ];
-    }
-
-    public function district(): BelongsTo
-    {
-        return $this->belongsTo(District::class);
     }
 
     public function buildings(): HasMany
