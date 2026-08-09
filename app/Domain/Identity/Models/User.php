@@ -77,7 +77,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Company::class, 'company_user')
             ->using(CompanyUser::class)
-            ->withPivot('door_access_enabled')
+            ->withPivot('door_access_enabled', 'is_admin')
             ->withTimestamps();
     }
 

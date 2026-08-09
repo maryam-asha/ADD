@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\GuestController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,3 +11,9 @@ use Illuminate\Support\Facades\Route;
 Route::get('guests', [GuestController::class, 'index']);
 Route::post('guests', [GuestController::class, 'store']);
 Route::delete('guests/{guest}', [GuestController::class, 'destroy']);
+
+// Self-service for a company admin managing their own company's members
+// (CompanyPolicy::manageMembers) — checked in the controller, not by role
+// middleware, since it depends on the company_user pivot, not a global role.
+Route::patch('companies/{company}/members/{user}', [CompanyMemberController::class, 'updateDoorAccess']);
+Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);

@@ -39,6 +39,7 @@ Route::patch('companies/{company}/status', [CompanyController::class, 'updateSta
 Route::get('companies/{company}/members', [CompanyMemberController::class, 'index']);
 Route::post('companies/{company}/members', [CompanyMemberController::class, 'store']);
 Route::patch('companies/{company}/members/{user}', [CompanyMemberController::class, 'updateDoorAccess']);
+Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
 Route::delete('companies/{company}/members/{user}', [CompanyMemberController::class, 'destroy']);
 
 // Narrower than the group above: managing accounts and roles is admin-only,

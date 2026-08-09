@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 /**
- * The pivot between `users` and `companies`. `door_access_enabled` is the
- * one scoped capability in the app (D.8, docs/decisions/rbac-scoping.md) —
- * CompanyPolicy::useDoorAccess() is the only thing that should read it for
- * authorization. Carries its own `id` (unlike a bare composite-key pivot)
- * so audit_logs and the policy have a single row to point at.
+ * The pivot between `users` and `companies`. `door_access_enabled` and
+ * `is_admin` are the scoped capabilities in the app (D.8,
+ * docs/decisions/rbac-scoping.md) — CompanyPolicy is the only thing that
+ * should read them for authorization. Carries its own `id` (unlike a bare
+ * composite-key pivot) so audit_logs and the policy have a single row to
+ * point at.
  */
 class CompanyUser extends Pivot
 {
@@ -25,12 +26,14 @@ class CompanyUser extends Pivot
         'company_id',
         'user_id',
         'door_access_enabled',
+        'is_admin',
     ];
 
     protected function casts(): array
     {
         return [
             'door_access_enabled' => 'boolean',
+            'is_admin' => 'boolean',
         ];
     }
 

@@ -6,11 +6,11 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 
 /**
- * D.8 (docs/decisions/rbac-scoping.md): the one scoped capability in the
- * app — using a company's shared door code — checked here rather than
- * through a general scope_type/scope_id system. `Gate::before` in
- * AppServiceProvider still lets `admin` bypass this, same as every other
- * ability.
+ * D.8 (docs/decisions/rbac-scoping.md): the scoped capabilities in the
+ * app — using a company's shared door code, and managing other members of
+ * that same company — checked here rather than through a general
+ * scope_type/scope_id system. `Gate::before` in AppServiceProvider still
+ * lets `admin` bypass both, same as every other ability.
  */
 class CompanyPolicy
 {
@@ -24,6 +24,23 @@ class CompanyPolicy
     {
         return $company->members()
             ->wherePivot('door_access_enabled', true)
+            ->where('users.id', $user->id)
+            ->exists();
+    }
+
+    /**
+     * Is this user a company admin for this specific company? Only a
+     * company admin may change another member's `door_access_enabled` or
+     * `is_admin` — a regular member cannot, even for themselves, through
+     * the member-facing endpoints (Api\V1\Member\CompanyMemberController).
+     * Operations/admin manage both fields unconditionally through the
+     * admin-dashboard endpoints, via the existing `Gate::before` bypass,
+     * independent of this check.
+     */
+    public function manageMembers(User $user, Company $company): bool
+    {
+        return $company->members()
+            ->wherePivot('is_admin', true)
             ->where('users.id', $user->id)
             ->exists();
     }

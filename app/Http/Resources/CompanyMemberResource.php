@@ -25,6 +25,7 @@ class CompanyMemberResource extends JsonResource
                 'phone' => $this->user->phone,
             ],
             'door_access_enabled' => $this->door_access_enabled,
+            'is_admin' => $this->is_admin,
             'created_at' => $this->created_at,
         ];
     }

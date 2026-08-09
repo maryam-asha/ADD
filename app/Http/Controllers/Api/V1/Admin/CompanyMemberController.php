@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCompanyMemberRequest;
+use App\Http\Requests\Admin\UpdateCompanyMemberAdminRequest;
 use App\Http\Requests\Admin\UpdateCompanyMemberRequest;
 use App\Http\Resources\CompanyMemberResource;
 use Illuminate\Http\JsonResponse;
@@ -32,6 +33,7 @@ class CompanyMemberController extends Controller
     {
         $company->members()->attach($request->validated('user_id'), [
             'door_access_enabled' => $request->boolean('door_access_enabled'),
+            'is_admin' => $request->boolean('is_admin'),
         ]);
 
         $membership = $company->members()->where('users.id', $request->validated('user_id'))->first();
@@ -39,6 +41,7 @@ class CompanyMemberController extends Controller
         $this->logSensitiveAction('company_member_added', $company, [
             'user_id' => $request->validated('user_id'),
             'door_access_enabled' => $request->boolean('door_access_enabled'),
+            'is_admin' => $request->boolean('is_admin'),
         ]);
 
         // attach() is a raw insert, not an Eloquent create() — Laravel's
@@ -58,6 +61,28 @@ class CompanyMemberController extends Controller
         $this->logSensitiveAction('company_member_door_access_changed', $company, [
             'user_id' => $user->id,
             'door_access_enabled' => $request->validated('door_access_enabled'),
+        ]);
+
+        $membership = $company->members()->where('users.id', $user->id)->first();
+
+        return new CompanyMemberResource($membership->pivot);
+    }
+
+    /**
+     * Operations grants/revokes company-admin status unconditionally
+     * (Gate::before bypass) — this is also the only way a company ever
+     * gets its first admin, since a company admin can only grant is_admin
+     * to an *existing* member (CompanyPolicy::manageMembers).
+     */
+    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): CompanyMemberResource
+    {
+        $company->members()->updateExistingPivot($user->id, [
+            'is_admin' => $request->validated('is_admin'),
+        ]);
+
+        $this->logSensitiveAction('company_member_admin_changed', $company, [
+            'user_id' => $user->id,
+            'is_admin' => $request->validated('is_admin'),
         ]);
 
         $membership = $company->members()->where('users.id', $user->id)->first();

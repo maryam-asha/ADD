@@ -20,6 +20,11 @@ class StoreCompanyMemberRequest extends FormRequest
         return [
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'door_access_enabled' => ['sometimes', 'boolean'],
+            // Operations bootstraps a company's first admin here — a
+            // company admin can only grant is_admin to an *existing*
+            // member (CompanyPolicy::manageMembers), so without this,
+            // no company could ever have one.
+            'is_admin' => ['sometimes', 'boolean'],
         ];
     }
 

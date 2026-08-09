@@ -47,7 +47,7 @@ class Company extends Model
     {
         return $this->belongsToMany(User::class, 'company_user')
             ->using(CompanyUser::class)
-            ->withPivot('door_access_enabled')
+            ->withPivot('door_access_enabled', 'is_admin')
             ->withTimestamps();
     }
 }
