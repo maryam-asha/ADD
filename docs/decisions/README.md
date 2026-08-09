@@ -18,6 +18,12 @@ decided, and what enforces it now.
 - [staff-operations-rename.md](staff-operations-rename.md) — `staff` role renamed to `operations` to match PRD §4 exactly
 - [district-removed.md](district-removed.md) — deliberate rollback: `District` dropped from the spatial hierarchy after Phase 1 shipped it
 
+**Design docs** — written ahead of the phase that implements them, so the
+first migration for that phase is built to the full shape instead of a
+minimal version that gets reworked later.
+
+- [wallet-points-categorization.md](wallet-points-categorization.md) — unified category/restriction/expiry model for wallet transactions, for Phase 3
+
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
 no table surface yet and nothing to guard.
