@@ -18,6 +18,7 @@ decided, and what enforces it now.
 - [staff-operations-rename.md](staff-operations-rename.md) — `staff` role renamed to `operations` to match PRD §4 exactly
 - [district-removed.md](district-removed.md) — deliberate rollback: `District` dropped from the spatial hierarchy after Phase 1 shipped it
 - [phase-3-membership-plan-wallet-mechanics.md](phase-3-membership-plan-wallet-mechanics.md) — base schema for `plans`/`memberships`/`wallets` (unspecified elsewhere), the signature-preserving debit algorithm, and the company-auto-provisioning gap the instructions left unanswered
+- [preferred-language-mutable.md](preferred-language-mutable.md) — `preferred_language` reversed from effectively-read-only to member-writable, landed alongside the new `preferred_currency` preference
 
 **Design docs** — written ahead of the phase that implements them, so the
 first migration for that phase is built to the full shape instead of a

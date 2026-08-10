@@ -61,3 +61,13 @@ money column anywhere is FLOAT/DOUBLE (already guarded repo-wide by
 [`MoneyIsDecimalOnlyTest`](../../tests/Guards/MoneyIsDecimalOnlyTest.php));
 and a naming check that no new migration reintroduces a
 `*_snapshot_usd`/single-USD-base column.
+
+## Update — 2026-08-09
+
+`exchange_rates` is now implemented: `app/Domain/Finance/Models/ExchangeRate.php`,
+migration `2026_08_09_160001_create_exchange_rates_table.php`. It's used
+for two purposes sharing the one table, per the original decision below:
+live, unstored display conversion (`preferred_currency`, see
+`docs/superpowers/plans/2026-08-09-display-currency.md`), and — not yet
+built — `exchange_rate_snapshot` on actual financial transactions. This
+is not a new decision, just infrastructure catching up to this one.
