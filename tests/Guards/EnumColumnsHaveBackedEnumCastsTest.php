@@ -11,9 +11,11 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Identity\Enums\ConsentType;
+use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\Consent;
+use App\Domain\Identity\Models\OtpVerification;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -57,6 +59,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Consent::class => [
             'subject_type' => ConsentSubjectType::class,
             'consent_type' => ConsentType::class,
+        ],
+        OtpVerification::class => [
+            'purpose' => OtpPurpose::class,
         ],
         Wallet::class => [
             'owner_type' => OwnerType::class,

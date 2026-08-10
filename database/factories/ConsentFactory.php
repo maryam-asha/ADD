@@ -23,7 +23,7 @@ class ConsentFactory extends Factory
         return [
             'subject_type' => ConsentSubjectType::User,
             'subject_id' => User::factory(),
-            'consent_type' => ConsentType::GuestDataOnBehalf,
+            'consent_type' => ConsentType::PublicDirectory,
             'granted_at' => now(),
         ];
     }

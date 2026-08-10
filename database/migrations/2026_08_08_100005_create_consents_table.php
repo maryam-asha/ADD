@@ -9,10 +9,8 @@ return new class extends Migration
     /**
      * PRD §5.11 (privacy). Polymorphic on purpose — `public_directory` and
      * `data_processing` consents belong to a `community_member` (Phase 9,
-     * not wired yet); `guest_data_on_behalf` belongs to the `user` who
-     * hosted a guest (Phase 2, wired now in MemberGuestController). No FK
-     * constraint on `subject_id`: the referenced table depends on
-     * `subject_type`.
+     * not wired yet). No FK constraint on `subject_id`: the referenced
+     * table depends on `subject_type`.
      */
     public function up(): void
     {

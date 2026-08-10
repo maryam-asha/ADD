@@ -29,7 +29,7 @@ class SuspendedAccountAccessTest extends IdentityTestCase
 
         // The token still works right now, before the status change.
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertOk();
 
         $member->update(['status' => 'deactivated']);
@@ -44,7 +44,7 @@ class SuspendedAccountAccessTest extends IdentityTestCase
         // Same token, same request — Sanctum still accepts the token (this
         // is not a 401), but the account is no longer allowed through.
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests');
+            ->getJson('/api/v1/member/wallet/options?category=general');
 
         $response->assertForbidden();
     }
@@ -75,7 +75,7 @@ class SuspendedAccountAccessTest extends IdentityTestCase
         $token = $member->createToken('member-app')->plainTextToken;
 
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertOk();
     }
 }

@@ -10,8 +10,7 @@ class UpdateCompanyMemberAdminRequest extends FormRequest
     /**
      * Whether the actor may manage *this* company's members at all
      * (CompanyPolicy::manageMembers) is checked in the controller, not
-     * here — same precedent as the ownership check in
-     * Api\V1\Member\GuestController::destroy().
+     * here.
      */
     public function authorize(): bool
     {

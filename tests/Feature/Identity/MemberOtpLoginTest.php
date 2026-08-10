@@ -3,46 +3,41 @@
 namespace Tests\Feature\Identity;
 
 use App\Domain\Identity\Models\User;
-use App\Services\Otp\OtpProvider;
-use stdClass;
+use Tests\Support\InteractsWithOtp;
 
 /**
  * Regression check after the staff -> operations rename
  * (docs/decisions/staff-operations-rename.md): the rename touched
  * RoleSeeder and two Form Requests but must not have touched what role a
- * newly-verified member gets.
+ * newly-registered member gets.
+ *
+ * The endpoint under test is registration now rather than login — the role
+ * assignment it guards moved with it, so the check follows rather than
+ * being retired.
  */
 class MemberOtpLoginTest extends IdentityTestCase
 {
-    public function test_verifying_a_valid_code_creates_a_member_and_assigns_the_member_role(): void
+    use InteractsWithOtp;
+
+    public function test_registering_with_a_valid_code_creates_a_member_and_assigns_the_member_role(): void
     {
-        $captured = new stdClass;
+        $this->fakeOtpProvider();
 
-        $this->app->bind(OtpProvider::class, fn () => new class($captured) implements OtpProvider
-        {
-            public function __construct(private stdClass $captured) {}
+        $payload = [
+            'phone' => '0912345678',
+            'name' => 'Maryam Asha',
+            'password' => 'correct-horse',
+            'password_confirmation' => 'correct-horse',
+        ];
 
-            public function send(string $phone, string $code, string $provider): bool
-            {
-                $this->captured->code = $code;
+        $code = $this->startRegistration($payload);
 
-                return true;
-            }
-        });
-
-        $phone = '0912345678';
-
-        $this->postJson('/api/v1/auth/otp/request', ['phone' => $phone])->assertOk();
-
-        $response = $this->postJson('/api/v1/auth/otp/verify', [
-            'phone' => $phone,
-            'code' => $captured->code,
-        ]);
+        $response = $this->postJson('/api/v1/auth/register/verify', $payload + ['code' => $code]);
 
         $response->assertOk();
-        $response->assertJsonPath('user.phone', $phone);
+        $response->assertJsonPath('user.phone', '0912345678');
 
-        $user = User::where('phone', $phone)->first();
+        $user = User::where('phone', '0912345678')->first();
         $this->assertTrue($user->hasRole('member'));
         $this->assertFalse($user->hasRole('operations'));
     }

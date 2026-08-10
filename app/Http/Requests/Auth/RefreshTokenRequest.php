@@ -2,10 +2,9 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Rules\SyrianPhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
-class VerifyOtpRequest extends FormRequest
+class RefreshTokenRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,8 +17,7 @@ class VerifyOtpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => ['required', 'string', new SyrianPhoneNumber],
-            'code' => ['required', 'string', 'size:'.config('otp.code_length')],
+            'refresh_token' => ['required', 'string'],
         ];
     }
 }

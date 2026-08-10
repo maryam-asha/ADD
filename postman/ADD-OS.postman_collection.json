@@ -2,18 +2,18 @@
   "info": {
     "_postman_id": "a1d0c0de-0001-4a1b-9c1e-add0scollection",
     "name": "ADD OS — Identity & Content",
-    "description": "Member app auth (phone + WhatsApp OTP, Sanctum token), Ops dashboard auth (Fortify session + 2FA, Sanctum SPA), admin-managed site content (Founders/Partners/Community), and the public read-only feed of that same content.\n\nImport the companion environment (ADD OS - Local) and select it — base_url, admin_email, admin_password, member_phone all live there.\n\nEverything under /api lives under /api/v1 — the whole API is versioned from day one.\n\nBefore using Admin/*: run the app locally with `php artisan serve --port=8000` — Sanctum's stateful-domain check only recognizes 127.0.0.1:8000 by default.\n\nMember flow: Member/Auth/Request OTP → read the code from storage/logs/laravel.log (mock WhatsApp driver) → Member/Auth/Verify OTP — the token is captured automatically into {{member_token}}.\n\nAdmin flow: Admin/Auth/Get CSRF Cookie once, then Admin/Auth/Login — every other Admin/* request reads the XSRF token from the cookie jar automatically. Each Admin/Content/* \"Create\" request captures the new row's id into a variable ({{founder_id}}, {{partner_id}}, {{community_member_id}}) so the Get/Update/Delete requests right below it work with no manual editing.",
+    "description": "Member app auth (phone + password, with WhatsApp OTP for sign-up and recovery), Ops dashboard auth (Fortify session + 2FA, Sanctum SPA), admin-managed site content (Founders/Partners/Community), and the public read-only feed of that same content.\n\nImport the companion environment (ADD OS - Local) and select it — base_url, admin_email, admin_password, member_phone, member_password all live there.\n\nEverything under /api lives under /api/v1 — the whole API is versioned from day one.\n\nBefore using Admin/*: run the app locally with `php artisan serve --port=8000` — Sanctum's stateful-domain check only recognizes 127.0.0.1:8000 by default.\n\nMember sign-up (once): Member/Auth/Register — Send Code (validates the whole profile up front) → read the code from storage/logs/laravel.log (mock WhatsApp driver) → Member/Auth/Register — Verify & Create. Member sign-in (every time after): Member/Auth/Login. Both capture an access_token + refresh_token pair into {{member_token}} and {{member_refresh_token}}; the access token expires after 60 minutes, and Member/Auth/Refresh Token renews it. Forgot the password? Forgot Password → Reset Password → Login.\n\nAdmin flow: Admin/Auth/Get CSRF Cookie once, then Admin/Auth/Login — every other Admin/* request reads the XSRF token from the cookie jar automatically. Each Admin/Content/* \"Create\" request captures the new row's id into a variable ({{founder_id}}, {{partner_id}}, {{community_member_id}}) so the Get/Update/Delete requests right below it work with no manual editing.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "member_token", "value": "", "type": "string" },
+    { "key": "member_refresh_token", "value": "", "type": "string" },
     { "key": "founder_id", "value": "", "type": "string" },
     { "key": "partner_id", "value": "", "type": "string" },
     { "key": "community_member_id", "value": "", "type": "string" },
     { "key": "user_id", "value": "", "type": "string" },
     { "key": "company_id", "value": "", "type": "string" },
-    { "key": "private_office_request_id", "value": "", "type": "string" },
-    { "key": "guest_id", "value": "", "type": "string" }
+    { "key": "private_office_request_id", "value": "", "type": "string" }
   ],
   "event": [
     {
@@ -29,32 +29,32 @@
   "item": [
     {
       "name": "Member (App)",
-      "description": "Phone + OTP over WhatsApp (mock driver for now) → Sanctum bearer token.",
+      "description": "Phone + password → Sanctum bearer token, with a WhatsApp code (mock driver for now) gating sign-up and password recovery.",
       "item": [
         {
           "name": "Auth",
-          "description": "The login lifecycle: request a code, verify it, log out.",
+          "description": "MEMBERS ONLY. An operations or admin account cannot sign in or reset a password anywhere in this folder — those accounts belong to Admin/Auth, behind Fortify's second factor. Tokens minted here carry the ability `member-app`, which /api/v1/admin/* rejects, so this surface stays sealed off from operations even for someone who is legitimately both.\n\nTwo separate journeys, in order.\n\nSIGN UP (once per member): Register — Send Code → Register — Verify & Create. Step 1 validates the whole profile and parks it, so a number that already has an account is refused there with a 422 rather than after the OTP round trip; step 2 then needs only the phone and the code. Nothing lands in `users` until step 2.\n\nSIGN IN (every time after): Login with phone + password. Refresh Token renews the access token when it expires (60 min) without re-entering the password; Logout ends the session on this device only.\n\nFORGOT IT: Forgot Password → Reset Password. The reset revokes every token the member holds on every device, and deliberately issues none — sign in again afterwards.\n\nRegister — Verify & Create, Login and Refresh Token all capture the pair into {{member_token}} and {{member_refresh_token}}.",
           "item": [
             {
-              "name": "Request OTP",
+              "name": "Register — Send Code",
               "request": {
                 "method": "POST",
                 "header": [{ "key": "Content-Type", "value": "application/json" }],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n  \"phone\": \"{{member_phone}}\"\n}",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"name\": \"New Member\",\n  \"email\": \"member@example.com\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
                   "options": { "raw": { "language": "json" } }
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/auth/otp/request",
+                  "raw": "{{base_url}}/api/v1/auth/register",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "otp", "request"]
+                  "path": ["api", "v1", "auth", "register"]
                 },
-                "description": "Rate-limited (1 per cooldown window per phone, plus a 10/min per-IP throttle). Code is dispatched via the mock WhatsApp driver — check storage/logs/laravel.log for the value until a real gateway is wired up."
+                "description": "Step 1 of sign-up. Validates the ENTIRE profile first and only then sends the code — so \"this number already has an account\", \"that email is taken\" and \"password too short\" all come back as 422 here, before you spend a WhatsApp message and an OTP round trip on a sign-up that was never going to succeed.\n\nOn success the profile is parked in `pending_registrations` (password already hashed) so step 2 needs only the phone and the code. Nothing lands in `users` — an unverified sign-up is never an account. The parked row expires with its code after 5 minutes and is swept hourly by `model:prune`, so abandoning the flow leaves nothing behind and holds no phone number.\n\nRunning this again overwrites the parked profile, which is how you correct a typo: fix the field, re-send, use the new code.\n\nThere is no `purpose` field — this endpoint always mints a `registration` code, and Forgot Password always mints a `password_reset` one. A code issued by one is refused by the other with an explicit 422; they are not interchangeable.\n\nRate-limited (1 per cooldown window per phone per purpose, plus a 10/min per-IP throttle). Code is dispatched via the mock WhatsApp driver — check storage/logs/laravel.log for the value until a real gateway is wired up."
               }
             },
             {
-              "name": "Verify OTP",
+              "name": "Register — Verify & Create",
               "event": [
                 {
                   "listen": "test",
@@ -62,9 +62,10 @@
                     "type": "text/javascript",
                     "exec": [
                       "if (pm.response.code === 200) {",
-                      "    const token = pm.response.json().token;",
-                      "    pm.collectionVariables.set('member_token', token);",
-                      "    console.log('member_token captured');",
+                      "    const body = pm.response.json();",
+                      "    pm.collectionVariables.set('member_token', body.access_token);",
+                      "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                      "    console.log('member_token + member_refresh_token captured');",
                       "}"
                     ]
                   }
@@ -79,11 +80,115 @@
                   "options": { "raw": { "language": "json" } }
                 },
                 "url": {
-                  "raw": "{{base_url}}/api/v1/auth/otp/verify",
+                  "raw": "{{base_url}}/api/v1/auth/register/verify",
                   "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "otp", "verify"]
+                  "path": ["api", "v1", "auth", "register", "verify"]
                 },
-                "description": "On success: creates the user on first verification (assigns the 'member' role) and returns a Sanctum token, captured into {{member_token}}."
+                "description": "Step 2 of sign-up, and ACCOUNT CREATION ONLY — this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the 'member' role, provisions an empty wallet, and discards the parked row — all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile — step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between — a race, not the normal \"already registered\" answer, which step 1 gives you as a 422."
+              }
+            },
+            {
+              "name": "Login",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    pm.collectionVariables.set('member_token', body.access_token);",
+                      "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                      "    console.log('member_token + member_refresh_token captured');",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"password\": \"{{member_password}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/login",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "login"]
+                },
+                "description": "The everyday sign-in, for MEMBERS ONLY. Returns the same access_token + refresh_token pair sign-up does, both captured automatically. The token carries the ability `member-app`, which /api/v1/admin/* rejects.\n\n401 is deliberately identical for three different failures — wrong password, unregistered number, and an account that holds no `member` role (an operations or admin account). Operators sign in at Admin/Auth/Login, behind Fortify's second factor; if this endpoint issued them a token, phone + password alone would reach the operations API and the second factor would be worth nothing. The wording is shared so the response can't be used to work out which numbers have accounts, or which of those belong to staff.\n\n403 means the account is deactivated or blocked; no token is issued and the body names the state.\n\n429 after 5 attempts per minute for this phone+IP combination, with retry_after in the body."
+              }
+            },
+            {
+              "name": "Refresh Token",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    const body = pm.response.json();",
+                      "    pm.collectionVariables.set('member_token', body.access_token);",
+                      "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                      "    console.log('member_token + member_refresh_token rotated');",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"refresh_token\": \"{{member_refresh_token}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/refresh",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "refresh"]
+                },
+                "description": "Renews an expired access token without the password. Unauthenticated — the refresh token in the body IS the credential.\n\nSingle use: the token sent here is revoked and the previous access token deleted, so both variables are overwritten with the replacements. Sending the same refresh token twice returns 401.\n\nAlso 401 if the refresh token has expired (30 days) or the account was deactivated/blocked in the meantime."
+              }
+            },
+            {
+              "name": "Forgot Password",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/forgot",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "forgot"]
+                },
+                "description": "Sends a `password_reset` code. Always answers 200 with the same neutral message whether or not the number has an account — that is intentional, and means a 200 here is not confirmation that anything was sent.\n\nA registered number gets the code via the mock WhatsApp driver: read it from storage/logs/laravel.log and paste it into Reset Password."
+              }
+            },
+            {
+              "name": "Reset Password",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/auth/password/reset",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "auth", "password", "reset"]
+                },
+                "description": "Sets the new password and revokes every access and refresh token the member holds, on every device — the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
               }
             },
             {
@@ -123,81 +228,6 @@
                   "host": ["{{base_url}}"],
                   "path": ["api", "v1", "auth", "me"]
                 }
-              }
-            }
-          ]
-        },
-        {
-          "name": "Guests",
-          "description": "PRD decision #9: a guest has no account and acts only through the hosting member. Submitting one also records a guest_data_on_behalf consent automatically.",
-          "item": [
-            {
-              "name": "List My Guests",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
-                },
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/member/guests",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "member", "guests"]
-                },
-                "description": "Only the authenticated member's own guests — there is no admin visibility into this list in this phase."
-              }
-            },
-            {
-              "name": "Create Guest",
-              "event": [
-                {
-                  "listen": "test",
-                  "script": {
-                    "type": "text/javascript",
-                    "exec": [
-                      "if (pm.response.code === 201 || pm.response.code === 200) {",
-                      "    pm.collectionVariables.set('guest_id', pm.response.json().data.id);",
-                      "}"
-                    ]
-                  }
-                }
-              ],
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
-                },
-                "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n  \"full_name\": \"Visitor X\",\n  \"phone\": \"0955555555\",\n  \"valid_until\": \"2026-12-31T18:00:00Z\"\n}",
-                  "options": { "raw": { "language": "json" } }
-                },
-                "url": {
-                  "raw": "{{base_url}}/api/v1/member/guests",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "member", "guests"]
-                },
-                "description": "valid_until must be in the future — a past date is a 422. phone is optional."
-              }
-            },
-            {
-              "name": "Delete Guest",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
-                },
-                "method": "DELETE",
-                "header": [],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/member/guests/{{guest_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "member", "guests", "{{guest_id}}"]
-                },
-                "description": "403 if this guest was hosted by a different member — a member may only delete their own."
               }
             }
           ]

@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
-use App\Http\Controllers\Api\V1\Member\GuestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
@@ -12,9 +11,6 @@ use Illuminate\Support\Facades\Route;
 // applied once, from the group wrapping this file in routes/api.php. A
 // company member is still just a `member` role-wise (D.8), so this group
 // covers both individual and company-affiliated members with no split.
-Route::get('guests', [GuestController::class, 'index']);
-Route::post('guests', [GuestController::class, 'store']);
-Route::delete('guests/{guest}', [GuestController::class, 'destroy']);
 
 // docs/decisions/wallet-points-categorization.md ("Routing for a user with
 // both a personal wallet and a company membership") — the read side of the

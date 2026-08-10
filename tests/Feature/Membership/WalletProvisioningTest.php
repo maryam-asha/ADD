@@ -7,22 +7,20 @@ use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
-use App\Services\Otp\OtpProvider;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-use stdClass;
+use Tests\Support\InteractsWithOtp;
 use Tests\TestCase;
 
 /**
  * docs/decisions/phase-3-membership-plan-wallet-mechanics.md: company
- * creation and first-time member OTP verification each provision exactly
- * one Wallet row, inline in their existing transaction/branch — no separate
- * creation path.
+ * creation and member registration each provision exactly one Wallet row,
+ * inline in their existing transaction/branch — no separate creation path.
  */
 class WalletProvisioningTest extends TestCase
 {
-    use RefreshDatabase;
+    use InteractsWithOtp, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -57,50 +55,42 @@ class WalletProvisioningTest extends TestCase
         );
     }
 
-    public function test_first_otp_verification_provisions_exactly_one_wallet_and_a_second_login_does_not_add_another(): void
+    /**
+     * The "second time round" half of this used to be a repeat login through
+     * the same endpoint. Since the hybrid-auth switch, sign-up refuses a number
+     * that already has an account, so the invariant is now checked against a
+     * refused re-run: the wallet count stays exactly one either way.
+     */
+    public function test_registration_provisions_exactly_one_wallet_and_a_repeat_attempt_adds_none(): void
     {
-        $captured = new stdClass;
-
-        $this->app->bind(OtpProvider::class, fn () => new class($captured) implements OtpProvider
-        {
-            public function __construct(private stdClass $captured) {}
-
-            public function send(string $phone, string $code, string $provider): bool
-            {
-                $this->captured->code = $code;
-
-                return true;
-            }
-        });
+        $this->fakeOtpProvider();
 
         $phone = '0912345678';
 
-        $this->postJson('/api/v1/auth/otp/request', ['phone' => $phone])->assertOk();
-
-        $response = $this->postJson('/api/v1/auth/otp/verify', [
+        $payload = [
             'phone' => $phone,
-            'code' => $captured->code,
-        ]);
+            'name' => 'Maryam Asha',
+            'password' => 'correct-horse',
+            'password_confirmation' => 'correct-horse',
+        ];
 
-        $response->assertOk();
+        $code = $this->startRegistration($payload);
 
-        $user = User::where('phone', $phone)->first();
+        $this->postJson('/api/v1/auth/register/verify', $payload + ['code' => $code])->assertOk();
+
+        $user = User::where('phone', $phone)->sole();
 
         $this->assertSame(
             1,
             Wallet::where('owner_type', OwnerType::User)->where('owner_id', $user->id)->count()
         );
 
-        // Second login for the same phone number — not a new user, no new wallet.
         // Travel past the resend cooldown so the second request isn't throttled.
         $this->travel(config('otp.resend_cooldown_seconds') + 1)->seconds();
 
-        $this->postJson('/api/v1/auth/otp/request', ['phone' => $phone])->assertOk();
-
-        $this->postJson('/api/v1/auth/otp/verify', [
-            'phone' => $phone,
-            'code' => $captured->code,
-        ])->assertOk();
+        $this->postJson('/api/v1/auth/register', $payload)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('phone');
 
         $this->assertSame(
             1,

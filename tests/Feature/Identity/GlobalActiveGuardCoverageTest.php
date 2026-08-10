@@ -26,17 +26,22 @@ class GlobalActiveGuardCoverageTest extends IdentityTestCase
             ->assertJsonPath('data', []);
     }
 
-    public function test_an_otp_request_and_verify_are_unaffected_since_no_user_is_authenticated_yet(): void
+    public function test_starting_a_registration_is_unaffected_since_no_user_is_authenticated_yet(): void
     {
-        $response = $this->postJson('/api/v1/auth/otp/request', ['phone' => '0955512345']);
+        $response = $this->postJson('/api/v1/auth/register', [
+            'phone' => '0955512345',
+            'name' => 'Prospective Member',
+            'password' => 'correct-horse',
+            'password_confirmation' => 'correct-horse',
+        ]);
 
         $response->assertOk();
     }
 
     public function test_a_route_with_no_explicit_active_check_registered_anywhere_is_still_covered(): void
     {
-        // member/guests never mentions EnsureAuthenticatedUserIsActive or
-        // any 'active' middleware in its own route/controller definition —
+        // member/wallet/options never mentions EnsureAuthenticatedUserIsActive
+        // or any 'active' middleware in its own route/controller definition —
         // it's covered purely because it goes through auth:sanctum, the
         // same as every other authenticated route.
         $member = User::factory()->create();
@@ -47,7 +52,7 @@ class GlobalActiveGuardCoverageTest extends IdentityTestCase
         Auth::forgetGuards();
 
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertForbidden();
     }
 }

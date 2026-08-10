@@ -7,9 +7,12 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Policies\CompanyPolicy;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
 use Illuminate\Auth\Events\Authenticated;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Events\TokenAuthenticated;
 
@@ -41,11 +44,31 @@ class AppServiceProvider extends ServiceProvider
         // explicitly. This is the only Policy in the app (D.8).
         Gate::policy(Company::class, CompanyPolicy::class);
 
+        $this->registerLoginRateLimiter();
+
         // Models live under App\Domain\<Domain>\Models, not App\Models, so Laravel's
         // default guess (Database\Factories\Domain\<Domain>\Models\XFactory) misses.
         // Factories stay flat in database/factories/ and are matched by class name.
         Factory::guessFactoryNamesUsing(
             fn (string $modelName) => 'Database\\Factories\\'.class_basename($modelName).'Factory'
         );
+    }
+
+    /**
+     * Keyed on phone *and* IP rather than IP alone: members behind one office
+     * NAT would otherwise share a budget and lock each other out, while an
+     * attacker rotating addresses against a single number would never hit the
+     * limit at all. The named limiter exists because `throttle:5,1` can only
+     * key on the request's IP or authenticated user — neither of which is the
+     * thing being guessed here.
+     */
+    private function registerLoginRateLimiter(): void
+    {
+        RateLimiter::for('member-login', fn (Request $request) => Limit::perMinute(5)
+            ->by($request->input('phone').'|'.$request->ip())
+            ->response(fn (Request $request, array $headers) => response()->json([
+                'message' => 'Too many login attempts. Please wait before trying again.',
+                'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+            ], 429, $headers)));
     }
 }

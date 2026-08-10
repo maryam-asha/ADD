@@ -24,7 +24,7 @@ class AccountDeactivationTest extends IdentityTestCase
         $token = $member->createToken('member-app')->plainTextToken;
 
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertOk();
 
         $this->assertSame(1, $member->tokens()->count());
@@ -44,7 +44,7 @@ class AccountDeactivationTest extends IdentityTestCase
 
         Auth::forgetGuards();
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests');
+            ->getJson('/api/v1/member/wallet/options?category=general');
 
         $response->assertUnauthorized();
     }
@@ -56,7 +56,7 @@ class AccountDeactivationTest extends IdentityTestCase
         $token = $member->createToken('member-app')->plainTextToken;
 
         $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertOk();
 
         $member->block('fraudulent activity');
@@ -68,7 +68,7 @@ class AccountDeactivationTest extends IdentityTestCase
 
         Auth::forgetGuards();
         $response = $this->withHeader('Authorization', "Bearer {$token}")
-            ->getJson('/api/v1/member/guests');
+            ->getJson('/api/v1/member/wallet/options?category=general');
 
         $response->assertUnauthorized();
     }
@@ -90,7 +90,7 @@ class AccountDeactivationTest extends IdentityTestCase
         Auth::forgetGuards();
 
         $this->withHeader('Authorization', "Bearer {$newToken}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertOk();
     }
 
@@ -117,7 +117,7 @@ class AccountDeactivationTest extends IdentityTestCase
 
         Auth::forgetGuards();
         $this->withHeader('Authorization', "Bearer {$targetToken}")
-            ->getJson('/api/v1/member/guests')
+            ->getJson('/api/v1/member/wallet/options?category=general')
             ->assertUnauthorized();
     }
 }

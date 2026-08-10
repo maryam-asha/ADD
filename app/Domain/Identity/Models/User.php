@@ -78,17 +78,17 @@ class User extends Authenticatable
         return $this->hasMany(NotificationLog::class);
     }
 
+    public function refreshTokens(): HasMany
+    {
+        return $this->hasMany(RefreshToken::class);
+    }
+
     public function companies(): BelongsToMany
     {
         return $this->belongsToMany(Company::class, 'company_user')
             ->using(CompanyUser::class)
             ->withPivot('door_access_enabled', 'is_admin')
             ->withTimestamps();
-    }
-
-    public function hostedGuests(): HasMany
-    {
-        return $this->hasMany(Guest::class, 'hosting_user_id');
     }
 
     /**
@@ -133,6 +133,11 @@ class User extends Authenticatable
      * EnsureUserIsActive's read-time check alone can't close (an already
      * per-request check still requires a request to happen; deleting the
      * token here means there is no valid token left to make one with).
+     *
+     * Refresh tokens are revoked in the same breath, and have to be: they are
+     * spendable without an access token, so deleting only the access tokens
+     * would leave a blocked account one /auth/refresh call away from a working
+     * session again.
      */
     private function transitionStatusAndRevokeTokens(string $status, ?string $reason): void
     {
@@ -144,6 +149,7 @@ class User extends Authenticatable
                 'status_changed_by' => auth()->id(),
             ])->save();
 
+            $this->refreshTokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
             $this->tokens()->delete();
         });
     }

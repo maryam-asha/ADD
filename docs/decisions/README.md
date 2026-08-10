@@ -19,6 +19,7 @@ decided, and what enforces it now.
 - [district-removed.md](district-removed.md) — deliberate rollback: `District` dropped from the spatial hierarchy after Phase 1 shipped it
 - [phase-3-membership-plan-wallet-mechanics.md](phase-3-membership-plan-wallet-mechanics.md) — base schema for `plans`/`memberships`/`wallets` (unspecified elsewhere), the signature-preserving debit algorithm, and the company-auto-provisioning gap the instructions left unanswered
 - [preferred-language-mutable.md](preferred-language-mutable.md) — `preferred_language` reversed from effectively-read-only to member-writable, landed alongside the new `preferred_currency` preference
+- [member-auth-hybrid.md](member-auth-hybrid.md) — members sign in with a password; OTP demoted to enrolment and recovery, access+refresh token pair introduced
 
 **Design docs** — written ahead of the phase that implements them, so the
 first migration for that phase is built to the full shape instead of a
@@ -40,7 +41,7 @@ no table surface yet and nothing to guard.
 | 6 | Hot Desk package selection creates a real booking, 24h free cancellation | — (Phase 5) | 5 |
 | 7 | Meeting rooms auto-confirm; only the event hall is manual | — (Phase 5) | 5 |
 | 8 | Operational status at Space/Resource level, no hierarchical escalation; affected-bookings on maintenance conflict | — (Phase 1 status, Phase 5 affected_bookings) | 1, 5 |
-| 9 | Guest requests go through the host exclusively | Partial — `guests` scoped to `hosting_user_id` end-to-end, tested in [`GuestTest`](../../tests/Feature/Identity/GuestTest.php); the service-ticket half completes in Phase 7 | 2 (base), 7 (tickets) |
+| 9 | Guest requests go through the host exclusively | — (Phase 7) | 7 |
 | 10 | Every service ticket carries the scanning member's identity | — (Phase 7) | 7 |
 | 11 | 24/7 access; no duration cap | [`NoAccessHoursWindowTest`](../../tests/Guards/NoAccessHoursWindowTest.php) | 0 (done) |
 | 12 | Gateway + custom codes primary; offline algorithmic is a documented degraded mode | — (Phase 6) | 6 |

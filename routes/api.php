@@ -13,7 +13,16 @@ Route::prefix('v1')->group(function () {
 
     // 'active' is no longer listed here — EnsureUserIsActive is registered
     // globally in bootstrap/app.php, not per route group.
-    Route::middleware(['auth:sanctum', 'role:admin|operations'])
+    //
+    // 'abilities:dashboard' is the isolation boundary between the two client
+    // surfaces, and it is separate from 'role' on purpose. The role says what
+    // its holder may do; the ability says which surface issued the credential
+    // being presented. A person who is genuinely both a member and an operator
+    // passes the role check with an app token — so only the ability keeps that
+    // token, minted behind a single factor, out of the operations API. The
+    // dashboard's own session satisfies this automatically (Sanctum gives a
+    // session-authenticated user a TransientToken that allows every ability).
+    Route::middleware(['auth:sanctum', 'abilities:dashboard', 'role:admin|operations'])
         ->prefix('admin')
         ->group(base_path('routes/api/v1/admin.php'));
 
