@@ -17,7 +17,7 @@ return new class extends Migration
         Schema::create('exchange_rates', function (Blueprint $table) {
             $table->id();
             $table->decimal('rate_usd_to_syp', 12, 4);
-            $table->timestamp('effective_from')->index();
+            $table->dateTime('effective_from')->index();
             $table->foreignId('set_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
         });

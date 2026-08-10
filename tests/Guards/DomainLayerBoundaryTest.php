@@ -13,10 +13,11 @@ use Tests\TestCase;
  * own §9 principle is that a written rule with no automated guard is a
  * request, not a guarantee.
  *
- * Booking, Access and Membership are Core: a contractual, paid relationship
- * (PRD §1). Neither Experience nor Ecosystem may depend on them, and they
- * may not depend on each other. This list is written against domains that
- * do not all exist yet (Booking/Access/Membership land in later phases) on
+ * Booking, Access, Membership and Finance are Core: a contractual, paid
+ * relationship (PRD §1) and the money/exchange-rate logic underpinning it.
+ * Neither Experience nor Ecosystem may depend on them, and they may not
+ * depend on each other. This list is written against domains that do not
+ * all exist yet (Booking/Access/Membership land in later phases) on
  * purpose, so the guard is already in force the moment those domains are
  * created — nobody has to remember to extend it.
  *
@@ -33,8 +34,8 @@ class DomainLayerBoundaryTest extends TestCase
 
     /** @var array<string, list<string>> domain => domains it may not import from */
     private const FORBIDDEN = [
-        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership'],
-        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership'],
+        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership', 'Finance'],
+        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership', 'Finance'],
     ];
 
     /** @var array<string, list<string>> file => domains it is cleared to import from, with why above */

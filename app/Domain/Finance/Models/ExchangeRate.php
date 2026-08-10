@@ -36,6 +36,7 @@ class ExchangeRate extends Model
     {
         return static::where('effective_from', '<=', now())
             ->orderByDesc('effective_from')
+            ->orderByDesc('id')
             ->first();
     }
 }
