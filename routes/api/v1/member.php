@@ -4,6 +4,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\GuestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
+use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -36,3 +37,9 @@ Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationCo
 // body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
 // their company — one endpoint, self-service checked in the controller.
 Route::post('memberships', [MembershipController::class, 'store']);
+
+// Unit 1 design (2026-08-09): both writable by the member at any time.
+// preferred_language becoming writable here is a reversal of prior
+// behavior — see docs/decisions/preferred-language-mutable.md.
+Route::patch('preferences/currency', [PreferencesController::class, 'updateCurrency']);
+Route::patch('preferences/language', [PreferencesController::class, 'updateLanguage']);

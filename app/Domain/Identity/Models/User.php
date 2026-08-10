@@ -32,6 +32,7 @@ class User extends Authenticatable
         'email',
         'password',
         'preferred_language',
+        'preferred_currency',
         'status',
     ];
 
