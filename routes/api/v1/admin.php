@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
@@ -19,6 +20,9 @@ Route::get('me', [CurrentUserController::class, 'show']);
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
+
+Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
+Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
 
 // Multi-word resource name — Laravel's auto-derived {community_member}
 // placeholder (snake_case) won't implicit-bind to a camelCase controller
