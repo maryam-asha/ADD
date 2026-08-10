@@ -7,6 +7,8 @@ use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Wallet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCompanyRequest;
 use App\Http\Requests\Admin\UpdateCompanyStatusRequest;
@@ -57,6 +59,11 @@ class CompanyController extends Controller
                 'status' => PrivateOfficeRequestStatus::Contracted,
                 'contract_ref' => $request->validated('contract_ref'),
                 'converted_company_id' => $company->id,
+            ]);
+
+            Wallet::create([
+                'owner_type' => OwnerType::Company,
+                'owner_id' => $company->id,
             ]);
 
             return $company;

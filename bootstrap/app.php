@@ -3,6 +3,9 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -22,10 +25,18 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->redirectGuestsTo(fn () => null);
 
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
+
+        // The "is this account still active" check is NOT registered here —
+        // a kernel-global middleware runs before auth:sanctum's route
+        // middleware resolves the user, so it would see $request->user() as
+        // null even on an otherwise-valid request (confirmed empirically).
+        // It's App\Listeners\EnsureAuthenticatedUserIsActive instead,
+        // listening for Sanctum's TokenAuthenticated / the framework's own
+        // Authenticated event — see that class's docblock for why.
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         // This app has no server-rendered views — every response, including

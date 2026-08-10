@@ -9,7 +9,11 @@
     { "key": "member_token", "value": "", "type": "string" },
     { "key": "founder_id", "value": "", "type": "string" },
     { "key": "partner_id", "value": "", "type": "string" },
-    { "key": "community_member_id", "value": "", "type": "string" }
+    { "key": "community_member_id", "value": "", "type": "string" },
+    { "key": "user_id", "value": "", "type": "string" },
+    { "key": "company_id", "value": "", "type": "string" },
+    { "key": "private_office_request_id", "value": "", "type": "string" },
+    { "key": "guest_id", "value": "", "type": "string" }
   ],
   "event": [
     {
@@ -122,6 +126,131 @@
               }
             }
           ]
+        },
+        {
+          "name": "Guests",
+          "description": "PRD decision #9: a guest has no account and acts only through the hosting member. Submitting one also records a guest_data_on_behalf consent automatically.",
+          "item": [
+            {
+              "name": "List My Guests",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/guests",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "member", "guests"]
+                },
+                "description": "Only the authenticated member's own guests — there is no admin visibility into this list in this phase."
+              }
+            },
+            {
+              "name": "Create Guest",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "    pm.collectionVariables.set('guest_id', pm.response.json().data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"full_name\": \"Visitor X\",\n  \"phone\": \"0955555555\",\n  \"valid_until\": \"2026-12-31T18:00:00Z\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/guests",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "member", "guests"]
+                },
+                "description": "valid_until must be in the future — a past date is a 422. phone is optional."
+              }
+            },
+            {
+              "name": "Delete Guest",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/guests/{{guest_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "member", "guests", "{{guest_id}}"]
+                },
+                "description": "403 if this guest was hosted by a different member — a member may only delete their own."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Company",
+          "description": "Self-service for a company's own admin managing their own company's members — gated by CompanyPolicy::manageMembers (is_admin on the company_user pivot), checked in the controller rather than by role middleware. Adding or removing a member entirely stays operations-only (Admin (Dashboard)/Company Members).",
+          "item": [
+            {
+              "name": "Update Door Access (self-service)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"door_access_enabled\": true\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/members/{{user_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "member", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                },
+                "description": "403 if the acting member isn't an admin of this specific company."
+              }
+            },
+            {
+              "name": "Update Admin Flag (self-service)",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                },
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_admin\": true\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/members/{{user_id}}/admin",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "member", "companies", "{{company_id}}", "members", "{{user_id}}", "admin"]
+                },
+                "description": "403 if the acting member isn't already an admin of this specific company."
+              }
+            }
+          ]
         }
       ]
     },
@@ -224,7 +353,7 @@
                   "host": ["{{base_url}}"],
                   "path": ["api", "v1", "admin", "me"]
                 },
-                "description": "Guarded by role:admin|staff — a logged-in member-only account gets 403 here, not 401."
+                "description": "Guarded by role:admin|operations — a logged-in member-only account gets 403 here, not 401. Also blocked (403) if the account's own status is deactivated/blocked, even with a fully valid session — see EnsureAuthenticatedUserIsActive."
               }
             },
             {
@@ -414,6 +543,395 @@
                   "raw": "{{base_url}}/reset-password",
                   "host": ["{{base_url}}"],
                   "path": ["reset-password"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Private Office Requests",
+          "description": "PRD §5.3 pipeline: requested -> quoted -> contracted. 'contracted' is only reachable through Companies/Create Company below, never through Update here.",
+          "item": [
+            {
+              "name": "List Private Office Requests",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/private-office-requests",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "private-office-requests"]
+                }
+              }
+            },
+            {
+              "name": "Create Private Office Request",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "    pm.collectionVariables.set('private_office_request_id', pm.response.json().data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"prospect_name\": \"Levant Textiles LLC\",\n  \"contact\": \"+963 999 111 222\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/private-office-requests",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "private-office-requests"]
+                },
+                "description": "Starts at status 'requested'."
+              }
+            },
+            {
+              "name": "Get Private Office Request",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                }
+              }
+            },
+            {
+              "name": "Mark as Quoted",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"quoted\",\n  \"quote_ref\": \"Q-2026-0001\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                },
+                "description": "status only accepts \"requested\" or \"quoted\" here — a 422 comes back for \"contracted\", which is only reachable via Companies/Create Company."
+              }
+            },
+            {
+              "name": "Delete Private Office Request",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Companies",
+          "description": "Created exclusively by operations from a quoted private-office request (PRD §5.1/§5.3) — never self-service. Creating one also auto-provisions its wallet (Phase 3, out of scope for this collection otherwise).",
+          "item": [
+            {
+              "name": "List Companies",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies"]
+                }
+              }
+            },
+            {
+              "name": "Create Company",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "    pm.collectionVariables.set('company_id', pm.response.json().data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"private_office_request_id\": {{private_office_request_id}},\n  \"legal_name\": \"Levant Textiles LLC\",\n  \"contract_ref\": \"C-2026-0001\",\n  \"branch_id\": 1\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies"]
+                },
+                "description": "422 if private_office_request_id isn't currently 'quoted' — run Private Office Requests/Mark as Quoted first. branch_id must reference an existing branch."
+              }
+            },
+            {
+              "name": "Get Company",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Company Status",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"inactive\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "status"]
+                },
+                "description": "status must be \"active\" or \"inactive\" — anything else is a 422."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Company Members",
+          "description": "door_access_enabled and is_admin are the only scoped capabilities in the app (D.8). Everything here sits under role:admin|operations; a company's own admin has the equivalent self-service actions under Member (App)/Company.",
+          "item": [
+            {
+              "name": "List Company Members",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members"]
+                }
+              }
+            },
+            {
+              "name": "Add Company Member",
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"user_id\": {{user_id}},\n  \"door_access_enabled\": true,\n  \"is_admin\": true\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members"]
+                },
+                "description": "is_admin here is how a company gets its very first admin — a company admin can only promote an existing member (CompanyPolicy::manageMembers), so operations has to bootstrap the first one. 422 if user_id is already a member of this company."
+              }
+            },
+            {
+              "name": "Update Door Access",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"door_access_enabled\": false\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                }
+              }
+            },
+            {
+              "name": "Update Admin Flag",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"is_admin\": false\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}/admin",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}", "admin"]
+                }
+              }
+            },
+            {
+              "name": "Remove Company Member",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                }
+              }
+            }
+          ]
+        },
+        {
+          "name": "Users",
+          "description": "Operations/admin accounts only — members self-register via Member (App)/Auth (phone + OTP), never through here. status must be active, deactivated, or blocked — the old 'suspended' value no longer exists (see docs/decisions/phase-3-membership-plan-wallet-mechanics.md's sibling audit notes).",
+          "item": [
+            {
+              "name": "List Users",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users"],
+                  "query": [
+                    { "key": "role", "value": "operations", "disabled": true }
+                  ]
+                },
+                "description": "Optional ?role= filter (member/operations/admin)."
+              }
+            },
+            {
+              "name": "Create User",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "type": "text/javascript",
+                    "exec": [
+                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                      "    pm.collectionVariables.set('user_id', pm.response.json().data.id);",
+                      "}"
+                    ]
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Rana Khoury\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\",\n  \"password\": \"a-strong-password\",\n  \"password_confirmation\": \"a-strong-password\",\n  \"role\": \"operations\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users"]
+                },
+                "description": "role must be \"operations\" or \"admin\" — this endpoint never creates a plain member. admin-only route (role:admin, not role:admin|operations — an operations account gets 403 here)."
+              }
+            },
+            {
+              "name": "Get User",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users", "{{user_id}}"]
+                }
+              }
+            },
+            {
+              "name": "Update User Profile",
+              "request": {
+                "method": "PUT",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"name\": \"Rana Khoury-Haddad\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users", "{{user_id}}"]
+                },
+                "description": "Profile fields only — status and role are the two separate actions below."
+              }
+            },
+            {
+              "name": "Update User Status",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"status\": \"deactivated\",\n  \"reason\": \"left the company\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/status",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users", "{{user_id}}", "status"]
+                },
+                "description": "status must be active, deactivated, or blocked (422 otherwise). Setting deactivated/blocked immediately revokes every access token this user holds (User::deactivate()/block()) — their very next request with an old token comes back 401, not 403. reason is optional but always recorded (status_reason/status_changed_at/status_changed_by)."
+              }
+            },
+            {
+              "name": "Assign Role",
+              "request": {
+                "method": "PATCH",
+                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"role\": \"admin\"\n}",
+                  "options": { "raw": { "language": "json" } }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/role",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "users", "{{user_id}}", "role"]
+                },
+                "description": "role must be member, operations, or admin. admin-only route."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Roles",
+          "description": "Just the assignable role names — no granular permissions yet (D.8).",
+          "item": [
+            {
+              "name": "List Roles",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/admin/roles",
+                  "host": ["{{base_url}}"],
+                  "path": ["api", "v1", "admin", "roles"]
                 }
               }
             }

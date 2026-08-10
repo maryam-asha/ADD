@@ -1,7 +1,10 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\GuestController;
+use App\Http\Controllers\Api\V1\Member\MembershipController;
+use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
 // Every route in this file already sits behind auth:sanctum + role:member —
@@ -12,8 +15,24 @@ Route::get('guests', [GuestController::class, 'index']);
 Route::post('guests', [GuestController::class, 'store']);
 Route::delete('guests/{guest}', [GuestController::class, 'destroy']);
 
+// docs/decisions/wallet-points-categorization.md ("Routing for a user with
+// both a personal wallet and a company membership") — the read side of the
+// hybrid-routing choice: every currently-spendable wallet for a category,
+// clearly labeled by source. No spend happens here.
+Route::get('wallet/options', [WalletController::class, 'options']);
+
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role
 // middleware, since it depends on the company_user pivot, not a global role.
 Route::patch('companies/{company}/members/{user}', [CompanyMemberController::class, 'updateDoorAccess']);
 Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
+
+// Same self-service precedent as above, for allocating from the company's
+// wallet (CompanyPolicy::manageMembers) — see
+// docs/decisions/wallet-points-categorization.md.
+Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationController::class, 'store']);
+
+// A member buys a plan for themselves, or (via an optional company_id in the
+// body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
+// their company — one endpoint, self-service checked in the controller.
+Route::post('memberships', [MembershipController::class, 'store']);

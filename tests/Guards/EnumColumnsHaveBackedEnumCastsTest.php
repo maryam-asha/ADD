@@ -15,6 +15,13 @@ use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\Consent;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
+use App\Domain\Membership\Enums\MembershipStatus;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Models\WalletTransaction;
 use Tests\TestCase;
 
 /**
@@ -50,6 +57,17 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Consent::class => [
             'subject_type' => ConsentSubjectType::class,
             'consent_type' => ConsentType::class,
+        ],
+        Wallet::class => [
+            'owner_type' => OwnerType::class,
+        ],
+        Membership::class => [
+            'owner_type' => OwnerType::class,
+            'status' => MembershipStatus::class,
+        ],
+        WalletTransaction::class => [
+            'category' => WalletTransactionCategory::class,
+            'source' => WalletTransactionSource::class,
         ],
     ];
 

@@ -11,6 +11,8 @@ Route::prefix('v1')->group(function () {
     require base_path('routes/api/v1/auth.php');
     require base_path('routes/api/v1/public.php');
 
+    // 'active' is no longer listed here — EnsureUserIsActive is registered
+    // globally in bootstrap/app.php, not per route group.
     Route::middleware(['auth:sanctum', 'role:admin|operations'])
         ->prefix('admin')
         ->group(base_path('routes/api/v1/admin.php'));

@@ -39,7 +39,37 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
+            // Set explicitly, not left to the migration's column default —
+            // Eloquent doesn't re-fetch DB-side defaults into an unrefreshed
+            // model (the same lesson already documented in the build plan's
+            // Phase 2 notes for CompanyController::store), and
+            // Sanctum::actingAs() in tests uses this in-memory instance
+            // directly, so a factory-created user with an unset `status`
+            // would otherwise fail any `status === 'active'` check even
+            // though the actual DB row is correctly 'active'.
+            'status' => 'active',
         ];
+    }
+
+    /**
+     * Indicate that the model's account has been deactivated (voluntary/
+     * administrative pause).
+     */
+    public function deactivated(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'deactivated',
+        ]);
+    }
+
+    /**
+     * Indicate that the model's account has been blocked (punitive/security).
+     */
+    public function blocked(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => 'blocked',
+        ]);
     }
 
     /**

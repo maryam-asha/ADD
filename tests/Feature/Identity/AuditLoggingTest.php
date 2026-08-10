@@ -42,12 +42,16 @@ class AuditLoggingTest extends IdentityTestCase
         $target->assignRole('member');
         Sanctum::actingAs($admin, ['*']);
 
-        $this->patchJson("/api/v1/admin/users/{$target->id}/status", ['status' => 'suspended'])->assertOk();
+        $this->patchJson("/api/v1/admin/users/{$target->id}/status", [
+            'status' => 'deactivated',
+            'reason' => 'left the company',
+        ])->assertOk();
 
         $activity = Activity::where('description', 'user_status_changed')->latest('id')->first();
         $this->assertNotNull($activity);
         $this->assertSame('active', $activity->properties['before']);
-        $this->assertSame('suspended', $activity->properties['after']);
+        $this->assertSame('deactivated', $activity->properties['after']);
+        $this->assertSame('left the company', $activity->properties['reason']);
     }
 
     public function test_company_creation_is_audit_logged(): void

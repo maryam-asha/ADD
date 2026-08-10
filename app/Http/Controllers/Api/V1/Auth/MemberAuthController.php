@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Auth;
 
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Wallet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\RequestOtpRequest;
 use App\Http\Requests\Auth\VerifyOtpRequest;
@@ -11,6 +13,7 @@ use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class MemberAuthController extends Controller
 {
@@ -38,14 +41,23 @@ class MemberAuthController extends Controller
             return response()->json(['message' => 'Invalid or expired code.'], 422);
         }
 
-        $user = User::firstOrCreate(
-            ['phone' => $phone],
-            ['preferred_language' => 'ar', 'status' => 'active']
-        );
+        $user = DB::transaction(function () use ($phone) {
+            $user = User::firstOrCreate(
+                ['phone' => $phone],
+                ['preferred_language' => 'ar', 'status' => 'active']
+            );
 
-        if ($user->wasRecentlyCreated) {
-            $user->assignRole('member');
-        }
+            if ($user->wasRecentlyCreated) {
+                $user->assignRole('member');
+
+                Wallet::create([
+                    'owner_type' => OwnerType::User,
+                    'owner_id' => $user->id,
+                ]);
+            }
+
+            return $user;
+        });
 
         return response()->json([
             'token' => $user->createToken('member-app')->plainTextToken,

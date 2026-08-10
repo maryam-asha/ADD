@@ -5,9 +5,13 @@ namespace App\Providers;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Policies\CompanyPolicy;
+use App\Listeners\EnsureAuthenticatedUserIsActive;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Sanctum\Events\TokenAuthenticated;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,6 +29,12 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::before(fn (User $user, string $ability) => $user->hasRole('admin') ? true : null);
+
+        // Applies to every guard, every route, with no per-route/group
+        // registration — see EnsureAuthenticatedUserIsActive's own docblock
+        // for why this is an event listener and not a middleware.
+        Event::listen(TokenAuthenticated::class, EnsureAuthenticatedUserIsActive::class);
+        Event::listen(Authenticated::class, EnsureAuthenticatedUserIsActive::class);
 
         // Models live under App\Domain\<Domain>\Policies, not App\Policies, so
         // Laravel's convention-based policy discovery misses these — register

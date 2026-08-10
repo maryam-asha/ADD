@@ -65,12 +65,18 @@ class UserController extends Controller
     public function updateStatus(UpdateUserStatusRequest $request, User $user): UserResource
     {
         $before = $user->status;
+        $reason = $request->validated('reason');
 
-        $user->update($request->validated());
+        match ($request->validated('status')) {
+            'active' => $user->activate($reason),
+            'deactivated' => $user->deactivate($reason),
+            'blocked' => $user->block($reason),
+        };
 
         $this->logSensitiveAction('user_status_changed', $user, [
             'before' => $before,
             'after' => $user->status,
+            'reason' => $reason,
         ]);
 
         return new UserResource($user);

@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
+use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -17,6 +18,7 @@ Route::get('me', [CurrentUserController::class, 'show']);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
+Route::apiResource('plans', PlanController::class);
 
 // Multi-word resource name — Laravel's auto-derived {community_member}
 // placeholder (snake_case) won't implicit-bind to a camelCase controller

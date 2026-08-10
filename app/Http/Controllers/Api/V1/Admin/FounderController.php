@@ -19,9 +19,20 @@ class FounderController extends AdminResourceController
         return FounderResource::class;
     }
 
+    /**
+     * `order` is set explicitly here, not left to the migration's column
+     * default — Eloquent doesn't re-fetch DB-side defaults into an
+     * unrefreshed model, so an omitted `order` would otherwise come back
+     * `null` in this very response even though the DB row is correctly `0`
+     * (the same lesson already documented for `CompanyController::store`
+     * and `UserFactory`).
+     */
     public function store(StoreFounderRequest $request): FounderResource
     {
-        return new FounderResource(Founder::create($request->validated()));
+        return new FounderResource(Founder::create(array_merge(
+            ['order' => 0],
+            $request->validated()
+        )));
     }
 
     public function update(UpdateFounderRequest $request, Founder $founder): FounderResource

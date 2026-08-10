@@ -7,8 +7,10 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Laravel\Fortify\TwoFactorAuthenticatable;
 use Laravel\Sanctum\HasApiTokens;
 use Laravel\Sanctum\NewAccessToken;
@@ -17,7 +19,7 @@ use Spatie\Permission\Traits\HasRoles;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasApiTokens, HasFactory, HasRoles, Notifiable, TwoFactorAuthenticatable;
+    use HasApiTokens, HasFactory, HasRoles, Notifiable, SoftDeletes, TwoFactorAuthenticatable;
 
     /**
      * The attributes that are mass assignable.
@@ -53,6 +55,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'status_changed_at' => 'datetime',
+            'anonymized_at' => 'datetime',
         ];
     }
 
@@ -84,6 +88,63 @@ class User extends Authenticatable
     public function hostedGuests(): HasMany
     {
         return $this->hasMany(Guest::class, 'hosting_user_id');
+    }
+
+    /**
+     * Voluntary/administrative pause — the reversible half of the two
+     * non-active states.
+     */
+    public function deactivate(?string $reason = null): void
+    {
+        $this->transitionStatusAndRevokeTokens('deactivated', $reason);
+    }
+
+    /**
+     * Punitive/security block — the same immediate-token-revocation
+     * treatment as deactivate(), distinguished only by `status`/`status_reason`
+     * for reporting; nothing in the spend/access guard reads which one it is.
+     */
+    public function block(?string $reason = null): void
+    {
+        $this->transitionStatusAndRevokeTokens('blocked', $reason);
+    }
+
+    /**
+     * Restores `active`. Doesn't revoke tokens — there's nothing to revoke:
+     * deactivate()/block() already deleted every token this account had.
+     */
+    public function activate(?string $reason = null): void
+    {
+        DB::transaction(function () use ($reason) {
+            $this->forceFill([
+                'status' => 'active',
+                'status_reason' => $reason,
+                'status_changed_at' => now(),
+                'status_changed_by' => auth()->id(),
+            ])->save();
+        });
+    }
+
+    /**
+     * Shared by deactivate()/block(): update the status/audit columns and
+     * delete every access token this account holds, in one transaction — a
+     * token that survives a status change is exactly the gap
+     * EnsureUserIsActive's read-time check alone can't close (an already
+     * per-request check still requires a request to happen; deleting the
+     * token here means there is no valid token left to make one with).
+     */
+    private function transitionStatusAndRevokeTokens(string $status, ?string $reason): void
+    {
+        DB::transaction(function () use ($status, $reason) {
+            $this->forceFill([
+                'status' => $status,
+                'status_reason' => $reason,
+                'status_changed_at' => now(),
+                'status_changed_by' => auth()->id(),
+            ])->save();
+
+            $this->tokens()->delete();
+        });
     }
 
     /**

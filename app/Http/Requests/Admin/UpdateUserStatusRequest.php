@@ -18,7 +18,8 @@ class UpdateUserStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'status' => ['required', Rule::in(['active', 'suspended'])],
+            'status' => ['required', Rule::in(['active', 'deactivated', 'blocked'])],
+            'reason' => ['nullable', 'string', 'max:500'],
         ];
     }
 }
