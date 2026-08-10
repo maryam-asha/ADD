@@ -1,7 +1,5 @@
 <?php
 
-// app/Http/Controllers/Api/V1/Member/PreferencesController.php
-
 namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Http\Controllers\Controller;

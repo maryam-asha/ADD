@@ -1,7 +1,5 @@
 <?php
 
-// tests/Feature/Member/PreferencesControllerTest.php
-
 namespace Tests\Feature\Member;
 
 use App\Domain\Identity\Models\User;
