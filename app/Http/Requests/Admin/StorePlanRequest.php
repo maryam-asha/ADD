@@ -2,8 +2,10 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Finance\Enums\Currency;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StorePlanRequest extends FormRequest
 {
@@ -22,7 +24,7 @@ class StorePlanRequest extends FormRequest
             [
                 'is_subscription' => ['required', 'boolean'],
                 'price' => ['required', 'numeric', 'min:0'],
-                'pricing_currency' => ['required', 'string', 'size:3'],
+                'pricing_currency' => ['required', Rule::enum(Currency::class)],
                 'duration_days' => ['required', 'integer', 'min:1'],
                 'included_hours' => ['required', 'numeric', 'min:0'],
                 'overage_rate' => ['nullable', 'numeric', 'min:0'],

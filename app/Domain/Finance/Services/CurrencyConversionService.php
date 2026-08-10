@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Enums\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 
 /**
@@ -25,11 +26,11 @@ class CurrencyConversionService
 
         $rateUsdToSyp = (float) $rate->rate_usd_to_syp;
 
-        if ($fromCurrency === 'USD' && $toCurrency === 'SYP') {
+        if ($fromCurrency === Currency::Usd->value && $toCurrency === Currency::Syp->value) {
             return round($amount * $rateUsdToSyp, 2);
         }
 
-        if ($fromCurrency === 'SYP' && $toCurrency === 'USD') {
+        if ($fromCurrency === Currency::Syp->value && $toCurrency === Currency::Usd->value) {
             return round($amount / $rateUsdToSyp, 2);
         }
 

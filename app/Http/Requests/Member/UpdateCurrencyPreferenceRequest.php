@@ -1,10 +1,10 @@
 <?php
 
-// app/Http/Requests/Member/UpdateCurrencyPreferenceRequest.php
-
 namespace App\Http\Requests\Member;
 
+use App\Domain\Finance\Enums\Currency;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * USD/SYP only — the only pair `exchange_rates` models (Unit 1 design,
@@ -21,7 +21,7 @@ class UpdateCurrencyPreferenceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'preferred_currency' => ['required', 'string', 'in:USD,SYP'],
+            'preferred_currency' => ['required', Rule::enum(Currency::class)],
         ];
     }
 }

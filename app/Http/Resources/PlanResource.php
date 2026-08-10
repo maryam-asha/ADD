@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 class PlanResource extends JsonResource
 {
@@ -30,8 +31,17 @@ class PlanResource extends JsonResource
         // Resolved directly from the guard, not the route — this lets
         // conversion opportunistically activate even on public routes with
         // no auth:sanctum middleware, as long as a valid bearer token is
-        // sent (Unit 1 design, 2026-08-09).
-        $user = $request->user('sanctum');
+        // sent (Unit 1 design, 2026-08-09). Resolving the guard fires
+        // Sanctum's TokenAuthenticated event, which
+        // EnsureAuthenticatedUserIsActive listens to and aborts (403) for a
+        // suspended/blocked account — never intended to affect this
+        // opportunistic, otherwise-always-200 public listing, so that abort
+        // is treated the same as "no user resolvable for conversion".
+        try {
+            $user = $request->user('sanctum');
+        } catch (HttpException) {
+            $user = null;
+        }
 
         if ($user?->preferred_currency && $user->preferred_currency !== $this->pricing_currency) {
             $converted = app(CurrencyConversionService::class)->convert(
@@ -41,7 +51,7 @@ class PlanResource extends JsonResource
             );
 
             if ($converted !== null) {
-                $data['converted_amount'] = $converted;
+                $data['converted_amount'] = number_format($converted, 2, '.', '');
                 $data['converted_currency'] = $user->preferred_currency;
             }
         }

@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -31,13 +32,11 @@ class PlanPriceConversionTest extends TestCase
         $response = $this->getJson("/api/v1/admin/plans/{$plan->id}");
 
         $response->assertOk();
-        // assertJsonPath uses assertSame internally, which is too strict here:
-        // json_encode(147000.0) drops the zero fraction (no
-        // JSON_PRESERVE_ZERO_FRACTION flag set anywhere in this app), so the
-        // decoded value comes back as PHP int 147000, not float 147000.0.
-        // assertEquals checks the numeric value without requiring the exact
-        // int/float type.
-        $this->assertEquals(147000.0, $response->json('data.converted_amount'));
+        // converted_amount is formatted as a decimal string (number_format),
+        // matching every other money field on this resource (price,
+        // pricing_currency, overage_rate) — not a raw JSON number, which
+        // would silently drop the fractional part for whole-number amounts.
+        $response->assertJsonPath('data.converted_amount', '147000.00');
         $response->assertJsonPath('data.converted_currency', 'SYP');
     }
 
@@ -78,5 +77,31 @@ class PlanPriceConversionTest extends TestCase
 
         $response->assertOk();
         $this->assertArrayNotHasKey('converted_amount', $response->json('data'));
+    }
+
+    /**
+     * Resolving `$request->user('sanctum')` inside PlanResource fires
+     * Sanctum's TokenAuthenticated event, which
+     * EnsureAuthenticatedUserIsActive listens to and aborts (403) for a
+     * suspended/blocked account. The public plans route has no
+     * auth:sanctum middleware and was always a 200 regardless of token
+     * state before conversion was added — a leftover token from a
+     * since-blocked account must not turn it into an occasional 403.
+     */
+    public function test_a_blocked_members_token_on_the_public_plans_route_still_returns_200_without_conversion(): void
+    {
+        Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD', 'is_active' => true]);
+        $member = User::factory()->create(['status' => 'active', 'preferred_currency' => 'SYP']);
+        $member->assignRole('member');
+        $token = $member->createToken('member-app')->plainTextToken;
+
+        $member->update(['status' => 'blocked']);
+        Auth::forgetGuards();
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/plans');
+
+        $response->assertOk();
+        $this->assertArrayNotHasKey('converted_amount', $response->json('data.0'));
     }
 }

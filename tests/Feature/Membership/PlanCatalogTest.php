@@ -131,6 +131,23 @@ class PlanCatalogTest extends TestCase
         ]);
     }
 
+    /**
+     * `pricing_currency` used to accept any size:3 string — a plan priced
+     * in e.g. EUR would pass validation but CurrencyConversionService only
+     * understands USD/SYP, silently producing no converted price ever.
+     * Rule::enum(Currency::class) closes that gap at the validation layer.
+     */
+    public function test_creating_a_plan_with_an_unsupported_pricing_currency_is_rejected(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->postJson('/api/v1/admin/plans', $this->payload(['pricing_currency' => 'EUR']));
+
+        $response->assertStatus(422);
+    }
+
     public function test_public_plan_listing_only_shows_active_plans(): void
     {
         Plan::factory()->create(['is_active' => true, 'order' => 2]);
