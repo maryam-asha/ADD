@@ -6,7 +6,7 @@ Every JSON message the API returns — success, validation, business-rule
 rejection, rate limiting, generic HTTP errors — is currently a hardcoded
 English (occasionally Arabic) literal scattered across controllers, a
 service-provider rate limiter, and one Form Request. There is no
-`resources/lang/` directory, no exception-message localization, and no
+`lang/` directory, no exception-message localization, and no
 per-request language signal at all. Two client apps (member, dashboard)
 need to render every message in the caller's language without the backend
 guessing from `Accept-Language` or anything else implicit.
@@ -34,24 +34,32 @@ guessing from `Accept-Language` or anything else implicit.
 - No third locale. `SyrianPhoneNumber` and other rule classes are
   unaffected — this is about response text, not validation logic.
 
-## 1. `SetLocaleFromHeader` middleware
+## 1. Locale resolution — middleware + listener
 
-New file: `app/Http/Middleware/SetLocaleFromHeader.php`.
+A single middleware **cannot** implement the full fallback chain
+(header → `preferred_language` → `'ar'`) correctly. `EnsureAuthenticatedUserIsActive`'s
+own docblock documents — empirically confirmed, not theoretical — that a
+middleware prepended to a middleware group runs *before* `auth:sanctum`'s
+route middleware resolves `$request->user()`, so any middleware-time
+check of "is this request authenticated" sees `null` even on a request
+that goes on to authenticate correctly. `SetLocaleFromHeader` would hit
+that exact trap if it tried to read the authenticated user itself. The
+fix reuses the same event-based escape hatch that class already
+established for this codebase:
+
+**`app/Http/Middleware/SetLocaleFromHeader.php`** (new) — handles only
+the header, setting a provisional locale immediately:
 
 ```php
 final class SetLocaleFromHeader
 {
-    private const SUPPORTED = ['ar', 'en'];
+    public const SUPPORTED_LOCALES = ['ar', 'en'];
 
     public function handle(Request $request, Closure $next): mixed
     {
         $header = strtolower((string) $request->header('lang'));
 
-        $locale = in_array($header, self::SUPPORTED, true)
-            ? $header
-            : (auth()->check() ? auth()->user()->preferred_language : 'ar');
-
-        App::setLocale($locale);
+        App::setLocale(in_array($header, self::SUPPORTED_LOCALES, true) ? $header : 'ar');
 
         return $next($request);
     }
@@ -68,18 +76,55 @@ Scoped to the `api` middleware group (covers `routes/api.php` and
 everything it `require`s: `auth.php`, `public.php`, `admin.php`,
 `member.php`) rather than the global stack, since this app's `web.php`
 is unused (JSON-only API). No route is exempted, including
-`auth.login`/`auth.register`/`auth.request-otp` equivalents — matches
-the requirement that no endpoint opts out.
+`auth.login`/`auth.register` — matches the requirement that no endpoint
+opts out.
 
-`auth()->check()` resolves correctly at this point regardless of where
-in the `api` group this middleware sits: Sanctum's guard resolves the
-user lazily on access, it isn't populated eagerly by earlier middleware
-— confirmed against this app's own comment in
-`EnsureAuthenticatedUserIsActive` about guard-resolution timing.
+**`app/Listeners/SetLocaleFromUserPreference.php`** (new) — listens to
+the same two events `EnsureAuthenticatedUserIsActive` already listens
+to (`TokenAuthenticated` for the member API, `Authenticated` for
+Fortify's session guard), which fire at the exact moment a guard
+resolves a user — after `SetLocaleFromHeader` already ran, since that
+resolution happens inside `auth:sanctum`'s own route middleware:
+
+```php
+final class SetLocaleFromUserPreference
+{
+    public function handle(TokenAuthenticated|Authenticated $event): void
+    {
+        $header = strtolower((string) request()->header('lang'));
+
+        if (in_array($header, SetLocaleFromHeader::SUPPORTED_LOCALES, true)) {
+            return; // a valid header always wins — never overridden here
+        }
+
+        $user = $event instanceof TokenAuthenticated ? $event->token->tokenable : $event->user;
+
+        if ($user instanceof User) {
+            App::setLocale($user->preferred_language);
+        }
+    }
+}
+```
+
+Registered in `AppServiceProvider::boot()` right alongside the existing
+listener registration:
+
+```php
+Event::listen(TokenAuthenticated::class, SetLocaleFromUserPreference::class);
+Event::listen(Authenticated::class, SetLocaleFromUserPreference::class);
+```
+
+Net effect: `SetLocaleFromHeader` sets `'ar'` as a provisional default
+whenever the header is missing/invalid; if the request goes on to
+authenticate, this listener immediately corrects that provisional value
+to the resolved user's `preferred_language`. An unauthenticated request
+keeps the provisional `'ar'`, matching the required fallback chain
+exactly. A valid header is never touched by the listener, so it always
+wins regardless of authentication.
 
 ## 2. Translation files
 
-**`resources/lang/{ar,en}/api.php`** — new, nested by domain:
+**`lang/{ar,en}/api.php`** — new, nested by domain:
 
 ```
 auth.otp_request_throttled
@@ -138,10 +183,10 @@ throws `AuthorizationException`, which Laravel renders as 403 with the
 default English "This action is unauthorized." unless we intercept it
 (rule 4 in §4 below).
 
-**`resources/lang/en/validation.php`** — published via
+**`lang/en/validation.php`** — published via
 `php artisan lang:publish` (Laravel 12 ships none by default).
 
-**`resources/lang/ar/validation.php`** — hand-translated line-by-line
+**`lang/ar/validation.php`** — hand-translated line-by-line
 from that same published file: same keys, same structure, same
 placeholders (`:attribute`, `:min`, `:max`, `:values`, ...), covering
 every stock rule Laravel ships (not just the ones this app currently
