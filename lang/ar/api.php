@@ -24,6 +24,7 @@ return [
 
     'wallet' => [
         'insufficient_balance' => 'الرصيد العام غير كافٍ لتخصيص هذا المبلغ.',
+        'insufficient_balance_for_plan' => 'الرصيد العام غير كافٍ لشراء هذه الباقة.',
     ],
 
     'system' => [

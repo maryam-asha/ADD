@@ -68,6 +68,52 @@ class SuspendedAccountAccessTest extends IdentityTestCase
         $response->assertForbidden();
     }
 
+    /**
+     * The 403 body, not just its status. This is the one message in the app
+     * produced by an abort() inside an event listener rather than a
+     * controller, and getting it translated depends on listener *registration
+     * order* in AppServiceProvider: EnsureAuthenticatedUserIsActive throws, so
+     * SetLocaleFromUserPreference has to be registered before it or it never
+     * runs on precisely the request that needs it. A real token is what makes
+     * that testable — Sanctum::actingAs() sets the guard's user directly and
+     * fires no TokenAuthenticated event, so neither listener would run at all.
+     */
+    public function test_the_suspension_message_falls_back_to_the_users_preferred_language(): void
+    {
+        $member = User::factory()->create([
+            'status' => 'deactivated',
+            'preferred_language' => 'en',
+        ]);
+        $member->assignRole('member');
+        $token = $member->createToken('member-app')->plainTextToken;
+
+        // Deliberately no `lang` header: SetLocaleFromHeader's provisional
+        // default is 'ar', and only SetLocaleFromUserPreference corrects it.
+        $response = $this->withHeader('Authorization', "Bearer {$token}")
+            ->getJson('/api/v1/member/wallet/options?category=general');
+
+        $response->assertForbidden();
+        $response->assertJsonPath('message', 'This account has been suspended. Please contact ADD.');
+    }
+
+    public function test_the_suspension_message_honours_an_explicit_lang_header_over_the_stored_preference(): void
+    {
+        $member = User::factory()->create([
+            'status' => 'deactivated',
+            'preferred_language' => 'en',
+        ]);
+        $member->assignRole('member');
+        $token = $member->createToken('member-app')->plainTextToken;
+
+        $response = $this->withHeaders([
+            'Authorization' => "Bearer {$token}",
+            'lang' => 'ar',
+        ])->getJson('/api/v1/member/wallet/options?category=general');
+
+        $response->assertForbidden();
+        $response->assertJsonPath('message', 'هذا الحساب معلّق. الرجاء التواصل مع ADD.');
+    }
+
     public function test_an_active_user_is_not_affected_by_the_guard(): void
     {
         $member = User::factory()->create(['status' => 'active']);

@@ -34,17 +34,25 @@ class AppServiceProvider extends ServiceProvider
     {
         Gate::before(fn (User $user, string $ability) => $user->hasRole('admin') ? true : null);
 
+        // Registered FIRST, and the order is load-bearing: corrects the
+        // provisional locale SetLocaleFromHeader set before auth resolved, to
+        // the user's preferred_language — but only when no valid `lang` header
+        // was sent. Listeners fire in registration order, and
+        // EnsureAuthenticatedUserIsActive below abort()s for a suspended
+        // account, which throws — so anything registered after it never runs
+        // on exactly the request whose error message needs translating. With
+        // the old order, a suspended member whose preferred_language is 'en'
+        // and who sent no `lang` header got the suspension message in Arabic
+        // (SetLocaleFromHeader's provisional default). Safe to run first: this
+        // listener only calls App::setLocale() and never throws.
+        Event::listen(TokenAuthenticated::class, SetLocaleFromUserPreference::class);
+        Event::listen(Authenticated::class, SetLocaleFromUserPreference::class);
+
         // Applies to every guard, every route, with no per-route/group
         // registration — see EnsureAuthenticatedUserIsActive's own docblock
         // for why this is an event listener and not a middleware.
         Event::listen(TokenAuthenticated::class, EnsureAuthenticatedUserIsActive::class);
         Event::listen(Authenticated::class, EnsureAuthenticatedUserIsActive::class);
-
-        // Runs after the above: corrects the provisional locale
-        // SetLocaleFromHeader set before auth resolved, to the user's
-        // preferred_language — but only when no valid `lang` header was sent.
-        Event::listen(TokenAuthenticated::class, SetLocaleFromUserPreference::class);
-        Event::listen(Authenticated::class, SetLocaleFromUserPreference::class);
 
         // Models live under App\Domain\<Domain>\Policies, not App\Policies, so
         // Laravel's convention-based policy discovery misses these — register

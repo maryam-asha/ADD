@@ -24,6 +24,7 @@ return [
 
     'wallet' => [
         'insufficient_balance' => 'Insufficient general balance to allocate this amount.',
+        'insufficient_balance_for_plan' => 'Insufficient general balance to purchase this plan.',
     ],
 
     'system' => [

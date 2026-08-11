@@ -88,7 +88,7 @@ class MembershipController extends Controller
             // producing the same 422 shape as CompanyWalletAllocationController
             // (shouldRenderJsonWhen(true) in bootstrap/app.php turns this into
             // a plain JSON {"message": ...} response).
-            abort(422, 'Insufficient general balance to purchase this plan.');
+            abort(422, __('api.wallet.insufficient_balance_for_plan'));
         }
 
         return new MembershipResource($membership->load('plan'));

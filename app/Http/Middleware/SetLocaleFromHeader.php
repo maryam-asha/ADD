@@ -9,11 +9,17 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Header only. Deliberately does not consult the authenticated user here —
- * this middleware is prepended to the `api` middleware group, which runs
- * before `auth:sanctum`'s own route middleware resolves $request->user()
- * (see EnsureAuthenticatedUserIsActive's docblock for the same ordering
- * trap, confirmed empirically there). SetLocaleFromUserPreference corrects
- * this provisional value once a guard actually resolves a user.
+ * this middleware is prepended to the kernel-global stack
+ * (`$middleware->prepend()` in bootstrap/app.php), not to the `api` group, so
+ * it runs before everything else in the pipeline. Two reasons it has to sit
+ * that early: it must run before `auth:sanctum`'s own route middleware
+ * resolves $request->user() (see EnsureAuthenticatedUserIsActive's docblock
+ * for the same ordering trap, confirmed empirically there), and it must run
+ * before route resolution itself — group middleware only attaches once a
+ * route is matched, which left requests to unmatched URLs (404) and to a
+ * right-path/wrong-verb URL (405) with no locale set at all.
+ * SetLocaleFromUserPreference corrects this provisional value once a guard
+ * actually resolves a user.
  */
 class SetLocaleFromHeader
 {
