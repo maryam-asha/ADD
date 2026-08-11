@@ -8,9 +8,19 @@ use App\Domain\Identity\Models\Consent;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdatePublicDirectoryConsentRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class PublicDirectoryConsentController extends Controller
 {
+    public function show(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        return response()->json([
+            'granted' => Consent::hasActive(ConsentSubjectType::User, $user->id, ConsentType::PublicDirectory),
+        ]);
+    }
+
     public function update(UpdatePublicDirectoryConsentRequest $request): JsonResponse
     {
         $user = $request->user();

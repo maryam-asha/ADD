@@ -72,4 +72,43 @@ class PublicDirectoryConsentControllerTest extends TestCase
 
         $this->assertDatabaseCount('consents', 1);
     }
+
+    public function test_reading_consent_state_with_no_grant_ever_made_returns_false(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/member/consents/public-directory');
+
+        $response->assertOk();
+        $response->assertJsonPath('granted', false);
+    }
+
+    public function test_reading_consent_state_after_granting_returns_true(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+
+        $response = $this->getJson('/api/v1/member/consents/public-directory');
+
+        $response->assertOk();
+        $response->assertJsonPath('granted', true);
+    }
+
+    public function test_reading_consent_state_after_granting_then_revoking_returns_false(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => false])->assertOk();
+
+        $response = $this->getJson('/api/v1/member/consents/public-directory');
+
+        $response->assertOk();
+        $response->assertJsonPath('granted', false);
+    }
 }

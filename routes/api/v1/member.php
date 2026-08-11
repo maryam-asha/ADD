@@ -52,4 +52,5 @@ Route::get('profile/professional', [ProfessionalProfileController::class, 'show'
 Route::patch('profile/professional', [ProfessionalProfileController::class, 'update']);
 
 // Member consent to appear in a future public directory (Task 5 consumes this).
+Route::get('consents/public-directory', [PublicDirectoryConsentController::class, 'show']);
 Route::patch('consents/public-directory', [PublicDirectoryConsentController::class, 'update']);
