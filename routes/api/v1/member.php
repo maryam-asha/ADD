@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PersonalProfileController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\ProfessionalProfileController;
+use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -49,3 +50,6 @@ Route::patch('profile/personal', [PersonalProfileController::class, 'update']);
 // Member professional profile endpoints
 Route::get('profile/professional', [ProfessionalProfileController::class, 'show']);
 Route::patch('profile/professional', [ProfessionalProfileController::class, 'update']);
+
+// Member consent to appear in a future public directory (Task 5 consumes this).
+Route::patch('consents/public-directory', [PublicDirectoryConsentController::class, 'update']);

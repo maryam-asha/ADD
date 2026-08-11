@@ -4,6 +4,7 @@ namespace App\Domain\Identity\Models;
 
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Identity\Enums\ConsentType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -33,5 +34,40 @@ class Consent extends Model
             'granted_at' => 'datetime',
             'revoked_at' => 'datetime',
         ];
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->whereNull('revoked_at');
+    }
+
+    public static function grant(ConsentSubjectType $subjectType, int $subjectId, ConsentType $consentType): self
+    {
+        return static::create([
+            'subject_type' => $subjectType,
+            'subject_id' => $subjectId,
+            'consent_type' => $consentType,
+            'granted_at' => now(),
+        ]);
+    }
+
+    public static function revokeActive(ConsentSubjectType $subjectType, int $subjectId, ConsentType $consentType): void
+    {
+        static::query()
+            ->where('subject_type', $subjectType->value)
+            ->where('subject_id', $subjectId)
+            ->where('consent_type', $consentType->value)
+            ->active()
+            ->update(['revoked_at' => now()]);
+    }
+
+    public static function hasActive(ConsentSubjectType $subjectType, int $subjectId, ConsentType $consentType): bool
+    {
+        return static::query()
+            ->where('subject_type', $subjectType->value)
+            ->where('subject_id', $subjectId)
+            ->where('consent_type', $consentType->value)
+            ->active()
+            ->exists();
     }
 }

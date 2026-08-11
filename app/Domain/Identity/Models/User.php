@@ -3,6 +3,7 @@
 namespace App\Domain\Identity\Models;
 
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Identity\Enums\ConsentSubjectType;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -82,6 +83,11 @@ class User extends Authenticatable
     public function professionalProfile(): HasOne
     {
         return $this->hasOne(UserProfessionalProfile::class);
+    }
+
+    public function consents(): HasMany
+    {
+        return $this->hasMany(Consent::class, 'subject_id')->where('subject_type', ConsentSubjectType::User->value);
     }
 
     public function notificationLogs(): HasMany
