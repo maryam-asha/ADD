@@ -20,7 +20,7 @@ class PreferencesControllerTest extends TestCase
 
     public function test_a_member_can_update_their_preferred_currency(): void
     {
-        $member = User::factory()->create(['preferred_currency' => null]);
+        $member = User::factory()->create();
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 

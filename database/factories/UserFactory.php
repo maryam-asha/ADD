@@ -48,6 +48,11 @@ class UserFactory extends Factory
             // would otherwise fail any `status === 'active'` check even
             // though the actual DB row is correctly 'active'.
             'status' => 'active',
+            // Same lesson as `status` above: the migration's column default
+            // isn't re-fetched into this unrefreshed in-memory instance, so a
+            // factory-created user with an unset `preferred_currency` would
+            // read as null here even though the real DB row is 'SYP'.
+            'preferred_currency' => 'SYP',
         ];
     }
 
