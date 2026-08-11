@@ -20,6 +20,7 @@
 /storage/pail
 /vendor
 /.worktrees
+/.superpowers
 Homestead.json
 Homestead.yaml
 Thumbs.db
