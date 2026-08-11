@@ -6,14 +6,46 @@
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "member_token", "value": "", "type": "string" },
-    { "key": "member_refresh_token", "value": "", "type": "string" },
-    { "key": "founder_id", "value": "", "type": "string" },
-    { "key": "partner_id", "value": "", "type": "string" },
-    { "key": "community_member_id", "value": "", "type": "string" },
-    { "key": "user_id", "value": "", "type": "string" },
-    { "key": "company_id", "value": "", "type": "string" },
-    { "key": "private_office_request_id", "value": "", "type": "string" }
+    {
+      "key": "member_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "member_refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "founder_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "partner_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "community_member_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "company_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "private_office_request_id",
+      "value": "",
+      "type": "string"
+    }
   ],
   "event": [
     {
@@ -39,16 +71,42 @@
               "name": "Register — Send Code",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"name\": \"New Member\",\n  \"email\": \"member@example.com\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/register",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "register"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register"
+                  ]
                 },
                 "description": "Step 1 of sign-up. Validates the ENTIRE profile first and only then sends the code — so \"this number already has an account\", \"that email is taken\" and \"password too short\" all come back as 422 here, before you spend a WhatsApp message and an OTP round trip on a sign-up that was never going to succeed.\n\nOn success the profile is parked in `pending_registrations` (password already hashed) so step 2 needs only the phone and the code. Nothing lands in `users` — an unverified sign-up is never an account. The parked row expires with its code after 5 minutes and is swept hourly by `model:prune`, so abandoning the flow leaves nothing behind and holds no phone number.\n\nRunning this again overwrites the parked profile, which is how you correct a typo: fix the field, re-send, use the new code.\n\nThere is no `purpose` field — this endpoint always mints a `registration` code, and Forgot Password always mints a `password_reset` one. A code issued by one is refused by the other with an explicit 422; they are not interchangeable.\n\nRate-limited (1 per cooldown window per phone per purpose, plus a 10/min per-IP throttle). Code is dispatched via the mock WhatsApp driver — check storage/logs/laravel.log for the value until a real gateway is wired up."
               }
@@ -73,16 +131,43 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/register/verify",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "register", "verify"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "register",
+                    "verify"
+                  ]
                 },
                 "description": "Step 2 of sign-up, and ACCOUNT CREATION ONLY — this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the 'member' role, provisions an empty wallet, and discards the parked row — all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile — step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between — a race, not the normal \"already registered\" answer, which step 1 gives you as a 422."
               }
@@ -107,16 +192,42 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"password\": \"{{member_password}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/login",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "login"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "login"
+                  ]
                 },
                 "description": "The everyday sign-in, for MEMBERS ONLY. Returns the same access_token + refresh_token pair sign-up does, both captured automatically. The token carries the ability `member-app`, which /api/v1/admin/* rejects.\n\n401 is deliberately identical for three different failures — wrong password, unregistered number, and an account that holds no `member` role (an operations or admin account). Operators sign in at Admin/Auth/Login, behind Fortify's second factor; if this endpoint issued them a token, phone + password alone would reach the operations API and the second factor would be worth nothing. The wording is shared so the response can't be used to work out which numbers have accounts, or which of those belong to staff.\n\n403 means the account is deactivated or blocked; no token is issued and the body names the state.\n\n429 after 5 attempts per minute for this phone+IP combination, with retry_after in the body."
               }
@@ -141,16 +252,42 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"refresh_token\": \"{{member_refresh_token}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/refresh",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "refresh"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "refresh"
+                  ]
                 },
                 "description": "Renews an expired access token without the password. Unauthenticated — the refresh token in the body IS the credential.\n\nSingle use: the token sent here is revoked and the previous access token deleted, so both variables are overwritten with the replacements. Sending the same refresh token twice returns 401.\n\nAlso 401 if the refresh token has expired (30 days) or the account was deactivated/blocked in the meantime."
               }
@@ -159,16 +296,43 @@
               "name": "Forgot Password",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"{{member_phone}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/password/forgot",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "password", "forgot"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "password",
+                    "forgot"
+                  ]
                 },
                 "description": "Sends a `password_reset` code. Always answers 200 with the same neutral message whether or not the number has an account — that is intentional, and means a 200 here is not confirmation that anything was sent.\n\nA registered number gets the code via the mock WhatsApp driver: read it from storage/logs/laravel.log and paste it into Reset Password."
               }
@@ -177,16 +341,43 @@
               "name": "Reset Password",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/password/reset",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "password", "reset"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "password",
+                    "reset"
+                  ]
                 },
                 "description": "Sets the new password and revokes every access and refresh token the member holds, on every device — the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
               }
@@ -196,14 +387,37 @@
               "request": {
                 "auth": {
                   "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
                 },
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/logout",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "logout"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "logout"
+                  ]
                 },
                 "description": "Revokes the current access token. Calling Account/Get Me again afterwards should return 401."
               }
@@ -219,14 +433,37 @@
               "request": {
                 "auth": {
                   "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
                 },
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/auth/me",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "auth", "me"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "auth",
+                    "me"
+                  ]
                 }
               }
             }
@@ -241,19 +478,53 @@
               "request": {
                 "auth": {
                   "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
                 },
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"door_access_enabled\": true\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/members/{{user_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "member", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "companies",
+                    "{{company_id}}",
+                    "members",
+                    "{{user_id}}"
+                  ]
                 },
                 "description": "403 if the acting member isn't an admin of this specific company."
               }
@@ -263,24 +534,167 @@
               "request": {
                 "auth": {
                   "type": "bearer",
-                  "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
                 },
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"is_admin\": true\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/members/{{user_id}}/admin",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "member", "companies", "{{company_id}}", "members", "{{user_id}}", "admin"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "companies",
+                    "{{company_id}}",
+                    "members",
+                    "{{user_id}}",
+                    "admin"
+                  ]
                 },
                 "description": "403 if the acting member isn't already an admin of this specific company."
               }
             }
           ]
+        },
+        {
+          "name": "Update Language Preference",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_token}}"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferred_language\": \"en\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/member/preferences/language",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member",
+                "preferences",
+                "language"
+              ]
+            },
+            "description": "Updates the authenticated member's stored language preference (`ar`/`en`). Distinct from the `lang` header: the header overrides the response language for this one request; this changes what a future request with no header falls back to."
+          }
+        },
+        {
+          "name": "Update Currency Preference",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{member_token}}"
+                }
+              ]
+            },
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"preferred_currency\": \"USD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/member/preferences/currency",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member",
+                "preferences",
+                "currency"
+              ]
+            },
+            "description": "Updates the authenticated member's stored currency preference (`USD`/`SYP`, display-only — never affects real pricing/wallet records). Distinct from the `currency` header: the header overrides a plan-listing response's converted currency for this one request; this changes the stored default a request with no header falls back to."
+          }
         }
       ]
     },
@@ -310,11 +724,27 @@
               "name": "Get CSRF Cookie",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/sanctum/csrf-cookie",
-                  "host": ["{{base_url}}"],
-                  "path": ["sanctum", "csrf-cookie"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "sanctum",
+                    "csrf-cookie"
+                  ]
                 },
                 "description": "Run this first — sets the XSRF-TOKEN cookie that every other request in Admin/* reads automatically."
               }
@@ -323,16 +753,39 @@
               "name": "Login",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/login",
-                  "host": ["{{base_url}}"],
-                  "path": ["login"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "login"
+                  ]
                 },
                 "description": "Returns {\"two_factor\": false} and logs the session in directly if 2FA isn't confirmed yet, or {\"two_factor\": true} and expects Two-Factor Challenge next."
               }
@@ -341,16 +794,39 @@
               "name": "Two-Factor Challenge",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"code\": \"123456\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/two-factor-challenge",
-                  "host": ["{{base_url}}"],
-                  "path": ["two-factor-challenge"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "two-factor-challenge"
+                  ]
                 },
                 "description": "Only needed if Login responded with two_factor: true. Use {\"recovery_code\": \"...\"} instead of \"code\" to fall back to a recovery code."
               }
@@ -359,11 +835,26 @@
               "name": "Logout",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/logout",
-                  "host": ["{{base_url}}"],
-                  "path": ["logout"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "logout"
+                  ]
                 }
               }
             }
@@ -377,11 +868,29 @@
               "name": "Get Me",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/me",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "me"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "me"
+                  ]
                 },
                 "description": "Guarded by role:admin|operations — a logged-in member-only account gets 403 here, not 401. Also blocked (403) if the account's own status is deactivated/blocked, even with a fully valid session — see EnsureAuthenticatedUserIsActive."
               }
@@ -390,16 +899,40 @@
               "name": "Update Profile Information",
               "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"ADD Admin\",\n  \"email\": \"{{admin_email}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/user/profile-information",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "profile-information"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "profile-information"
+                  ]
                 }
               }
             }
@@ -413,11 +946,27 @@
               "name": "Enable",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/two-factor-authentication",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "two-factor-authentication"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "two-factor-authentication"
+                  ]
                 },
                 "description": "Generates a secret + recovery codes but leaves 2FA unconfirmed until Confirm succeeds."
               }
@@ -426,11 +975,27 @@
               "name": "Get QR Code",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/two-factor-qr-code",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "two-factor-qr-code"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "two-factor-qr-code"
+                  ]
                 }
               }
             },
@@ -438,16 +1003,40 @@
               "name": "Confirm",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"code\": \"123456\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/user/confirmed-two-factor-authentication",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "confirmed-two-factor-authentication"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "confirmed-two-factor-authentication"
+                  ]
                 },
                 "description": "Code from an authenticator app scanning the QR code above. Once confirmed, future logins require Auth/Two-Factor Challenge."
               }
@@ -456,11 +1045,27 @@
               "name": "Get Recovery Codes",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/two-factor-recovery-codes",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "two-factor-recovery-codes"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "two-factor-recovery-codes"
+                  ]
                 }
               }
             },
@@ -468,11 +1073,27 @@
               "name": "Regenerate Recovery Codes",
               "request": {
                 "method": "POST",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/two-factor-recovery-codes",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "two-factor-recovery-codes"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "two-factor-recovery-codes"
+                  ]
                 }
               }
             },
@@ -480,11 +1101,27 @@
               "name": "Disable",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/two-factor-authentication",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "two-factor-authentication"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "two-factor-authentication"
+                  ]
                 }
               }
             }
@@ -498,16 +1135,40 @@
               "name": "Confirm Password",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"password\": \"{{admin_password}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/user/confirm-password",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "confirm-password"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "confirm-password"
+                  ]
                 },
                 "description": "Fortify requires a fresh password confirmation (session-timed) before sensitive actions like changing the password or disabling 2FA."
               }
@@ -516,11 +1177,27 @@
               "name": "Confirmed Password Status",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/user/confirmed-password-status",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "confirmed-password-status"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "confirmed-password-status"
+                  ]
                 }
               }
             },
@@ -528,16 +1205,40 @@
               "name": "Update Password",
               "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"current_password\": \"{{admin_password}}\",\n  \"password\": \"new-password\",\n  \"password_confirmation\": \"new-password\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/user/password",
-                  "host": ["{{base_url}}"],
-                  "path": ["user", "password"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "user",
+                    "password"
+                  ]
                 }
               }
             },
@@ -545,16 +1246,39 @@
               "name": "Forgot Password",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"email\": \"{{admin_email}}\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/forgot-password",
-                  "host": ["{{base_url}}"],
-                  "path": ["forgot-password"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "forgot-password"
+                  ]
                 },
                 "description": "MAIL_MAILER=log by default — check storage/logs/laravel.log for the reset link/token."
               }
@@ -563,16 +1287,39 @@
               "name": "Reset Password",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"token\": \"REPLACE_WITH_TOKEN_FROM_LOG\",\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"new-password\",\n  \"password_confirmation\": \"new-password\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/reset-password",
-                  "host": ["{{base_url}}"],
-                  "path": ["reset-password"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "reset-password"
+                  ]
                 }
               }
             }
@@ -586,11 +1333,29 @@
               "name": "List Private Office Requests",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/private-office-requests",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "private-office-requests"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "private-office-requests"
+                  ]
                 }
               }
             },
@@ -611,16 +1376,42 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"prospect_name\": \"Levant Textiles LLC\",\n  \"contact\": \"+963 999 111 222\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/private-office-requests",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "private-office-requests"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "private-office-requests"
+                  ]
                 },
                 "description": "Starts at status 'requested'."
               }
@@ -629,11 +1420,30 @@
               "name": "Get Private Office Request",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "private-office-requests",
+                    "{{private_office_request_id}}"
+                  ]
                 }
               }
             },
@@ -641,16 +1451,43 @@
               "name": "Mark as Quoted",
               "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"status\": \"quoted\",\n  \"quote_ref\": \"Q-2026-0001\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "private-office-requests",
+                    "{{private_office_request_id}}"
+                  ]
                 },
                 "description": "status only accepts \"requested\" or \"quoted\" here — a 422 comes back for \"contracted\", which is only reachable via Companies/Create Company."
               }
@@ -659,11 +1496,30 @@
               "name": "Delete Private Office Request",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "private-office-requests", "{{private_office_request_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "private-office-requests",
+                    "{{private_office_request_id}}"
+                  ]
                 }
               }
             }
@@ -677,11 +1533,29 @@
               "name": "List Companies",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies"
+                  ]
                 }
               }
             },
@@ -702,16 +1576,42 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"private_office_request_id\": {{private_office_request_id}},\n  \"legal_name\": \"Levant Textiles LLC\",\n  \"contract_ref\": \"C-2026-0001\",\n  \"branch_id\": 1\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies"
+                  ]
                 },
                 "description": "422 if private_office_request_id isn't currently 'quoted' — run Private Office Requests/Mark as Quoted first. branch_id must reference an existing branch."
               }
@@ -720,11 +1620,30 @@
               "name": "Get Company",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}"
+                  ]
                 }
               }
             },
@@ -732,16 +1651,44 @@
               "name": "Update Company Status",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"status\": \"inactive\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/status",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "status"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "status"
+                  ]
                 },
                 "description": "status must be \"active\" or \"inactive\" — anything else is a 422."
               }
@@ -756,11 +1703,31 @@
               "name": "List Company Members",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "members"
+                  ]
                 }
               }
             },
@@ -768,16 +1735,44 @@
               "name": "Add Company Member",
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"user_id\": {{user_id}},\n  \"door_access_enabled\": true,\n  \"is_admin\": true\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "members"
+                  ]
                 },
                 "description": "is_admin here is how a company gets its very first admin — a company admin can only promote an existing member (CompanyPolicy::manageMembers), so operations has to bootstrap the first one. 422 if user_id is already a member of this company."
               }
@@ -786,16 +1781,45 @@
               "name": "Update Door Access",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"door_access_enabled\": false\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "members",
+                    "{{user_id}}"
+                  ]
                 }
               }
             },
@@ -803,16 +1827,46 @@
               "name": "Update Admin Flag",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"is_admin\": false\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}/admin",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}", "admin"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "members",
+                    "{{user_id}}",
+                    "admin"
+                  ]
                 }
               }
             },
@@ -820,11 +1874,32 @@
               "name": "Remove Company Member",
               "request": {
                 "method": "DELETE",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/companies/{{company_id}}/members/{{user_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "companies", "{{company_id}}", "members", "{{user_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "companies",
+                    "{{company_id}}",
+                    "members",
+                    "{{user_id}}"
+                  ]
                 }
               }
             }
@@ -838,13 +1913,35 @@
               "name": "List Users",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users"],
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users"
+                  ],
                   "query": [
-                    { "key": "role", "value": "operations", "disabled": true }
+                    {
+                      "key": "role",
+                      "value": "operations",
+                      "disabled": true
+                    }
                   ]
                 },
                 "description": "Optional ?role= filter (member/operations/admin)."
@@ -867,16 +1964,42 @@
               ],
               "request": {
                 "method": "POST",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Rana Khoury\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\",\n  \"password\": \"a-strong-password\",\n  \"password_confirmation\": \"a-strong-password\",\n  \"role\": \"operations\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users"
+                  ]
                 },
                 "description": "role must be \"operations\" or \"admin\" — this endpoint never creates a plain member. admin-only route (role:admin, not role:admin|operations — an operations account gets 403 here)."
               }
@@ -885,11 +2008,30 @@
               "name": "Get User",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users", "{{user_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "{{user_id}}"
+                  ]
                 }
               }
             },
@@ -897,16 +2039,43 @@
               "name": "Update User Profile",
               "request": {
                 "method": "PUT",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"name\": \"Rana Khoury-Haddad\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users", "{{user_id}}"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "{{user_id}}"
+                  ]
                 },
                 "description": "Profile fields only — status and role are the two separate actions below."
               }
@@ -915,16 +2084,44 @@
               "name": "Update User Status",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"status\": \"deactivated\",\n  \"reason\": \"left the company\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/status",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users", "{{user_id}}", "status"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "{{user_id}}",
+                    "status"
+                  ]
                 },
                 "description": "status must be active, deactivated, or blocked (422 otherwise). Setting deactivated/blocked immediately revokes every access token this user holds (User::deactivate()/block()) — their very next request with an old token comes back 401, not 403. reason is optional but always recorded (status_reason/status_changed_at/status_changed_by)."
               }
@@ -933,16 +2130,44 @@
               "name": "Assign Role",
               "request": {
                 "method": "PATCH",
-                "header": [{ "key": "Content-Type", "value": "application/json" }],
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "body": {
                   "mode": "raw",
                   "raw": "{\n  \"role\": \"admin\"\n}",
-                  "options": { "raw": { "language": "json" } }
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
                 },
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/role",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "users", "{{user_id}}", "role"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "users",
+                    "{{user_id}}",
+                    "role"
+                  ]
                 },
                 "description": "role must be member, operations, or admin. admin-only route."
               }
@@ -957,11 +2182,29 @@
               "name": "List Roles",
               "request": {
                 "method": "GET",
-                "header": [],
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
                 "url": {
                   "raw": "{{base_url}}/api/v1/admin/roles",
-                  "host": ["{{base_url}}"],
-                  "path": ["api", "v1", "admin", "roles"]
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "admin",
+                    "roles"
+                  ]
                 }
               }
             }
@@ -978,11 +2221,29 @@
                   "name": "List Founders",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/founders",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "founders"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "founders"
+                      ]
                     }
                   }
                 },
@@ -1003,16 +2264,42 @@
                   ],
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"أحمد الشامي\", \"en\": \"Ahmad Al-Shami\" },\n  \"role\": { \"ar\": \"المؤسس والمدير التنفيذي\", \"en\": \"Founder & CEO\" },\n  \"bio\": { \"ar\": \"خبرة 10 سنوات بريادة الأعمال\", \"en\": \"10 years in entrepreneurship\" },\n  \"photo_url\": \"https://example.com/ahmad.jpg\",\n  \"linkedin_url\": \"https://linkedin.com/in/ahmad\",\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/founders",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "founders"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "founders"
+                      ]
                     }
                   }
                 },
@@ -1020,11 +2307,30 @@
                   "name": "Get Founder",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "founders",
+                        "{{founder_id}}"
+                      ]
                     }
                   }
                 },
@@ -1032,16 +2338,43 @@
                   "name": "Update Founder",
                   "request": {
                     "method": "PUT",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"أحمد الشامي\", \"en\": \"Ahmad Al-Shami\" },\n  \"role\": { \"ar\": \"الرئيس التنفيذي\", \"en\": \"CEO\" },\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "founders",
+                        "{{founder_id}}"
+                      ]
                     }
                   }
                 },
@@ -1049,11 +2382,30 @@
                   "name": "Delete Founder",
                   "request": {
                     "method": "DELETE",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/founders/{{founder_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "founders", "{{founder_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "founders",
+                        "{{founder_id}}"
+                      ]
                     }
                   }
                 }
@@ -1066,11 +2418,29 @@
                   "name": "List Partners",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/partners",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "partners"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "partners"
+                      ]
                     }
                   }
                 },
@@ -1091,16 +2461,42 @@
                   ],
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"بنك سوريا\", \"en\": \"Bank of Syria\" },\n  \"description\": { \"ar\": \"شريك مصرفي\", \"en\": \"Banking partner\" },\n  \"category\": \"local\",\n  \"is_active\": true,\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/partners",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "partners"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "partners"
+                      ]
                     },
                     "description": "category must be \"local\" or \"global\"."
                   }
@@ -1109,11 +2505,30 @@
                   "name": "Get Partner",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "partners",
+                        "{{partner_id}}"
+                      ]
                     }
                   }
                 },
@@ -1121,16 +2536,43 @@
                   "name": "Update Partner",
                   "request": {
                     "method": "PUT",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"بنك سوريا\", \"en\": \"Bank of Syria\" },\n  \"category\": \"local\",\n  \"is_active\": false,\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "partners",
+                        "{{partner_id}}"
+                      ]
                     }
                   }
                 },
@@ -1138,11 +2580,30 @@
                   "name": "Delete Partner",
                   "request": {
                     "method": "DELETE",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/partners/{{partner_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "partners", "{{partner_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "partners",
+                        "{{partner_id}}"
+                      ]
                     }
                   }
                 }
@@ -1155,11 +2616,29 @@
                   "name": "List Community Members",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/community-members",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "community-members"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "community-members"
+                      ]
                     }
                   }
                 },
@@ -1180,16 +2659,42 @@
                   ],
                   "request": {
                     "method": "POST",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"لينا حداد\", \"en\": \"Lina Haddad\" },\n  \"category\": \"investors\",\n  \"company\": { \"ar\": \"صندوق النمو\", \"en\": \"Growth Fund\" },\n  \"title\": { \"ar\": \"شريكة استثمار\", \"en\": \"Investment Partner\" },\n  \"skills\": [\"Fintech\", \"Venture Capital\"],\n  \"social_links\": { \"linkedin\": \"https://linkedin.com/in/lina\" },\n  \"published\": true,\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/community-members",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "community-members"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "community-members"
+                      ]
                     },
                     "description": "category must be one of: pioneers, growth_partners, investors, impact_partners."
                   }
@@ -1198,11 +2703,30 @@
                   "name": "Get Community Member",
                   "request": {
                     "method": "GET",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "community-members",
+                        "{{community_member_id}}"
+                      ]
                     }
                   }
                 },
@@ -1210,16 +2734,43 @@
                   "name": "Update Community Member",
                   "request": {
                     "method": "PUT",
-                    "header": [{ "key": "Content-Type", "value": "application/json" }],
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "body": {
                       "mode": "raw",
                       "raw": "{\n  \"name\": { \"ar\": \"لينا حداد\", \"en\": \"Lina Haddad\" },\n  \"category\": \"investors\",\n  \"published\": false,\n  \"order\": 1\n}",
-                      "options": { "raw": { "language": "json" } }
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
                     },
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "community-members",
+                        "{{community_member_id}}"
+                      ]
                     }
                   }
                 },
@@ -1227,11 +2778,30 @@
                   "name": "Delete Community Member",
                   "request": {
                     "method": "DELETE",
-                    "header": [],
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
                     "url": {
                       "raw": "{{base_url}}/api/v1/admin/community-members/{{community_member_id}}",
-                      "host": ["{{base_url}}"],
-                      "path": ["api", "v1", "admin", "community-members", "{{community_member_id}}"]
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "community-members",
+                        "{{community_member_id}}"
+                      ]
                     }
                   }
                 }
@@ -1249,11 +2819,28 @@
           "name": "Get Founders",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/founders",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "founders"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "founders"
+              ]
             }
           }
         },
@@ -1261,11 +2848,28 @@
           "name": "Get Partners",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/partners",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "partners"]
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "partners"
+              ]
             },
             "description": "Only partners with is_active = true are returned."
           }
@@ -1274,13 +2878,34 @@
           "name": "Get Community Members",
           "request": {
             "method": "GET",
-            "header": [],
+            "header": [
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
             "url": {
               "raw": "{{base_url}}/api/v1/community-members",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "community-members"],
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "community-members"
+              ],
               "query": [
-                { "key": "category", "value": "investors", "disabled": true }
+                {
+                  "key": "category",
+                  "value": "investors",
+                  "disabled": true
+                }
               ]
             },
             "description": "Only published = true rows are returned. Enable the ?category= query param to filter by pioneers/growth_partners/investors/impact_partners."
