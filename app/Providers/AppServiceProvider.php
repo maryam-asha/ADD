@@ -6,6 +6,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Policies\CompanyPolicy;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
+use App\Listeners\SetLocaleFromUserPreference;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -38,6 +39,12 @@ class AppServiceProvider extends ServiceProvider
         // for why this is an event listener and not a middleware.
         Event::listen(TokenAuthenticated::class, EnsureAuthenticatedUserIsActive::class);
         Event::listen(Authenticated::class, EnsureAuthenticatedUserIsActive::class);
+
+        // Runs after the above: corrects the provisional locale
+        // SetLocaleFromHeader set before auth resolved, to the user's
+        // preferred_language — but only when no valid `lang` header was sent.
+        Event::listen(TokenAuthenticated::class, SetLocaleFromUserPreference::class);
+        Event::listen(Authenticated::class, SetLocaleFromUserPreference::class);
 
         // Models live under App\Domain\<Domain>\Policies, not App\Policies, so
         // Laravel's convention-based policy discovery misses these — register

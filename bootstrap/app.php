@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\SetLocaleFromHeader;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -17,6 +18,10 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Every response speaks whichever locale this resolves — prepended so
+        // it runs before anything else in the pipeline, including auth:sanctum.
+        $middleware->api(prepend: SetLocaleFromHeader::class);
+
         $middleware->statefulApi();
 
         // No "login" view route exists (Fortify's views are disabled) — the
