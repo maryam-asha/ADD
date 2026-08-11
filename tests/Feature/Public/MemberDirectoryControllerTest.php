@@ -24,7 +24,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
 
         $response = $this->getJson('/api/v1/member-directory');
 
@@ -37,7 +37,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member = User::factory()->create();
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
 
         $response = $this->getJson('/api/v1/member-directory');
 
@@ -64,7 +64,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
         $this->getJson('/api/v1/member-directory')->assertJsonCount(1, 'data');
 
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => false])->assertOk();
@@ -78,7 +78,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
 
         $response = $this->getJson('/api/v1/member-directory');
 
@@ -93,7 +93,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
         $this->getJson('/api/v1/member-directory')->assertJsonCount(1, 'data');
 
         $member->block();
@@ -107,7 +107,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
         $this->getJson('/api/v1/member-directory')->assertJsonCount(1, 'data');
 
         $member->deactivate();
@@ -125,7 +125,7 @@ class MemberDirectoryControllerTest extends TestCase
         foreach ([$zed, $anwar] as $member) {
             Sanctum::actingAs($member, ['*']);
             $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-            $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+            $this->patchJson('/api/v1/member/profile', ['bio' => 'Founder.'])->assertOk();
         }
 
         $response = $this->getJson('/api/v1/member-directory');
@@ -141,7 +141,7 @@ class MemberDirectoryControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $this->patchJson('/api/v1/member/profile/personal', [])->assertOk();
+        $this->patchJson('/api/v1/member/profile', [])->assertOk();
 
         $response = $this->getJson('/api/v1/member-directory');
 

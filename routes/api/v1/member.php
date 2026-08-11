@@ -3,9 +3,8 @@
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
-use App\Http\Controllers\Api\V1\Member\PersonalProfileController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
-use App\Http\Controllers\Api\V1\Member\ProfessionalProfileController;
+use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -43,13 +42,11 @@ Route::post('memberships', [MembershipController::class, 'store']);
 Route::patch('preferences/currency', [PreferencesController::class, 'updateCurrency']);
 Route::patch('preferences/language', [PreferencesController::class, 'updateLanguage']);
 
-// Member personal profile endpoints
-Route::get('profile/personal', [PersonalProfileController::class, 'show']);
-Route::patch('profile/personal', [PersonalProfileController::class, 'update']);
-
-// Member professional profile endpoints
-Route::get('profile/professional', [ProfessionalProfileController::class, 'show']);
-Route::patch('profile/professional', [ProfessionalProfileController::class, 'update']);
+// Combined member profile endpoint — account info (UserResource) plus the
+// personal and professional profile domains in one payload, replacing the
+// former split profile/personal + profile/professional routes.
+Route::get('profile', [ProfileController::class, 'show']);
+Route::patch('profile', [ProfileController::class, 'update']);
 
 // Member consent to appear in a future public directory (Task 5 consumes this).
 Route::get('consents/public-directory', [PublicDirectoryConsentController::class, 'show']);
