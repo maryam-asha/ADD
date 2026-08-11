@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Finance\Services\CurrencyResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -43,16 +44,22 @@ class PlanResource extends JsonResource
             $user = null;
         }
 
-        if ($user?->preferred_currency && $user->preferred_currency !== $this->pricing_currency) {
+        // Docs/superpowers/specs/2026-08-11-currency-header-design.md §2:
+        // a target currency is always resolved (defaulting to SYP), so
+        // conversion is now attempted unconditionally rather than only
+        // when a preference happens to be set.
+        $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
+
+        if ($targetCurrency !== $this->pricing_currency) {
             $converted = app(CurrencyConversionService::class)->convert(
                 (float) $this->price,
                 $this->pricing_currency,
-                $user->preferred_currency
+                $targetCurrency
             );
 
             if ($converted !== null) {
                 $data['converted_amount'] = number_format($converted, 2, '.', '');
-                $data['converted_currency'] = $user->preferred_currency;
+                $data['converted_currency'] = $targetCurrency;
             }
         }
 
