@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Membership;
 
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -124,6 +125,39 @@ class MembershipPurchaseTest extends TestCase
             $membership->current_period_end->toDateTimeString(),
             $hoursCredit->expires_at->toDateTimeString()
         );
+    }
+
+    /**
+     * docs/decisions/currency-header-conversion-scope.md: `PlanResource`'s
+     * always-on conversion reaches the nested `data.plan` on
+     * `MembershipResource` too, not just direct plan-listing responses —
+     * the `currency` header (or a differing stored preference) must produce
+     * `converted_amount`/`converted_currency` here as well.
+     */
+    public function test_the_purchase_response_includes_a_converted_amount_on_the_nested_plan(): void
+    {
+        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+
+        $member = $this->makeFundedMember('500.00');
+
+        $plan = Plan::factory()->create([
+            'is_subscription' => true,
+            'is_active' => true,
+            'price' => '10.00',
+            'pricing_currency' => 'USD',
+            'duration_days' => 30,
+            'included_hours' => '0.00',
+        ]);
+
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->withHeader('currency', 'SYP')->postJson('/api/v1/member/memberships', [
+            'plan_id' => $plan->id,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.plan.converted_amount', '147000.00');
+        $response->assertJsonPath('data.plan.converted_currency', 'SYP');
     }
 
     public function test_insufficient_balance_fails_with_no_partial_state(): void

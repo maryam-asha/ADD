@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Finance\Enums\Currency;
 use App\Domain\Identity\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -24,6 +25,7 @@ class AdminUserSeeder extends Seeder
                 'email' => 'admin@add.local',
                 'password' => 'password',
                 'preferred_language' => 'ar',
+                'preferred_currency' => Currency::Syp->value,
                 'status' => 'active',
             ]
         );

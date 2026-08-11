@@ -20,6 +20,7 @@ decided, and what enforces it now.
 - [phase-3-membership-plan-wallet-mechanics.md](phase-3-membership-plan-wallet-mechanics.md) — base schema for `plans`/`memberships`/`wallets` (unspecified elsewhere), the signature-preserving debit algorithm, and the company-auto-provisioning gap the instructions left unanswered
 - [preferred-language-mutable.md](preferred-language-mutable.md) — `preferred_language` reversed from effectively-read-only to member-writable, landed alongside the new `preferred_currency` preference
 - [member-auth-hybrid.md](member-auth-hybrid.md) — members sign in with a password; OTP demoted to enrolment and recovery, access+refresh token pair introduced
+- [currency-header-conversion-scope.md](currency-header-conversion-scope.md) — `converted_amount`/`converted_currency` are always-present and reach the nested `MembershipResource.data.plan`, not just direct plan-listing responses
 
 **Design docs** — written ahead of the phase that implements them, so the
 first migration for that phase is built to the full shape instead of a

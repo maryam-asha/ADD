@@ -90,6 +90,21 @@ class MemberRegistrationTest extends IdentityTestCase
     }
 
     /**
+     * Regression: `User::create()` in `verifyRegistration()` used to omit
+     * `preferred_currency`, so this response showed null even though the DB
+     * column defaults to 'SYP' — Eloquent doesn't re-fetch DB-side defaults
+     * into an unrefreshed in-memory model. Asserts the response body
+     * directly, not a re-fetch, since that's what was actually wrong.
+     */
+    public function test_the_registration_response_includes_the_syp_currency_default(): void
+    {
+        $response = $this->register();
+
+        $response->assertOk();
+        $response->assertJsonPath('user.preferred_currency', 'SYP');
+    }
+
+    /**
      * The point of parking the profile: step two carries the code and nothing
      * else. No re-typing, and the password crosses the wire once.
      */

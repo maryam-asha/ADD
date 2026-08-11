@@ -2,6 +2,7 @@
 
 namespace Tests\Guards;
 
+use App\Domain\Identity\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
@@ -32,7 +33,7 @@ class PreferredCurrencyDefaultsToSypTest extends TestCase
 
     public function test_a_factory_created_user_with_no_override_has_syp_on_the_in_memory_model(): void
     {
-        $user = \App\Domain\Identity\Models\User::factory()->create();
+        $user = User::factory()->create();
 
         $this->assertSame('SYP', $user->preferred_currency);
     }

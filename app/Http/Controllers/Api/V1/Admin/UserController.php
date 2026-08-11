@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Finance\Enums\Currency;
 use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignRoleRequest;
@@ -40,6 +41,7 @@ class UserController extends Controller
             ...$request->safe()->except(['password', 'role']),
             'password' => Hash::make($request->validated('password')),
             'preferred_language' => 'ar',
+            'preferred_currency' => Currency::Syp->value,
             'status' => 'active',
         ]);
 

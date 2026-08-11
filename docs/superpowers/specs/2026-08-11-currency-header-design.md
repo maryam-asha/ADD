@@ -98,7 +98,12 @@ if ($targetCurrency !== $this->pricing_currency) {
 ```
 
 **Confirmed API contract change:** `converted_amount`/`converted_currency`
-now appear on every plan-listing response by default — including for
+now appear by default on every response that embeds a `PlanResource` —
+not just direct plan-listing/show responses, but also the nested
+`data.plan` on `MembershipResource` (e.g. the
+`POST /api/v1/member/memberships` purchase response, which
+`whenLoaded('plan', ...)`s a `PlanResource` — see
+`docs/decisions/currency-header-conversion-scope.md`) — including for
 anonymous requests with no token at all — rather than only when a member
 had explicitly set a preference. They still silently disappear if
 `ExchangeRate::current()` returns null (no rate ever seeded) — an

@@ -59,4 +59,27 @@ class PreferredCurrencyIsDisplayOnlyTest extends TestCase
         $this->assertDatabaseHas('wallet_transactions', ['id' => $transaction->id, 'amount' => '25.00']);
         $this->assertDatabaseHas('spaces', ['id' => $space->id, 'hourly_rate' => '15.00', 'pricing_currency' => 'USD']);
     }
+
+    /**
+     * The `currency` request header (2026-08-11) is a second, unauthenticated
+     * input channel that also reaches `PlanResource` — it must be just as
+     * display-only as the stored preference above. Uses the public plan
+     * listing since it's the simplest route that returns `PlanResource` with
+     * no auth required at all.
+     */
+    public function test_the_currency_header_does_not_mutate_pricing_records(): void
+    {
+        $plan = Plan::factory()->create(['pricing_currency' => 'USD', 'price' => '10.00', 'is_active' => true]);
+
+        $planBefore = $plan->only(['pricing_currency', 'price']);
+
+        $this->withHeader('currency', 'SYP')
+            ->getJson('/api/v1/plans')
+            ->assertOk();
+
+        $plan->refresh();
+
+        $this->assertSame($planBefore, $plan->only(['pricing_currency', 'price']));
+        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'pricing_currency' => 'USD', 'price' => '10.00']);
+    }
 }
