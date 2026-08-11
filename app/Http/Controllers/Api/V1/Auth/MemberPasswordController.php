@@ -49,7 +49,7 @@ class MemberPasswordController extends Controller
         }
 
         return response()->json([
-            'message' => 'If that number has an account, a reset code has been sent to it.',
+            'message' => __('api.auth.password_reset_code_sent'),
         ]);
     }
 
@@ -70,19 +70,19 @@ class MemberPasswordController extends Controller
         // here. forgot() never mints a code for a non-member, so this should be
         // unreachable — it is the backstop, not the gate.
         if (! $user) {
-            return response()->json(['message' => 'Invalid or expired code.'], 422);
+            return response()->json(['message' => __('api.auth.code_invalid')], 422);
         }
 
         $result = $this->otp->verify($phone, $request->validated('code'), OtpPurpose::PasswordReset);
 
         if ($result === OtpResult::PurposeMismatch) {
             return response()->json([
-                'message' => 'That code was issued to create an account, not to reset a password.',
+                'message' => __('api.auth.code_purpose_mismatch_registration'),
             ], 422);
         }
 
         if ($result !== OtpResult::Verified) {
-            return response()->json(['message' => 'Invalid or expired code.'], 422);
+            return response()->json(['message' => __('api.auth.code_invalid')], 422);
         }
 
         DB::transaction(function () use ($user, $request) {
@@ -92,7 +92,7 @@ class MemberPasswordController extends Controller
         });
 
         return response()->json([
-            'message' => 'Password updated. Please log in with your new password.',
+            'message' => __('api.auth.password_updated'),
         ]);
     }
 
