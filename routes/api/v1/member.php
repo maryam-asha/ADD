@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PersonalProfileController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
+use App\Http\Controllers\Api\V1\Member\ProfessionalProfileController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -44,3 +45,7 @@ Route::patch('preferences/language', [PreferencesController::class, 'updateLangu
 // Member personal profile endpoints
 Route::get('profile/personal', [PersonalProfileController::class, 'show']);
 Route::patch('profile/personal', [PersonalProfileController::class, 'update']);
+
+// Member professional profile endpoints
+Route::get('profile/professional', [ProfessionalProfileController::class, 'show']);
+Route::patch('profile/professional', [ProfessionalProfileController::class, 'update']);
