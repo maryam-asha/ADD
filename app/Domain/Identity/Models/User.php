@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -71,6 +72,16 @@ class User extends Authenticatable
         return $this->belongsToMany(Branch::class, 'user_branch_memberships')
             ->withPivot('is_home_branch')
             ->withTimestamps();
+    }
+
+    public function personalProfile(): HasOne
+    {
+        return $this->hasOne(UserPersonalProfile::class);
+    }
+
+    public function professionalProfile(): HasOne
+    {
+        return $this->hasOne(UserProfessionalProfile::class);
     }
 
     public function notificationLogs(): HasMany
