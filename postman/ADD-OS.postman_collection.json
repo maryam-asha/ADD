@@ -695,6 +695,247 @@
             },
             "description": "Updates the authenticated member's stored currency preference (`USD`/`SYP`, display-only — never affects real pricing/wallet records). Distinct from the `currency` header: the header overrides a plan-listing response's converted currency for this one request; this changes the stored default a request with no header falls back to."
           }
+        },
+        {
+          "name": "Profile",
+          "item": [
+            {
+              "name": "Get Profile",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "profile"
+                  ]
+                },
+                "description": "Returns the authenticated member in one payload: the same account fields as Get Me (id, name, phone, email, preferred_language, preferred_currency, status, roles) plus `personal` (`bio`, `city`, `avatar_url`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`). Profile fields are null until the member has ever saved one — there is no separate \"not found\" state; the underlying rows are only created on first PATCH. Independent of `Account → Get Me`, which stays account-info-only."
+              }
+            },
+            {
+              "name": "Update Profile",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"bio\": \"Coffee and code.\",\n  \"city\": \"Aleppo\",\n  \"avatar_url\": \"https://example.com/avatar.png\",\n  \"job_title\": \"Founder\",\n  \"company_name\": \"ACME\",\n  \"industry\": \"Software\",\n  \"linkedin_url\": \"https://linkedin.com/in/example\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/profile",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "profile"
+                  ]
+                },
+                "description": "Upserts the personal AND professional profile in one call, in one transaction — creates both rows on first call, updates them after, never a duplicate row on either table. Every field is optional and independently nullable: omitting a field leaves it unchanged, sending it as `null` explicitly clears it. Send all seven fields together (as in this example) or just the subset you're changing — both work. Plain single-language strings, not the `{ar, en}` bilingual JSON pattern used for admin-curated content. Returns the same combined shape as Get Profile."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Public Directory Consent",
+          "item": [
+            {
+              "name": "Get Consent Status",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/consents/public-directory",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "consents",
+                    "public-directory"
+                  ]
+                },
+                "description": "Returns whether the authenticated member currently has an active `public_directory` consent grant: `{\"granted\": true|false}`. A member who never granted, or who revoked and never re-granted, gets `false`."
+              }
+            },
+            {
+              "name": "Update Consent",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{member_token}}"
+                    }
+                  ]
+                },
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  },
+                  {
+                    "key": "lang",
+                    "value": "{{lang}}",
+                    "type": "text"
+                  },
+                  {
+                    "key": "currency",
+                    "value": "{{currency}}",
+                    "type": "text"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"granted\": true\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/member/consents/public-directory",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "member",
+                    "consents",
+                    "public-directory"
+                  ]
+                },
+                "description": "Grants (`granted: true`) or revokes (`granted: false`) the member's consent to appear in the public member directory (see Public (Site) → Get Member Directory). Consent is append-only history: granting while already active is a no-op, revoking sets `revoked_at` on the active row, and re-granting after a revoke inserts a fresh row rather than reusing the old one. Appearing in the directory also requires at least one filled profile (Personal and/or Professional) and an `active` account status."
+              }
+            }
+          ]
+        },
+        {
+          "name": "Report Client Error",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"error_type\": \"NetworkException\",\n  \"message\": \"Failed to fetch plans\",\n  \"stack_trace\": \"at PlansRepository.fetch (plans_repository.dart:42)\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"platform\": \"android\",\n  \"os\": \"Android 14\",\n  \"device\": \"Pixel 7\",\n  \"screen\": \"PlansListScreen\",\n  \"session_id\": \"a1b2c3d4\",\n  \"occurred_at\": \"2026-08-11T10:15:00Z\",\n  \"metadata\": {\n    \"retry_count\": 2\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/errors",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "errors"
+              ]
+            },
+            "description": "Ingests a client-reported error/crash from the member mobile app. Lives under mobile.php, not member.php — deliberately UNAUTHENTICATED (no bearer token needed): a crash can happen before login, e.g. on the splash/login screen itself, so this can't depend on a session existing yet. Placed here for discoverability alongside the rest of the mobile app's requests. Only `error_type` and `message` are required; everything else is optional context. `platform` is restricted to `android`/`ios`; `occurred_at` defaults to now() if omitted. Throttled at 60/min per IP."
+          }
         }
       ]
     },
@@ -2909,6 +3150,43 @@
               ]
             },
             "description": "Only published = true rows are returned. Enable the ?category= query param to filter by pioneers/growth_partners/investors/impact_partners."
+          }
+        },
+        {
+          "name": "Get Member Directory",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+              },
+              {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/member-directory",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "member-directory"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "2",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Lists members who have an active `public_directory` consent grant, at least one filled profile (Personal and/or Professional), and an `active` account status. Never includes phone/email regardless of consent. Unauthenticated, paginated (20 per page, ordered by name), throttled, and computed fresh on every request — no caching."
           }
         }
       ]
