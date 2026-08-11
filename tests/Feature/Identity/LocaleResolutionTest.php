@@ -21,7 +21,7 @@ class LocaleResolutionTest extends IdentityTestCase
     public function test_a_valid_header_is_read_on_an_unauthenticated_request(): void
     {
         $response = $this->withHeader('lang', 'ar')->postJson('/api/v1/auth/login', [
-            'phone' => '0000000000',
+            'phone' => '0900000000',
             'password' => 'anything',
         ]);
 

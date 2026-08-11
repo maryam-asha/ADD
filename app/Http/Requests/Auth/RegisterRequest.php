@@ -60,7 +60,7 @@ class RegisterRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'phone.unique' => 'This number already has an account. Please log in instead.',
+            'phone.unique' => __('api.auth.phone_already_registered'),
         ];
     }
 }

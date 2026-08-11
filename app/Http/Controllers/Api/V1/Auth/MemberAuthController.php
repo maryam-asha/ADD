@@ -64,12 +64,12 @@ class MemberAuthController extends Controller
             });
         } catch (OtpThrottledException $e) {
             return response()->json([
-                'message' => 'Too many requests. Please wait before requesting a new code.',
+                'message' => __('api.auth.otp_request_throttled'),
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
         }
 
-        return response()->json(['message' => 'Verification code sent.']);
+        return response()->json(['message' => __('api.auth.otp_sent')]);
     }
 
     /**
@@ -94,7 +94,7 @@ class MemberAuthController extends Controller
         // here to build an account from.
         if (! $pending || ! $pending->isUsable()) {
             return response()->json([
-                'message' => 'Invalid or expired code. Please start signing up again.',
+                'message' => __('api.auth.registration_code_invalid'),
             ], 422);
         }
 
@@ -108,7 +108,7 @@ class MemberAuthController extends Controller
         // row.
         if ($this->phoneOrEmailIsTaken($pending)) {
             return response()->json([
-                'message' => 'An account already exists for this number or email. Please log in instead.',
+                'message' => __('api.auth.account_already_exists'),
             ], 409);
         }
 
@@ -116,12 +116,12 @@ class MemberAuthController extends Controller
 
         if ($result === OtpResult::PurposeMismatch) {
             return response()->json([
-                'message' => 'That code was issued to reset a password, not to create an account.',
+                'message' => __('api.auth.code_purpose_mismatch_reset'),
             ], 422);
         }
 
         if ($result !== OtpResult::Verified) {
-            return response()->json(['message' => 'Invalid or expired code.'], 422);
+            return response()->json(['message' => __('api.auth.code_invalid')], 422);
         }
 
         $user = DB::transaction(function () use ($pending) {
@@ -198,7 +198,7 @@ class MemberAuthController extends Controller
         // given just calls support.
         if ($user->status !== 'active') {
             return response()->json([
-                'message' => 'This account has been suspended. Please contact ADD.',
+                'message' => __('api.auth.account_inactive'),
                 'status' => $user->status,
             ], 403);
         }
@@ -231,7 +231,7 @@ class MemberAuthController extends Controller
      */
     private function credentialsRejected(): JsonResponse
     {
-        return response()->json(['message' => 'These credentials do not match our records.'], 401);
+        return response()->json(['message' => __('api.auth.invalid_credentials')], 401);
     }
 
     /**
@@ -271,7 +271,7 @@ class MemberAuthController extends Controller
         try {
             $pair = $this->tokens->rotate($request->validated('refresh_token'));
         } catch (InvalidRefreshTokenException) {
-            return response()->json(['message' => 'Invalid or expired refresh token.'], 401);
+            return response()->json(['message' => __('api.auth.refresh_token_invalid')], 401);
         }
 
         return response()->json($pair->toArray());
@@ -305,6 +305,6 @@ class MemberAuthController extends Controller
             }
         }
 
-        return response()->json(['message' => 'Logged out.']);
+        return response()->json(['message' => __('api.auth.logged_out')]);
     }
 }
