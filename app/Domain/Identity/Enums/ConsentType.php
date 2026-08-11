@@ -3,8 +3,9 @@
 namespace App\Domain\Identity\Enums;
 
 /**
- * `PublicDirectory` and `DataProcessing` have no write path yet — they
- * belong to the community directory opt-in flow (Phase 9).
+ * `PublicDirectory` has a full write path (grant/revoke/read) via
+ * PublicDirectoryConsentController. `DataProcessing` still has no write
+ * path yet — it belongs to a later opt-in flow.
  */
 enum ConsentType: string
 {
