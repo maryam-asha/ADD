@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Public\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Public\FounderController;
+use App\Http\Controllers\Api\V1\Public\MemberDirectoryController;
 use App\Http\Controllers\Api\V1\Public\PartnerController;
 use App\Http\Controllers\Api\V1\Public\PlanController;
 use Illuminate\Support\Facades\Route;
@@ -12,3 +13,4 @@ Route::get('founders', [FounderController::class, 'index']);
 Route::get('partners', [PartnerController::class, 'index']);
 Route::get('community-members', [CommunityMemberController::class, 'index']);
 Route::get('plans', [PlanController::class, 'index']);
+Route::get('member-directory', [MemberDirectoryController::class, 'index']);
