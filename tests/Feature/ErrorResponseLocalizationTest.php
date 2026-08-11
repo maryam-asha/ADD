@@ -77,15 +77,31 @@ class ErrorResponseLocalizationTest extends TestCase
 
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
+        $payload = [
             'category' => 'cafe',
             'amount' => '20.00',
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
-        ]);
+        ];
 
-        $response->assertStatus(403);
-        $response->assertJsonPath('message', 'This action is unauthorized.');
+        $en = $this->withHeader('lang', 'en')
+            ->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", $payload);
+
+        $en->assertStatus(403);
+        $en->assertJsonPath('message', 'This action is unauthorized.');
+
+        // The Arabic case is the assertion that actually proves anything here:
+        // api.auth.forbidden's English value is byte-identical to Laravel's own
+        // untranslated default, so the English assertion above passes whether
+        // or not the handler ever reaches our translated branch. It did not,
+        // for a while — the render() closure was typed against
+        // AuthorizationException, which prepareException() has already
+        // rewritten to AccessDeniedHttpException by render time.
+        $ar = $this->withHeader('lang', 'ar')
+            ->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", $payload);
+
+        $ar->assertStatus(403);
+        $ar->assertJsonPath('message', 'غير مخوّل بتنفيذ هذا الإجراء.');
     }
 
     public function test_an_unknown_route_returns_a_translated_not_found_message(): void

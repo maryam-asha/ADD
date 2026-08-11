@@ -1,11 +1,11 @@
 <?php
 
 use App\Http\Middleware\SetLocaleFromHeader;
-use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
@@ -13,6 +13,8 @@ use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
+use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -76,11 +78,13 @@ return Application::configure(basePath: dirname(__DIR__))
         // which doesn't exist (Fortify's view routes are disabled).
         $exceptions->shouldRenderJsonWhen(fn () => true);
 
-        // Six specific exception shapes get a translated `message` instead
+        // Five specific exception shapes get a translated `message` instead
         // of Laravel's English-only default. Anything else (e.g. an
         // abort(403, __('api.auth.account_inactive')) elsewhere in the app)
         // already carries its own translated message and falls through to
-        // Laravel's default HttpExceptionInterface rendering unchanged.
+        // Laravel's default HttpExceptionInterface rendering unchanged — see
+        // the pass-through guard in the Throwable catch-all at the bottom,
+        // which is what keeps that true once APP_DEBUG is off.
         $exceptions->render(fn (ValidationException $e) => response()->json([
             'message' => __('api.validation.failed'),
             'errors' => $e->errors(),
@@ -94,7 +98,18 @@ return Application::configure(basePath: dirname(__DIR__))
             'message' => __('api.auth.unauthenticated'),
         ], 401));
 
-        $exceptions->render(fn (AuthorizationException $e) => response()->json([
+        // AccessDeniedHttpException, NOT AuthorizationException: Laravel's
+        // handler runs prepareException() *before* any render() callback, and
+        // that rewrites a statusless AuthorizationException (what
+        // Gate::authorize() throws) into AccessDeniedHttpException. A closure
+        // typed against AuthorizationException therefore never matches
+        // anything at render time — it was dead code, and 403s from the one
+        // policy in the app shipped with Laravel's untranslated English
+        // default. Verified with an Arabic assertion in
+        // ErrorResponseLocalizationTest, which is what the English-only
+        // assertion could not catch: api.auth.forbidden's English wording is
+        // byte-identical to Laravel's own default.
+        $exceptions->render(fn (AccessDeniedHttpException $e) => response()->json([
             'message' => __('api.auth.forbidden'),
         ], 403));
 
@@ -106,6 +121,22 @@ return Application::configure(basePath: dirname(__DIR__))
         // above always wins. Returning null in debug mode defers to Laravel's
         // own rich diagnostic rendering — a local-dev tool this doesn't touch.
         $exceptions->render(function (Throwable $e) {
+            // Already carries its own status and message — abort(403, __(...)),
+            // a policy denial, a named limiter's own 429 response. Only a
+            // genuinely unhandled exception becomes a generic 500.
+            //
+            // Without this check the closure only looked at app.debug, so with
+            // APP_DEBUG=false (i.e. production) every such exception was
+            // flattened into an untranslated 500. HttpResponseException needs
+            // its own test because it does not implement
+            // HttpExceptionInterface, and Laravel's handler runs render()
+            // callbacks *before* the match arm that would have unwrapped it —
+            // which is how the member-login limiter's ->response() 429 ended
+            // up here at all.
+            if ($e instanceof HttpExceptionInterface || $e instanceof HttpResponseException) {
+                return null;
+            }
+
             if (config('app.debug')) {
                 return null;
             }
