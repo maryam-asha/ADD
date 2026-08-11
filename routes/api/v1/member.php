@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
+use App\Http\Controllers\Api\V1\Member\PersonalProfileController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -39,3 +40,7 @@ Route::post('memberships', [MembershipController::class, 'store']);
 // behavior — see docs/decisions/preferred-language-mutable.md.
 Route::patch('preferences/currency', [PreferencesController::class, 'updateCurrency']);
 Route::patch('preferences/language', [PreferencesController::class, 'updateLanguage']);
+
+// Member personal profile endpoints
+Route::get('profile/personal', [PersonalProfileController::class, 'show']);
+Route::patch('profile/personal', [PersonalProfileController::class, 'update']);
