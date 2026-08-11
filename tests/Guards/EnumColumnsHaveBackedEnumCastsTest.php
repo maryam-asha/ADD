@@ -11,10 +11,12 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Identity\Enums\ConsentType;
+use App\Domain\Identity\Enums\ErrorLogPlatform;
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\Consent;
+use App\Domain\Identity\Models\ErrorLog;
 use App\Domain\Identity\Models\OtpVerification;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Membership\Enums\MembershipStatus;
@@ -52,6 +54,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         PrivateOfficeRequest::class => [
             'status' => PrivateOfficeRequestStatus::class,
+        ],
+        ErrorLog::class => [
+            'platform' => ErrorLogPlatform::class,
         ],
         Company::class => [
             'status' => CompanyStatus::class,

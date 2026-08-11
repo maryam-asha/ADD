@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function () {
     require base_path('routes/api/v1/auth.php');
     require base_path('routes/api/v1/public.php');
+    require base_path('routes/api/v1/mobile.php');
 
     // 'active' is no longer listed here — EnsureUserIsActive is registered
     // globally in bootstrap/app.php, not per route group.

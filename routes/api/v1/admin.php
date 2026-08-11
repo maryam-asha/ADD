@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
@@ -48,6 +49,12 @@ Route::patch('companies/{company}/members/{user}', [CompanyMemberController::cla
 Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
 Route::delete('companies/{company}/members/{user}', [CompanyMemberController::class, 'destroy']);
 
+// Mobile client crash/error reports (ingested unauthenticated from
+// routes/api/v1/mobile.php) — viewable by both roles, but deleting one is
+// admin-only, same narrower-than-the-group pattern as below.
+Route::get('error-logs', [ErrorLogController::class, 'index']);
+Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
+
 // Narrower than the group above: managing accounts and roles is admin-only,
 // operations can't create or promote other accounts.
 Route::middleware('role:admin')->group(function () {
@@ -56,4 +63,6 @@ Route::middleware('role:admin')->group(function () {
     Route::patch('users/{user}/role', [UserController::class, 'assignRole']);
 
     Route::get('roles', [RoleController::class, 'index']);
+
+    Route::delete('error-logs/{errorLog}', [ErrorLogController::class, 'destroy']);
 });
