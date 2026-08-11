@@ -13,4 +13,4 @@ Route::get('founders', [FounderController::class, 'index']);
 Route::get('partners', [PartnerController::class, 'index']);
 Route::get('community-members', [CommunityMemberController::class, 'index']);
 Route::get('plans', [PlanController::class, 'index']);
-Route::get('member-directory', [MemberDirectoryController::class, 'index']);
+Route::get('member-directory', [MemberDirectoryController::class, 'index'])->middleware('throttle:60,1');

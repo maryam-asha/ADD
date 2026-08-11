@@ -1,7 +1,5 @@
 <?php
 
-// tests/Feature/Public/MemberDirectoryControllerTest.php
-
 namespace Tests\Feature\Public;
 
 use App\Domain\Identity\Models\User;
@@ -87,5 +85,67 @@ class MemberDirectoryControllerTest extends TestCase
         $response->assertOk();
         $response->assertJsonMissing(['phone' => '0912345678']);
         $response->assertJsonMissing(['email' => 'lina@example.com']);
+    }
+
+    public function test_a_blocked_member_is_excluded_from_the_directory(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->getJson('/api/v1/member-directory')->assertJsonCount(1, 'data');
+
+        $member->block();
+
+        $this->getJson('/api/v1/member-directory')->assertJsonCount(0, 'data');
+    }
+
+    public function test_a_deactivated_member_is_excluded_from_the_directory(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+        $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        $this->getJson('/api/v1/member-directory')->assertJsonCount(1, 'data');
+
+        $member->deactivate();
+
+        $this->getJson('/api/v1/member-directory')->assertJsonCount(0, 'data');
+    }
+
+    public function test_results_are_ordered_by_name(): void
+    {
+        $zed = User::factory()->create(['name' => 'Zed Youssef']);
+        $zed->assignRole('member');
+        $anwar = User::factory()->create(['name' => 'Anwar Khalil']);
+        $anwar->assignRole('member');
+
+        foreach ([$zed, $anwar] as $member) {
+            Sanctum::actingAs($member, ['*']);
+            $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+            $this->patchJson('/api/v1/member/profile/personal', ['bio' => 'Founder.'])->assertOk();
+        }
+
+        $response = $this->getJson('/api/v1/member-directory');
+
+        $response->assertOk();
+        $names = array_column($response->json('data'), 'name');
+        $this->assertSame(['Anwar Khalil', 'Zed Youssef'], $names);
+    }
+
+    public function test_a_member_with_an_empty_profile_still_appears_in_the_directory(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+        $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
+        $this->patchJson('/api/v1/member/profile/personal', [])->assertOk();
+
+        $response = $this->getJson('/api/v1/member-directory');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
     }
 }

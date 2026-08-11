@@ -1,7 +1,5 @@
 <?php
 
-// app/Http/Resources/MemberDirectoryResource.php
-
 namespace App\Http\Resources;
 
 use Illuminate\Http\Request;
