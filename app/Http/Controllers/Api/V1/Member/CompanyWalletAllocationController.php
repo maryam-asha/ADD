@@ -60,7 +60,7 @@ class CompanyWalletAllocationController extends Controller
                 return $allocation;
             });
         } catch (InsufficientBalanceException) {
-            return response()->json(['message' => 'Insufficient general balance to allocate this amount.'], 422);
+            return response()->json(['message' => __('api.wallet.insufficient_balance')], 422);
         }
 
         return response()->json([

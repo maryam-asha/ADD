@@ -124,7 +124,7 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
         Sanctum::actingAs($admin, ['*']);
 
-        $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
             'amount' => '20.00',
             'user_ids' => [$member->id],

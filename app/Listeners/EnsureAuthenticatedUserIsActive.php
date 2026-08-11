@@ -49,7 +49,7 @@ class EnsureAuthenticatedUserIsActive
         }
 
         if ($user->status !== 'active' && ! request()->routeIs(...self::EXEMPT_ROUTES)) {
-            abort(403, 'This account has been suspended.');
+            abort(403, __('api.auth.account_inactive'));
         }
     }
 }

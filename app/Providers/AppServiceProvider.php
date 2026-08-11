@@ -74,7 +74,7 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('member-login', fn (Request $request) => Limit::perMinute(5)
             ->by($request->input('phone').'|'.$request->ip())
             ->response(fn (Request $request, array $headers) => response()->json([
-                'message' => 'Too many login attempts. Please wait before trying again.',
+                'message' => __('api.auth.too_many_attempts'),
                 'retry_after' => (int) ($headers['Retry-After'] ?? 60),
             ], 429, $headers)));
     }
