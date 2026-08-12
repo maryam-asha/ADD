@@ -53,6 +53,7 @@ return [
         'branch_updated' => 'تم تحديث الفرع.',
         'building_updated' => 'تم تحديث المبنى.',
         'floor_updated' => 'تم تحديث الطابق.',
+        'zone_updated' => 'تم تحديث المنطقة.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
         'plan_updated' => 'تم تحديث الباقة.',

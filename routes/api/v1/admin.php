@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
+use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,6 +26,7 @@ Route::get('me', [CurrentUserController::class, 'show']);
 Route::apiResource('branches', BranchController::class);
 Route::apiResource('buildings', BuildingController::class);
 Route::apiResource('floors', FloorController::class);
+Route::apiResource('zones', ZoneController::class);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
