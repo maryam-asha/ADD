@@ -45,6 +45,51 @@
       "key": "private_office_request_id",
       "value": "",
       "type": "string"
+    },
+    {
+      "key": "branch_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "building_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "floor_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "zone_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "space_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "resource_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "seat_desk_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "device_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "device_capability_id",
+      "value": "",
+      "type": "string"
     }
   ],
   "event": [
@@ -2408,6 +2453,1981 @@
             }
           ]
         },
+        {
+          "name": "Spatial Hierarchy",
+          "description": "Branch > Building > Floor > Zone > Space > Resource / SeatDesk, plus Device > DeviceCapability off Branch/Space (docs/decisions/district-removed.md, docs/architecture/2026-08-08-backend-build-plan.md). Each folder's Create auto-captures the new row's id for the requests below it — build top-down (Branch first) the first time through.",
+          "item": [
+            {
+              "name": "Branches",
+              "description": "Top of the physical hierarchy (docs/decisions/district-removed.md). No parent — nothing to filter on.",
+              "item": [
+                {
+                  "name": "List Branches",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/branches",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "branches"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Create Branch",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('branch_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"الفرع الرئيسي\", \"en\": \"Main Branch\" },\n  \"city\": { \"ar\": \"حلب\", \"en\": \"Aleppo\" },\n  \"timezone\": \"Asia/Damascus\",\n  \"is_active\": true\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/branches",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "branches"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Branch",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/branches/{{branch_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "branches",
+                        "{{branch_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Branch",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"name\": { \"ar\": \"الفرع الرئيسي\", \"en\": \"Main Branch\" },\n  \"city\": { \"ar\": \"حلب\", \"en\": \"Aleppo\" },\n  \"timezone\": \"Asia/Riyadh\",\n  \"is_active\": true\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/branches/{{branch_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "branches",
+                        "{{branch_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Branch",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/branches/{{branch_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "branches",
+                        "{{branch_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every Building/Floor/Zone/Space/Resource/SeatDesk/Device under this branch."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Buildings",
+              "item": [
+                {
+                  "name": "List Buildings",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/buildings",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "buildings"
+                      ],
+                      "query": [
+                        {
+                          "key": "branch_id",
+                          "value": "{{branch_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?branch_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Building",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('building_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"branch_id\": {{branch_id}},\n  \"name\": { \"ar\": \"المبنى أ\", \"en\": \"Building A\" },\n  \"floor_count\": 5\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/buildings",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "buildings"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Building",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/buildings/{{building_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "buildings",
+                        "{{building_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Building",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"branch_id\": {{branch_id}},\n  \"name\": { \"ar\": \"المبنى أ\", \"en\": \"Building A\" },\n  \"floor_count\": 6\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/buildings/{{building_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "buildings",
+                        "{{building_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Building",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/buildings/{{building_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "buildings",
+                        "{{building_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every Floor/Zone/Space/Resource/SeatDesk under this building."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Floors",
+              "description": "Classification/display only — no booking or access logic, ever (PRD decision #2).",
+              "item": [
+                {
+                  "name": "List Floors",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/floors",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "floors"
+                      ],
+                      "query": [
+                        {
+                          "key": "building_id",
+                          "value": "{{building_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?building_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Floor",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('floor_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"building_id\": {{building_id}},\n  \"label\": \"1\",\n  \"sort_order\": 0\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/floors",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "floors"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Floor",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/floors/{{floor_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "floors",
+                        "{{floor_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Floor",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"building_id\": {{building_id}},\n  \"label\": \"Mezzanine\",\n  \"sort_order\": 1\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/floors/{{floor_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "floors",
+                        "{{floor_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Floor",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/floors/{{floor_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "floors",
+                        "{{floor_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every Zone/Space under this floor."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Zones",
+              "description": "Classification/display only — no booking or access logic, ever (PRD decision #2). Same reasoning as Floors.",
+              "item": [
+                {
+                  "name": "List Zones",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/zones",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "zones"
+                      ],
+                      "query": [
+                        {
+                          "key": "floor_id",
+                          "value": "{{floor_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?floor_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Zone",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('zone_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"floor_id\": {{floor_id}},\n  \"label\": \"Zone A\",\n  \"sort_order\": 0\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/zones",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "zones"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Zone",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/zones/{{zone_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "zones",
+                        "{{zone_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Zone",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"floor_id\": {{floor_id}},\n  \"label\": \"Zone B\",\n  \"sort_order\": 1\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/zones/{{zone_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "zones",
+                        "{{zone_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Zone",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/zones/{{zone_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "zones",
+                        "{{zone_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every Space under this zone."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Spaces",
+              "description": "space_type: co_space | room | business | event_hall. The example below creates a co_space so the Seats & Desks folder can reference it (a seat/desk can only live inside a co_space).",
+              "item": [
+                {
+                  "name": "List Spaces",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces"
+                      ],
+                      "query": [
+                        {
+                          "key": "building_id",
+                          "value": "{{building_id}}",
+                          "disabled": true
+                        },
+                        {
+                          "key": "zone_id",
+                          "value": "{{zone_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?building_id= and ?zone_id= filters, independently or combined."
+                  }
+                },
+                {
+                  "name": "Create Space",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('space_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 20\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces"
+                      ]
+                    },
+                    "description": "status defaults to active — set it via the separate Update Space Status request, never through this one."
+                  }
+                },
+                {
+                  "name": "Get Space",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces",
+                        "{{space_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Space",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 25\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces",
+                        "{{space_id}}"
+                      ]
+                    },
+                    "description": "Structural fields only — status/status_reason/status_from/status_until are rejected here even if sent; use Update Space Status. Returns `{\"message\": \"...\"}` on success."
+                  }
+                },
+                {
+                  "name": "Update Space Status",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"status\": \"maintenance\",\n  \"status_reason\": \"Carpet replacement\",\n  \"status_from\": \"2026-08-12T09:00:00Z\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/status",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces",
+                        "{{space_id}}",
+                        "status"
+                      ]
+                    },
+                    "description": "status: active | maintenance | retired. Logged to activity_log (before/after) via LogsSensitiveActions. Returns `{\"message\": \"...\"}` on success."
+                  }
+                },
+                {
+                  "name": "Delete Space",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "spaces",
+                        "{{space_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every Resource/SeatDesk under this space."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Resources",
+              "description": "A space's equipment (projector, mic, screen, ...) — never booked or requested independently (PRD decision #3). Not to be confused with 'admin resource' in the general sense; this is the App\\Domain\\Foundation\\Models\\Resource model specifically.",
+              "item": [
+                {
+                  "name": "List Resources",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources"
+                      ],
+                      "query": [
+                        {
+                          "key": "space_id",
+                          "value": "{{space_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?space_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Resource",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('resource_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"name\": \"Projector\",\n  \"category\": \"projector\",\n  \"quantity\": 1\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources"
+                      ]
+                    },
+                    "description": "quantity defaults to 1 and status defaults to active — set status via the separate Update Resource Status request, never through this one."
+                  }
+                },
+                {
+                  "name": "Get Resource",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources",
+                        "{{resource_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Resource",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"name\": \"Projector\",\n  \"category\": \"projector\",\n  \"quantity\": 2\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources",
+                        "{{resource_id}}"
+                      ]
+                    },
+                    "description": "Structural fields only — status/status_reason/status_from/status_until are rejected here even if sent; use Update Resource Status. Returns `{\"message\": \"...\"}` on success."
+                  }
+                },
+                {
+                  "name": "Update Resource Status",
+                  "request": {
+                    "method": "PATCH",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"status\": \"maintenance\",\n  \"status_reason\": \"Bulb replacement\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}/status",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources",
+                        "{{resource_id}}",
+                        "status"
+                      ]
+                    },
+                    "description": "status: active | maintenance | retired. Logged to activity_log (before/after) via LogsSensitiveActions. Returns `{\"message\": \"...\"}` on success."
+                  }
+                },
+                {
+                  "name": "Delete Resource",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "resources",
+                        "{{resource_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations)."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Seats & Desks",
+              "description": "A fixed QR-code address inside a Co-Space — never a booking unit (PRD decision #4). space_id must reference a co_space-type Space, enforced server-side.",
+              "item": [
+                {
+                  "name": "List Seats & Desks",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/seats-desks",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "seats-desks"
+                      ],
+                      "query": [
+                        {
+                          "key": "space_id",
+                          "value": "{{space_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?space_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Seat/Desk",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('seat_desk_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"label\": \"D-12\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/seats-desks",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "seats-desks"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Get Seat/Desk",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/seats-desks/{{seat_desk_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "seats-desks",
+                        "{{seat_desk_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Seat/Desk",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"label\": \"D-99\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/seats-desks/{{seat_desk_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "seats-desks",
+                        "{{seat_desk_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Seat/Desk",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/seats-desks/{{seat_desk_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "seats-desks",
+                        "{{seat_desk_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations)."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Devices",
+              "description": "Hardware inventory (locks, gateways, cameras, ...) off a Branch and optionally a Space.",
+              "item": [
+                {
+                  "name": "List Devices",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/devices",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "devices"
+                      ],
+                      "query": [
+                        {
+                          "key": "branch_id",
+                          "value": "{{branch_id}}",
+                          "disabled": true
+                        },
+                        {
+                          "key": "space_id",
+                          "value": "{{space_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?branch_id= and ?space_id= filters, independently or combined."
+                  }
+                },
+                {
+                  "name": "Create Device",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('device_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"branch_id\": {{branch_id}},\n  \"space_id\": {{space_id}},\n  \"type\": \"lock\",\n  \"external_ref\": \"TTLOCK-001\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/devices",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "devices"
+                      ]
+                    },
+                    "description": "type: lock | gateway | camera | gate | printer | display | occupancy_sensor | attendance_terminal. status defaults to offline."
+                  }
+                },
+                {
+                  "name": "Get Device",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/devices/{{device_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "devices",
+                        "{{device_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Device",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"branch_id\": {{branch_id}},\n  \"space_id\": {{space_id}},\n  \"type\": \"lock\",\n  \"external_ref\": \"TTLOCK-001\",\n  \"status\": \"online\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/devices/{{device_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "devices",
+                        "{{device_id}}"
+                      ]
+                    },
+                    "description": "status: online | offline | faulted. Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Device",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/devices/{{device_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "devices",
+                        "{{device_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations) — cascades through every DeviceCapability on this device."
+                  }
+                }
+              ]
+            },
+            {
+              "name": "Device Capabilities",
+              "item": [
+                {
+                  "name": "List Device Capabilities",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/device-capabilities",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "device-capabilities"
+                      ],
+                      "query": [
+                        {
+                          "key": "device_id",
+                          "value": "{{device_id}}",
+                          "disabled": true
+                        }
+                      ]
+                    },
+                    "description": "Optional ?device_id= filter."
+                  }
+                },
+                {
+                  "name": "Create Device Capability",
+                  "event": [
+                    {
+                      "listen": "test",
+                      "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                          "if (pm.response.code === 201 || pm.response.code === 200) {",
+                          "    pm.collectionVariables.set('device_capability_id', pm.response.json().data.id);",
+                          "}"
+                        ]
+                      }
+                    }
+                  ],
+                  "request": {
+                    "method": "POST",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"device_id\": {{device_id}},\n  \"capability\": \"generate_passcode\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/device-capabilities",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "device-capabilities"
+                      ]
+                    },
+                    "description": "capability: generate_passcode | revoke_passcode | list_status | stream."
+                  }
+                },
+                {
+                  "name": "Get Device Capability",
+                  "request": {
+                    "method": "GET",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/device-capabilities/{{device_capability_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "device-capabilities",
+                        "{{device_capability_id}}"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "Update Device Capability",
+                  "request": {
+                    "method": "PUT",
+                    "header": [
+                      {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                      },
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\n  \"device_id\": {{device_id}},\n  \"capability\": \"stream\"\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/device-capabilities/{{device_capability_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "device-capabilities",
+                        "{{device_capability_id}}"
+                      ]
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                  }
+                },
+                {
+                  "name": "Delete Device Capability",
+                  "request": {
+                    "method": "DELETE",
+                    "header": [
+                      {
+                        "key": "lang",
+                        "value": "{{lang}}",
+                        "type": "text"
+                      },
+                      {
+                        "key": "currency",
+                        "value": "{{currency}}",
+                        "type": "text"
+                      }
+                    ],
+                    "url": {
+                      "raw": "{{base_url}}/api/v1/admin/device-capabilities/{{device_capability_id}}",
+                      "host": [
+                        "{{base_url}}"
+                      ],
+                      "path": [
+                        "api",
+                        "v1",
+                        "admin",
+                        "device-capabilities",
+                        "{{device_capability_id}}"
+                      ]
+                    },
+                    "description": "Admin-only (not operations)."
+                  }
+                }
+              ]
+            }
+          ]
+        },
+
         {
           "name": "Content",
           "description": "Admin-managed site content — Founders, Partners, Community. Each 'Create' below auto-captures the new row's id for the requests under it.",
