@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
+use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
@@ -33,6 +34,10 @@ Route::apiResource('spaces', SpaceController::class);
 Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
 Route::apiResource('resources', ResourceController::class);
 Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
+
+// Multi-word resource name — same reason as community-members above.
+Route::apiResource('seats-desks', SeatDeskController::class)
+    ->parameters(['seats-desks' => 'seatDesk']);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
