@@ -183,11 +183,19 @@ Following the existing project-wide rule exactly:
 
 ## Tests
 
-One Feature test file per resource under `tests/Feature/Foundation/Admin/`
-(`BranchControllerTest`, `BuildingControllerTest`, ... `DeviceCapabilityControllerTest`),
-covering `index` (incl. its parent-filter query param), `store`, `show`,
+One Feature test file per resource directly under `tests/Feature/Foundation/`
+(`BranchControllerTest`, `BuildingControllerTest`, ... `DeviceCapabilityControllerTest`)
+— matching this domain's existing convention (`SpatialHierarchyTest.php`
+lives there too, not in a `tests/Feature/Admin/` or `.../Admin/` subfolder;
+that path is reserved for cross-cutting resources with no clear domain home,
+like `ExchangeRateControllerTest`/`ErrorLogControllerTest`). Each file
+covers `index` (incl. its parent-filter query param), `store`, `show`,
 `update`, `destroy`, and — for `Space`/`Resource` — `updateStatus`, all as an
 authenticated admin, plus one 403 check per file for a `member`-role token.
+Any test asserting an exact localized message string sends
+`->withHeader('lang', 'en')` first — without it, `SetLocaleFromHeader`
+defaults the locale to Arabic, not English, matching every existing test of
+this shape (`FounderUpdateTest`, `PartnerUpdateTest`, `UserUpdateTest`, ...).
 No new guard tests — `SpatialHierarchyGuardTest` and `SpatialHierarchyTest`
 already cover the schema-shape invariants this design must not violate, and
 this design doesn't change the schema at all.

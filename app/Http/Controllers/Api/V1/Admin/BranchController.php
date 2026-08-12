@@ -27,10 +27,10 @@ class BranchController extends AdminResourceController
 
     public function store(StoreBranchRequest $request): BranchResource
     {
-        return new BranchResource(Branch::create(array_merge(
-            ['is_active' => true],
-            $request->validated()
-        )));
+        $data = $request->validated();
+        $data['is_active'] ??= true;
+
+        return new BranchResource(Branch::create($data));
     }
 
     public function update(UpdateBranchRequest $request, Branch $branch): JsonResponse

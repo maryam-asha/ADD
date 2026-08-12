@@ -29,6 +29,15 @@ class DeviceCapabilityControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_device_capability(): void
     {
         $this->actingAsAdmin();
@@ -78,6 +87,15 @@ class DeviceCapabilityControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/device-capabilities/{$capability->id}")->assertNoContent();
         $this->assertDatabaseMissing('device_capabilities', ['id' => $capability->id]);
+    }
+
+    public function test_operations_cannot_delete_a_device_capability(): void
+    {
+        $this->actingAsOperations();
+        $capability = DeviceCapability::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/device-capabilities/{$capability->id}")->assertForbidden();
+        $this->assertDatabaseHas('device_capabilities', ['id' => $capability->id]);
     }
 
     public function test_a_member_cannot_access_device_capability_admin_routes(): void

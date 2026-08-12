@@ -37,10 +37,10 @@ class ZoneController extends AdminResourceController
 
     public function store(StoreZoneRequest $request): ZoneResource
     {
-        return new ZoneResource(Zone::create(array_merge(
-            ['sort_order' => 0],
-            $request->validated()
-        )));
+        $data = $request->validated();
+        $data['sort_order'] ??= 0;
+
+        return new ZoneResource(Zone::create($data));
     }
 
     public function update(UpdateZoneRequest $request, Zone $zone): JsonResponse

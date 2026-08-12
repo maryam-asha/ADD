@@ -37,10 +37,10 @@ class FloorController extends AdminResourceController
 
     public function store(StoreFloorRequest $request): FloorResource
     {
-        return new FloorResource(Floor::create(array_merge(
-            ['sort_order' => 0],
-            $request->validated()
-        )));
+        $data = $request->validated();
+        $data['sort_order'] ??= 0;
+
+        return new FloorResource(Floor::create($data));
     }
 
     public function update(UpdateFloorRequest $request, Floor $floor): JsonResponse

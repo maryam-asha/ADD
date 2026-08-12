@@ -30,6 +30,15 @@ class ResourceControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_resource_and_quantity_and_status_default(): void
     {
         $this->actingAsAdmin();
@@ -45,6 +54,23 @@ class ResourceControllerTest extends TestCase
         $response->assertJsonPath('data.quantity', 1);
         $response->assertJsonPath('data.status', 'active');
         $this->assertDatabaseHas('resources', ['space_id' => $space->id, 'quantity' => 1, 'status' => 'active']);
+    }
+
+    public function test_admin_can_create_a_resource_with_explicit_null_quantity_and_it_still_defaults_to_one(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/resources', [
+            'space_id' => $space->id,
+            'name' => 'Projector',
+            'category' => 'projector',
+            'quantity' => null,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.quantity', 1);
+        $this->assertDatabaseHas('resources', ['space_id' => $space->id, 'quantity' => 1]);
     }
 
     public function test_index_can_be_filtered_by_space_id(): void
@@ -107,6 +133,15 @@ class ResourceControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/resources/{$resource->id}")->assertNoContent();
         $this->assertDatabaseMissing('resources', ['id' => $resource->id]);
+    }
+
+    public function test_operations_cannot_delete_a_resource(): void
+    {
+        $this->actingAsOperations();
+        $resource = Resource::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/resources/{$resource->id}")->assertForbidden();
+        $this->assertDatabaseHas('resources', ['id' => $resource->id]);
     }
 
     public function test_a_member_cannot_access_resource_admin_routes(): void

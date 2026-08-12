@@ -42,10 +42,11 @@ class ResourceController extends AdminResourceController
 
     public function store(StoreResourceRequest $request): ResourceResource
     {
-        return new ResourceResource(Resource::create(array_merge(
-            ['quantity' => 1, 'status' => OperationalStatus::Active],
-            $request->validated()
-        )));
+        $data = $request->validated();
+        $data['quantity'] ??= 1;
+        $data['status'] = OperationalStatus::Active;
+
+        return new ResourceResource(Resource::create($data));
     }
 
     public function update(UpdateResourceRequest $request, Resource $resource): JsonResponse

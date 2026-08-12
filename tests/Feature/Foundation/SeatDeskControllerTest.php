@@ -29,6 +29,15 @@ class SeatDeskControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_seat_desk(): void
     {
         $this->actingAsAdmin();
@@ -41,6 +50,21 @@ class SeatDeskControllerTest extends TestCase
 
         $response->assertCreated();
         $this->assertDatabaseHas('seats_desks', ['space_id' => $space->id, 'label' => 'D-12']);
+    }
+
+    public function test_admin_cannot_create_a_seat_desk_inside_a_non_co_space(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->create(['space_type' => 'room']);
+
+        $response = $this->postJson('/api/v1/admin/seats-desks', [
+            'space_id' => $space->id,
+            'label' => 'D-13',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('space_id');
+        $this->assertDatabaseMissing('seats_desks', ['space_id' => $space->id]);
     }
 
     public function test_index_can_be_filtered_by_space_id(): void
@@ -78,6 +102,15 @@ class SeatDeskControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/seats-desks/{$seatDesk->id}")->assertNoContent();
         $this->assertDatabaseMissing('seats_desks', ['id' => $seatDesk->id]);
+    }
+
+    public function test_operations_cannot_delete_a_seat_desk(): void
+    {
+        $this->actingAsOperations();
+        $seatDesk = SeatDesk::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/seats-desks/{$seatDesk->id}")->assertForbidden();
+        $this->assertDatabaseHas('seats_desks', ['id' => $seatDesk->id]);
     }
 
     public function test_a_member_cannot_access_seat_desk_admin_routes(): void

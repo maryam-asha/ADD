@@ -29,6 +29,15 @@ class ZoneControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_zone_and_sort_order_defaults_to_zero(): void
     {
         $this->actingAsAdmin();
@@ -42,6 +51,22 @@ class ZoneControllerTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('data.sort_order', 0);
         $this->assertDatabaseHas('zones', ['floor_id' => $floor->id, 'label' => 'Zone A']);
+    }
+
+    public function test_admin_can_create_a_zone_with_explicit_null_sort_order_and_it_still_defaults_to_zero(): void
+    {
+        $this->actingAsAdmin();
+        $floor = Floor::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/zones', [
+            'floor_id' => $floor->id,
+            'label' => 'Zone A',
+            'sort_order' => null,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.sort_order', 0);
+        $this->assertDatabaseHas('zones', ['floor_id' => $floor->id, 'label' => 'Zone A', 'sort_order' => 0]);
     }
 
     public function test_index_can_be_filtered_by_floor_id(): void
@@ -80,6 +105,15 @@ class ZoneControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/zones/{$zone->id}")->assertNoContent();
         $this->assertDatabaseMissing('zones', ['id' => $zone->id]);
+    }
+
+    public function test_operations_cannot_delete_a_zone(): void
+    {
+        $this->actingAsOperations();
+        $zone = Zone::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/zones/{$zone->id}")->assertForbidden();
+        $this->assertDatabaseHas('zones', ['id' => $zone->id]);
     }
 
     public function test_a_member_cannot_access_zone_admin_routes(): void

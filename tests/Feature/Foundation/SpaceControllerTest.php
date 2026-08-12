@@ -31,6 +31,15 @@ class SpaceControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_space_and_status_defaults_to_active(): void
     {
         $this->actingAsAdmin();
@@ -112,6 +121,15 @@ class SpaceControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/spaces/{$space->id}")->assertNoContent();
         $this->assertDatabaseMissing('spaces', ['id' => $space->id]);
+    }
+
+    public function test_operations_cannot_delete_a_space(): void
+    {
+        $this->actingAsOperations();
+        $space = Space::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/spaces/{$space->id}")->assertForbidden();
+        $this->assertDatabaseHas('spaces', ['id' => $space->id]);
     }
 
     public function test_a_member_cannot_access_space_admin_routes(): void

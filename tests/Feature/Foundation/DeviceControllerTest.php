@@ -30,6 +30,15 @@ class DeviceControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_device_and_status_defaults_to_offline(): void
     {
         $this->actingAsAdmin();
@@ -38,6 +47,22 @@ class DeviceControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/devices', [
             'branch_id' => $branch->id,
             'type' => 'lock',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.status', 'offline');
+        $this->assertDatabaseHas('devices', ['branch_id' => $branch->id, 'type' => 'lock', 'status' => 'offline']);
+    }
+
+    public function test_admin_can_create_a_device_with_explicit_null_status_and_it_still_defaults_to_offline(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/devices', [
+            'branch_id' => $branch->id,
+            'type' => 'lock',
+            'status' => null,
         ]);
 
         $response->assertCreated();
@@ -81,6 +106,15 @@ class DeviceControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/devices/{$device->id}")->assertNoContent();
         $this->assertDatabaseMissing('devices', ['id' => $device->id]);
+    }
+
+    public function test_operations_cannot_delete_a_device(): void
+    {
+        $this->actingAsOperations();
+        $device = Device::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/devices/{$device->id}")->assertForbidden();
+        $this->assertDatabaseHas('devices', ['id' => $device->id]);
     }
 
     public function test_a_member_cannot_access_device_admin_routes(): void

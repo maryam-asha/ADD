@@ -28,6 +28,15 @@ class BranchControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_branch_and_is_active_defaults_true(): void
     {
         $this->actingAsAdmin();
@@ -36,6 +45,22 @@ class BranchControllerTest extends TestCase
             'name' => ['ar' => 'الفرع الرئيسي', 'en' => 'Main Branch'],
             'city' => ['ar' => 'حلب', 'en' => 'Aleppo'],
             'timezone' => 'Asia/Damascus',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.is_active', true);
+        $this->assertDatabaseHas('branches', ['timezone' => 'Asia/Damascus', 'is_active' => 1]);
+    }
+
+    public function test_admin_can_create_a_branch_with_explicit_null_is_active_and_it_still_defaults_true(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/branches', [
+            'name' => ['ar' => 'الفرع الرئيسي', 'en' => 'Main Branch'],
+            'city' => ['ar' => 'حلب', 'en' => 'Aleppo'],
+            'timezone' => 'Asia/Damascus',
+            'is_active' => null,
         ]);
 
         $response->assertCreated();
@@ -86,6 +111,15 @@ class BranchControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/branches/{$branch->id}")->assertNoContent();
         $this->assertDatabaseMissing('branches', ['id' => $branch->id]);
+    }
+
+    public function test_operations_cannot_delete_a_branch(): void
+    {
+        $this->actingAsOperations();
+        $branch = Branch::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/branches/{$branch->id}")->assertForbidden();
+        $this->assertDatabaseHas('branches', ['id' => $branch->id]);
     }
 
     public function test_a_member_cannot_access_branch_admin_routes(): void

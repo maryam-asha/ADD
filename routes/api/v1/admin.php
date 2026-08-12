@@ -28,24 +28,29 @@ use Illuminate\Support\Facades\Route;
 Route::get('me', [CurrentUserController::class, 'show']);
 
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
-Route::apiResource('branches', BranchController::class);
-Route::apiResource('buildings', BuildingController::class);
-Route::apiResource('floors', FloorController::class);
-Route::apiResource('zones', ZoneController::class);
-Route::apiResource('spaces', SpaceController::class);
+// destroy() is admin-only for all 9 of these (see the role:admin group below):
+// a Branch delete cascades through the DB's own FKs and can wipe out every
+// Building/Floor/Zone/Space/Resource/SeatDesk/Device beneath it in one request.
+Route::apiResource('branches', BranchController::class)->except('destroy');
+Route::apiResource('buildings', BuildingController::class)->except('destroy');
+Route::apiResource('floors', FloorController::class)->except('destroy');
+Route::apiResource('zones', ZoneController::class)->except('destroy');
+Route::apiResource('spaces', SpaceController::class)->except('destroy');
 Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
-Route::apiResource('resources', ResourceController::class);
+Route::apiResource('resources', ResourceController::class)->except('destroy');
 Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
 
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('seats-desks', SeatDeskController::class)
-    ->parameters(['seats-desks' => 'seatDesk']);
+    ->parameters(['seats-desks' => 'seatDesk'])
+    ->except('destroy');
 
-Route::apiResource('devices', DeviceController::class);
+Route::apiResource('devices', DeviceController::class)->except('destroy');
 
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('device-capabilities', DeviceCapabilityController::class)
-    ->parameters(['device-capabilities' => 'deviceCapability']);
+    ->parameters(['device-capabilities' => 'deviceCapability'])
+    ->except('destroy');
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
@@ -94,4 +99,17 @@ Route::middleware('role:admin')->group(function () {
     Route::get('roles', [RoleController::class, 'index']);
 
     Route::delete('error-logs/{errorLog}', [ErrorLogController::class, 'destroy']);
+
+    // Spatial Hierarchy destroys are admin-only — a Branch delete cascades
+    // through the DB's own FKs down to every Building/Floor/Zone/Space/
+    // Resource/SeatDesk/Device beneath it in one request.
+    Route::delete('branches/{branch}', [BranchController::class, 'destroy']);
+    Route::delete('buildings/{building}', [BuildingController::class, 'destroy']);
+    Route::delete('floors/{floor}', [FloorController::class, 'destroy']);
+    Route::delete('zones/{zone}', [ZoneController::class, 'destroy']);
+    Route::delete('spaces/{space}', [SpaceController::class, 'destroy']);
+    Route::delete('resources/{resource}', [ResourceController::class, 'destroy']);
+    Route::delete('seats-desks/{seatDesk}', [SeatDeskController::class, 'destroy']);
+    Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
+    Route::delete('device-capabilities/{deviceCapability}', [DeviceCapabilityController::class, 'destroy']);
 });

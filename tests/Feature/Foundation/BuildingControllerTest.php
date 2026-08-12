@@ -29,6 +29,15 @@ class BuildingControllerTest extends TestCase
         return $admin;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     public function test_admin_can_create_a_building(): void
     {
         $this->actingAsAdmin();
@@ -89,6 +98,15 @@ class BuildingControllerTest extends TestCase
 
         $this->deleteJson("/api/v1/admin/buildings/{$building->id}")->assertNoContent();
         $this->assertDatabaseMissing('buildings', ['id' => $building->id]);
+    }
+
+    public function test_operations_cannot_delete_a_building(): void
+    {
+        $this->actingAsOperations();
+        $building = Building::factory()->create();
+
+        $this->deleteJson("/api/v1/admin/buildings/{$building->id}")->assertForbidden();
+        $this->assertDatabaseHas('buildings', ['id' => $building->id]);
     }
 
     public function test_a_member_cannot_access_building_admin_routes(): void

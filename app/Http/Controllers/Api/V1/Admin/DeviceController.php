@@ -42,10 +42,10 @@ class DeviceController extends AdminResourceController
 
     public function store(StoreDeviceRequest $request): DeviceResource
     {
-        return new DeviceResource(Device::create(array_merge(
-            ['status' => 'offline'],
-            $request->validated()
-        )));
+        $data = $request->validated();
+        $data['status'] ??= 'offline';
+
+        return new DeviceResource(Device::create($data));
     }
 
     public function update(UpdateDeviceRequest $request, Device $device): JsonResponse
