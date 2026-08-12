@@ -6,6 +6,7 @@ use App\Domain\Ecosystem\Models\Partner;
 use App\Http\Requests\Admin\StorePartnerRequest;
 use App\Http\Requests\Admin\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
+use Illuminate\Http\JsonResponse;
 
 class PartnerController extends AdminResourceController
 {
@@ -35,10 +36,10 @@ class PartnerController extends AdminResourceController
         )));
     }
 
-    public function update(UpdatePartnerRequest $request, Partner $partner): PartnerResource
+    public function update(UpdatePartnerRequest $request, Partner $partner): JsonResponse
     {
         $partner->update($request->validated());
 
-        return new PartnerResource($partner);
+        return response()->json(['message' => __('api.admin.partner_updated')]);
     }
 }

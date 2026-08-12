@@ -6,6 +6,7 @@ use App\Domain\Ecosystem\Models\Founder;
 use App\Http\Requests\Admin\StoreFounderRequest;
 use App\Http\Requests\Admin\UpdateFounderRequest;
 use App\Http\Resources\FounderResource;
+use Illuminate\Http\JsonResponse;
 
 class FounderController extends AdminResourceController
 {
@@ -35,10 +36,10 @@ class FounderController extends AdminResourceController
         )));
     }
 
-    public function update(UpdateFounderRequest $request, Founder $founder): FounderResource
+    public function update(UpdateFounderRequest $request, Founder $founder): JsonResponse
     {
         $founder->update($request->validated());
 
-        return new FounderResource($founder);
+        return response()->json(['message' => __('api.admin.founder_updated')]);
     }
 }

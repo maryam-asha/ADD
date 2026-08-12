@@ -6,6 +6,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Http\Requests\Admin\StorePlanRequest;
 use App\Http\Requests\Admin\UpdatePlanRequest;
 use App\Http\Resources\PlanResource;
+use Illuminate\Http\JsonResponse;
 
 class PlanController extends AdminResourceController
 {
@@ -35,10 +36,10 @@ class PlanController extends AdminResourceController
         )));
     }
 
-    public function update(UpdatePlanRequest $request, Plan $plan): PlanResource
+    public function update(UpdatePlanRequest $request, Plan $plan): JsonResponse
     {
         $plan->update($request->validated());
 
-        return new PlanResource($plan);
+        return response()->json(['message' => __('api.admin.plan_updated')]);
     }
 }

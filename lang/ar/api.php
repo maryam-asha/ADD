@@ -45,4 +45,18 @@ return [
         'admin_flag_updated' => 'تم تحديث صلاحية الإدارة.',
     ],
 
+    'admin' => [
+        'founder_updated' => 'تم تحديث المؤسس.',
+        'partner_updated' => 'تم تحديث الشريك.',
+        'plan_updated' => 'تم تحديث الباقة.',
+        'community_member_updated' => 'تم تحديث عضو المجتمع.',
+        'private_office_request_updated' => 'تم تحديث طلب المكتب الخاص.',
+        'company_status_updated' => 'تم تحديث حالة الشركة.',
+        'company_member_door_access_updated' => 'تم تحديث صلاحية دخول العضو.',
+        'company_member_admin_updated' => 'تم تحديث صلاحية إدارة العضو.',
+        'user_updated' => 'تم تحديث المستخدم.',
+        'user_status_updated' => 'تم تحديث حالة المستخدم.',
+        'user_role_updated' => 'تم تحديث دور المستخدم.',
+    ],
+
 ];

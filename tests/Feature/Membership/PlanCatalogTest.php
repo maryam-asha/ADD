@@ -62,14 +62,18 @@ class PlanCatalogTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.id', $planId);
 
-        $updateResponse = $this->putJson("/api/v1/admin/plans/{$planId}", $this->payload([
+        $updateResponse = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/plans/{$planId}", $this->payload([
             'price' => 60000,
             'is_active' => false,
         ]));
 
         $updateResponse->assertOk();
-        $updateResponse->assertJsonPath('data.price', '60000.00');
-        $updateResponse->assertJsonPath('data.is_active', false);
+        $updateResponse->assertExactJson(['message' => 'Plan updated.']);
+        $this->assertDatabaseHas('plans', [
+            'id' => $planId,
+            'price' => 60000,
+            'is_active' => false,
+        ]);
 
         $this->deleteJson("/api/v1/admin/plans/{$planId}")->assertNoContent();
 

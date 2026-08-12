@@ -11,6 +11,7 @@ use App\Http\Requests\Admin\StoreUserRequest;
 use App\Http\Requests\Admin\UpdateUserRequest;
 use App\Http\Requests\Admin\UpdateUserStatusRequest;
 use App\Http\Resources\UserResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\Hash;
@@ -57,14 +58,14 @@ class UserController extends Controller
         return new UserResource($user);
     }
 
-    public function update(UpdateUserRequest $request, User $user): UserResource
+    public function update(UpdateUserRequest $request, User $user): JsonResponse
     {
         $user->update($request->validated());
 
-        return new UserResource($user);
+        return response()->json(['message' => __('api.admin.user_updated')]);
     }
 
-    public function updateStatus(UpdateUserStatusRequest $request, User $user): UserResource
+    public function updateStatus(UpdateUserStatusRequest $request, User $user): JsonResponse
     {
         $before = $user->status;
         $reason = $request->validated('reason');
@@ -81,10 +82,10 @@ class UserController extends Controller
             'reason' => $reason,
         ]);
 
-        return new UserResource($user);
+        return response()->json(['message' => __('api.admin.user_status_updated')]);
     }
 
-    public function assignRole(AssignRoleRequest $request, User $user): UserResource
+    public function assignRole(AssignRoleRequest $request, User $user): JsonResponse
     {
         $before = $user->getRoleNames();
 
@@ -95,6 +96,6 @@ class UserController extends Controller
             'after' => $user->getRoleNames(),
         ]);
 
-        return new UserResource($user);
+        return response()->json(['message' => __('api.admin.user_role_updated')]);
     }
 }

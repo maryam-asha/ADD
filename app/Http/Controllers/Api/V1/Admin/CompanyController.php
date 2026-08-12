@@ -13,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCompanyRequest;
 use App\Http\Requests\Admin\UpdateCompanyStatusRequest;
 use App\Http\Resources\CompanyResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
 
@@ -76,7 +77,7 @@ class CompanyController extends Controller
         return new CompanyResource($company);
     }
 
-    public function updateStatus(UpdateCompanyStatusRequest $request, Company $company): CompanyResource
+    public function updateStatus(UpdateCompanyStatusRequest $request, Company $company): JsonResponse
     {
         $before = $company->status;
 
@@ -87,6 +88,6 @@ class CompanyController extends Controller
             'after' => $company->status,
         ]);
 
-        return new CompanyResource($company);
+        return response()->json(['message' => __('api.admin.company_status_updated')]);
     }
 }

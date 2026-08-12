@@ -45,4 +45,18 @@ return [
         'admin_flag_updated' => 'Admin status updated.',
     ],
 
+    'admin' => [
+        'founder_updated' => 'Founder updated.',
+        'partner_updated' => 'Partner updated.',
+        'plan_updated' => 'Plan updated.',
+        'community_member_updated' => 'Community member updated.',
+        'private_office_request_updated' => 'Private office request updated.',
+        'company_status_updated' => 'Company status updated.',
+        'company_member_door_access_updated' => 'Member door access updated.',
+        'company_member_admin_updated' => 'Member admin status updated.',
+        'user_updated' => 'User updated.',
+        'user_status_updated' => 'User status updated.',
+        'user_role_updated' => 'User role updated.',
+    ],
+
 ];

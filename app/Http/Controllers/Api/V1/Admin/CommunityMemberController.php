@@ -6,6 +6,7 @@ use App\Domain\Ecosystem\Models\CommunityMember;
 use App\Http\Requests\Admin\StoreCommunityMemberRequest;
 use App\Http\Requests\Admin\UpdateCommunityMemberRequest;
 use App\Http\Resources\CommunityMemberResource;
+use Illuminate\Http\JsonResponse;
 
 class CommunityMemberController extends AdminResourceController
 {
@@ -35,10 +36,10 @@ class CommunityMemberController extends AdminResourceController
         )));
     }
 
-    public function update(UpdateCommunityMemberRequest $request, CommunityMember $communityMember): CommunityMemberResource
+    public function update(UpdateCommunityMemberRequest $request, CommunityMember $communityMember): JsonResponse
     {
         $communityMember->update($request->validated());
 
-        return new CommunityMemberResource($communityMember);
+        return response()->json(['message' => __('api.admin.community_member_updated')]);
     }
 }

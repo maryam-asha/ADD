@@ -52,7 +52,7 @@ class CompanyMemberController extends Controller
             ->setStatusCode(Response::HTTP_CREATED);
     }
 
-    public function updateDoorAccess(UpdateCompanyMemberRequest $request, Company $company, User $user): CompanyMemberResource
+    public function updateDoorAccess(UpdateCompanyMemberRequest $request, Company $company, User $user): JsonResponse
     {
         $company->members()->updateExistingPivot($user->id, [
             'door_access_enabled' => $request->validated('door_access_enabled'),
@@ -63,9 +63,7 @@ class CompanyMemberController extends Controller
             'door_access_enabled' => $request->validated('door_access_enabled'),
         ]);
 
-        $membership = $company->members()->where('users.id', $user->id)->first();
-
-        return new CompanyMemberResource($membership->pivot);
+        return response()->json(['message' => __('api.admin.company_member_door_access_updated')]);
     }
 
     /**
@@ -74,7 +72,7 @@ class CompanyMemberController extends Controller
      * gets its first admin, since a company admin can only grant is_admin
      * to an *existing* member (CompanyPolicy::manageMembers).
      */
-    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): CompanyMemberResource
+    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): JsonResponse
     {
         $company->members()->updateExistingPivot($user->id, [
             'is_admin' => $request->validated('is_admin'),
@@ -85,9 +83,7 @@ class CompanyMemberController extends Controller
             'is_admin' => $request->validated('is_admin'),
         ]);
 
-        $membership = $company->members()->where('users.id', $user->id)->first();
-
-        return new CompanyMemberResource($membership->pivot);
+        return response()->json(['message' => __('api.admin.company_member_admin_updated')]);
     }
 
     public function destroy(Company $company, User $user): Response

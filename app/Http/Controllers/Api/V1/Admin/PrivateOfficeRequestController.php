@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Http\Requests\Admin\StorePrivateOfficeRequestRequest;
 use App\Http\Requests\Admin\UpdatePrivateOfficeRequestRequest;
 use App\Http\Resources\PrivateOfficeRequestResource;
+use Illuminate\Http\JsonResponse;
 
 class PrivateOfficeRequestController extends AdminResourceController
 {
@@ -33,10 +34,10 @@ class PrivateOfficeRequestController extends AdminResourceController
         ]));
     }
 
-    public function update(UpdatePrivateOfficeRequestRequest $request, PrivateOfficeRequest $privateOfficeRequest): PrivateOfficeRequestResource
+    public function update(UpdatePrivateOfficeRequestRequest $request, PrivateOfficeRequest $privateOfficeRequest): JsonResponse
     {
         $privateOfficeRequest->update($request->validated());
 
-        return new PrivateOfficeRequestResource($privateOfficeRequest);
+        return response()->json(['message' => __('api.admin.private_office_request_updated')]);
     }
 }

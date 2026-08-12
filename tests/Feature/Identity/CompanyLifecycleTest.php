@@ -73,12 +73,16 @@ class CompanyLifecycleTest extends IdentityTestCase
 
         $company = Company::factory()->create();
 
-        $response = $this->patchJson("/api/v1/admin/companies/{$company->id}/status", [
+        $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/companies/{$company->id}/status", [
             'status' => 'inactive',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.status', 'inactive');
+        $response->assertJsonPath('message', 'Company status updated.');
         $this->assertSame(CompanyStatus::Inactive, $company->refresh()->status);
+
+        $this->getJson("/api/v1/admin/companies/{$company->id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'inactive');
     }
 }
