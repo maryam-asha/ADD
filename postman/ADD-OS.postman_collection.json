@@ -425,51 +425,6 @@
           ]
         },
         {
-          "name": "Account",
-          "description": "Anything about the already-authenticated member, as opposed to the act of logging in.",
-          "item": [
-            {
-              "name": "Get Me",
-              "request": {
-                "auth": {
-                  "type": "bearer",
-                  "bearer": [
-                    {
-                      "key": "token",
-                      "value": "{{member_token}}"
-                    }
-                  ]
-                },
-                "method": "GET",
-                "header": [
-                  {
-                    "key": "lang",
-                    "value": "{{lang}}",
-                    "type": "text"
-                  },
-                  {
-                    "key": "currency",
-                    "value": "{{currency}}",
-                    "type": "text"
-                  }
-                ],
-                "url": {
-                  "raw": "{{base_url}}/api/v1/auth/me",
-                  "host": [
-                    "{{base_url}}"
-                  ],
-                  "path": [
-                    "api",
-                    "v1",
-                    "auth",
-                    "me"
-                  ]
-                }
-              }
-            }
-          ]
-        },
-        {
           "name": "Company",
           "description": "Self-service for a company's own admin managing their own company's members — gated by CompanyPolicy::manageMembers (is_admin on the company_user pivot), checked in the controller rather than by role middleware. Adding or removing a member entirely stays operations-only (Admin (Dashboard)/Company Members).",
           "item": [
