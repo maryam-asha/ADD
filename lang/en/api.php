@@ -54,6 +54,8 @@ return [
         'building_updated' => 'Building updated.',
         'floor_updated' => 'Floor updated.',
         'zone_updated' => 'Zone updated.',
+        'space_updated' => 'Space updated.',
+        'space_status_updated' => 'Space status updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',
         'plan_updated' => 'Plan updated.',

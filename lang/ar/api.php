@@ -54,6 +54,8 @@ return [
         'building_updated' => 'تم تحديث المبنى.',
         'floor_updated' => 'تم تحديث الطابق.',
         'zone_updated' => 'تم تحديث المنطقة.',
+        'space_updated' => 'تم تحديث المساحة.',
+        'space_status_updated' => 'تم تحديث حالة المساحة.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
         'plan_updated' => 'تم تحديث الباقة.',

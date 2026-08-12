@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
+use App\Http\Controllers\Api\V1\Admin\SpaceController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
@@ -27,6 +28,8 @@ Route::apiResource('branches', BranchController::class);
 Route::apiResource('buildings', BuildingController::class);
 Route::apiResource('floors', FloorController::class);
 Route::apiResource('zones', ZoneController::class);
+Route::apiResource('spaces', SpaceController::class);
+Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
