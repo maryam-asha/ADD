@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
@@ -17,6 +18,9 @@ use Illuminate\Support\Facades\Route;
 // Every route in this file already sits behind auth:sanctum + role:admin|operations
 // — that's applied once, from the group wrapping this file in routes/api.php.
 Route::get('me', [CurrentUserController::class, 'show']);
+
+// Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
+Route::apiResource('branches', BranchController::class);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
