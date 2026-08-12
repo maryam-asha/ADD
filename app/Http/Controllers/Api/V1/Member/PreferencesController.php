@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateCurrencyPreferenceRequest;
 use App\Http\Requests\Member\UpdateLanguagePreferenceRequest;
-use App\Http\Resources\UserResource;
+use Illuminate\Http\JsonResponse;
 
 /**
  * `preferred_currency` is display-only (Unit 1 design, 2026-08-09) — never
@@ -16,17 +16,17 @@ use App\Http\Resources\UserResource;
  */
 class PreferencesController extends Controller
 {
-    public function updateCurrency(UpdateCurrencyPreferenceRequest $request): UserResource
+    public function updateCurrency(UpdateCurrencyPreferenceRequest $request): JsonResponse
     {
         $request->user()->update($request->validated());
 
-        return new UserResource($request->user());
+        return response()->json(['message' => __('api.member.currency_preference_updated')]);
     }
 
-    public function updateLanguage(UpdateLanguagePreferenceRequest $request): UserResource
+    public function updateLanguage(UpdateLanguagePreferenceRequest $request): JsonResponse
     {
         $request->user()->update($request->validated());
 
-        return new UserResource($request->user());
+        return response()->json(['message' => __('api.member.language_preference_updated')]);
     }
 }

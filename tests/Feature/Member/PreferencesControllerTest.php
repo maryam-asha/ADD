@@ -24,12 +24,12 @@ class PreferencesControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->patchJson('/api/v1/member/preferences/currency', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/preferences/currency', [
             'preferred_currency' => 'USD',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.preferred_currency', 'USD');
+        $response->assertJsonPath('message', 'Currency preference updated.');
         $this->assertDatabaseHas('users', ['id' => $member->id, 'preferred_currency' => 'USD']);
     }
 
@@ -52,12 +52,12 @@ class PreferencesControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->patchJson('/api/v1/member/preferences/language', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/preferences/language', [
             'preferred_language' => 'en',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.preferred_language', 'en');
+        $response->assertJsonPath('message', 'Language preference updated.');
         $this->assertDatabaseHas('users', ['id' => $member->id, 'preferred_language' => 'en']);
     }
 

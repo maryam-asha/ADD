@@ -24,15 +24,19 @@ class PublicDirectoryConsentControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true]);
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/consents/public-directory', ['granted' => true]);
 
         $response->assertOk();
-        $response->assertJsonPath('granted', true);
+        $response->assertJsonPath('message', 'Consent updated.');
         $this->assertDatabaseHas('consents', [
             'subject_type' => 'user',
             'subject_id' => $member->id,
             'consent_type' => 'public_directory',
         ]);
+
+        $this->getJson('/api/v1/member/consents/public-directory')
+            ->assertOk()
+            ->assertJsonPath('granted', true);
     }
 
     public function test_a_member_can_revoke_public_directory_consent(): void
@@ -42,10 +46,14 @@ class PublicDirectoryConsentControllerTest extends TestCase
         Sanctum::actingAs($member, ['*']);
 
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
-        $response = $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => false]);
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/consents/public-directory', ['granted' => false]);
 
         $response->assertOk();
-        $response->assertJsonPath('granted', false);
+        $response->assertJsonPath('message', 'Consent updated.');
+
+        $this->getJson('/api/v1/member/consents/public-directory')
+            ->assertOk()
+            ->assertJsonPath('granted', false);
     }
 
     public function test_re_granting_after_revoke_creates_a_new_row_preserving_history(): void

@@ -36,4 +36,13 @@ return [
         'failed' => 'البيانات المُرسلة غير صالحة.',
     ],
 
+    'member' => [
+        'currency_preference_updated' => 'تم تحديث تفضيل العملة.',
+        'language_preference_updated' => 'تم تحديث تفضيل اللغة.',
+        'profile_updated' => 'تم تحديث الملف الشخصي.',
+        'consent_updated' => 'تم تحديث الموافقة.',
+        'door_access_updated' => 'تم تحديث صلاحية الدخول.',
+        'admin_flag_updated' => 'تم تحديث صلاحية الإدارة.',
+    ],
+
 ];

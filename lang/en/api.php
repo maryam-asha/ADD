@@ -36,4 +36,13 @@ return [
         'failed' => 'The given data is invalid.',
     ],
 
+    'member' => [
+        'currency_preference_updated' => 'Currency preference updated.',
+        'language_preference_updated' => 'Language preference updated.',
+        'profile_updated' => 'Profile updated.',
+        'consent_updated' => 'Consent updated.',
+        'door_access_updated' => 'Door access updated.',
+        'admin_flag_updated' => 'Admin status updated.',
+    ],
+
 ];

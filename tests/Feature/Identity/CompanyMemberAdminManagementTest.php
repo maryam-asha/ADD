@@ -66,12 +66,12 @@ class CompanyMemberAdminManagementTest extends IdentityTestCase
         $company->members()->attach($target->id, ['door_access_enabled' => false]);
 
         Sanctum::actingAs($companyAdmin, ['*']);
-        $response = $this->patchJson("/api/v1/member/companies/{$company->id}/members/{$target->id}", [
+        $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/member/companies/{$company->id}/members/{$target->id}", [
             'door_access_enabled' => true,
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.door_access_enabled', true);
+        $response->assertJsonPath('message', 'Door access updated.');
         $this->assertTrue(
             $company->members()->wherePivot('door_access_enabled', true)->where('users.id', $target->id)->exists()
         );
@@ -88,12 +88,12 @@ class CompanyMemberAdminManagementTest extends IdentityTestCase
         $company->members()->attach($target->id, ['is_admin' => false]);
 
         Sanctum::actingAs($companyAdmin, ['*']);
-        $response = $this->patchJson("/api/v1/member/companies/{$company->id}/members/{$target->id}/admin", [
+        $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/member/companies/{$company->id}/members/{$target->id}/admin", [
             'is_admin' => true,
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.is_admin', true);
+        $response->assertJsonPath('message', 'Admin status updated.');
         $this->assertTrue(Gate::forUser($target->fresh())->allows('manageMembers', $company));
     }
 

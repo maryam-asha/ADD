@@ -33,8 +33,6 @@ class PublicDirectoryConsentController extends Controller
             Consent::revokeActive(ConsentSubjectType::User, $user->id, ConsentType::PublicDirectory);
         }
 
-        return response()->json([
-            'granted' => Consent::hasActive(ConsentSubjectType::User, $user->id, ConsentType::PublicDirectory),
-        ]);
+        return response()->json(['message' => __('api.member.consent_updated')]);
     }
 }

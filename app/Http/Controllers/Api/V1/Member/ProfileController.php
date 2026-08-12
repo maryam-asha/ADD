@@ -9,7 +9,6 @@ use App\Http\Requests\Member\UpdateProfileRequest;
 use App\Http\Resources\MemberProfileResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
@@ -39,10 +38,6 @@ class ProfileController extends Controller
             );
         });
 
-        // Force 200 rather than Eloquent's wasRecentlyCreated-driven auto-201
-        // (see Admin\CompanyMemberController::store()).
-        return (new MemberProfileResource($user->fresh(['personalProfile', 'professionalProfile'])))
-            ->response()
-            ->setStatusCode(Response::HTTP_OK);
+        return response()->json(['message' => __('api.member.profile_updated')]);
     }
 }

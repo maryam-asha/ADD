@@ -49,7 +49,7 @@ class ProfileControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->patchJson('/api/v1/member/profile', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/profile', [
             'bio' => 'Coffee and code.',
             'city' => 'Aleppo',
             'avatar_url' => 'https://example.com/avatar.png',
@@ -60,8 +60,7 @@ class ProfileControllerTest extends TestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.personal.bio', 'Coffee and code.');
-        $response->assertJsonPath('data.professional.job_title', 'Founder');
+        $response->assertJsonPath('message', 'Profile updated.');
 
         $this->assertDatabaseCount('user_personal_profiles', 1);
         $this->assertDatabaseCount('user_professional_profiles', 1);
@@ -113,15 +112,14 @@ class ProfileControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->patchJson('/api/v1/member/profile', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/profile', [
             'bio' => 'Coffee and code.',
             'city' => 'Aleppo',
             'avatar_url' => 'https://example.com/avatar.png',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.personal.city', 'Aleppo');
-        $response->assertJsonPath('data.professional.job_title', null);
+        $response->assertJsonPath('message', 'Profile updated.');
 
         $this->assertDatabaseCount('user_personal_profiles', 1);
         $this->assertDatabaseCount('user_professional_profiles', 1);
@@ -145,15 +143,13 @@ class ProfileControllerTest extends TestCase
             'company_name' => 'ACME',
         ])->assertOk();
 
-        $response = $this->patchJson('/api/v1/member/profile', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/profile', [
             'bio' => 'Tea now.',
             'city' => 'Damascus',
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('data.personal.city', 'Damascus');
-        $response->assertJsonPath('data.professional.job_title', 'Founder');
-        $response->assertJsonPath('data.professional.company_name', 'ACME');
+        $response->assertJsonPath('message', 'Profile updated.');
 
         $this->assertDatabaseCount('user_personal_profiles', 1);
         $this->assertDatabaseCount('user_professional_profiles', 1);

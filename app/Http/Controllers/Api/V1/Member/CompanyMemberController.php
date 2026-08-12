@@ -8,7 +8,7 @@ use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateCompanyMemberAdminRequest;
 use App\Http\Requests\Member\UpdateCompanyMemberDoorAccessRequest;
-use App\Http\Resources\CompanyMemberResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -22,7 +22,7 @@ class CompanyMemberController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function updateDoorAccess(UpdateCompanyMemberDoorAccessRequest $request, Company $company, User $user): CompanyMemberResource
+    public function updateDoorAccess(UpdateCompanyMemberDoorAccessRequest $request, Company $company, User $user): JsonResponse
     {
         Gate::authorize('manageMembers', $company);
 
@@ -35,12 +35,10 @@ class CompanyMemberController extends Controller
             'door_access_enabled' => $request->validated('door_access_enabled'),
         ]);
 
-        $membership = $company->members()->where('users.id', $user->id)->first();
-
-        return new CompanyMemberResource($membership->pivot);
+        return response()->json(['message' => __('api.member.door_access_updated')]);
     }
 
-    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): CompanyMemberResource
+    public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): JsonResponse
     {
         Gate::authorize('manageMembers', $company);
 
@@ -53,8 +51,6 @@ class CompanyMemberController extends Controller
             'is_admin' => $request->validated('is_admin'),
         ]);
 
-        $membership = $company->members()->where('users.id', $user->id)->first();
-
-        return new CompanyMemberResource($membership->pivot);
+        return response()->json(['message' => __('api.member.admin_flag_updated')]);
     }
 }
