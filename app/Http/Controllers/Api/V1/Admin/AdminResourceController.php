@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Http\Response;
@@ -19,13 +21,15 @@ abstract class AdminResourceController extends Controller
 
     abstract protected function resourceClass(): string;
 
-    public function index(): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection
     {
         $query = ($this->modelClass())::query();
 
         if ($this->hasOrderColumn()) {
             $query->orderBy('order');
         }
+
+        $this->applyIndexFilters($query, $request);
 
         return ($this->resourceClass())::collection($query->get());
     }
@@ -47,5 +51,15 @@ abstract class AdminResourceController extends Controller
     protected function hasOrderColumn(): bool
     {
         return true;
+    }
+
+    /**
+     * No-op by default. Concrete controllers whose index() should support
+     * parent-id query filters (e.g. `buildings?branch_id=`) override this
+     * instead of re-implementing index() from scratch.
+     */
+    protected function applyIndexFilters(Builder $query, Request $request): void
+    {
+        //
     }
 }

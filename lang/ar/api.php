@@ -51,6 +51,7 @@ return [
 
     'admin' => [
         'branch_updated' => 'تم تحديث الفرع.',
+        'building_updated' => 'تم تحديث المبنى.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
         'plan_updated' => 'تم تحديث الباقة.',
