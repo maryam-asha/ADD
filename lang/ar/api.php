@@ -56,6 +56,8 @@ return [
         'zone_updated' => 'تم تحديث المنطقة.',
         'space_updated' => 'تم تحديث المساحة.',
         'space_status_updated' => 'تم تحديث حالة المساحة.',
+        'resource_updated' => 'تم تحديث المورد.',
+        'resource_status_updated' => 'تم تحديث حالة المورد.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
         'plan_updated' => 'تم تحديث الباقة.',
