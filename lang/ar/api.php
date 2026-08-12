@@ -60,6 +60,7 @@ return [
         'resource_status_updated' => 'تم تحديث حالة المورد.',
         'seat_desk_updated' => 'تم تحديث المقعد/المكتب.',
         'device_updated' => 'تم تحديث الجهاز.',
+        'device_capability_updated' => 'تم تحديث خاصية الجهاز.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
         'plan_updated' => 'تم تحديث الباقة.',

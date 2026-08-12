@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
@@ -41,6 +42,10 @@ Route::apiResource('seats-desks', SeatDeskController::class)
     ->parameters(['seats-desks' => 'seatDesk']);
 
 Route::apiResource('devices', DeviceController::class);
+
+// Multi-word resource name — same reason as community-members above.
+Route::apiResource('device-capabilities', DeviceCapabilityController::class)
+    ->parameters(['device-capabilities' => 'deviceCapability']);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
