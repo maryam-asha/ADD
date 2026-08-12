@@ -75,11 +75,13 @@ class SpaceControllerTest extends TestCase
             'space_type' => $space->space_type->value,
             'is_lockable' => $space->is_lockable,
             'capacity' => 10,
+            'status' => 'retired',
         ]);
 
         $response->assertOk();
         $response->assertExactJson(['message' => 'Space updated.']);
         $this->assertSame(10, $space->fresh()->capacity);
+        $this->assertSame('active', $space->fresh()->status->value);
     }
 
     public function test_admin_can_transition_space_status_and_it_is_logged(): void
@@ -100,6 +102,7 @@ class SpaceControllerTest extends TestCase
         $this->assertNotNull($activity);
         $this->assertSame($admin->id, $activity->causer_id);
         $this->assertSame('active', $activity->properties['before']);
+        $this->assertSame('maintenance', $activity->properties['after']);
     }
 
     public function test_admin_can_delete_a_space(): void
