@@ -50,8 +50,7 @@ class ErrorLogIngestionTest extends IdentityTestCase
         $response = $this->postJson('/api/v1/errors', $this->payload());
 
         $response->assertCreated();
-        $response->assertJsonPath('data.error_type', 'NullPointerException');
-        $response->assertJsonPath('data.platform', 'android');
+        $response->assertExactJson(['message' => __('api.mobile.error_logged')]);
 
         $log = ErrorLog::sole();
         $this->assertSame('NullPointerException', $log->error_type);

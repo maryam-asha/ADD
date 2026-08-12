@@ -45,6 +45,10 @@ return [
         'admin_flag_updated' => 'تم تحديث صلاحية الإدارة.',
     ],
 
+    'mobile' => [
+        'error_logged' => 'تم استلام تقرير الخطأ.',
+    ],
+
     'admin' => [
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',

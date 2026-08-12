@@ -41,6 +41,7 @@ class ProfileControllerTest extends TestCase
         $response->assertJsonPath('data.professional.company_name', null);
         $response->assertJsonPath('data.professional.industry', null);
         $response->assertJsonPath('data.professional.linkedin_url', null);
+        $response->assertJsonMissingPath('data.roles');
     }
 
     public function test_patch_with_all_seven_fields_creates_both_rows_in_one_call(): void

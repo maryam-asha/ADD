@@ -45,6 +45,10 @@ return [
         'admin_flag_updated' => 'Admin status updated.',
     ],
 
+    'mobile' => [
+        'error_logged' => 'Error report received.',
+    ],
+
     'admin' => [
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',
