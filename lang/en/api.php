@@ -52,6 +52,7 @@ return [
     'admin' => [
         'branch_updated' => 'Branch updated.',
         'building_updated' => 'Building updated.',
+        'floor_updated' => 'Floor updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',
         'plan_updated' => 'Plan updated.',

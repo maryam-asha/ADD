@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
+use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
@@ -23,6 +24,7 @@ Route::get('me', [CurrentUserController::class, 'show']);
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
 Route::apiResource('branches', BranchController::class);
 Route::apiResource('buildings', BuildingController::class);
+Route::apiResource('floors', FloorController::class);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
