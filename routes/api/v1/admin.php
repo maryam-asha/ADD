@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
@@ -38,6 +39,8 @@ Route::patch('resources/{resource}/status', [ResourceController::class, 'updateS
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('seats-desks', SeatDeskController::class)
     ->parameters(['seats-desks' => 'seatDesk']);
+
+Route::apiResource('devices', DeviceController::class);
 
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);

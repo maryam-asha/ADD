@@ -59,6 +59,7 @@ return [
         'resource_updated' => 'Resource updated.',
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
+        'device_updated' => 'Device updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',
         'plan_updated' => 'Plan updated.',
