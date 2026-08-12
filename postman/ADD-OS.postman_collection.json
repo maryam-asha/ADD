@@ -481,7 +481,7 @@
                     "{{user_id}}"
                   ]
                 },
-                "description": "403 if the acting member isn't an admin of this specific company."
+                "description": "403 if the acting member isn't an admin of this specific company. Returns `{\"message\": \"...\"}` on success, not the updated membership resource."
               }
             },
             {
@@ -538,7 +538,7 @@
                     "admin"
                   ]
                 },
-                "description": "403 if the acting member isn't already an admin of this specific company."
+                "description": "403 if the acting member isn't already an admin of this specific company. Returns `{\"message\": \"...\"}` on success, not the updated membership resource."
               }
             }
           ]
@@ -594,7 +594,7 @@
                 "language"
               ]
             },
-            "description": "Updates the authenticated member's stored language preference (`ar`/`en`). Distinct from the `lang` header: the header overrides the response language for this one request; this changes what a future request with no header falls back to."
+            "description": "Updates the authenticated member's stored language preference (`ar`/`en`). Distinct from the `lang` header: the header overrides the response language for this one request; this changes what a future request with no header falls back to. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
           }
         },
         {
@@ -648,7 +648,7 @@
                 "currency"
               ]
             },
-            "description": "Updates the authenticated member's stored currency preference (`USD`/`SYP`, display-only — never affects real pricing/wallet records). Distinct from the `currency` header: the header overrides a plan-listing response's converted currency for this one request; this changes the stored default a request with no header falls back to."
+            "description": "Updates the authenticated member's stored currency preference (`USD`/`SYP`, display-only — never affects real pricing/wallet records). Distinct from the `currency` header: the header overrides a plan-listing response's converted currency for this one request; this changes the stored default a request with no header falls back to. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
           }
         },
         {
@@ -691,7 +691,7 @@
                     "profile"
                   ]
                 },
-                "description": "Returns the authenticated member in one payload: the same account fields as Get Me (id, name, phone, email, preferred_language, preferred_currency, status, roles) plus `personal` (`bio`, `city`, `avatar_url`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`). Profile fields are null until the member has ever saved one — there is no separate \"not found\" state; the underlying rows are only created on first PATCH. Independent of `Account → Get Me`, which stays account-info-only."
+                "description": "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status — deliberately no `roles`, unlike `/auth/me`'s shared UserResource, since a member doesn't need their own Spatie roles echoed back) plus `personal` (`bio`, `city`, `avatar_url`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`). Profile fields are null until the member has ever saved one — there is no separate \"not found\" state; the underlying rows are only created on first PATCH."
               }
             },
             {
@@ -744,7 +744,7 @@
                     "profile"
                   ]
                 },
-                "description": "Upserts the personal AND professional profile in one call, in one transaction — creates both rows on first call, updates them after, never a duplicate row on either table. Every field is optional and independently nullable: omitting a field leaves it unchanged, sending it as `null` explicitly clears it. Send all seven fields together (as in this example) or just the subset you're changing — both work. Plain single-language strings, not the `{ar, en}` bilingual JSON pattern used for admin-curated content. Returns the same combined shape as Get Profile."
+                "description": "Upserts the personal AND professional profile in one call, in one transaction — creates both rows on first call, updates them after, never a duplicate row on either table. Every field is optional and independently nullable: omitting a field leaves it unchanged, sending it as `null` explicitly clears it. Send all seven fields together (as in this example) or just the subset you're changing — both work. Plain single-language strings, not the `{ar, en}` bilingual JSON pattern used for admin-curated content. Returns `{\"message\": \"...\"}` on success — not the profile data, since you already sent it; use Get Profile to read it back."
               }
             }
           ]
@@ -844,7 +844,7 @@
                     "public-directory"
                   ]
                 },
-                "description": "Grants (`granted: true`) or revokes (`granted: false`) the member's consent to appear in the public member directory (see Public (Site) → Get Member Directory). Consent is append-only history: granting while already active is a no-op, revoking sets `revoked_at` on the active row, and re-granting after a revoke inserts a fresh row rather than reusing the old one. Appearing in the directory also requires at least one filled profile (Personal and/or Professional) and an `active` account status."
+                "description": "Grants (`granted: true`) or revokes (`granted: false`) the member's consent to appear in the public member directory (see Public (Site) → Get Member Directory). Consent is append-only history: granting while already active is a no-op, revoking sets `revoked_at` on the active row, and re-granting after a revoke inserts a fresh row rather than reusing the old one. Appearing in the directory also requires at least one filled profile (Personal and/or Professional) and an `active` account status. Returns `{\"message\": \"...\"}` on success — use Get Consent Status to read the resulting state back."
               }
             }
           ]
@@ -889,7 +889,7 @@
                 "errors"
               ]
             },
-            "description": "Ingests a client-reported error/crash from the member mobile app. Lives under mobile.php, not member.php — deliberately UNAUTHENTICATED (no bearer token needed): a crash can happen before login, e.g. on the splash/login screen itself, so this can't depend on a session existing yet. Placed here for discoverability alongside the rest of the mobile app's requests. Only `error_type` and `message` are required; everything else is optional context. `platform` is restricted to `android`/`ios`; `occurred_at` defaults to now() if omitted. Throttled at 60/min per IP."
+            "description": "Ingests a client-reported error/crash from the member mobile app. Lives under mobile.php, not member.php — deliberately UNAUTHENTICATED (no bearer token needed): a crash can happen before login, e.g. on the splash/login screen itself, so this can't depend on a session existing yet. Placed here for discoverability alongside the rest of the mobile app's requests. Only `error_type` and `message` are required; everything else is optional context. `platform` is restricted to `android`/`ios`; `occurred_at` defaults to now() if omitted. Throttled at 60/min per IP. Returns a `message`-only body on success (201), not the created error-log resource."
           }
         }
       ]
@@ -1685,7 +1685,7 @@
                     "{{private_office_request_id}}"
                   ]
                 },
-                "description": "status only accepts \"requested\" or \"quoted\" here — a 422 comes back for \"contracted\", which is only reachable via Companies/Create Company."
+                "description": "status only accepts \"requested\" or \"quoted\" here — a 422 comes back for \"contracted\", which is only reachable via Companies/Create Company. Returns `{\"message\": \"...\"}` on success, not the updated resource."
               }
             },
             {
@@ -1886,7 +1886,7 @@
                     "status"
                   ]
                 },
-                "description": "status must be \"active\" or \"inactive\" — anything else is a 422."
+                "description": "status must be \"active\" or \"inactive\" — anything else is a 422. Returns `{\"message\": \"...\"}` on success, not the updated resource."
               }
             }
           ]
@@ -2016,7 +2016,8 @@
                     "members",
                     "{{user_id}}"
                   ]
-                }
+                },
+                "description": "Returns `{\"message\": \"...\"}` on success, not the updated membership resource."
               }
             },
             {
@@ -2063,7 +2064,8 @@
                     "{{user_id}}",
                     "admin"
                   ]
-                }
+                },
+                "description": "Returns `{\"message\": \"...\"}` on success, not the updated membership resource."
               }
             },
             {
@@ -2273,7 +2275,7 @@
                     "{{user_id}}"
                   ]
                 },
-                "description": "Profile fields only — status and role are the two separate actions below."
+                "description": "Profile fields only — status and role are the two separate actions below. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
               }
             },
             {
@@ -2319,7 +2321,7 @@
                     "status"
                   ]
                 },
-                "description": "status must be active, deactivated, or blocked (422 otherwise). Setting deactivated/blocked immediately revokes every access token this user holds (User::deactivate()/block()) — their very next request with an old token comes back 401, not 403. reason is optional but always recorded (status_reason/status_changed_at/status_changed_by)."
+                "description": "status must be active, deactivated, or blocked (422 otherwise). Setting deactivated/blocked immediately revokes every access token this user holds (User::deactivate()/block()) — their very next request with an old token comes back 401, not 403. reason is optional but always recorded (status_reason/status_changed_at/status_changed_by). Returns `{\"message\": \"...\"}` on success, not the updated user resource."
               }
             },
             {
@@ -2365,7 +2367,7 @@
                     "role"
                   ]
                 },
-                "description": "role must be member, operations, or admin. admin-only route."
+                "description": "role must be member, operations, or admin. admin-only route. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
               }
             }
           ]
@@ -2571,7 +2573,8 @@
                         "founders",
                         "{{founder_id}}"
                       ]
-                    }
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
                   }
                 },
                 {
@@ -2769,7 +2772,8 @@
                         "partners",
                         "{{partner_id}}"
                       ]
-                    }
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
                   }
                 },
                 {
@@ -2967,7 +2971,8 @@
                         "community-members",
                         "{{community_member_id}}"
                       ]
-                    }
+                    },
+                    "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
                   }
                 },
                 {
