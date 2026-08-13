@@ -2,7 +2,7 @@
     "info":  {
                  "_postman_id":  "a1d0c0de-0001-4a1b-9c1e-add0scollection",
                  "name":  "ADD OS â€” Identity \u0026 Content",
-                 "description":  "Member app auth (phone + password, with WhatsApp OTP for sign-up and recovery), Ops dashboard auth (Fortify session + 2FA, Sanctum SPA), admin-managed site content (Founders/Partners/Community), and the public read-only feed of that same content.\n\nImport the companion environment (ADD OS - Local) and select it â€” base_url, admin_email, admin_password, member_phone, member_password all live there.\n\nEverything under /api lives under /api/v1 â€” the whole API is versioned from day one.\n\nBefore using Admin/*: run the app locally with `php artisan serve --port=8000` â€” Sanctum\u0027s stateful-domain check only recognizes 127.0.0.1:8000 by default.\n\nMember sign-up (once): Member/Auth/Register â€” Send Code (validates the whole profile up front) â†’ read the code from storage/logs/laravel.log (mock WhatsApp driver) â†’ Member/Auth/Register â€” Verify \u0026 Create. Member sign-in (every time after): Member/Auth/Login. Both capture an access_token + refresh_token pair into {{member_token}} and {{member_refresh_token}}; the access token expires after 60 minutes, and Member/Auth/Refresh Token renews it. Forgot the password? Forgot Password â†’ Reset Password â†’ Login.\n\nAdmin flow: Admin/Auth/Get CSRF Cookie once, then Admin/Auth/Login â€” every other Admin/* request reads the XSRF token from the cookie jar automatically. Each Admin/Content/* \"Create\" request captures the new row\u0027s id into a variable ({{founder_id}}, {{partner_id}}, {{community_member_id}}) so the Get/Update/Delete requests right below it work with no manual editing.",
+                 "description":  "واجهة برمجية (API) لتطبيق ADD OS - تطبيق إدارة المستخدمين والمحتوى\n\nالميزات الرئيسية:\n• مصادقة الأعضاء: رقم الهاتف + كلمة المرور، مع رمز التحقق عبر WhatsApp للتسجيل واسترجاع كلمة المرور\n• مصادقة الموظفين: البريد الإلكتروني + كلمة المرور + مصادقة ثنائية\n• إدارة محتوى الموقع: الرؤساء والشركاء والأعضاء المجتمع\n\nقبل البدء:\n1. استورد بيئة العمل المحلية: ADD OS - Local\n2. شغل الخادم: php artisan serve --port=8000\n\nتدفق تسجيل الأعضاء:\nMember/Auth/Register → Send Code → تحقق من الرمز → Verify \u0026 Create\nثم قم بتسجيل الدخول يومياً مع Member/Auth/Login",
                  "schema":  "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
              },
     "variable":  [
@@ -793,7 +793,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "Update Profile Image",
+                                                       "name":  "تحميل صورة الملف الشخصي",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -980,10 +980,10 @@
                                                   }
                                   },
                                   {
-                                      "name":  "Account",
+                                      "name":  "حساب المستخدم",
                                       "item":  [
                                                    {
-                                                       "name":  "Delete Account",
+                                                       "name":  "حذف الحساب (نهائي)",
                                                        "request":  {
                                                                        "method":  "DELETE",
                                                                        "url":  {
@@ -1016,10 +1016,10 @@
                                                ]
                                   },
                                   {
-                                      "name":  "Privacy Policy",
+                                      "name":  "سياسة الخصوصية",
                                       "item":  [
                                                    {
-                                                       "name":  "Get Privacy Policy",
+                                                       "name":  "عرض سياسة الخصوصية",
                                                        "request":  {
                                                                        "method":  "GET",
                                                                        "url":  {
@@ -1050,7 +1050,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "Record Privacy Policy Consent",
+                                                       "name":  "تسجيل الموافقة على السياسة",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -5188,7 +5188,7 @@
                                       "name":  "Privacy Policy",
                                       "item":  [
                                                    {
-                                                       "name":  "Get Privacy Policy",
+                                                       "name":  "عرض سياسة الخصوصية",
                                                        "request":  {
                                                                        "method":  "GET",
                                                                        "url":  {
@@ -5206,12 +5206,12 @@
                                                                                },
                                                                        "header":  [
                                                                                       {
-                                                                                          "key":  "Accept",
+                                                                                          "key":  "Authorization",
                                                                                           "type":  "text",
-                                                                                          "value":  "application/json"
+                                                                                          "value":  "Bearer {{member_token}}"
                                                                                       },
                                                                                       {
-                                                                                          "key":  "Content-Type",
+                                                                                          "key":  "Accept",
                                                                                           "type":  "text",
                                                                                           "value":  "application/json"
                                                                                       }
@@ -5219,7 +5219,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "Update Privacy Policy",
+                                                       "name":  "تحديث سياسة الخصوصية",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -5236,7 +5236,7 @@
                                                                                },
                                                                        "method":  "PATCH",
                                                                        "body":  {
-                                                                                    "raw":  "{\n  \"content\": {\n    \"en\": \"Privacy Policy content in English...\",\n    \"ar\": \"محتوى سياسة الخصوصية بالعربية...\"\n  }\n}",
+                                                                                    "raw":  "{\n  \"content\": {\n    \"en\": \"سياسة الخصوصية الجديدة - النسخة الإنجليزية\",\n    \"ar\": \"سياسة الخصوصية الجديدة - النسخة العربية\"\n  }\n}",
                                                                                     "mode":  "raw"
                                                                                 },
                                                                        "header":  [
