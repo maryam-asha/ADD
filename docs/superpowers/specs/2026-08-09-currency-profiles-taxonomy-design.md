@@ -70,7 +70,7 @@ Two codebase-reality discoveries shaped this design and are recorded here so the
 ### Endpoints
 
 - `Member\PersonalProfileController@show/@update` and `Member\ProfessionalProfileController@show/@update` — `update` upserts (creates the row on first write, since filling a profile is optional). One Form Request per controller.
-- Consent: reuse the existing `consents` table as-is — `subject_type = user`, `consent_type = public_directory` — no schema change. Add `scopeActive()` and `grant()`/`revoke()` helpers to the existing `Consent` model (append-only history, same pattern as `exchange_rates`: granting when no active row exists inserts a new row; revoking sets `revoked_at` on the currently active row; re-granting after a revoke inserts a fresh row rather than reusing the old one). `GuestController`'s existing consent-writing code is left untouched.
+- Consent: reuse the existing `consents` table as-is — `subject_type = user`, `consent_type = public_directory` — no schema change. Add `scopeActive()` and `grant()`/`revoke()` helpers to the existing `Consent` model (append-only history, same pattern as `exchange_rates`: granting when no active row exists inserts a new row; revoking sets `revoked_at` on the currently active row; re-granting after a revoke inserts a fresh row rather than reusing the old one).
 - New endpoint `PATCH /api/v1/member/consents/public-directory` (`{granted: true|false}`) using those helpers.
 
 ### Public Member Directory

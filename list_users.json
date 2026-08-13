@@ -1,0 +1,38 @@
+{
+    "name": "List Users",
+    "request": {
+        "method": "GET",
+        "header": [
+            {
+                "key": "lang",
+                "value": "{{lang}}",
+                "type": "text"
+            },
+            {
+                "key": "currency",
+                "value": "{{currency}}",
+                "type": "text"
+            }
+        ],
+        "url": {
+            "raw": "{{base_url}}/api/v1/admin/users",
+            "host": [
+                "{{base_url}}"
+            ],
+            "path": [
+                "api",
+                "v1",
+                "admin",
+                "users"
+            ],
+            "query": [
+                {
+                    "key": "role",
+                    "value": "operations",
+                    "disabled": true
+                }
+            ]
+        },
+        "description": "Optional ?role= filter (member/operations/admin)."
+    }
+}
