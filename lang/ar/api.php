@@ -20,6 +20,7 @@ return [
         'too_many_attempts' => 'محاولات كثيرة جداً. الرجاء الانتظار قبل المحاولة مرة أخرى.',
         'unauthenticated' => 'غير مصادَق.',
         'forbidden' => 'غير مخوّل بتنفيذ هذا الإجراء.',
+        'account_deleted' => 'تم حذف الحساب.',
     ],
 
     'wallet' => [
@@ -30,6 +31,8 @@ return [
     'system' => [
         'not_found' => 'المورد المطلوب غير موجود.',
         'server_error' => 'حدث خطأ غير متوقع. الرجاء المحاولة لاحقاً.',
+        'updated' => 'تم التحديث بنجاح.',
+        'consent_recorded' => 'تم تسجيل الموافقة.',
     ],
 
     'validation' => [
@@ -43,6 +46,10 @@ return [
         'consent_updated' => 'تم تحديث الموافقة.',
         'door_access_updated' => 'تم تحديث صلاحية الدخول.',
         'admin_flag_updated' => 'تم تحديث صلاحية الإدارة.',
+    ],
+
+    'profile' => [
+        'image_updated' => 'تم تحديث صورة الملف الشخصي.',
     ],
 
     'mobile' => [

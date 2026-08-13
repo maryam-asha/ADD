@@ -108,6 +108,11 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
+    public function privacyPolicyConsents(): HasMany
+    {
+        return $this->hasMany(UserPrivacyPolicyConsent::class);
+    }
+
     /**
      * Voluntary/administrative pause — the reversible half of the two
      * non-active states.

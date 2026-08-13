@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
+use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
@@ -26,6 +27,10 @@ use Illuminate\Support\Facades\Route;
 // Every route in this file already sits behind auth:sanctum + role:admin|operations
 // — that's applied once, from the group wrapping this file in routes/api.php.
 Route::get('me', [CurrentUserController::class, 'show']);
+
+// Privacy Policy
+Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
+Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
 
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
 // destroy() is admin-only for all 9 of these (see the role:admin group below):

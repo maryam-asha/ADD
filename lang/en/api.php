@@ -20,6 +20,7 @@ return [
         'too_many_attempts' => 'Too many attempts. Please wait before trying again.',
         'unauthenticated' => 'Unauthenticated.',
         'forbidden' => 'This action is unauthorized.',
+        'account_deleted' => 'Account deleted.',
     ],
 
     'wallet' => [
@@ -30,6 +31,8 @@ return [
     'system' => [
         'not_found' => 'The requested resource was not found.',
         'server_error' => 'An unexpected error occurred. Please try again later.',
+        'updated' => 'Updated successfully.',
+        'consent_recorded' => 'Consent recorded.',
     ],
 
     'validation' => [
@@ -43,6 +46,10 @@ return [
         'consent_updated' => 'Consent updated.',
         'door_access_updated' => 'Door access updated.',
         'admin_flag_updated' => 'Admin status updated.',
+    ],
+
+    'profile' => [
+        'image_updated' => 'Profile image updated.',
     ],
 
     'mobile' => [

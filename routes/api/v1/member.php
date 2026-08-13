@@ -1,9 +1,11 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Member\AccountController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
+use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
@@ -51,3 +53,11 @@ Route::patch('profile', [ProfileController::class, 'update']);
 // Member consent to appear in a future public directory (Task 5 consumes this).
 Route::get('consents/public-directory', [PublicDirectoryConsentController::class, 'show']);
 Route::patch('consents/public-directory', [PublicDirectoryConsentController::class, 'update']);
+
+// Account management
+Route::delete('account', [AccountController::class, 'delete']);
+Route::patch('profile/image', [AccountController::class, 'updateProfileImage']);
+
+// Privacy Policy
+Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
+Route::post('privacy-policy/consent', [PrivacyPolicyController::class, 'consent']);
