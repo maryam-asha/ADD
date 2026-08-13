@@ -793,7 +793,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "تحميل صورة الملف الشخصي",
+                                                       "name":  "Update Profile Image",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -980,10 +980,10 @@
                                                   }
                                   },
                                   {
-                                      "name":  "حساب المستخدم",
+                                      "name":  "Account",
                                       "item":  [
                                                    {
-                                                       "name":  "حذف الحساب (نهائي)",
+                                                       "name":  "Delete Account",
                                                        "request":  {
                                                                        "method":  "DELETE",
                                                                        "url":  {
@@ -1016,10 +1016,10 @@
                                                ]
                                   },
                                   {
-                                      "name":  "سياسة الخصوصية",
+                                      "name":  "Privacy Policy",
                                       "item":  [
                                                    {
-                                                       "name":  "عرض سياسة الخصوصية",
+                                                       "name":  "Get Privacy Policy",
                                                        "request":  {
                                                                        "method":  "GET",
                                                                        "url":  {
@@ -1050,7 +1050,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "تسجيل الموافقة على السياسة",
+                                                       "name":  "Record Consent",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -5188,7 +5188,7 @@
                                       "name":  "Privacy Policy",
                                       "item":  [
                                                    {
-                                                       "name":  "عرض سياسة الخصوصية",
+                                                       "name":  "Get Privacy Policy",
                                                        "request":  {
                                                                        "method":  "GET",
                                                                        "url":  {
@@ -5219,7 +5219,7 @@
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "تحديث سياسة الخصوصية",
+                                                       "name":  "Update Privacy Policy",
                                                        "request":  {
                                                                        "url":  {
                                                                                    "host":  [
@@ -5236,7 +5236,7 @@
                                                                                },
                                                                        "method":  "PATCH",
                                                                        "body":  {
-                                                                                    "raw":  "{\n  \"content\": {\n    \"en\": \"سياسة الخصوصية الجديدة - النسخة الإنجليزية\",\n    \"ar\": \"سياسة الخصوصية الجديدة - النسخة العربية\"\n  }\n}",
+                                                                                    "raw":  "{\n  \"content\": {\n    \"en\": \"Privacy Policy content in English\",\n    \"ar\": \"محتوى سياسة الخصوصية بالعربية\"\n  }\n}",
                                                                                     "mode":  "raw"
                                                                                 },
                                                                        "header":  [
