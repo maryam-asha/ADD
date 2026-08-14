@@ -31,6 +31,11 @@ abstract class AdminResourceController extends Controller
 
         $this->applyIndexFilters($query, $request);
 
+        if ($request->filled('per_page')) {
+            $perPage = $request->integer('per_page', 15);
+            return ($this->resourceClass())::collection($query->paginate($perPage));
+        }
+
         return ($this->resourceClass())::collection($query->get());
     }
 

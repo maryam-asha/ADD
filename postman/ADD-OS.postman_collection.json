@@ -110,7 +110,7 @@
                      "item":  [
                                   {
                                       "name":  "Auth",
-                                      "description":  "MEMBERS ONLY. An operations or admin account cannot sign in or reset a password anywhere in this folder â€” those accounts belong to Admin/Auth, behind Fortify\u0027s second factor. Tokens minted here carry the ability `member-app`, which /api/v1/admin/* rejects, so this surface stays sealed off from operations even for someone who is legitimately both.\n\nTwo separate journeys, in order.\n\nSIGN UP (once per member): Register â€” Send Code â†’ Register â€” Verify \u0026 Create. Step 1 validates the whole profile and parks it, so a number that already has an account is refused there with a 422 rather than after the OTP round trip; step 2 then needs only the phone and the code. Nothing lands in `users` until step 2.\n\nSIGN IN (every time after): Login with phone + password. Refresh Token renews the access token when it expires (60 min) without re-entering the password; Logout ends the session on this device only.\n\nFORGOT IT: Forgot Password â†’ Reset Password. The reset revokes every token the member holds on every device, and deliberately issues none â€” sign in again afterwards.\n\nRegister â€” Verify \u0026 Create, Login and Refresh Token all capture the pair into {{member_token}} and {{member_refresh_token}}.",
+                                      "description":  "MEMBERS ONLY. An operations or admin account cannot sign in or reset a password anywhere in this folder â€” those accounts belong to Admin/Auth, behind Fortify\u0027s second factor. Tokens minted here carry the ability `member-app`, which /api/v1/admin/* rejects, so this surface stays sealed off from operations even for someone who is legitimately both.\n\nTwo separate journeys, in order.\n\nSIGN UP (once per member): Register â€” Send Code â†’ Register â€” Verify \u0026 Create. Step 1 validates the whole profile and parks it, so a number that already has an account is refused there with a 422 rather than after the OTP round trip; step 2 then needs only the phone and the code. Nothing lands in `users` until step 2.\n\nSIGN IN (every time after): Login with phone + password. Refresh Token renews the access token when it expires (60 min) without re-entering the password; Logout ends the session on this device only.\n\nFORGOT IT: Forgot Password â†’ Reset Password. The reset revokes every token the member holds on every device, and deliberately issues none â€” sign in again afterwards.\n\nRegister â€” Verify \u0026 Create, Login and Refresh Token all capture the pair into {{member_token}} and {{member_refresh_token}}. Account Reactivation -- Verify does the same.\n\nDEACTIVATED, WANT BACK IN: Account Reactivation -- Request Code -> Account Reactivation -- Verify. Only works on an account a member deactivated themselves (Member (App)/Account/Deactivate Account) -- a blocked account can't use this; only an admin can reverse a block. Verify signs the member straight back in with a fresh token pair, since a deactivated account holds no live session to return to.\n\nAlready signed in and just want a new password without having forgotten the old one? That's Member (App)/Account/Change Password instead -- it proves identity with the current password rather than a code, and only ends every *other* session, not this one.",
                                       "item":  [
                                                    {
                                                        "name":  "Register â€” Send Code",
@@ -425,6 +425,113 @@
                                                                                             ]
                                                                                },
                                                                        "description":  "Sets the new password and revokes every access and refresh token the member holds, on every device â€” the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Account Reactivation -- Request Code",
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\"\n}",
+                                                                                    "options":  {
+                                                                                                    "raw":  {
+                                                                                                                "language":  "json"
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/auth/account/reactivate",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "auth",
+                                                                                                "account",
+                                                                                                "reactivate"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "Sends an `account_reactivation` code -- only useful to a phone that belongs to a DEACTIVATED member account (that's Member (App)/Account/Deactivate Account, the self-service action that puts it in this state). Always answers 200 with the same neutral message whether or not that applies, same as Forgot Password -- a 200 here is not confirmation anything was sent.\n\nA blocked account never gets a code here -- reversing a block is admin-only (Admin (Dashboard)/Users/Update User Status). Read the code from storage/logs/laravel.log (mock WhatsApp driver) and paste it into Account Reactivation -- Verify."
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Account Reactivation -- Verify",
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "if (pm.response.code === 200) {",
+                                                                                                     "    const body = pm.response.json();",
+                                                                                                     "    pm.collectionVariables.set('member_token', body.access_token);",
+                                                                                                     "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                                                                                                     "    console.log('member_token + member_refresh_token captured');",
+                                                                                                     "}"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ],
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
+                                                                                    "options":  {
+                                                                                                    "raw":  {
+                                                                                                                "language":  "json"
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/auth/account/reactivate/verify",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "auth",
+                                                                                                "account",
+                                                                                                "reactivate",
+                                                                                                "verify"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "Restores the account to `active` and signs it straight back in -- unlike Reset Password, this issues a fresh access_token + refresh_token pair (captured automatically), because a deactivated account has no live session to fall back on; there is no separate Login step afterwards.\n\nThe code must have been issued by Account Reactivation -- Request Code. A registration or password-reset code sent here is refused with 422 and a message saying so."
                                                                    }
                                                    },
                                                    {
@@ -981,6 +1088,7 @@
                                   },
                                   {
                                       "name":  "Account",
+                                      "description":  "Delete is permanent and immediate. Deactivate is the reversible, self-service pause -- undo it with Auth/Account Reactivation (a WhatsApp code, since a deactivated account has no session to sign back into). Change Password is the authenticated alternative to Auth/Forgot Password, for a member who already knows their current password and is signed in; it proves identity with that password instead of a code, and only ends every *other* session, keeping this one alive.",
                                       "item":  [
                                                    {
                                                        "name":  "Delete Account",
@@ -1011,6 +1119,114 @@
                                                                                           "value":  "application/json"
                                                                                       }
                                                                                   ]
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Deactivate Account",
+                                                       "request":  {
+                                                                       "auth":  {
+                                                                                    "type":  "bearer",
+                                                                                    "bearer":  [
+                                                                                                   {
+                                                                                                       "key":  "token",
+                                                                                                       "value":  "{{member_token}}"
+                                                                                                   }
+                                                                                               ]
+                                                                                },
+                                                                       "method":  "PATCH",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"reason\": \"Taking a break\"\n}",
+                                                                                    "options":  {
+                                                                                                    "raw":  {
+                                                                                                                "language":  "json"
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/member/account/deactivate",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "member",
+                                                                                                "account",
+                                                                                                "deactivate"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "Voluntary, self-service pause -- the member's own counterpart to an admin deactivating/blocking a user (Admin (Dashboard)/Users/Update User Status). `reason` is optional free text, kept for the record. Every session this member holds is revoked, on every device.\n\nReversible only through Auth/Account Reactivation (a WhatsApp code) -- there is no way back in through Login while `deactivated`. An admin can also reverse it directly, same as a block. Returns `{\"message\": \"...\"}`, not the updated user resource."
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Change Password",
+                                                       "request":  {
+                                                                       "auth":  {
+                                                                                    "type":  "bearer",
+                                                                                    "bearer":  [
+                                                                                                   {
+                                                                                                       "key":  "token",
+                                                                                                       "value":  "{{member_token}}"
+                                                                                                   }
+                                                                                               ]
+                                                                                },
+                                                                       "method":  "PATCH",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"current_password\": \"{{member_password}}\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
+                                                                                    "options":  {
+                                                                                                    "raw":  {
+                                                                                                                "language":  "json"
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/member/account/password",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "member",
+                                                                                                "account",
+                                                                                                "password"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "The authenticated alternative to Auth/Forgot Password -> Auth/Reset Password: proves identity with `current_password` instead of a WhatsApp code, for a member who already knows it and is signed in. Same password rule as sign-up: min 8 chars, `confirmed`.\n\n422 with `current_password_incorrect` if that field doesn't match -- the password is left unchanged.\n\nOn success, every OTHER session this member holds is revoked, but the one making THIS request stays alive -- unlike Reset Password, which ends all of them and issues nothing back. No new token is issued here either, since the current one is still valid; {{member_token}} keeps working as-is.\n\nThe example re-uses {{member_password}} for current and new so the variable stays valid for later requests in this collection -- swap in a real new value to test an actual change."
                                                                    }
                                                    }
                                                ]

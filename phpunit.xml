@@ -35,6 +35,10 @@
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
         <env name="MAIL_MAILER" value="array"/>
+        <!-- Cleared regardless of a local .env override (e.g. for manual
+             mobile-app testing) — tests that assert on distinct codes would
+             otherwise flake whenever that convenience flag is set. -->
+        <env name="OTP_FIXED_CODE" value=""/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>

@@ -125,4 +125,23 @@ class TokenPairService
             $user->tokens()->delete();
         });
     }
+
+    /**
+     * Cut every session but the one making this request. Unlike revokeAll(),
+     * this is for a password change proved from *inside* an already-trusted
+     * session — the member just presented their current password over this
+     * exact token, so there is nothing wrong with it to revoke, only every
+     * other device that might still be holding the old credential.
+     */
+    public function revokeAllExcept(User $user, PersonalAccessToken $currentAccessToken): void
+    {
+        DB::transaction(function () use ($user, $currentAccessToken) {
+            $user->refreshTokens()
+                ->whereNull('revoked_at')
+                ->where('access_token_id', '!=', $currentAccessToken->getKey())
+                ->update(['revoked_at' => now()]);
+
+            $user->tokens()->whereKeyNot($currentAccessToken->getKey())->delete();
+        });
+    }
 }

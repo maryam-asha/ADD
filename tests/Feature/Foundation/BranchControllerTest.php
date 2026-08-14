@@ -76,6 +76,20 @@ class BranchControllerTest extends TestCase
         $this->getJson('/api/v1/admin/branches')->assertOk()->assertJsonCount(2, 'data');
     }
 
+    public function test_admin_can_paginate_branches(): void
+    {
+        $this->actingAsAdmin();
+        Branch::factory()->count(5)->create();
+
+        $response = $this->getJson('/api/v1/admin/branches?per_page=2');
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('meta.total', 5);
+        $response->assertJsonPath('meta.per_page', 2);
+        $response->assertJsonPath('links.next', fn ($url) => str_contains($url, 'page=2'));
+    }
+
     public function test_admin_can_show_a_branch(): void
     {
         $this->actingAsAdmin();

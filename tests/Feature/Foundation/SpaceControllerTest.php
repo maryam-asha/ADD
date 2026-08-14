@@ -73,6 +73,20 @@ class SpaceControllerTest extends TestCase
         $response->assertJsonPath('data.0.id', $matching->id);
     }
 
+    public function test_index_can_be_paginated(): void
+    {
+        $this->actingAsAdmin();
+        Space::factory()->count(8)->create();
+
+        $response = $this->getJson('/api/v1/admin/spaces?per_page=3');
+
+        $response->assertOk();
+        $response->assertJsonCount(3, 'data');
+        $response->assertJsonPath('meta.total', 8);
+        $response->assertJsonPath('meta.per_page', 3);
+        $response->assertJsonPath('links.next', fn ($url) => str_contains($url, 'page=2'));
+    }
+
     public function test_admin_can_update_structural_fields_without_touching_status(): void
     {
         $this->actingAsAdmin();

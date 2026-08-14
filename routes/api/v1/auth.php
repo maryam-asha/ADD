@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Auth\AccountReactivationController;
 use App\Http\Controllers\Api\V1\Auth\MemberAuthController;
 use App\Http\Controllers\Api\V1\Auth\MemberPasswordController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
@@ -26,6 +27,15 @@ Route::prefix('auth')->group(function () {
     // email-based reset for the operations dashboard; these two don't overlap.
     Route::post('password/forgot', [MemberPasswordController::class, 'forgot'])->middleware('throttle:10,1');
     Route::post('password/reset', [MemberPasswordController::class, 'reset'])->middleware('throttle:10,1');
+
+    // The deactivated-only counterpart to admin-side unblocking: a member who
+    // deactivated their own account (member/account/deactivate) can restore it
+    // with a WhatsApp code, same as a password reset. A blocked account is
+    // excluded on purpose — AccountReactivationController::memberFor() only
+    // resolves a `deactivated` account, so this can never be the way a block
+    // gets reversed; that stays an admin-only action.
+    Route::post('account/reactivate', [AccountReactivationController::class, 'request'])->middleware('throttle:10,1');
+    Route::post('account/reactivate/verify', [AccountReactivationController::class, 'verify'])->middleware('throttle:10,1');
 
     Route::middleware('auth:sanctum')->group(function () {
         // Named so EnsureUserIsActive's global check (bootstrap/app.php) can

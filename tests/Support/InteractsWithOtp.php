@@ -44,4 +44,16 @@ trait InteractsWithOtp
 
         return $this->otpProvider->lastCodeFor($phone);
     }
+
+    /**
+     * Step one of self-service reactivation. Returns the code sent, or null
+     * when the number doesn't resolve to a deactivated member account — this
+     * endpoint answers 200 either way by design.
+     */
+    protected function startAccountReactivation(string $phone): ?string
+    {
+        $this->postJson('/api/v1/auth/account/reactivate', ['phone' => $phone])->assertOk();
+
+        return $this->otpProvider->lastCodeFor($phone);
+    }
 }

@@ -56,6 +56,8 @@ Route::patch('consents/public-directory', [PublicDirectoryConsentController::cla
 
 // Account management
 Route::delete('account', [AccountController::class, 'delete']);
+Route::patch('account/deactivate', [AccountController::class, 'deactivate']);
+Route::patch('account/password', [AccountController::class, 'changePassword']);
 Route::patch('profile/image', [AccountController::class, 'updateProfileImage']);
 
 // Privacy Policy

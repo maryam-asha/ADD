@@ -21,6 +21,11 @@ return [
         'unauthenticated' => 'غير مصادَق.',
         'forbidden' => 'غير مخوّل بتنفيذ هذا الإجراء.',
         'account_deleted' => 'تم حذف الحساب.',
+        'account_deactivated' => 'تم تعطيل الحساب.',
+        'account_reactivation_code_sent' => 'إذا كان هذا الرقم مرتبطاً بحساب معطّل، فسيتم إرسال رمز إعادة التفعيل إليه.',
+        'code_purpose_mismatch' => 'هذا الرمز مخصّص لإجراء آخر.',
+        'current_password_incorrect' => 'كلمة المرور الحالية غير صحيحة.',
+        'password_changed' => 'تم تحديث كلمة المرور.',
     ],
 
     'wallet' => [

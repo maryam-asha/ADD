@@ -104,6 +104,10 @@ class OtpService
 
     private function generateCode(): string
     {
+        if ($fixed = config('otp.fixed_code')) {
+            return $fixed;
+        }
+
         $length = config('otp.code_length');
 
         return (string) random_int(10 ** ($length - 1), (10 ** $length) - 1);

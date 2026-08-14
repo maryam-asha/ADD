@@ -21,6 +21,11 @@ return [
         'unauthenticated' => 'Unauthenticated.',
         'forbidden' => 'This action is unauthorized.',
         'account_deleted' => 'Account deleted.',
+        'account_deactivated' => 'Account deactivated.',
+        'account_reactivation_code_sent' => 'If that number belongs to a deactivated account, a reactivation code has been sent to it.',
+        'code_purpose_mismatch' => 'That code was issued for a different action.',
+        'current_password_incorrect' => 'Current password is incorrect.',
+        'password_changed' => 'Password updated.',
     ],
 
     'wallet' => [
