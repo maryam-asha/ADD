@@ -73,4 +73,48 @@ class SettingServiceTest extends TestCase
 
         $this->assertSame(999, $service->get('test.cached_key'));
     }
+
+    public function test_get_does_not_permanently_cache_the_callers_default(): void
+    {
+        $service = new SettingService;
+
+        // First caller supplies a default for a key that doesn't exist yet.
+        $this->assertSame('first-default', $service->get('test.some_missing_key', 'first-default'));
+
+        // A later call with no default must see null, not the previous
+        // caller's default baked into the cache.
+        $this->assertNull($service->get('test.some_missing_key'));
+
+        // And a later call with a different default must see that default,
+        // not the first caller's.
+        $this->assertSame('other-default', $service->get('test.some_missing_key', 'other-default'));
+    }
+
+    public function test_set_default_creates_a_new_key_with_the_given_value(): void
+    {
+        $service = new SettingService;
+
+        $setting = $service->setDefault('test.new_default_key', 42, SettingValueType::Int);
+
+        $this->assertSame(42, $setting->resolvedValue());
+        $this->assertSame(42, $service->get('test.new_default_key'));
+        $this->assertDatabaseHas('settings', [
+            'key' => 'test.new_default_key',
+            'scope_type' => 'global',
+            'scope_id' => 0,
+            'type' => 'int',
+            'value' => '42',
+        ]);
+    }
+
+    public function test_set_default_does_not_overwrite_an_existing_value(): void
+    {
+        $service = new SettingService;
+        $service->set('test.already_set_key', 10, SettingValueType::Int);
+
+        $setting = $service->setDefault('test.already_set_key', 999, SettingValueType::Int);
+
+        $this->assertSame(10, $setting->resolvedValue());
+        $this->assertSame(10, $service->get('test.already_set_key'));
+    }
 }

@@ -38,9 +38,9 @@ adds an 11th.
   index meaningful.
 - **Cache-aside with no TTL.** `SettingService::get()` calls
   `Cache::rememberForever()`; `set()` always calls `Cache::forget()` on
-  its own key first. A TTL would mean a booking request occasionally reads
-  a stale value for no reason, when exact invalidation on write is no
-  harder to build.
+  its own key right after writing. A TTL would mean a booking request
+  occasionally reads a stale value for no reason, when exact invalidation
+  on write is no harder to build.
 - **Seeded defaults for keys with no spec-given value are assumptions, not
   locked decisions** — flagged here for confirmation before this reaches
   production:

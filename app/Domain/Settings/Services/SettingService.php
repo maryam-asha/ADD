@@ -11,9 +11,10 @@ use InvalidArgumentException;
 /**
  * The one read/write path for settings rows. Reads are cached forever
  * (settings change rarely, and only through set(), which always forgets
- * its own cache key first) rather than on a TTL — a TTL would mean a
- * booking request occasionally reads a stale cancellation window for no
- * reason, when exact invalidation is just as easy to get right.
+ * its own cache key right after writing) rather than on a TTL — a TTL
+ * would mean a booking request occasionally reads a stale cancellation
+ * window for no reason, when exact invalidation is just as easy to get
+ * right.
  */
 class SettingService
 {
@@ -23,10 +24,12 @@ class SettingService
         SettingScope $scopeType = SettingScope::Global,
         int $scopeId = 0,
     ): mixed {
-        return Cache::rememberForever(
+        $value = Cache::rememberForever(
             $this->cacheKey($key, $scopeType, $scopeId),
-            fn () => $this->find($key, $scopeType, $scopeId)?->resolvedValue() ?? $default,
+            fn () => $this->find($key, $scopeType, $scopeId)?->resolvedValue(),
         );
+
+        return $value ?? $default;
     }
 
     public function set(
@@ -53,6 +56,23 @@ class SettingService
         Cache::forget($this->cacheKey($key, $scopeType, $scopeId));
 
         return $setting;
+    }
+
+    /**
+     * Creates a setting only if it doesn't already exist for this key/scope —
+     * for seeding initial values without clobbering an admin edit. Unlike
+     * set(), which always overwrites (that's what the admin update endpoint
+     * needs), this is a no-op when the row is already there.
+     */
+    public function setDefault(
+        string $key,
+        mixed $value,
+        SettingValueType $type,
+        SettingScope $scopeType = SettingScope::Global,
+        int $scopeId = 0,
+    ): Setting {
+        return $this->find($key, $scopeType, $scopeId)
+            ?? $this->set($key, $value, $type, $scopeType, $scopeId);
     }
 
     private function find(string $key, SettingScope $scopeType, int $scopeId): ?Setting

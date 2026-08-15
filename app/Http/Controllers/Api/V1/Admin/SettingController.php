@@ -25,7 +25,11 @@ class SettingController extends Controller
     public function index(): AnonymousResourceCollection
     {
         return SettingResource::collection(
-            Setting::query()->where('scope_type', SettingScope::Global)->orderBy('key')->get()
+            Setting::query()
+                ->where('scope_type', SettingScope::Global)
+                ->where('scope_id', 0)
+                ->orderBy('key')
+                ->get()
         );
     }
 
@@ -35,11 +39,11 @@ class SettingController extends Controller
         $before = $setting->resolvedValue();
         $after = $request->validated('value');
 
-        $settings->set($key, $after, $setting->type);
+        $updated = $settings->set($key, $after, $setting->type);
 
         $this->logSensitiveAction('setting_updated', $setting, [
             'before' => $before,
-            'after' => $after,
+            'after' => $updated->resolvedValue(),
         ]);
 
         return response()->json(['message' => __('api.admin.setting_updated')]);

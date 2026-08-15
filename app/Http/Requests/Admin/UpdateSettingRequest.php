@@ -34,6 +34,7 @@ class UpdateSettingRequest extends FormRequest
         return $this->resolvedSetting ??= Setting::query()
             ->where('key', $this->route('key'))
             ->where('scope_type', SettingScope::Global)
+            ->where('scope_id', 0)
             ->firstOrFail();
     }
 }

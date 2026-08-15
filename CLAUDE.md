@@ -28,7 +28,7 @@ php artisan test --filter=test_method_name
 
 # Migrations / seeders
 php artisan migrate
-php artisan db:seed                          # runs RoleSeeder only (see DatabaseSeeder)
+php artisan db:seed                          # runs RoleSeeder + SettingSeeder (see DatabaseSeeder)
 php artisan db:seed --class=AdminUserSeeder  # bootstraps the first admin account (local only)
 
 # Code style (Laravel Pint, no custom pint.json — uses Pint's defaults)
