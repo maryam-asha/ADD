@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
+use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
@@ -31,6 +32,9 @@ Route::get('me', [CurrentUserController::class, 'show']);
 // Privacy Policy
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
 Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
+
+// Settings — global key/value config (docs/decisions/settings-key-value-store.md).
+Route::get('settings', [SettingController::class, 'index']);
 
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
 // destroy() is admin-only for all 9 of these (see the role:admin group below):
@@ -117,4 +121,6 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('seats-desks/{seatDesk}', [SeatDeskController::class, 'destroy']);
     Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
     Route::delete('device-capabilities/{deviceCapability}', [DeviceCapabilityController::class, 'destroy']);
+
+    Route::patch('settings/{key}', [SettingController::class, 'update']);
 });

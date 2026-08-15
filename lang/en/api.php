@@ -84,6 +84,7 @@ return [
         'user_updated' => 'User updated.',
         'user_status_updated' => 'User status updated.',
         'user_role_updated' => 'User role updated.',
+        'setting_updated' => 'Setting updated.',
     ],
 
 ];

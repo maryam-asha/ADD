@@ -84,6 +84,7 @@ return [
         'user_updated' => 'تم تحديث المستخدم.',
         'user_status_updated' => 'تم تحديث حالة المستخدم.',
         'user_role_updated' => 'تم تحديث دور المستخدم.',
+        'setting_updated' => 'تم تحديث الإعداد.',
     ],
 
 ];
