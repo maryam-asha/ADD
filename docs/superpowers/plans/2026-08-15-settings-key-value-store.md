@@ -589,6 +589,7 @@ git commit -m "feat: add SettingService with cache-aside get/set"
 **Files:**
 - Create: `database/seeders/SettingSeeder.php`
 - Modify: `database/seeders/DatabaseSeeder.php`
+- Test: `tests/Feature/Settings/SettingSeederTest.php`
 
 **Interfaces:**
 - Consumes: `SettingService::set()` (Task 4).
@@ -657,12 +658,16 @@ to:
 
 - [ ] **Step 3: Write a feature test asserting the seed**
 
-Create `tests/Feature/Admin/SettingSeederTest.php`:
+Create `tests/Feature/Settings/SettingSeederTest.php` — this is a domain-level
+seeding test, not an HTTP-audience test, so it belongs in a domain-named
+Feature subdirectory (matching e.g. `tests/Feature/Membership/`), not
+`tests/Feature/Admin/` (reserved for `Api/V1/Admin` controller tests, see
+Task 6's `SettingControllerTest`):
 
 ```php
 <?php
 
-namespace Tests\Feature\Admin;
+namespace Tests\Feature\Settings;
 
 use App\Domain\Settings\Services\SettingService;
 use Database\Seeders\SettingSeeder;
@@ -692,13 +697,13 @@ class SettingSeederTest extends TestCase
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `php artisan test tests/Feature/Admin/SettingSeederTest.php`
+Run: `php artisan test tests/Feature/Settings/SettingSeederTest.php`
 Expected: PASS
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add database/seeders/SettingSeeder.php database/seeders/DatabaseSeeder.php tests/Feature/Admin/SettingSeederTest.php
+git add database/seeders/SettingSeeder.php database/seeders/DatabaseSeeder.php tests/Feature/Settings/SettingSeederTest.php
 git commit -m "feat: seed default values for every settings key"
 ```
 
