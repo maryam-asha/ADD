@@ -26,6 +26,9 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Settings\Enums\SettingScope;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Models\Setting;
 use Tests\TestCase;
 
 /**
@@ -78,6 +81,10 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         WalletTransaction::class => [
             'category' => WalletTransactionCategory::class,
             'source' => WalletTransactionSource::class,
+        ],
+        Setting::class => [
+            'scope_type' => SettingScope::class,
+            'type' => SettingValueType::class,
         ],
     ];
 
