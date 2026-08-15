@@ -2825,6 +2825,87 @@
                                                ]
                                   },
                                   {
+                                      "name":  "Settings",
+                                      "description":  "Global key/value config (docs/decisions/settings-key-value-store.md). List is available to admin and operations; update is admin-only.",
+                                      "item":  [
+                                                   {
+                                                       "name":  "List Settings",
+                                                       "request":  {
+                                                                       "method":  "GET",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/admin/settings",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "admin",
+                                                                                                "settings"
+                                                                                            ]
+                                                                               }
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Update Setting",
+                                                       "request":  {
+                                                                       "method":  "PATCH",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                   "mode":  "raw",
+                                                                                   "raw":  "{\n  \"value\": 15\n}",
+                                                                                   "options":  {
+                                                                                                   "raw":  {
+                                                                                                               "language":  "json"
+                                                                                                           }
+                                                                                               }
+                                                                               },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/admin/settings/booking.buffer_minutes",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "admin",
+                                                                                                "settings",
+                                                                                                "booking.buffer_minutes"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "`value`'s expected shape depends on the key's type (int/bool/string/time \"H:i\"/json array) — a mismatch is a 422. Returns `{\"message\": \"...\"}` on success, not the updated setting."
+                                                                   }
+                                                   }
+                                               ]
+                                  },
+                                  {
                                       "name":  "Spatial Hierarchy",
                                       "description":  "Branch \u003e Building \u003e Floor \u003e Zone \u003e Space \u003e Resource / SeatDesk, plus Device \u003e DeviceCapability off Branch/Space (docs/decisions/district-removed.md, docs/architecture/2026-08-08-backend-build-plan.md). Each folder\u0027s Create auto-captures the new row\u0027s id for the requests below it â€” build top-down (Branch first) the first time through.",
                                       "item":  [
