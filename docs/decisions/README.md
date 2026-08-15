@@ -27,6 +27,7 @@ first migration for that phase is built to the full shape instead of a
 minimal version that gets reworked later.
 
 - [wallet-points-categorization.md](wallet-points-categorization.md) — unified category/restriction/expiry model for wallet transactions, for Phase 3
+- [settings-key-value-store.md](settings-key-value-store.md) — new `Settings` domain: cached, typed key/value config, the enabler for business hours/booking/guests/profile/module-toggle work
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
