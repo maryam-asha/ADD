@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
+use App\Http\Controllers\Api\V1\Admin\BusinessHourController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
@@ -59,6 +60,13 @@ Route::apiResource('devices', DeviceController::class)->except('destroy');
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('device-capabilities', DeviceCapabilityController::class)
     ->parameters(['device-capabilities' => 'deviceCapability'])
+    ->except('destroy');
+
+// Business hours — per-branch recurring weekly schedule
+// (docs/decisions/business-hours.md). Multi-word resource name — same
+// reason as community-members above.
+Route::apiResource('business-hours', BusinessHourController::class)
+    ->parameters(['business-hours' => 'businessHour'])
     ->except('destroy');
 
 Route::apiResource('founders', FounderController::class);
@@ -121,6 +129,7 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('seats-desks/{seatDesk}', [SeatDeskController::class, 'destroy']);
     Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
     Route::delete('device-capabilities/{deviceCapability}', [DeviceCapabilityController::class, 'destroy']);
+    Route::delete('business-hours/{businessHour}', [BusinessHourController::class, 'destroy']);
 
     Route::patch('settings/{key}', [SettingController::class, 'update']);
 });

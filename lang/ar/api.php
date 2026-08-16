@@ -85,6 +85,7 @@ return [
         'user_status_updated' => 'تم تحديث حالة المستخدم.',
         'user_role_updated' => 'تم تحديث دور المستخدم.',
         'setting_updated' => 'تم تحديث الإعداد.',
+        'business_hour_updated' => 'تم تحديث ساعات العمل.',
     ],
 
 ];
