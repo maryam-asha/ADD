@@ -20,7 +20,7 @@ class AmountCalculator
     public function forRange(Space $space, CarbonInterface $start, CarbonInterface $end): array
     {
         $seconds = $start->diffInSeconds($end);
-        $hours = sprintf('%.6f', $seconds / 3600);
+        $hours = bcdiv((string) $seconds, '3600', 6);
         $rate = (string) ($space->hourly_rate ?? '0.00');
 
         return [bcmul($hours, $rate, 2), $space->pricing_currency];
