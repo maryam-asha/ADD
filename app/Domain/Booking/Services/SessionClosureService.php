@@ -2,12 +2,15 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Domain\Identity\Models\User;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -52,6 +55,32 @@ class SessionClosureService
     public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
     {
         $this->finalizeClosure($session, $closingInstant, TerminationSource::Auto);
+    }
+
+    /**
+     * Reception collected cash/sham/mtn/syriatel and confirms it here — no
+     * wallet is touched (that only happens for a wallet-sourced booking
+     * payment, out of scope this phase, and for the separate wallet
+     * top-up endpoint). "Write the same wallet-transaction-style audit
+     * trail used elsewhere" is the caller's job via LogsSensitiveActions,
+     * not this service's.
+     */
+    public function settlePayment(Booking|WalkinSession $session, PaymentMethod $method, User $operator): void
+    {
+        if ($session->checked_out_at === null || $session->amount_owed === null) {
+            throw new ReceptionActionException('api.reception.not_yet_checked_out');
+        }
+
+        if ($session->payment_state === PaymentState::Paid) {
+            throw new ReceptionActionException('api.reception.already_paid', 409);
+        }
+
+        $session->forceFill([
+            'payment_state' => PaymentState::Paid,
+            'payment_method' => $method,
+            'paid_by' => $operator->id,
+            'paid_at' => now(),
+        ])->save();
     }
 
     /**

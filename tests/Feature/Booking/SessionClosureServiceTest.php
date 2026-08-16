@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\SessionClosureService;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -142,6 +145,61 @@ class SessionClosureServiceTest extends TestCase
             $this->fail('Expected a ReceptionActionException for not checked in.');
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.reception.not_checked_in', $e->messageKey);
+        }
+    }
+
+    public function test_settling_payment_marks_paid_and_records_operator(): void
+    {
+        $space = $this->openSpace();
+        $operator = User::factory()->create();
+        $session = WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus'),
+            'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'),
+            'amount_owed' => '10.00',
+        ]);
+
+        $this->closures->settlePayment($session, PaymentMethod::Sham, $operator);
+
+        $session->refresh();
+        $this->assertSame(PaymentState::Paid, $session->payment_state);
+        $this->assertSame(PaymentMethod::Sham, $session->payment_method);
+        $this->assertTrue($session->paid_by === $operator->id);
+        $this->assertNotNull($session->paid_at);
+    }
+
+    public function test_settling_an_already_paid_session_fails(): void
+    {
+        $space = $this->openSpace();
+        $operator = User::factory()->create();
+        $session = WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus'),
+            'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'),
+            'amount_owed' => '10.00',
+            'payment_state' => PaymentState::Paid,
+        ]);
+
+        try {
+            $this->closures->settlePayment($session, PaymentMethod::Cash, $operator);
+            $this->fail('Expected a ReceptionActionException for already paid.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.reception.already_paid', $e->messageKey);
+            $this->assertSame(409, $e->status);
+        }
+    }
+
+    public function test_settling_payment_before_checkout_fails(): void
+    {
+        $space = $this->openSpace();
+        $operator = User::factory()->create();
+        $session = WalkinSession::factory()->create(['space_id' => $space->id]);
+
+        try {
+            $this->closures->settlePayment($session, PaymentMethod::Cash, $operator);
+            $this->fail('Expected a ReceptionActionException for not yet checked out.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.reception.not_yet_checked_out', $e->messageKey);
         }
     }
 }
