@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\DayOfWeek;
@@ -56,6 +57,12 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
     private const EXPECTED_CASTS = [
         Booking::class => [
             'status' => BookingStatus::class,
+            'payment_state' => PaymentState::class,
+            'payment_source' => PaymentSource::class,
+            'termination_source' => TerminationSource::class,
+            'payment_method' => PaymentMethod::class,
+        ],
+        WalkinSession::class => [
             'payment_state' => PaymentState::class,
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
