@@ -45,6 +45,16 @@ class SessionClosureService
     }
 
     /**
+     * Identical effect to closeOut(), termination_source = auto, no
+     * operator. Called by the scheduled command for any session still
+     * checked in past its branch's closing time.
+     */
+    public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
+    {
+        $this->finalizeClosure($session, $closingInstant, TerminationSource::Auto);
+    }
+
+    /**
      * Last period's close_time (H:i) for the branch's local calendar date
      * matching $instant, or null if closed that day. Public: Task 7's
      * auto-closure command needs this to decide which open sessions are

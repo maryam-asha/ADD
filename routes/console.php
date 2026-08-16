@@ -15,3 +15,11 @@ Artisan::command('inspire', function () {
  * indefinitely — see App\Domain\Identity\Models\PendingRegistration::prunable().
  */
 Schedule::command('model:prune')->hourly();
+
+/*
+ * Reception operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
+ * — a booking or walk-in session still checked in past its branch's
+ * closing time must be closed automatically (termination_source = auto),
+ * not left open indefinitely until reception happens to notice.
+ */
+Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes();
