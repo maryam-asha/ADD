@@ -230,6 +230,59 @@ class BusinessHourExceptionControllerTest extends TestCase
         $response->assertJson(['message' => __('api.admin.business_hour_exception_updated')]);
     }
 
+    public function test_updating_a_closed_entirely_exception_with_times_but_no_is_closed_field_converts_it_to_a_period(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+        $exception = BusinessHourException::factory()->closedEntirely()->create([
+            'branch_id' => $branch->id,
+            'date' => '2026-12-25',
+        ]);
+
+        // Deliberately omit `is_closed` — the client is only sending times.
+        $response = $this->patchJson("/api/v1/admin/business-hour-exceptions/{$exception->id}", [
+            'branch_id' => $branch->id,
+            'date' => '2026-12-25',
+            'open_time' => '09:00',
+            'close_time' => '13:00',
+        ]);
+
+        $response->assertOk();
+
+        $exception->refresh();
+        $this->assertFalse($exception->is_closed);
+        $this->assertSame('09:00', $exception->open_time);
+        $this->assertSame('13:00', $exception->close_time);
+    }
+
+    public function test_updating_a_period_exception_to_closed_entirely_without_resending_times_nulls_them_out(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+        $exception = BusinessHourException::factory()->create([
+            'branch_id' => $branch->id,
+            'date' => '2026-04-10',
+            'is_closed' => false,
+            'open_time' => '09:00',
+            'close_time' => '13:00',
+        ]);
+
+        // Deliberately omit open_time/close_time — the client is only
+        // flipping is_closed.
+        $response = $this->patchJson("/api/v1/admin/business-hour-exceptions/{$exception->id}", [
+            'branch_id' => $branch->id,
+            'date' => '2026-04-10',
+            'is_closed' => true,
+        ]);
+
+        $response->assertOk();
+
+        $exception->refresh();
+        $this->assertTrue($exception->is_closed);
+        $this->assertNull($exception->open_time);
+        $this->assertNull($exception->close_time);
+    }
+
     public function test_an_operations_user_can_list_but_not_delete(): void
     {
         $operator = User::factory()->create();

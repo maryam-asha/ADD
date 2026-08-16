@@ -42,7 +42,19 @@ class BusinessHourExceptionController extends AdminResourceController
 
     public function update(UpdateBusinessHourExceptionRequest $request, BusinessHourException $businessHourException): JsonResponse
     {
-        $businessHourException->update($request->validated());
+        $data = $request->validated();
+
+        // A partial update that flips is_closed to true without resending
+        // open/close times (or vice versa) must not leave the row's OTHER
+        // half stale from before — explicitly null the times whenever the
+        // validated is_closed is true, rather than trusting the input to
+        // have supplied nulls.
+        if ($data['is_closed']) {
+            $data['open_time'] = null;
+            $data['close_time'] = null;
+        }
+
+        $businessHourException->update($data);
 
         return response()->json(['message' => __('api.admin.business_hour_exception_updated')]);
     }

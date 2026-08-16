@@ -16,6 +16,21 @@ class StoreBusinessHourExceptionRequest extends FormRequest
     }
 
     /**
+     * Normalizes `is_closed` to an actual boolean and merges it back into
+     * the request data BEFORE validation runs, so it's always present in
+     * validated() — even when the client omits it entirely. Without this,
+     * an update that omits `is_closed` would validate against the
+     * "not closed" branch (since $this->boolean('is_closed') defaults to
+     * false) but never actually persist that false, leaving a stale
+     * `is_closed` value from before mismatched with the new open/close
+     * times — the exact mixed state this whole feature exists to prevent.
+     */
+    protected function prepareForValidation(): void
+    {
+        $this->merge(['is_closed' => $this->boolean('is_closed')]);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
