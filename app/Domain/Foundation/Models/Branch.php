@@ -46,6 +46,11 @@ class Branch extends Model
         return $this->hasMany(Device::class);
     }
 
+    public function businessHours(): HasMany
+    {
+        return $this->hasMany(BusinessHour::class);
+    }
+
     public function userBranchMemberships(): HasMany
     {
         return $this->hasMany(UserBranchMembership::class);
