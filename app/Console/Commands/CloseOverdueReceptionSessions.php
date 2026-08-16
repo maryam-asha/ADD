@@ -60,7 +60,6 @@ class CloseOverdueReceptionSessions extends Command
             return;
         }
 
-        $localClosingTime = $now->copy()->setTimezone('Asia/Damascus')->setTimeFromTimeString($closingTime);
-        $closures->autoClose($session, $localClosingTime->setTimezone('UTC'));
+        $closures->autoClose($session, $now->copy()->setTimeFromTimeString($closingTime));
     }
 }

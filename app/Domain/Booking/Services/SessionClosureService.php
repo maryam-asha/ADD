@@ -88,7 +88,7 @@ class SessionClosureService
         [$amount, $currency] = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
 
         $session->forceFill([
-            'checked_out_at' => $checkedOutAt,
+            'checked_out_at' => $checkedOutAt->copy()->setTimezone('UTC'),
             'termination_source' => $source,
             'amount_owed' => $amount,
             'currency' => $currency,
