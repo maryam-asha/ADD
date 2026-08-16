@@ -865,7 +865,7 @@ class BusinessHoursServiceTest extends TestCase
     public function test_resolution_is_correct_for_an_instant_near_a_day_boundary_in_the_configured_timezone(): void
     {
         $branch = Branch::factory()->create();
-        // Sunday is open all day; Saturday has no schedule (closed).
+        // Sunday is open all day; Monday has no schedule at all (closed).
         BusinessHour::factory()->create([
             'branch_id' => $branch->id,
             'day_of_week' => DayOfWeek::Sunday,
@@ -876,11 +876,16 @@ class BusinessHoursServiceTest extends TestCase
         $settings = new SettingService;
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
 
-        // 2026-08-16 21:30:00 UTC is a Saturday in UTC, but Asia/Damascus is
-        // UTC+3, so locally it is already 2026-08-17 00:30:00 — a Sunday.
-        $instant = Carbon::parse('2026-08-16 21:30:00', 'UTC');
+        // 2026-08-16 is a Sunday. 22:00:00 UTC, converted to Asia/Damascus
+        // (UTC+3, no DST), is 2026-08-17 01:00:00 — already Monday locally,
+        // even though the instant's own UTC calendar day is still Sunday.
+        $instant = Carbon::parse('2026-08-16 22:00:00', 'UTC');
 
-        $this->assertTrue($this->service->isWithinBusinessHours($instant, $branch));
+        // If resolution incorrectly used the instant's UTC weekday (Sunday,
+        // open all day), this would wrongly return true. The correct,
+        // timezone-aware answer is false: locally it is already Monday,
+        // which has no schedule at all.
+        $this->assertFalse($this->service->isWithinBusinessHours($instant, $branch));
     }
 }
 ```
