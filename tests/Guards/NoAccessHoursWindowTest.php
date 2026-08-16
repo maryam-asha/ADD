@@ -14,6 +14,18 @@ use Tests\TestCase;
  * later booking/check-in flow. The guard fails on the file paths and on
  * the specific config key, not just "the class doesn't exist", so it also
  * catches a re-implementation under a different name.
+ *
+ * Scope, clarified 2026-08-15 (docs/decisions/business-hours-prd-11-partial-reversal.md):
+ * this guard covers the PHYSICAL/DOOR-ACCESS layer only. Decision #11 never
+ * governed booking or scheduling — a distinct, separately-approved
+ * business-hours concept for BOOKING now exists
+ * (App\Domain\Foundation\Services\BusinessHoursService, `business_hours` /
+ * `business_hour_exceptions` tables). That is not a violation of this
+ * guard or of decision #11: physical door access remains unrestricted and
+ * TTLock grants remain `Period` with no time window, exactly as before.
+ * The three assertions below are unchanged — none of them are weakened,
+ * narrowed, or skipped; this comment only makes the scope explicit now
+ * that something exists to contrast against.
  */
 class NoAccessHoursWindowTest extends TestCase
 {

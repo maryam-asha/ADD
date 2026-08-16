@@ -21,6 +21,7 @@ decided, and what enforces it now.
 - [preferred-language-mutable.md](preferred-language-mutable.md) — `preferred_language` reversed from effectively-read-only to member-writable, landed alongside the new `preferred_currency` preference
 - [member-auth-hybrid.md](member-auth-hybrid.md) — members sign in with a password; OTP demoted to enrolment and recovery, access+refresh token pair introduced
 - [currency-header-conversion-scope.md](currency-header-conversion-scope.md) — `converted_amount`/`converted_currency` are always-present and reach the nested `MembershipResource.data.plan`, not just direct plan-listing responses
+- [business-hours-prd-11-partial-reversal.md](business-hours-prd-11-partial-reversal.md) — clarifies that booking-hours (Phase 2) does not reverse PRD #11 (physical access remains 24/7); the guard's docblock scope is stated explicitly, not weakened
 
 **Design docs** — written ahead of the phase that implements them, so the
 first migration for that phase is built to the full shape instead of a
