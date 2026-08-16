@@ -106,6 +106,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         WalletTransaction::class => [
             'category' => WalletTransactionCategory::class,
             'source' => WalletTransactionSource::class,
+            'payment_method' => PaymentMethod::class,
         ],
         Setting::class => [
             'scope_type' => SettingScope::class,
