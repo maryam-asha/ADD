@@ -22,7 +22,7 @@ member can reserve a space for a given time. This is a different question
 about a different system: no `Device`, lock, or TTLock code is touched by
 this phase (Access/TTLock is Phase 6, not yet built), and physical entry
 continues to require nothing beyond a valid access grant, unrestricted by
-time — decision #9 keeps TTLock grants `Period`-typed specifically because
+time — decision #13 keeps TTLock grants `Period`-typed specifically because
 the main door has no lock at all, so time-restricting a room's own code
 would have no enforcement effect on when someone enters the building.
 
