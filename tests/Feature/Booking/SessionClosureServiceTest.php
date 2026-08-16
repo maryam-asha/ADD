@@ -41,10 +41,10 @@ class SessionClosureServiceTest extends TestCase
     public function test_checkout_computes_amount_from_actual_elapsed_duration(): void
     {
         $space = $this->openSpace('10.00');
-        $checkedInAt = Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus');
+        $checkedInAt = Carbon::parse('2026-08-17 09:00:00');
         $session = WalkinSession::factory()->create(['space_id' => $space->id, 'checked_in_at' => $checkedInAt]);
 
-        $this->closures->closeOut($session, Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus'));
+        $this->closures->closeOut($session, Carbon::parse('2026-08-17 11:30:00'));
 
         $session->refresh();
         $this->assertNotNull($session->checked_out_at);
@@ -56,13 +56,13 @@ class SessionClosureServiceTest extends TestCase
     public function test_checkout_works_identically_for_a_booking(): void
     {
         $space = $this->openSpace('10.00');
-        $checkedInAt = Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus');
+        $checkedInAt = Carbon::parse('2026-08-17 09:00:00');
         $booking = Booking::factory()->create([
             'space_id' => $space->id,
             'checked_in_at' => $checkedInAt,
         ]);
 
-        $this->closures->closeOut($booking, Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));
+        $this->closures->closeOut($booking, Carbon::parse('2026-08-17 10:00:00'));
 
         $this->assertSame('10.00', (string) $booking->fresh()->amount_owed);
     }
