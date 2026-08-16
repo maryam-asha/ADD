@@ -20,6 +20,7 @@ return [
         'too_many_attempts' => 'Too many attempts. Please wait before trying again.',
         'unauthenticated' => 'Unauthenticated.',
         'forbidden' => 'This action is unauthorized.',
+        'already_authenticated' => 'You are already signed in.',
         'account_deleted' => 'Account deleted.',
         'account_deactivated' => 'Account deactivated.',
         'account_reactivation_code_sent' => 'If that number belongs to a deactivated account, a reactivation code has been sent to it.',

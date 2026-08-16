@@ -59,6 +59,13 @@ return Application::configure(basePath: dirname(__DIR__))
             // TokenPairService::MEMBER_APP_ABILITY for why both are needed.
             'abilities' => CheckAbilities::class,
             'ability' => CheckForAnyAbility::class,
+
+            // Overrides the framework default so Fortify's guest-only routes
+            // (`/login`, ...) return JSON to an already-authenticated SPA
+            // caller instead of an unconditional redirect() — see the class
+            // docblock for why `redirectGuestsTo(fn () => null)` below only
+            // covers the opposite direction.
+            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —

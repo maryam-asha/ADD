@@ -20,6 +20,7 @@ return [
         'too_many_attempts' => 'محاولات كثيرة جداً. الرجاء الانتظار قبل المحاولة مرة أخرى.',
         'unauthenticated' => 'غير مصادَق.',
         'forbidden' => 'غير مخوّل بتنفيذ هذا الإجراء.',
+        'already_authenticated' => 'أنت مسجّل الدخول بالفعل.',
         'account_deleted' => 'تم حذف الحساب.',
         'account_deactivated' => 'تم تعطيل الحساب.',
         'account_reactivation_code_sent' => 'إذا كان هذا الرقم مرتبطاً بحساب معطّل، فسيتم إرسال رمز إعادة التفعيل إليه.',
