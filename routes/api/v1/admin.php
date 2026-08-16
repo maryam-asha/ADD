@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\BusinessHourController;
+use App\Http\Controllers\Api\V1\Admin\BusinessHourExceptionController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
@@ -69,6 +70,11 @@ Route::apiResource('business-hours', BusinessHourController::class)
     ->parameters(['business-hours' => 'businessHour'])
     ->except('destroy');
 
+// Multi-word resource name — same reason as community-members above.
+Route::apiResource('business-hour-exceptions', BusinessHourExceptionController::class)
+    ->parameters(['business-hour-exceptions' => 'businessHourException'])
+    ->except('destroy');
+
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
@@ -130,6 +136,7 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
     Route::delete('device-capabilities/{deviceCapability}', [DeviceCapabilityController::class, 'destroy']);
     Route::delete('business-hours/{businessHour}', [BusinessHourController::class, 'destroy']);
+    Route::delete('business-hour-exceptions/{businessHourException}', [BusinessHourExceptionController::class, 'destroy']);
 
     Route::patch('settings/{key}', [SettingController::class, 'update']);
 });

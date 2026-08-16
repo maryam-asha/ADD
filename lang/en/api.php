@@ -86,6 +86,7 @@ return [
         'user_role_updated' => 'User role updated.',
         'setting_updated' => 'Setting updated.',
         'business_hour_updated' => 'Business hour updated.',
+        'business_hour_exception_updated' => 'Business hour exception updated.',
     ],
 
 ];
