@@ -14,4 +14,5 @@ enum WalletTransactionSource: string
     case SubscriptionGrant = 'subscription_grant';
     case Gift = 'gift';
     case CompanyAdminAllocation = 'company_admin_allocation';
+    case Refund = 'refund';
 }
