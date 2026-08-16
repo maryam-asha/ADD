@@ -25,5 +25,6 @@ class SettingSeeder extends Seeder
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
+        $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
     }
 }

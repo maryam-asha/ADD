@@ -25,6 +25,7 @@ class SettingSeederTest extends TestCase
         $this->assertSame(80, $settings->get('profile.completion_threshold'));
         $this->assertSame(120, $settings->get('guest.host_approval_timeout_seconds'));
         $this->assertTrue($settings->get('module.cafe.is_enabled'));
+        $this->assertSame('Asia/Damascus', $settings->get('app.timezone'));
     }
 
     public function test_re_seeding_does_not_clobber_an_admin_edited_value(): void
