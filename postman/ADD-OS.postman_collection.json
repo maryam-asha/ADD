@@ -2906,6 +2906,470 @@
                                                ]
                                   },
                                   {
+                                      "name":  "Business Hours",
+                                      "description":  "Per-branch weekly schedule and date exceptions (docs/decisions/business-hours.md). List/Get are available to admin and operations; Create/Update/Delete are admin-only where the route requires it.",
+                                      "item":  [
+                                                   {
+                                                       "name":  "Weekly Schedule",
+                                                       "item":  [
+                                                                    {
+                                                                        "name":  "List Business Hours",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hours",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hours"
+                                                                                                             ],
+                                                                                                    "query":  [
+                                                                                                                  {
+                                                                                                                      "key":  "branch_id",
+                                                                                                                      "value":  "{{branch_id}}",
+                                                                                                                      "disabled":  true
+                                                                                                                  }
+                                                                                                              ]
+                                                                                                },
+                                                                                        "description":  "Optional ?branch_id= filter."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Create Business Hour",
+                                                                        "event":  [
+                                                                                      {
+                                                                                          "listen":  "test",
+                                                                                          "script":  {
+                                                                                                         "type":  "text/javascript",
+                                                                                                         "exec":  [
+                                                                                                                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                                                                                      "    pm.collectionVariables.set('business_hour_id', pm.response.json().data.id);",
+                                                                                                                      "}"
+                                                                                                                  ]
+                                                                                                     }
+                                                                                      }
+                                                                                  ],
+                                                                        "request":  {
+                                                                                        "method":  "POST",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"branch_id\": {{branch_id}},\n  \"day_of_week\": \"monday\",\n  \"open_time\": \"08:00\",\n  \"close_time\": \"17:00\"\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hours",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hours"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Get Business Hour",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hours/{{business_hour_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hours",
+                                                                                                                 "{{business_hour_id}}"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Update Business Hour",
+                                                                        "request":  {
+                                                                                        "method":  "PUT",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"branch_id\": {{branch_id}},\n  \"day_of_week\": \"monday\",\n  \"open_time\": \"09:00\",\n  \"close_time\": \"18:00\"\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hours/{{business_hour_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hours",
+                                                                                                                 "{{business_hour_id}}"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "Returns `{\"message\": \"...\"}` on success, not the updated resource. day_of_week must be one of sunday..saturday; close_time must be strictly after open_time and must not overlap an existing period for the same branch+weekday."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Delete Business Hour",
+                                                                        "request":  {
+                                                                                        "method":  "DELETE",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hours/{{business_hour_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hours",
+                                                                                                                 "{{business_hour_id}}"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "Admin-only (not operations)."
+                                                                                    }
+                                                                    }
+                                                                ]
+                                                   },
+                                                   {
+                                                       "name":  "Exceptions",
+                                                       "item":  [
+                                                                    {
+                                                                        "name":  "List Exceptions",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions"
+                                                                                                             ],
+                                                                                                    "query":  [
+                                                                                                                  {
+                                                                                                                      "key":  "branch_id",
+                                                                                                                      "value":  "{{branch_id}}",
+                                                                                                                      "disabled":  true
+                                                                                                                  }
+                                                                                                              ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Create Exception (closed entirely)",
+                                                                        "event":  [
+                                                                                      {
+                                                                                          "listen":  "test",
+                                                                                          "script":  {
+                                                                                                         "type":  "text/javascript",
+                                                                                                         "exec":  [
+                                                                                                                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                                                                                      "    pm.collectionVariables.set('business_hour_exception_id', pm.response.json().data.id);",
+                                                                                                                      "}"
+                                                                                                                  ]
+                                                                                                     }
+                                                                                      }
+                                                                                  ],
+                                                                        "request":  {
+                                                                                        "method":  "POST",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"branch_id\": {{branch_id}},\n  \"date\": \"2026-12-25\",\n  \"is_closed\": true,\n  \"reason\": \"Holiday\"\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "is_closed=true means open_time/close_time must be omitted."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Create Exception (shortened hours)",
+                                                                        "request":  {
+                                                                                        "method":  "POST",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"branch_id\": {{branch_id}},\n  \"date\": \"2026-04-10\",\n  \"is_closed\": false,\n  \"open_time\": \"09:00\",\n  \"close_time\": \"13:00\",\n  \"reason\": \"Ramadan hours\"\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "is_closed=false requires open_time/close_time; close_time must be strictly after open_time and must not overlap an existing period for the same branch+date."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Get Exception",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions/{{business_hour_exception_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions",
+                                                                                                                 "{{business_hour_exception_id}}"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Update Exception",
+                                                                        "request":  {
+                                                                                        "method":  "PUT",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"branch_id\": {{branch_id}},\n  \"date\": \"2026-12-25\",\n  \"is_closed\": true,\n  \"reason\": \"Holiday (updated)\"\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions/{{business_hour_exception_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions",
+                                                                                                                 "{{business_hour_exception_id}}"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Delete Exception",
+                                                                        "request":  {
+                                                                                        "method":  "DELETE",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "currency",
+                                                                                                           "value":  "{{currency}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/business-hour-exceptions/{{business_hour_exception_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "business-hour-exceptions",
+                                                                                                                 "{{business_hour_exception_id}}"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "Admin-only (not operations)."
+                                                                                    }
+                                                                    }
+                                                                ]
+                                                   }
+                                               ]
+                                  },
+                                  {
                                       "name":  "Spatial Hierarchy",
                                       "description":  "Branch \u003e Building \u003e Floor \u003e Zone \u003e Space \u003e Resource / SeatDesk, plus Device \u003e DeviceCapability off Branch/Space (docs/decisions/district-removed.md, docs/architecture/2026-08-08-backend-build-plan.md). Each folder\u0027s Create auto-captures the new row\u0027s id for the requests below it â€” build top-down (Branch first) the first time through.",
                                       "item":  [
