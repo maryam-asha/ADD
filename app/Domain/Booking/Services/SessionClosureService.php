@@ -88,6 +88,11 @@ class SessionClosureService
         [$amount, $currency] = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
 
         $session->forceFill([
+            // Normalize to UTC: Eloquent's datetime cast stores the Carbon value's
+            // current wall-clock as-is and reinterprets it as UTC on read, so
+            // non-UTC inputs (e.g. from autoClose()'s Damascus-timezone closing time)
+            // would round-trip with a 3-hour drift. This ensures correct storage
+            // regardless of the caller's timezone.
             'checked_out_at' => $checkedOutAt->copy()->setTimezone('UTC'),
             'termination_source' => $source,
             'amount_owed' => $amount,
