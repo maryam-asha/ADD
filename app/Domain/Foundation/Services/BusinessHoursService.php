@@ -42,6 +42,12 @@ class BusinessHoursService
     }
 
     /**
+     * An empty array means closed, but does not distinguish an explicit
+     * exception closure (which may carry a `reason` on the
+     * `BusinessHourException` row) from a weekday with no schedule at all —
+     * a caller that needs to explain *why* a date is closed must query
+     * `BusinessHourException` directly for that date.
+     *
      * @return array<int, array{open_time: string, close_time: string}>
      */
     public function periodsFor(CarbonInterface $date, Branch $branch): array

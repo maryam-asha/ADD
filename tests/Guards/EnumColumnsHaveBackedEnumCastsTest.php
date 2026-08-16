@@ -3,9 +3,11 @@
 namespace Tests\Guards;
 
 use App\Domain\Foundation\Enums\AllocationModel;
+use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Enums\CompanyStatus;
@@ -54,6 +56,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Resource::class => [
             'category' => ResourceCategory::class,
             'status' => OperationalStatus::class,
+        ],
+        BusinessHour::class => [
+            'day_of_week' => DayOfWeek::class,
         ],
         PrivateOfficeRequest::class => [
             'status' => PrivateOfficeRequestStatus::class,

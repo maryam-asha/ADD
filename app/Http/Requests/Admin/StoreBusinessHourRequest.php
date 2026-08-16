@@ -21,6 +21,8 @@ class StoreBusinessHourRequest extends FormRequest
      */
     public function rules(): array
     {
+        $openTime = is_string($this->input('open_time')) ? $this->input('open_time') : '';
+
         $existingPeriods = BusinessHour::query()
             ->where('branch_id', $this->input('branch_id'))
             ->where('day_of_week', $this->input('day_of_week'))
@@ -47,7 +49,7 @@ class StoreBusinessHourRequest extends FormRequest
                         $fail('The close time must be strictly after the open time.');
                     }
                 },
-                new NoOverlappingPeriod($existingPeriods, (string) $this->input('open_time')),
+                new NoOverlappingPeriod($existingPeriods, $openTime),
             ],
         ];
     }

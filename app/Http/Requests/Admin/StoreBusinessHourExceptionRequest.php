@@ -41,9 +41,12 @@ class StoreBusinessHourExceptionRequest extends FormRequest
             $openTimeRules = ['prohibited'];
             $closeTimeRules = ['prohibited'];
         } else {
+            $date = is_string($this->input('date')) ? $this->input('date') : '';
+            $openTime = is_string($this->input('open_time')) ? $this->input('open_time') : '';
+
             $existingPeriods = BusinessHourException::query()
                 ->where('branch_id', $this->input('branch_id'))
-                ->whereDate('date', (string) $this->input('date'))
+                ->whereDate('date', $date)
                 ->where('is_closed', false)
                 ->when(
                     $this->route('businessHourException'),
@@ -65,7 +68,7 @@ class StoreBusinessHourExceptionRequest extends FormRequest
                         $fail('The close time must be strictly after the open time.');
                     }
                 },
-                new NoOverlappingPeriod($existingPeriods, (string) $this->input('open_time')),
+                new NoOverlappingPeriod($existingPeriods, $openTime),
             ];
         }
 
@@ -86,9 +89,11 @@ class StoreBusinessHourExceptionRequest extends FormRequest
                 return;
             }
 
+            $date = is_string($this->input('date')) ? $this->input('date') : '';
+
             $siblings = BusinessHourException::query()
                 ->where('branch_id', $this->input('branch_id'))
-                ->whereDate('date', (string) $this->input('date'))
+                ->whereDate('date', $date)
                 ->when(
                     $this->route('businessHourException'),
                     fn ($query, $exception) => $query->whereKeyNot($exception->id)

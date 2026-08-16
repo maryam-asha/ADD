@@ -21,6 +21,7 @@ class SettingControllerTest extends TestCase
         $this->seed(RoleSeeder::class);
         app(SettingService::class)->set('booking.buffer_minutes', 0, SettingValueType::Int);
         app(SettingService::class)->set('module.cafe.is_enabled', true, SettingValueType::Bool);
+        app(SettingService::class)->set('app.timezone', 'Asia/Damascus', SettingValueType::String);
     }
 
     public function test_an_admin_can_list_settings(): void
@@ -96,6 +97,29 @@ class SettingControllerTest extends TestCase
         Sanctum::actingAs($operator, ['*']);
 
         $this->patchJson('/api/v1/admin/settings/booking.buffer_minutes', ['value' => 15])->assertForbidden();
+    }
+
+    public function test_an_admin_can_update_app_timezone_to_a_valid_identifier(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/app.timezone', ['value' => 'Europe/London']);
+
+        $response->assertOk();
+        $this->assertSame('Europe/London', app(SettingService::class)->get('app.timezone'));
+    }
+
+    public function test_updating_app_timezone_rejects_an_invalid_identifier(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->patchJson('/api/v1/admin/settings/app.timezone', ['value' => 'Not/AZone']);
+
+        $response->assertStatus(422);
     }
 
     public function test_updating_a_setting_writes_an_audit_log_entry(): void

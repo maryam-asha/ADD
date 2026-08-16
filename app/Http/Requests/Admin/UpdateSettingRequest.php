@@ -18,6 +18,10 @@ class UpdateSettingRequest extends FormRequest
 
     public function rules(): array
     {
+        if ($this->targetSetting()->key === 'app.timezone') {
+            return ['value' => ['required', 'string', 'timezone']];
+        }
+
         return [
             'value' => match ($this->targetSetting()->type) {
                 SettingValueType::Int => ['required', 'integer'],
