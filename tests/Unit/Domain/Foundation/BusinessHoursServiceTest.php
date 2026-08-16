@@ -211,4 +211,28 @@ class BusinessHoursServiceTest extends TestCase
         // which has no schedule at all.
         $this->assertFalse($this->service->isWithinBusinessHours($instant, $branch));
     }
+
+    public function test_resolution_uses_the_configured_timezone_setting_not_just_the_hardcoded_default(): void
+    {
+        $branch = Branch::factory()->create();
+        // Sunday is open all day; Monday has no schedule at all (closed).
+        BusinessHour::factory()->create([
+            'branch_id' => $branch->id,
+            'day_of_week' => DayOfWeek::Sunday,
+            'open_time' => '00:00',
+            'close_time' => '23:59',
+        ]);
+
+        $settings = new SettingService;
+        $settings->setDefault('app.timezone', 'UTC', SettingValueType::String);
+
+        // Same instant as the day-boundary test (2026-08-16 22:00 UTC), which
+        // resolves to Monday (closed) under Asia/Damascus but is still Sunday
+        // (open all day) under UTC. If the service ignored the configured
+        // setting and always used its hardcoded 'Asia/Damascus' default, this
+        // would incorrectly return false instead of true.
+        $instant = Carbon::parse('2026-08-16 22:00:00', 'UTC');
+
+        $this->assertTrue($this->service->isWithinBusinessHours($instant, $branch));
+    }
 }

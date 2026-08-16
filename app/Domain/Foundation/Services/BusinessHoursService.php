@@ -54,7 +54,7 @@ class BusinessHoursService
             ->get();
 
         if ($exceptions->isNotEmpty()) {
-            if ($exceptions->first()->is_closed) {
+            if ($exceptions->contains('is_closed', true)) {
                 return [];
             }
 
