@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
@@ -121,6 +122,10 @@ Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController
 Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
 Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
 Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionController::class, 'settlePayment']);
+
+Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
+Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);
+Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
 
 // Narrower than the group above: managing accounts and roles is admin-only,
 // operations can't create or promote other accounts.
