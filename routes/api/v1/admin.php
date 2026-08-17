@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
+use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
@@ -111,6 +112,15 @@ Route::delete('companies/{company}/members/{user}', [CompanyMemberController::cl
 // admin-only, same narrower-than-the-group pattern as below.
 Route::get('error-logs', [ErrorLogController::class, 'index']);
 Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
+
+// Reception Operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
+// — check-in, check-out, cancellation and payment settlement for bookings.
+// No narrower role gate than the file's own admin|operations group: both do
+// all of it.
+Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController::class, 'checkIn']);
+Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
+Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
+Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionController::class, 'settlePayment']);
 
 // Narrower than the group above: managing accounts and roles is admin-only,
 // operations can't create or promote other accounts.
