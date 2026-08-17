@@ -17,7 +17,7 @@ class CheckOutSessionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'checked_out_at' => ['required', 'date'],
+            'checked_out_at' => ['required', 'date', 'before_or_equal:now'],
         ];
     }
 }
