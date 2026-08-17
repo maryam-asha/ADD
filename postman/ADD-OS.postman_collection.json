@@ -1,4 +1,4 @@
-﻿{
+{
     "info":  {
                  "_postman_id":  "a1d0c0de-0001-4a1b-9c1e-add0scollection",
                  "name":  "ADD OS â€” Identity \u0026 Content",
@@ -692,8 +692,112 @@
                                                                                },
                                                                        "description":  "403 if the acting member isn\u0027t already an admin of this specific company. Returns `{\"message\": \"...\"}` on success, not the updated membership resource."
                                                                    }
+                                                   },
+                                                   {
+                                                       "name": "Create Wallet Allocation",
+                                                       "request": {
+                                                           "auth": {
+                                                               "type": "bearer",
+                                                               "bearer": [
+                                                                   { "key": "token", "value": "{{member_token}}" }
+                                                               ]
+                                                           },
+                                                           "method": "POST",
+                                                           "header": [
+                                                               { "key": "Content-Type", "value": "application/json" },
+                                                               { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                               { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                           ],
+                                                           "body": {
+                                                               "mode": "raw",
+                                                               "raw": "{\n  \"category\": \"cafe\",\n  \"amount\": \"20.00\",\n  \"user_ids\": [{{user_id}}],\n  \"expires_at\": \"2026-12-31T23:59:59Z\",\n  \"description\": \"Team cafe allowance\"\n}",
+                                                               "options": { "raw": { "language": "json" } }
+                                                           },
+                                                           "url": {
+                                                               "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/wallet-allocations",
+                                                               "host": ["{{base_url}}"],
+                                                               "path": ["api", "v1", "member", "companies", "{{company_id}}", "wallet-allocations"]
+                                                           },
+                                                           "description": "Gap found in the Task 15 Postman audit. Company-admin only (CompanyPolicy::manageMembers) -- reallocates from the company wallet's general balance, it does not add new money. restricted_space_id is required when category is space_specific and prohibited otherwise; category general is rejected."
+                                                       }
                                                    }
                                                ]
+                                  },
+                                  {
+                                      "name": "Wallet",
+                                      "item": [
+                                          {
+                                              "name": "Get Wallet Options",
+                                              "request": {
+                                                  "auth": {
+                                                      "type": "bearer",
+                                                      "bearer": [
+                                                          { "key": "token", "value": "{{member_token}}" }
+                                                      ]
+                                                  },
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/wallet/options?category=cafe",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "wallet", "options"],
+                                                      "query": [
+                                                          { "key": "category", "value": "cafe" }
+                                                      ]
+                                                  },
+                                                  "description": "Gap found in the Task 15 Postman audit. Reports every currently-spendable wallet for the given category (personal and/or company) so the client can present a choice when there is more than one. category is one of general/cafe/printing_internet/space_specific."
+                                              }
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "name": "Memberships",
+                                      "item": [
+                                          {
+                                              "name": "Create Membership",
+                                              "event": [
+                                                  {
+                                                      "listen": "test",
+                                                      "script": {
+                                                          "type": "text/javascript",
+                                                          "exec": [
+                                                              "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                              "    pm.collectionVariables.set('membership_id', pm.response.json().data.id);",
+                                                              "}"
+                                                          ]
+                                                      }
+                                                  }
+                                              ],
+                                              "request": {
+                                                  "auth": {
+                                                      "type": "bearer",
+                                                      "bearer": [
+                                                          { "key": "token", "value": "{{member_token}}" }
+                                                      ]
+                                                  },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"plan_id\": {{plan_id}}\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/memberships",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "memberships"]
+                                                  },
+                                                  "description": "Gap found in the Task 15 Postman audit. Debits the buyer's personal wallet (or, with an optional company_id, the company's wallet -- requires CompanyPolicy::manageMembers) for plan.price and creates the Membership in one transaction. The plan must be a subscription (is_subscription = true) and currently active."
+                                              }
+                                          }
+                                      ]
                                   },
                                   {
                                       "name":  "Update Language Preference",
@@ -2825,6 +2929,155 @@
                                                ]
                                   },
                                   {
+                                      "name": "Plans",
+                                      "description": "Membership/package catalog (App\\Domain\\Membership\\Models\\Plan). Gap found in the Task 15 Postman audit -- this CRUD existed in routes/api/v1/admin.php with no Postman coverage at all.",
+                                      "item": [
+                                          {
+                                              "name": "List Plans",
+                                              "request": {
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/plans",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "plans"]
+                                                  }
+                                              }
+                                          },
+                                          {
+                                              "name": "Create Plan",
+                                              "event": [
+                                                  {
+                                                      "listen": "test",
+                                                      "script": {
+                                                          "type": "text/javascript",
+                                                          "exec": [
+                                                              "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                              "    pm.collectionVariables.set('plan_id', pm.response.json().data.id);",
+                                                              "}"
+                                                          ]
+                                                      }
+                                                  }
+                                              ],
+                                              "request": {
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"name\": { \"ar\": \"خطة شهرية\", \"en\": \"Monthly Plan\" },\n  \"is_subscription\": true,\n  \"price\": \"150.00\",\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": \"20.00\",\n  \"overage_rate\": \"5.00\",\n  \"is_active\": true,\n  \"order\": 1\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/plans",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "plans"]
+                                                  }
+                                              }
+                                          },
+                                          {
+                                              "name": "Get Plan",
+                                              "request": {
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/plans/{{plan_id}}",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "plans", "{{plan_id}}"]
+                                                  }
+                                              }
+                                          },
+                                          {
+                                              "name": "Update Plan",
+                                              "request": {
+                                                  "method": "PUT",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"name\": { \"ar\": \"خطة شهرية\", \"en\": \"Monthly Plan\" },\n  \"is_subscription\": true,\n  \"price\": \"175.00\",\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": \"25.00\",\n  \"overage_rate\": \"5.00\",\n  \"is_active\": true,\n  \"order\": 1\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/plans/{{plan_id}}",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "plans", "{{plan_id}}"]
+                                                  },
+                                                  "description": "Returns `{\"message\": \"...\"}` on success, not the updated plan resource."
+                                              }
+                                          },
+                                          {
+                                              "name": "Delete Plan",
+                                              "request": {
+                                                  "method": "DELETE",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/plans/{{plan_id}}",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "plans", "{{plan_id}}"]
+                                                  }
+                                              }
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "name": "Exchange Rates",
+                                      "description": "USD/SYP conversion rates (App\\Domain\\Finance\\Models\\ExchangeRate, Unit 1 design 2026-08-09). A rate row is never updated or deleted once written -- only index/store exist. Gap found in the Task 15 Postman audit.",
+                                      "item": [
+                                          {
+                                              "name": "List Exchange Rates",
+                                              "request": {
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/exchange-rates",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "exchange-rates"]
+                                                  }
+                                              }
+                                          },
+                                          {
+                                              "name": "Create Exchange Rate",
+                                              "request": {
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"rate_usd_to_syp\": 14500,\n  \"effective_from\": \"2026-08-17T00:00:00Z\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/exchange-rates",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "exchange-rates"]
+                                                  }
+                                              }
+                                          }
+                                      ]
+                                  },
+                                  {
                                       "name":  "Settings",
                                       "description":  "Global key/value config (docs/decisions/settings-key-value-store.md). List is available to admin and operations; update is admin-only.",
                                       "item":  [
@@ -3366,11 +3619,349 @@
                                                                                     }
                                                                     }
                                                                 ]
-                                                   }
+                                   }
                                                ]
                                   },
                                   {
-                                      "name":  "Spatial Hierarchy",
+                                      "name": "Reception Operations",
+                                      "description": "Check-in/check-out, payment settlement, cancellation and manual wallet top-up (docs/decisions/reception-operations-scope.md). Bookings/walk-ins are created via factory/tinker in this phase -- there is no creation endpoint yet, so set {{booking_id}}/{{walkin_session_id}} manually before running these.",
+                                      "item": [
+                                          {
+                                              "name": "Check-in & Check-out",
+                                              "item": [
+                                                  {
+                                                      "name": "Check In Booking",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/check-in",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "check-in"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Check In Booking — Error: Outside Business Hours",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/check-in",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "check-in"]
+                                                          },
+                                                          "description": "422 `{\"message\": \"This action is not available outside business hours.\"}` when the branch is currently closed."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Start Walk-in Session",
+                                                      "event": [
+                                                          {
+                                                              "listen": "test",
+                                                              "script": {
+                                                                  "type": "text/javascript",
+                                                                  "exec": [
+                                                                      "if (pm.response.code === 201) {",
+                                                                      "    pm.collectionVariables.set('walkin_session_id', pm.response.json().data.id);",
+                                                                      "}"
+                                                                  ]
+                                                              }
+                                                          }
+                                                      ],
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"space_id\": {{space_id}},\n  \"user_id\": {{user_id}}\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/walk-ins",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "walk-ins"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Start Walk-in Session — Error: No Capacity",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"space_id\": {{space_id}},\n  \"user_id\": {{user_id}}\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/walk-ins",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "walk-ins"]
+                                                          },
+                                                          "description": "422 `{\"message\": \"This space has no available capacity right now.\"}` when the space is already at Space.capacity."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Check Out Booking",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"checked_out_at\": \"2026-08-17T11:00:00+03:00\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/check-out",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "check-out"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Check Out Booking — Error: Past Closing Time",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"checked_out_at\": \"2026-08-17T23:59:00+03:00\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/check-out",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "check-out"]
+                                                          },
+                                                          "description": "422 `{\"message\": \"The checkout time cannot be after the branch's closing time.\"}`"
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Check Out Walk-in Session",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"checked_out_at\": \"2026-08-17T11:00:00+03:00\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/walk-ins/{{walkin_session_id}}/check-out",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "walk-ins", "{{walkin_session_id}}", "check-out"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Cancel Booking",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/cancel",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "cancel"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Cancel Booking — Error: Past Cancellation Window",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/cancel",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "cancel"]
+                                                          },
+                                                          "description": "422 `{\"message\": \"This booking is past its cancellation window.\"}`"
+                                                      }
+                                                  }
+                                              ]
+                                          },
+                                          {
+                                              "name": "Payment Settlement",
+                                              "item": [
+                                                  {
+                                                      "name": "Settle Booking Payment",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"payment_method\": \"sham\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/settle-payment",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "settle-payment"]
+                                                          },
+                                                          "description": "payment_method is one of cash|sham|mtn|syriatel."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Settle Booking Payment — Error: Already Paid",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"payment_method\": \"cash\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/settle-payment",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "settle-payment"]
+                                                          },
+                                                          "description": "409 `{\"message\": \"This booking or session has already been paid.\"}`"
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Settle Walk-in Payment",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"payment_method\": \"mtn\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/walk-ins/{{walkin_session_id}}/settle-payment",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "walk-ins", "{{walkin_session_id}}", "settle-payment"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Settle Walk-in Payment — Error: Not Yet Checked Out",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"payment_method\": \"cash\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/walk-ins/{{walkin_session_id}}/settle-payment",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "walk-ins", "{{walkin_session_id}}", "settle-payment"]
+                                                          },
+                                                          "description": "422 `{\"message\": \"This booking or session must be checked out before payment can be settled.\"}`"
+                                                      }
+                                                  }
+                                              ]
+                                          },
+                                          {
+                                              "name": "Wallet Top-up",
+                                              "item": [
+                                                  {
+                                                      "name": "Top Up Member Wallet",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"user_id\": {{user_id}},\n  \"amount\": \"25.00\",\n  \"payment_method\": \"cash\",\n  \"description\": \"Front-desk cash top-up\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/wallet-top-ups",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "wallet-top-ups"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Top Up Company Wallet",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"company_id\": {{company_id}},\n  \"amount\": \"50.00\",\n  \"payment_method\": \"syriatel\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/wallet-top-ups",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "wallet-top-ups"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Top Up Wallet — Error: No Target Specified",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"amount\": \"25.00\",\n  \"payment_method\": \"cash\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/wallet-top-ups",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "wallet-top-ups"]
+                                                          },
+                                                          "description": "422 -- exactly one of user_id/company_id is required."
+                                                      }
+                                                  }
+                                              ]
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "name": "Spatial Hierarchy",
                                       "description":  "Branch \u003e Building \u003e Floor \u003e Zone \u003e Space \u003e Resource / SeatDesk, plus Device \u003e DeviceCapability off Branch/Space (docs/decisions/district-removed.md, docs/architecture/2026-08-08-backend-build-plan.md). Each folder\u0027s Create auto-captures the new row\u0027s id for the requests below it â€” build top-down (Branch first) the first time through.",
                                       "item":  [
                                                    {
@@ -6015,6 +6606,66 @@
                                                                    }
                                                    }
                                                ]
+                                  },
+                                  {
+                                      "name": "Error Logs",
+                                      "description": "Mobile client crash/error reports ingested unauthenticated via Mobile/Report Client Error. List/Get are available to admin and operations; Delete is admin-only. Gap found in the Task 15 Postman audit -- this existed in routes/api/v1/admin.php with no Postman coverage at all.",
+                                      "item": [
+                                          {
+                                              "name": "List Error Logs",
+                                              "request": {
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/error-logs?platform=android",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "error-logs"],
+                                                      "query": [
+                                                          { "key": "platform", "value": "android" },
+                                                          { "key": "error_type", "value": "NetworkException", "disabled": true },
+                                                          { "key": "user_id", "value": "{{user_id}}", "disabled": true },
+                                                          { "key": "from", "value": "2026-08-01", "disabled": true },
+                                                          { "key": "to", "value": "2026-08-31", "disabled": true }
+                                                      ]
+                                                  },
+                                                  "description": "Paginated (25 per page). All query params are optional filters."
+                                              }
+                                          },
+                                          {
+                                              "name": "Get Error Log",
+                                              "request": {
+                                                  "method": "GET",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/error-logs/{{error_log_id}}",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "error-logs", "{{error_log_id}}"]
+                                                  }
+                                              }
+                                          },
+                                          {
+                                              "name": "Delete Error Log",
+                                              "request": {
+                                                  "method": "DELETE",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                                      { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/error-logs/{{error_log_id}}",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "error-logs", "{{error_log_id}}"]
+                                                  },
+                                                  "description": "Admin-only (not operations)."
+                                              }
+                                          }
+                                      ]
                                   }
                               ]
                  },
@@ -6117,6 +6768,22 @@
                                                               },
                                                       "description":  "Only published = true rows are returned. Enable the ?category= query param to filter by pioneers/growth_partners/investors/impact_partners."
                                                   }
+                                  },
+                                  {
+                                      "name": "Get Plans",
+                                      "request": {
+                                          "method": "GET",
+                                          "header": [
+                                              { "key": "lang", "value": "{{lang}}", "type": "text" },
+                                              { "key": "currency", "value": "{{currency}}", "type": "text" }
+                                          ],
+                                          "url": {
+                                              "raw": "{{base_url}}/api/v1/plans",
+                                              "host": ["{{base_url}}"],
+                                              "path": ["api", "v1", "plans"]
+                                          },
+                                          "description": "Only is_active = true rows are returned, ordered by `order`. Gap found in the Task 15 Postman audit -- this existed in routes/api/v1/public.php with no Postman coverage at all."
+                                      }
                                   },
                                   {
                                       "name":  "Get Member Directory",
