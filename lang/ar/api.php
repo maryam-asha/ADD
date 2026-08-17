@@ -76,6 +76,7 @@ return [
         'device_capability_updated' => 'تم تحديث خاصية الجهاز.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',
+        'contact_link_updated' => 'تم تحديث رابط التواصل.',
         'plan_updated' => 'تم تحديث الباقة.',
         'community_member_updated' => 'تم تحديث عضو المجتمع.',
         'private_office_request_updated' => 'تم تحديث طلب المكتب الخاص.',

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\BusinessHourExceptionController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
@@ -81,6 +82,13 @@ Route::apiResource('business-hour-exceptions', BusinessHourExceptionController::
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
+
+// Contact Links — public org content (social/app-store/website/phone
+// links), admin-managed. Same permission tier as Founders/Partners (no
+// narrower role:admin group) — see
+// docs/decisions/profile-fields-completion-score-contact-links.md.
+Route::apiResource('contact-links', ContactLinkController::class)
+    ->parameters(['contact-links' => 'contactLink']);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);

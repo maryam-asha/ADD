@@ -76,6 +76,7 @@ return [
         'device_capability_updated' => 'Device capability updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',
+        'contact_link_updated' => 'Contact link updated.',
         'plan_updated' => 'Plan updated.',
         'community_member_updated' => 'Community member updated.',
         'private_office_request_updated' => 'Private office request updated.',
