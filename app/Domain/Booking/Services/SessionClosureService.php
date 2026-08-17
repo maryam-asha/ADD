@@ -54,6 +54,8 @@ class SessionClosureService
      */
     public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
     {
+        $this->assertOpenForClosure($session);
+
         $this->finalizeClosure($session, $closingInstant, TerminationSource::Auto);
     }
 

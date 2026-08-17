@@ -22,4 +22,4 @@ Schedule::command('model:prune')->hourly();
  * closing time must be closed automatically (termination_source = auto),
  * not left open indefinitely until reception happens to notice.
  */
-Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes();
+Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes()->withoutOverlapping();
