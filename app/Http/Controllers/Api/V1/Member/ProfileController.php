@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Domain\Identity\Models\UserPersonalProfile;
 use App\Domain\Identity\Models\UserProfessionalProfile;
+use App\Domain\Identity\Services\ProfileCompletionService;
+use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateProfileRequest;
 use App\Http\Resources\MemberProfileResource;
@@ -13,9 +15,17 @@ use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request): MemberProfileResource
+    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings): MemberProfileResource
     {
-        return new MemberProfileResource($request->user());
+        $user = $request->user();
+
+        return (new MemberProfileResource($user))->additional([
+            'completion' => [
+                'score' => $completion->score($user),
+                'threshold' => $settings->get('profile.completion_threshold', 80),
+                'missing_fields' => $completion->missingFields($user),
+            ],
+        ]);
     }
 
     public function update(UpdateProfileRequest $request): JsonResponse
