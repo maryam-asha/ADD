@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Domain\Booking;
 
+use Illuminate\Support\Facades\Lang;
 use Tests\TestCase;
 
 class ReceptionLangKeysTest extends TestCase
@@ -32,7 +33,7 @@ class ReceptionLangKeysTest extends TestCase
     {
         foreach (self::keys() as $key) {
             $this->assertTrue(
-                \Illuminate\Support\Facades\Lang::has("api.reception.{$key}", 'en'),
+                Lang::has("api.reception.{$key}", 'en'),
                 "Missing lang/en/api.php reception.{$key}"
             );
         }
@@ -42,7 +43,7 @@ class ReceptionLangKeysTest extends TestCase
     {
         foreach (self::keys() as $key) {
             $this->assertTrue(
-                \Illuminate\Support\Facades\Lang::has("api.reception.{$key}", 'ar'),
+                Lang::has("api.reception.{$key}", 'ar'),
                 "Missing lang/ar/api.php reception.{$key}"
             );
         }

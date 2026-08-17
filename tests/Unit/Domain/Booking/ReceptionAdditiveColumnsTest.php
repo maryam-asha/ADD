@@ -5,7 +5,6 @@ namespace Tests\Unit\Domain\Booking;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;

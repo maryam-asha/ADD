@@ -9,11 +9,11 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
-use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -56,7 +56,7 @@ class BookingCancellationServiceTest extends TestCase
     public function test_cancelling_a_wallet_paid_booking_refunds_the_planned_amount(): void
     {
         $space = Space::factory()->room()->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
-        $member = \App\Domain\Identity\Models\User::factory()->create();
+        $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         $booking = Booking::factory()->create([
             'space_id' => $space->id,
@@ -81,7 +81,7 @@ class BookingCancellationServiceTest extends TestCase
     public function test_cancelling_a_cash_paid_booking_does_not_touch_any_wallet(): void
     {
         $space = Space::factory()->room()->create(['hourly_rate' => '10.00']);
-        $member = \App\Domain\Identity\Models\User::factory()->create();
+        $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         $booking = Booking::factory()->create([
             'space_id' => $space->id,

@@ -3,8 +3,10 @@
 namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\TerminationSource;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
@@ -90,9 +92,9 @@ class CloseOverdueReceptionSessionsCommandTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-08-17 20:30:00', 'Asia/Damascus'));
         $this->artisan('reception:close-overdue-sessions');
 
-        $closures = app(\App\Domain\Booking\Services\SessionClosureService::class);
+        $closures = app(SessionClosureService::class);
 
-        $this->expectException(\App\Domain\Booking\Exceptions\ReceptionActionException::class);
+        $this->expectException(ReceptionActionException::class);
         $closures->closeOut($session->fresh(), now());
     }
 }
