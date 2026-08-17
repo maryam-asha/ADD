@@ -14,6 +14,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SessionClosureService
 {
@@ -51,12 +52,24 @@ class SessionClosureService
      * Identical effect to closeOut(), termination_source = auto, no
      * operator. Called by the scheduled command for any session still
      * checked in past its branch's closing time.
+     *
+     * $session may be stale: the command loads a page of candidates via
+     * chunkById() and can reach this call some time after that read, during
+     * which a concurrent manual closeOut() may have already closed the same
+     * row. Checking $session's in-memory state would miss that entirely, so
+     * this locks and re-reads the row from the database before deciding —
+     * the same lock-then-check pattern WalkInCapacityService::start() uses
+     * for the identical class of race.
      */
     public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
     {
-        $this->assertOpenForClosure($session);
+        DB::transaction(function () use ($session, $closingInstant) {
+            $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
-        $this->finalizeClosure($session, $closingInstant, TerminationSource::Auto);
+            $this->assertOpenForClosure($locked);
+
+            $this->finalizeClosure($locked, $closingInstant, TerminationSource::Auto);
+        });
     }
 
     /**

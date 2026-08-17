@@ -97,4 +97,47 @@ class CloseOverdueReceptionSessionsCommandTest extends TestCase
         $this->expectException(ReceptionActionException::class);
         $closures->closeOut($session->fresh(), now());
     }
+
+    /**
+     * Reproduces the exact race the command is exposed to: it loads a page
+     * of open sessions (chunkById()), then calls autoClose() on each some
+     * time later. If a manual closeOut() completes on the same row in that
+     * window, autoClose() must notice — not silently overwrite it using the
+     * stale in-memory copy it was handed.
+     */
+    public function test_autoclose_does_not_overwrite_a_session_closed_concurrently_since_it_was_loaded(): void
+    {
+        $space = $this->openSpace();
+        $closures = app(SessionClosureService::class);
+
+        // Plain UTC, not 'Asia/Damascus': checked_in_at is assigned directly
+        // via the factory, bypassing finalizeClosure()'s UTC-normalization —
+        // an explicit non-UTC timezone here would round-trip through
+        // Eloquent's datetime cast with the same drift already fixed for
+        // checked_out_at elsewhere. The 2-hour gap being tested doesn't
+        // depend on wall-clock timezone, only the elapsed interval.
+        $session = WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00'),
+        ]);
+
+        // Simulates the command's earlier chunkById() read — a copy of the
+        // row as it looked before the concurrent manual checkout below.
+        $staleInMemoryCopy = WalkinSession::find($session->id);
+
+        // A concurrent manual checkout completes via an independently
+        // fetched instance the stale copy above knows nothing about.
+        $closures->closeOut(WalkinSession::find($session->id), Carbon::parse('2026-08-17 11:00:00'));
+
+        try {
+            $closures->autoClose($staleInMemoryCopy, Carbon::parse('2026-08-17 20:00:00', 'Asia/Damascus'));
+            $this->fail('Expected a ReceptionActionException — autoClose() must not overwrite a concurrently-completed manual checkout.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.reception.already_checked_out', $e->messageKey);
+        }
+
+        $session->refresh();
+        $this->assertSame(TerminationSource::Reception, $session->termination_source);
+        $this->assertSame('20.00', (string) $session->amount_owed);
+    }
 }
