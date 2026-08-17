@@ -13,6 +13,7 @@ class UserPersonalProfileResource extends JsonResource
             'bio' => $this->bio,
             'city' => $this->city,
             'avatar_url' => $this->avatar_url,
+            'gender' => $this->gender?->value,
         ];
     }
 }

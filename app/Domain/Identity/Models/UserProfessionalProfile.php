@@ -16,6 +16,9 @@ class UserProfessionalProfile extends Model
         'company_name',
         'industry',
         'linkedin_url',
+        'instagram_url',
+        'behance_url',
+        'website_url',
     ];
 
     public function user(): BelongsTo

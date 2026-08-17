@@ -20,8 +20,8 @@ class ProfileController extends Controller
 
     public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $personalFields = ['bio', 'city', 'avatar_url'];
-        $professionalFields = ['job_title', 'company_name', 'industry', 'linkedin_url'];
+        $personalFields = ['bio', 'city', 'avatar_url', 'gender'];
+        $professionalFields = ['job_title', 'company_name', 'industry', 'linkedin_url', 'instagram_url', 'behance_url', 'website_url'];
 
         $validated = $request->validated();
         $user = $request->user();

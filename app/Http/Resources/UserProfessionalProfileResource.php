@@ -14,6 +14,9 @@ class UserProfessionalProfileResource extends JsonResource
             'company_name' => $this->company_name,
             'industry' => $this->industry,
             'linkedin_url' => $this->linkedin_url,
+            'instagram_url' => $this->instagram_url,
+            'behance_url' => $this->behance_url,
+            'website_url' => $this->website_url,
         ];
     }
 }

@@ -174,4 +174,64 @@ class ProfileControllerTest extends TestCase
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['avatar_url']);
     }
+
+    public function test_show_includes_gender_and_the_new_social_links_as_null_by_default(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/member/profile');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.personal.gender', null);
+        $response->assertJsonPath('data.professional.instagram_url', null);
+        $response->assertJsonPath('data.professional.behance_url', null);
+        $response->assertJsonPath('data.professional.website_url', null);
+    }
+
+    public function test_patch_can_set_gender_and_the_new_social_links(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/member/profile', [
+            'gender' => 'female',
+            'instagram_url' => 'https://instagram.com/example',
+            'behance_url' => 'https://behance.net/example',
+            'website_url' => 'https://example.com',
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('message', 'Profile updated.');
+
+        $this->assertDatabaseHas('user_personal_profiles', [
+            'user_id' => $member->id,
+            'gender' => 'female',
+        ]);
+        $this->assertDatabaseHas('user_professional_profiles', [
+            'user_id' => $member->id,
+            'instagram_url' => 'https://instagram.com/example',
+            'behance_url' => 'https://behance.net/example',
+            'website_url' => 'https://example.com',
+        ]);
+
+        $getResponse = $this->getJson('/api/v1/member/profile');
+        $getResponse->assertJsonPath('data.personal.gender', 'female');
+    }
+
+    public function test_patch_rejects_an_invalid_gender_value(): void
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->patchJson('/api/v1/member/profile', [
+            'gender' => 'not-a-real-value',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['gender']);
+    }
 }
