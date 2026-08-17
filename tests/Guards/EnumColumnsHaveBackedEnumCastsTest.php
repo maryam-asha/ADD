@@ -2,6 +2,13 @@
 
 namespace Tests\Guards;
 
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\TerminationSource;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
@@ -48,6 +55,19 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        Booking::class => [
+            'status' => BookingStatus::class,
+            'payment_state' => PaymentState::class,
+            'payment_source' => PaymentSource::class,
+            'termination_source' => TerminationSource::class,
+            'payment_method' => PaymentMethod::class,
+        ],
+        WalkinSession::class => [
+            'payment_state' => PaymentState::class,
+            'payment_source' => PaymentSource::class,
+            'termination_source' => TerminationSource::class,
+            'payment_method' => PaymentMethod::class,
+        ],
         Space::class => [
             'space_type' => SpaceType::class,
             'allocation_model' => AllocationModel::class,
@@ -86,6 +106,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         WalletTransaction::class => [
             'category' => WalletTransactionCategory::class,
             'source' => WalletTransactionSource::class,
+            'payment_method' => PaymentMethod::class,
         ],
         Setting::class => [
             'scope_type' => SettingScope::class,

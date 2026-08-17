@@ -2,6 +2,7 @@
 
 namespace App\Domain\Membership\Models;
 
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -15,7 +16,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * positive is a credit/grant, negative is a debit. No rows in
  * `wallet_transaction_allowed_users` means unrestricted (any member of the
  * owning wallet is eligible); rows present restrict eligibility to those
- * users.
+ * users. `performed_by_user_id`/`payment_method` are reception-only
+ * metadata (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
+ * — null for every transaction created outside a manual reception action.
  */
 class WalletTransaction extends Model
 {
@@ -29,6 +32,8 @@ class WalletTransaction extends Model
         'restricted_space_id',
         'source',
         'expires_at',
+        'performed_by_user_id',
+        'payment_method',
     ];
 
     protected function casts(): array
@@ -38,6 +43,7 @@ class WalletTransaction extends Model
             'category' => WalletTransactionCategory::class,
             'source' => WalletTransactionSource::class,
             'expires_at' => 'datetime',
+            'payment_method' => PaymentMethod::class,
         ];
     }
 
@@ -67,6 +73,11 @@ class WalletTransaction extends Model
     public function allowedUsers(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'wallet_transaction_allowed_users');
+    }
+
+    public function performedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'performed_by_user_id');
     }
 
     public function isRestricted(): bool

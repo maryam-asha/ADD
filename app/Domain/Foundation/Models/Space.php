@@ -24,6 +24,7 @@ class Space extends Model
         'capacity',
         'hourly_rate',
         'pricing_currency',
+        'cancellation_window_minutes',
         'status',
         'status_reason',
         'status_from',

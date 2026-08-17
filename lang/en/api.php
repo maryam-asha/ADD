@@ -90,4 +90,22 @@ return [
         'business_hour_exception_updated' => 'Business hour exception updated.',
     ],
 
+    'reception' => [
+        'checked_in' => 'Checked in.',
+        'checked_out' => 'Checked out.',
+        'cancelled' => 'Booking cancelled.',
+        'payment_settled' => 'Payment settled.',
+        'already_checked_in' => 'This booking has already been checked in.',
+        'already_checked_out' => 'This session has already been checked out.',
+        'already_cancelled' => 'This booking has already been cancelled.',
+        'already_paid' => 'This booking or session has already been paid.',
+        'outside_business_hours' => 'This action is not available outside business hours.',
+        'no_capacity' => 'This space has no available capacity right now.',
+        'not_checked_in' => 'This session has not been checked in yet.',
+        'checkout_before_checkin' => 'The checkout time cannot be before the check-in time.',
+        'checkout_past_closing' => "The checkout time cannot be after the branch's closing time.",
+        'not_yet_checked_out' => 'This booking or session must be checked out before payment can be settled.',
+        'cancellation_window_passed' => 'This booking is past its cancellation window.',
+    ],
+
 ];
