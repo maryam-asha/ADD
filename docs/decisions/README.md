@@ -30,6 +30,7 @@ minimal version that gets reworked later.
 - [wallet-points-categorization.md](wallet-points-categorization.md) — unified category/restriction/expiry model for wallet transactions, for Phase 3
 - [settings-key-value-store.md](settings-key-value-store.md) — new `Settings` domain: cached, typed key/value config, the enabler for business hours/booking/guests/profile/module-toggle work
 - [business-hours.md](business-hours.md) — per-branch weekly schedule + date exceptions + resolution service; the capability Sprint 3's booking validation will consume
+- [reception-operations-scope.md](reception-operations-scope.md) — reception's check-in/check-out/settlement/cancellation/wallet-top-up layer; a deliberate slice of the build plan's Phase 5 (+ a PaymentMethod sliver of Phase 4), not the full thing
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
@@ -41,7 +42,7 @@ no table surface yet and nothing to guard.
 | 2 | Floor/Zone are classification only | — (Phase 1) | 1 |
 | 3 | Resource is metadata, never booked independently | — (Phase 1) | 1 |
 | 4 | Seat/Desk is an address, not a seat map | — (Phase 1) | 1 |
-| 5 | Booking = prepaid + cancellable; session without booking = postpaid + not cancellable | — (Phase 5) | 5 |
+| 5 | Booking = prepaid + cancellable; session without booking = postpaid + not cancellable | `tests/Feature/Booking/*` (reception-ops slice, [reception-operations-scope.md](reception-operations-scope.md)); no dedicated `tests/Guards/` entry yet — full capacity-slot/extension scope still pending | 3 (slice), 5 (full) |
 | 6 | Hot Desk package selection creates a real booking, 24h free cancellation | — (Phase 5) | 5 |
 | 7 | Meeting rooms auto-confirm; only the event hall is manual | — (Phase 5) | 5 |
 | 8 | Operational status at Space/Resource level, no hierarchical escalation; affected-bookings on maintenance conflict | — (Phase 1 status, Phase 5 affected_bookings) | 1, 5 |
