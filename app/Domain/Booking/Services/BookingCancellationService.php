@@ -11,6 +11,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
+use Illuminate\Support\Facades\DB;
 
 class BookingCancellationService
 {
@@ -37,31 +38,35 @@ class BookingCancellationService
      */
     public function cancel(Booking $booking): void
     {
-        if ($booking->status === BookingStatus::Cancelled) {
-            throw new ReceptionActionException('api.reception.already_cancelled', 409);
-        }
+        DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
-        if ($booking->checked_in_at !== null) {
-            throw new ReceptionActionException('api.reception.already_checked_in', 409);
-        }
+            if ($locked->status === BookingStatus::Cancelled) {
+                throw new ReceptionActionException('api.reception.already_cancelled', 409);
+            }
 
-        $windowMinutes = $booking->space->cancellation_window_minutes
-            ?? $this->settings->get('booking.cancellation_window_minutes', 60);
+            if ($locked->checked_in_at !== null) {
+                throw new ReceptionActionException('api.reception.already_checked_in', 409);
+            }
 
-        if (now()->gt($booking->start_at->copy()->subMinutes($windowMinutes))) {
-            throw new ReceptionActionException('api.reception.cancellation_window_passed');
-        }
+            $windowMinutes = $locked->space->cancellation_window_minutes
+                ?? $this->settings->get('booking.cancellation_window_minutes', 60);
 
-        $booking->forceFill([
-            'status' => BookingStatus::Cancelled,
-            'cancelled_at' => now(),
-        ])->save();
+            if (now()->gt($locked->start_at->copy()->subMinutes($windowMinutes))) {
+                throw new ReceptionActionException('api.reception.cancellation_window_passed');
+            }
 
-        if ($booking->payment_source === PaymentSource::Wallet && $booking->payment_state === PaymentState::Paid) {
-            [$refundAmount] = $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
+            $locked->forceFill([
+                'status' => BookingStatus::Cancelled,
+                'cancelled_at' => now(),
+            ])->save();
 
-            $wallet = $this->wallets->walletFor(OwnerType::User, $booking->user_id);
-            $this->wallets->creditGeneral($wallet, $refundAmount, WalletTransactionSource::Refund, 'Booking cancellation refund');
-        }
+            if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
+                [$refundAmount] = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
+
+                $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
+                $this->wallets->creditGeneral($wallet, $refundAmount, WalletTransactionSource::Refund, 'Booking cancellation refund');
+            }
+        });
     }
 }
