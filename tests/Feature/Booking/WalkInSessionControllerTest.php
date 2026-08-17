@@ -110,11 +110,11 @@ class WalkInSessionControllerTest extends TestCase
         $space = $this->openSpace();
         $session = WalkinSession::factory()->create([
             'space_id' => $space->id,
-            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'checked_in_at' => Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus')->setTimezone('UTC'),
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/check-out", [
-            'checked_out_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->toIso8601String(),
+            'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->toIso8601String(),
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Checked out.']);
@@ -137,7 +137,7 @@ class WalkInSessionControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/check-out", [
-            'checked_out_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->toIso8601String(),
+            'checked_out_at' => Carbon::parse('2026-08-17 09:30:00', 'Asia/Damascus')->toIso8601String(),
         ]);
 
         $response->assertStatus(409)->assertExactJson(['message' => 'This session has already been checked out.']);

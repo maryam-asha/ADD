@@ -112,11 +112,11 @@ class BookingReceptionControllerTest extends TestCase
         $space = $this->openSpace();
         $booking = Booking::factory()->checkedIn()->create([
             'space_id' => $space->id,
-            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'checked_in_at' => Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus')->setTimezone('UTC'),
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-out", [
-            'checked_out_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->toIso8601String(),
+            'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->toIso8601String(),
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Checked out.']);
@@ -148,6 +148,8 @@ class BookingReceptionControllerTest extends TestCase
             'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus')->setTimezone('UTC'),
         ]);
 
+        Carbon::setTestNow(Carbon::parse('2026-08-17 21:00:00', 'Asia/Damascus'));
+
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-out", [
             'checked_out_at' => Carbon::parse('2026-08-17 20:01:00', 'Asia/Damascus')->toIso8601String(),
         ]);
@@ -166,7 +168,7 @@ class BookingReceptionControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-out", [
-            'checked_out_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->toIso8601String(),
+            'checked_out_at' => Carbon::parse('2026-08-17 09:30:00', 'Asia/Damascus')->toIso8601String(),
         ]);
 
         $response->assertStatus(409)->assertExactJson(['message' => 'This session has already been checked out.']);
