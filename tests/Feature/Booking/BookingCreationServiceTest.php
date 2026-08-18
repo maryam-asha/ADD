@@ -13,12 +13,14 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
+use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,6 +33,7 @@ class BookingCreationServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleSeeder::class);
         $this->creations = app(BookingCreationService::class);
         // 2026-08-17 is a Monday.
         Carbon::setTestNow(Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus'));
@@ -333,5 +336,46 @@ class BookingCreationServiceTest extends TestCase
 
         $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
         $this->assertSame(0, $wallet->transactions()->where('amount', '<', 0)->count());
+    }
+
+    public function test_creation_creates_a_pending_booking_when_the_space_requires_approval(): void
+    {
+        $space = $this->openSpace(['requires_approval' => true]);
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
+
+        $this->assertSame(BookingStatus::Pending, $booking->status);
+        $this->assertSame(
+            1,
+            NotificationLog::where('user_id', $operator->id)->where('template_key', 'booking.pending_approval')->count()
+        );
+    }
+
+    public function test_a_pending_booking_blocks_a_second_request_for_the_same_slot(): void
+    {
+        $space = $this->openSpace(['requires_approval' => true]);
+        [$start, $end] = $this->slot(10);
+        $this->creations->create($space, User::factory()->create(), $start, $end);
+
+        try {
+            $this->creations->create($space, User::factory()->create(), $start, $end);
+            $this->fail('Expected a ReceptionActionException for slot unavailable.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.slot_unavailable', $e->messageKey);
+        }
+    }
+
+    public function test_creation_stays_confirmed_when_the_space_does_not_require_approval(): void
+    {
+        $space = $this->openSpace(['requires_approval' => false]);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
+
+        $this->assertSame(BookingStatus::Confirmed, $booking->status);
+        $this->assertSame(0, NotificationLog::count());
     }
 }
