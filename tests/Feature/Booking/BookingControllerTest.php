@@ -114,6 +114,22 @@ class BookingControllerTest extends TestCase
         $this->assertSame(0, Booking::count());
     }
 
+    public function test_booking_creation_rejects_a_wallet_owner_id_without_a_wallet_owner_type(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'space_id' => $space->id,
+            'start_at' => '2026-08-17T10:00:00+03:00',
+            'end_at' => '2026-08-17T11:00:00+03:00',
+            'wallet_owner_id' => 999,
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertSame(0, Booking::count());
+    }
+
     public function test_an_operator_cannot_create_a_booking_via_the_member_route(): void
     {
         $operator = User::factory()->create();
