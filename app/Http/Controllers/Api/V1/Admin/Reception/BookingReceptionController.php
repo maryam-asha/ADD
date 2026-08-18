@@ -6,15 +6,18 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\BookingApprovalService;
 use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
+use App\Http\Requests\Admin\Reception\RejectBookingRequest;
 use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 class BookingReceptionController extends Controller
 {
@@ -80,5 +83,31 @@ class BookingReceptionController extends Controller
         $this->logSensitiveAction('payment_settled', $booking, ['payment_method' => $booking->payment_method->value]);
 
         return response()->json(['message' => __('api.reception.payment_settled')]);
+    }
+
+    public function approve(Request $request, Booking $booking, BookingApprovalService $approvals): JsonResponse
+    {
+        try {
+            $approvals->approve($booking, $request->user());
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey)], $e->status);
+        }
+
+        $this->logSensitiveAction('booking_approved', $booking);
+
+        return response()->json(['message' => __('api.booking.approved')]);
+    }
+
+    public function reject(RejectBookingRequest $request, Booking $booking, BookingApprovalService $approvals): JsonResponse
+    {
+        try {
+            $approvals->reject($booking, $request->user(), $request->validated('rejection_reason'));
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey)], $e->status);
+        }
+
+        $this->logSensitiveAction('booking_rejected', $booking, ['rejection_reason' => $booking->rejection_reason]);
+
+        return response()->json(['message' => __('api.booking.rejected')]);
     }
 }
