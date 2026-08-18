@@ -112,6 +112,39 @@ See "Decision" above — each bullet states its own reasoning inline.
 - `tests/Guards/AddMemberTierUnbuiltTest.php` (new)
 - `postman/ADD-OS.postman_collection.json` (`Content > Contact Links`, `Public (Site) > Get Contact Links`, updated `Profile` examples)
 
+## Known limitations
+
+- **`sort_order`/`is_visible` are `nullable` in validation but `NOT NULL`
+  with no DB default is not quite right either — both columns do have
+  `NOT NULL` DB defaults (`0`/`true`), but `ContactLinkController::store()`
+  papers over that with `array_merge(['sort_order' => 0, 'is_visible' =>
+  true], $request->validated())`. `array_merge` lets a later array's key
+  override an earlier one, so an explicitly-sent `null` for either field
+  (allowed by the `nullable` rule) survives the merge and reaches
+  `ContactLink::create()` as `null`, which then throws a DB-level `NOT NULL
+  constraint` error instead of falling back to the intended default. This
+  is not new to `ContactLink` — it's the same house pattern already present
+  in `FounderController`/`PartnerController`/`CommunityMemberController`/
+  `PlanController::store()`, all four also unfixed today. Noted here so a
+  future cleanup fixes all five call sites together rather than
+  `ContactLink` alone.
+- **`ProfileCompletionService`'s weight table treats any non-null value as
+  "filled" regardless of length** — a one-character `bio` earns the same
+  full 10 points as a real one. This is soft today because nothing consumes
+  the score yet (see the "No ADD Member promotion/tier mechanism is built"
+  bullet above). Whoever eventually gates a real benefit on this score
+  should decide whether minimum-length/quality checks belong in this
+  service or a later validation layer.
+- **`contact_links.value` is not a pre-sanitized, trustworthy `href`.** The
+  `not_regex` scheme denylist added against Finding 2 of this phase's
+  review blocks the most dangerous schemes (`javascript:`/`data:`/
+  `vbscript:`), but the field is still admin/operations-authored (a broader
+  trust circle than `admin` alone) free-form content served unauthenticated
+  on `GET /api/v1/contact-links`. Downstream consumers (the marketing site,
+  the mobile app, a kiosk client) should keep treating it as untrusted
+  user-adjacent content rather than assuming the denylist makes it safe to
+  interpolate anywhere.
+
 ## Guard
 
 [`EnumColumnsHaveBackedEnumCastsTest`](../../tests/Guards/EnumColumnsHaveBackedEnumCastsTest.php)

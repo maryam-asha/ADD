@@ -56,6 +56,21 @@ class ContactLinkAdminTest extends TestCase
         $response->assertJsonPath('data.type', 'social_threads');
     }
 
+    public function test_a_javascript_scheme_value_is_rejected(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->postJson('/api/v1/admin/contact-links', [
+            'type' => 'website',
+            'value' => 'javascript:alert(1)',
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors('value');
+    }
+
     public function test_operations_can_list_admin_can_update_and_delete(): void
     {
         $operations = User::factory()->create();

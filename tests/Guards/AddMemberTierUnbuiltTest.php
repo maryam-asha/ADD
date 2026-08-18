@@ -8,8 +8,9 @@ use Tests\TestCase;
 /**
  * The 2026-08-17 profile-completion phase investigated whether an "ADD
  * Member" tier/promotion mechanism already existed to wire the completion
- * score into (docs/decisions/profile-fields-completion-score-contact-links.md
- * §3). It doesn't: `add_members` is named in the backend build plan and
+ * score into — the spec's §3 investigation, recorded in
+ * docs/decisions/profile-fields-completion-score-contact-links.md. It
+ * doesn't: `add_members` is named in the backend build plan and
  * D.12 as a future rung of the Community → ADD Members → ADD Club ladder,
  * but no table, model, or promotion logic exists in code. Per that
  * decision, this phase reports the gap rather than inventing a tier system
