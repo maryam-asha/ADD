@@ -31,6 +31,7 @@ minimal version that gets reworked later.
 - [settings-key-value-store.md](settings-key-value-store.md) — new `Settings` domain: cached, typed key/value config, the enabler for business hours/booking/guests/profile/module-toggle work
 - [business-hours.md](business-hours.md) — per-branch weekly schedule + date exceptions + resolution service; the capability Sprint 3's booking validation will consume
 - [reception-operations-scope.md](reception-operations-scope.md) — reception's check-in/check-out/settlement/cancellation/wallet-top-up layer; a deliberate slice of the build plan's Phase 5 (+ a PaymentMethod sliver of Phase 4), not the full thing
+- [profile-fields-completion-score-contact-links.md](profile-fields-completion-score-contact-links.md) — gender/social-link profile fields, the derived completion score, `contact_links`, and the confirmed-absent ADD Member tier
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
