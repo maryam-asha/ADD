@@ -74,4 +74,9 @@ class SpaceFactory extends Factory
             'status_from' => now(),
         ]);
     }
+
+    public function requiresApproval(): static
+    {
+        return $this->state(['requires_approval' => true]);
+    }
 }
