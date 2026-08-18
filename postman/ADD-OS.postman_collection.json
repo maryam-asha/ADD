@@ -754,6 +754,159 @@
                                       ]
                                   },
                                   {
+                                      "name": "Bookings",
+                                      "item": [
+                                          {
+                                              "name": "Create Booking",
+                                              "event": [
+                                                  {
+                                                      "listen": "test",
+                                                      "script": {
+                                                          "type": "text/javascript",
+                                                          "exec": [
+                                                              "if (pm.response.code === 201) {",
+                                                              "    pm.collectionVariables.set('booking_id', pm.response.json().data.id);",
+                                                              "}"
+                                                          ]
+                                                      }
+                                                  }
+                                              ],
+                                              "request": {
+                                                  "auth": {
+                                                      "type": "bearer",
+                                                      "bearer": [{ "key": "token", "value": "{{member_token}}" }]
+                                                  },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:00:00+03:00\",\n  \"end_at\": \"2026-08-24T11:00:00+03:00\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings"]
+                                                  },
+                                                  "description": "docs/decisions/booking-creation-approval-extension.md. Creates a confirmed+unpaid booking when the space has no wallet balance and requires_approval = false. 201 returns the created booking and auto-captures booking_id."
+                                              }
+                                          },
+                                          {
+                                              "name": "Create Booking — Error: Invalid Start Time",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:15:00+03:00\",\n  \"end_at\": \"2026-08-24T11:15:00+03:00\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings"]
+                                                  },
+                                                  "description": "422 `{\"message\": \"The start time does not match this space's slot granularity.\"}`"
+                                              }
+                                          },
+                                          {
+                                              "name": "Create Booking — Error: Slot Unavailable",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:00:00+03:00\",\n  \"end_at\": \"2026-08-24T11:00:00+03:00\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings"]
+                                                  },
+                                                  "description": "422 `{\"message\": \"This space is not available for the requested time.\"}` when a confirmed or pending booking already covers this window."
+                                              }
+                                          },
+                                          {
+                                              "name": "Create Booking — Error: Multiple Wallets, Choice Required",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:00:00+03:00\",\n  \"end_at\": \"2026-08-24T11:00:00+03:00\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings"]
+                                                  },
+                                                  "description": "422 `{\"message\": \"More than one wallet can cover this booking. Please choose one.\", \"wallet_options\": [...]}` when both a personal and a company balance apply -- resubmit with wallet_owner_type/wallet_owner_id from the list (see Wallet > Get Wallet Options)."
+                                              }
+                                          },
+                                          {
+                                              "name": "Extend Booking",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"additional_minutes\": 60\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings", "{{booking_id}}", "extend"]
+                                                  },
+                                                  "description": "Booking must already be checked in (checked_in_at set, checked_out_at null)."
+                                              }
+                                          },
+                                          {
+                                              "name": "Extend Booking — Error: Conflict",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"additional_minutes\": 180\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "bookings", "{{booking_id}}", "extend"]
+                                                  },
+                                                  "description": "422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
+                                              }
+                                          }
+                                      ]
+                                  },
+                                  {
                                       "name": "Memberships",
                                       "item": [
                                           {
@@ -3624,7 +3777,7 @@
                                   },
                                   {
                                       "name": "Reception Operations",
-                                      "description": "Check-in/check-out, payment settlement, cancellation and manual wallet top-up (docs/decisions/reception-operations-scope.md). Bookings/walk-ins are created via factory/tinker in this phase -- there is no creation endpoint yet, so set {{booking_id}}/{{walkin_session_id}} manually before running these.",
+                                      "description": "Check-in/check-out, payment settlement, cancellation, manual wallet top-up, and booking approval/extension (docs/decisions/reception-operations-scope.md, docs/decisions/booking-creation-approval-extension.md). Bookings are created via Member (App) > Bookings > Create Booking, which auto-captures {{booking_id}}; walk-ins are created via Start Walk-in Session below, which auto-captures {{walkin_session_id}}.",
                                       "item": [
                                           {
                                               "name": "Check-in & Check-out",
@@ -3954,6 +4107,123 @@
                                                               "path": ["api", "v1", "admin", "reception", "wallet-top-ups"]
                                                           },
                                                           "description": "422 -- exactly one of user_id/company_id is required."
+                                                      }
+                                                  }
+                                              ]
+                                          },
+                                          {
+                                              "name": "Booking Approvals",
+                                              "item": [
+                                                  {
+                                                      "name": "Approve Booking",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/approve",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "approve"]
+                                                          },
+                                                          "description": "docs/decisions/booking-creation-approval-extension.md. booking_id must reference a pending booking (created against a space with requires_approval = true)."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Reject Booking",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"rejection_reason\": \"Space closed for maintenance that day.\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/reject",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "reject"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Reject Booking — Error: Reason Required",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/reject",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "reject"]
+                                                          },
+                                                          "description": "422 -- rejection_reason is required."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Approve/Reject — Error: Not Pending",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/approve",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "approve"]
+                                                          },
+                                                          "description": "409 `{\"message\": \"This booking is not awaiting approval.\"}` when the booking is already confirmed, rejected, or cancelled."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Extend Booking (Reception, on the member's behalf)",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"additional_minutes\": 60\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/extend",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "extend"]
+                                                          }
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Extend Booking (Reception) — Error: Conflict",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"additional_minutes\": 180\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/extend",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "{{booking_id}}", "extend"]
+                                                          },
+                                                          "description": "422 -- states the latest possible end time explicitly."
                                                       }
                                                   }
                                               ]
