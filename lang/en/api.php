@@ -109,4 +109,20 @@ return [
         'cancellation_window_passed' => 'This booking is past its cancellation window.',
     ],
 
+    'booking' => [
+        'invalid_start_time' => "The start time does not match this space's slot granularity.",
+        'duration_too_short' => 'The booking duration is shorter than the minimum allowed.',
+        'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
+        'slot_unavailable' => 'This space is not available for the requested time.',
+        'buffer_conflict' => 'This booking is too close to another booking on this space.',
+        'wallet_choice_required' => 'More than one wallet can cover this booking. Please choose one.',
+        'not_pending' => 'This booking is not awaiting approval.',
+        'rejection_reason_required' => 'A rejection reason is required.',
+        'approved' => 'Booking approved.',
+        'rejected' => 'Booking rejected.',
+        'invalid_extension_duration' => 'The extension duration does not meet the minimum duration or granularity requirements.',
+        'extension_conflict' => 'This booking cannot be extended past :latest_end_at.',
+        'extended' => 'Booking extended.',
+    ],
+
 ];
