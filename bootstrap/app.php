@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SetLocaleFromHeader;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -65,7 +66,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // caller instead of an unconditional redirect() — see the class
             // docblock for why `redirectGuestsTo(fn () => null)` below only
             // covers the opposite direction.
-            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+            'guest' => RedirectIfAuthenticated::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —

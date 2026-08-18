@@ -33,6 +33,7 @@ abstract class AdminResourceController extends Controller
 
         if ($request->filled('per_page')) {
             $perPage = $request->integer('per_page', 15);
+
             return ($this->resourceClass())::collection($query->paginate($perPage));
         }
 
