@@ -3,11 +3,23 @@
 namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingApprovalService;
+use App\Domain\Booking\Services\BookingCreationService;
+use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Models\BusinessHour;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\WalletService;
+use Carbon\Carbon;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -20,6 +32,7 @@ class BookingApprovalServiceTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->seed(RoleSeeder::class);
         $this->approvals = app(BookingApprovalService::class);
     }
 
@@ -71,6 +84,43 @@ class BookingApprovalServiceTest extends TestCase
             1,
             NotificationLog::where('user_id', $booking->user_id)->where('template_key', 'booking.rejected')->count()
         );
+    }
+
+    public function test_rejecting_a_wallet_paid_booking_refunds_the_member(): void
+    {
+        $space = Space::factory()->room()->create([
+            'hourly_rate' => '10.00',
+            'pricing_currency' => 'USD',
+            'requires_approval' => true,
+        ]);
+        BusinessHour::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'day_of_week' => DayOfWeek::Monday,
+            'open_time' => '08:00',
+            'close_time' => '20:00',
+        ]);
+
+        $member = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+
+        // 2026-08-17 is a Monday.
+        $start = Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus');
+        $end = $start->copy()->addHour();
+
+        $booking = app(BookingCreationService::class)->create($space, $member, $start, $end);
+
+        $this->assertSame(BookingStatus::Pending, $booking->status);
+        $this->assertSame(PaymentState::Paid, $booking->payment_state);
+        $this->assertSame(PaymentSource::Wallet, $booking->payment_source);
+
+        $operator = User::factory()->create();
+        $this->approvals->reject($booking, $operator, 'Space unavailable that day.');
+
+        $refund = $wallet->transactions()->where('source', WalletTransactionSource::Refund)->first();
+
+        $this->assertNotNull($refund);
+        $this->assertSame('10.00', (string) $refund->amount);
     }
 
     public function test_approving_an_already_decided_booking_fails(): void

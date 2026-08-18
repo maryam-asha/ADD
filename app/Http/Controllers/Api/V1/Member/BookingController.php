@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
+use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
@@ -18,6 +19,8 @@ use Illuminate\Http\JsonResponse;
 
 class BookingController extends Controller
 {
+    use LogsSensitiveActions;
+
     public function store(StoreBookingRequest $request, BookingCreationService $creations): JsonResponse
     {
         $space = Space::findOrFail($request->validated('space_id'));
@@ -44,6 +47,8 @@ class BookingController extends Controller
             ], 422);
         }
 
+        $this->logSensitiveAction('booking_created', $booking);
+
         return response()->json(['data' => new BookingResource($booking)], 201);
     }
 
@@ -58,6 +63,8 @@ class BookingController extends Controller
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
+
+        $this->logSensitiveAction('booking_extended', $booking, ['additional_minutes' => $request->validated('additional_minutes')]);
 
         return response()->json(['message' => __('api.booking.extended')]);
     }

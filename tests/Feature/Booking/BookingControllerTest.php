@@ -17,6 +17,7 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 class BookingControllerTest extends TestCase
@@ -76,6 +77,7 @@ class BookingControllerTest extends TestCase
         $response->assertCreated();
         $this->assertSame(1, Booking::where('space_id', $space->id)->count());
         $this->assertSame(BookingStatus::Confirmed, Booking::first()->status);
+        $this->assertNotNull(Activity::where('description', 'booking_created')->latest('id')->first());
     }
 
     public function test_booking_creation_rejects_a_start_time_off_the_granularity(): void

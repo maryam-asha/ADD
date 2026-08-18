@@ -71,8 +71,15 @@ class BookingExtensionService
             $paymentState = $lockedBooking->payment_state;
 
             if ($lockedBooking->payment_state === PaymentState::Paid && $lockedBooking->payment_source === PaymentSource::Wallet) {
-                $wallet = $this->wallets->walletFor(OwnerType::User, $lockedBooking->user_id);
-                $this->wallets->debit($wallet, $lockedBooking->user, WalletTransactionCategory::SpaceSpecific, $difference, "Booking #{$lockedBooking->id} extension");
+                $personalOption = collect($this->wallets->spendOptions($lockedBooking->user, WalletTransactionCategory::SpaceSpecific))
+                    ->firstWhere('owner_type', OwnerType::User->value);
+
+                if ($personalOption !== null && bccomp($personalOption['usable_balance'], $difference, 2) >= 0) {
+                    $wallet = $this->wallets->walletFor(OwnerType::User, $lockedBooking->user_id);
+                    $this->wallets->debit($wallet, $lockedBooking->user, WalletTransactionCategory::SpaceSpecific, $difference, "Booking #{$lockedBooking->id} extension");
+                } else {
+                    $paymentState = PaymentState::Unpaid;
+                }
             } else {
                 $paymentState = PaymentState::Unpaid;
             }

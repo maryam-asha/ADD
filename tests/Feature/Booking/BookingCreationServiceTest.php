@@ -113,6 +113,26 @@ class BookingCreationServiceTest extends TestCase
         }
     }
 
+    public function test_creation_fails_when_the_booking_spans_two_calendar_days(): void
+    {
+        $space = $this->openSpace();
+        // 2026-08-17 is a Monday; 2026-08-18 is a Tuesday — both within the
+        // space's 08:00-20:00 Monday business hours were they compared as
+        // bare times, but the window crosses midnight into a different
+        // calendar day, which the same-day guard must reject outright.
+        $start = Carbon::parse('2026-08-17 19:00:00', 'Asia/Damascus');
+        $end = Carbon::parse('2026-08-18 02:00:00', 'Asia/Damascus');
+
+        try {
+            $this->creations->create($space, User::factory()->create(), $start, $end);
+            $this->fail('Expected a ReceptionActionException — the window crosses into the next calendar day.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.reception.outside_business_hours', $e->messageKey);
+        }
+
+        $this->assertSame(0, Booking::count());
+    }
+
     public function test_creation_fails_when_the_start_time_does_not_match_granularity(): void
     {
         $space = $this->openSpace(['slot_granularity_minutes' => 30]);
@@ -264,6 +284,38 @@ class BookingCreationServiceTest extends TestCase
 
         $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
         $this->assertNull($booking->payment_source);
+    }
+
+    public function test_creation_stays_unpaid_when_the_single_available_wallet_balance_is_insufficient(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($wallet, '5.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, $member, $start, $end);
+
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertNull($booking->payment_source);
+        $this->assertSame(0, $wallet->transactions()->where('amount', '<', 0)->count());
+    }
+
+    public function test_creation_stays_unpaid_when_the_explicitly_chosen_wallet_balance_is_insufficient(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $company = Company::factory()->create();
+        $member->companies()->attach($company->id);
+        $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        (new WalletService)->creditGeneral($companyWallet, '5.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, $member, $start, $end, OwnerType::Company, $company->id);
+
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertNull($booking->payment_source);
+        $this->assertSame(0, $companyWallet->transactions()->where('amount', '<', 0)->count());
     }
 
     public function test_creation_requires_an_explicit_wallet_choice_when_multiple_balances_apply(): void

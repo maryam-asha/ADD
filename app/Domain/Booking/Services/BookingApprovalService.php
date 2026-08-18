@@ -3,10 +3,15 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Services\WalletService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -16,6 +21,11 @@ use Illuminate\Support\Facades\DB;
  */
 class BookingApprovalService
 {
+    public function __construct(
+        private readonly WalletService $wallets,
+        private readonly AmountCalculator $amounts,
+    ) {}
+
     public function approve(Booking $booking, User $operator): void
     {
         DB::transaction(function () use ($booking, $operator) {
@@ -46,6 +56,13 @@ class BookingApprovalService
                 'approved_by' => $operator->id,
                 'approved_at' => now(),
             ])->save();
+
+            if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
+                [$refundAmount] = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
+
+                $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
+                $this->wallets->creditGeneral($wallet, $refundAmount, WalletTransactionSource::Refund, 'Booking rejection refund');
+            }
 
             $this->notify($locked->user_id, 'booking.rejected');
         });

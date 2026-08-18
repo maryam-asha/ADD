@@ -124,6 +124,8 @@ return [
         'extension_conflict' => 'لا يمكن تمديد هذا الحجز إلى ما بعد :latest_end_at.',
         'extended' => 'تم تمديد الحجز.',
         'wallet_not_owned' => 'أنت غير مخول بالسحب من هذه المحفظة.',
+        'check_in_requires_approval' => 'يجب الموافقة على هذا الحجز قبل تسجيل دخوله.',
+        'check_in_rejected' => 'تم رفض هذا الحجز ولا يمكن تسجيل دخوله.',
     ],
 
 ];

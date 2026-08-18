@@ -131,6 +131,10 @@ class BookingCreationService
                 throw new ReceptionActionException('api.booking.wallet_not_owned');
             }
 
+            if (bccomp($matched['usable_balance'], $amount, 2) < 0) {
+                return [PaymentState::Unpaid, null];
+            }
+
             $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
             $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
 
@@ -143,7 +147,7 @@ class BookingCreationService
             throw new WalletChoiceRequiredException($options);
         }
 
-        if (count($options) === 1) {
+        if (count($options) === 1 && bccomp($options[0]['usable_balance'], $amount, 2) >= 0) {
             $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
             $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
 
@@ -156,6 +160,12 @@ class BookingCreationService
     private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end): void
     {
         $branch = $space->building->branch;
+        $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
+
+        if (! $start->copy()->setTimezone($timezone)->isSameDay($end->copy()->setTimezone($timezone))) {
+            throw new ReceptionActionException('api.reception.outside_business_hours');
+        }
+
         $startTime = $this->localTimeOfDay($start);
         $endTime = $this->localTimeOfDay($end);
 

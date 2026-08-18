@@ -25,6 +25,8 @@ class BookingLangKeysTest extends TestCase
             'extension_conflict',
             'extended',
             'wallet_not_owned',
+            'check_in_requires_approval',
+            'check_in_rejected',
         ];
     }
 

@@ -143,6 +143,43 @@ class BookingExtensionServiceTest extends TestCase
         $this->assertSame(PaymentState::Paid, $booking->fresh()->payment_state);
     }
 
+    public function test_extension_leaves_payment_unpaid_when_the_wallet_balance_is_insufficient(): void
+    {
+        $member = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($wallet, '5.00', WalletTransactionSource::TopUp);
+        $booking = $this->checkedInBooking([
+            'user_id' => $member->id,
+            'payment_state' => PaymentState::Paid,
+            'payment_source' => PaymentSource::Wallet,
+        ]);
+
+        $this->extensions->extend($booking, 60);
+
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+        $this->assertSame(PaymentState::Unpaid, $booking->fresh()->payment_state);
+        $this->assertSame(0, $wallet->transactions()->where('amount', '<', 0)->count());
+    }
+
+    public function test_extension_leaves_payment_unpaid_when_the_member_has_no_personal_wallet(): void
+    {
+        // The booking was originally paid via a company wallet, so the
+        // member never needed a personal one — extend() only ever debits
+        // the personal wallet, and walletFor()'s firstOrFail() must not
+        // blow up when that wallet simply doesn't exist.
+        $member = User::factory()->create();
+        $booking = $this->checkedInBooking([
+            'user_id' => $member->id,
+            'payment_state' => PaymentState::Paid,
+            'payment_source' => PaymentSource::Wallet,
+        ]);
+
+        $this->extensions->extend($booking, 60);
+
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+        $this->assertSame(PaymentState::Unpaid, $booking->fresh()->payment_state);
+    }
+
     public function test_extension_leaves_an_unpaid_booking_unpaid(): void
     {
         $booking = $this->checkedInBooking();

@@ -124,6 +124,8 @@ return [
         'extension_conflict' => 'This booking cannot be extended past :latest_end_at.',
         'extended' => 'Booking extended.',
         'wallet_not_owned' => 'You are not authorized to spend from that wallet.',
+        'check_in_requires_approval' => 'This booking must be approved before it can be checked in.',
+        'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
     ],
 
 ];

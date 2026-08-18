@@ -99,6 +99,31 @@ class BookingReceptionControllerTest extends TestCase
         $response->assertStatus(409)->assertExactJson(['message' => 'This booking has already been cancelled.']);
     }
 
+    public function test_check_in_fails_if_booking_is_pending(): void
+    {
+        $this->actingAsOperations();
+        $booking = Booking::factory()->pending()->create(['space_id' => $this->openSpace()->id]);
+
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-in");
+
+        $response->assertStatus(409)->assertExactJson(['message' => 'This booking must be approved before it can be checked in.']);
+        $this->assertNull($booking->fresh()->checked_in_at);
+    }
+
+    public function test_check_in_fails_if_booking_is_rejected(): void
+    {
+        $this->actingAsOperations();
+        $booking = Booking::factory()->create([
+            'space_id' => $this->openSpace()->id,
+            'status' => BookingStatus::Rejected,
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-in");
+
+        $response->assertStatus(409)->assertExactJson(['message' => 'This booking was rejected and cannot be checked in.']);
+        $this->assertNull($booking->fresh()->checked_in_at);
+    }
+
     public function test_check_in_on_a_nonexistent_booking_is_404(): void
     {
         $this->actingAsOperations();

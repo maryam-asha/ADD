@@ -31,6 +31,14 @@ class BookingReceptionController extends Controller
             return response()->json(['message' => __('api.reception.already_cancelled')], 409);
         }
 
+        if ($booking->status === BookingStatus::Pending) {
+            return response()->json(['message' => __('api.booking.check_in_requires_approval')], 409);
+        }
+
+        if ($booking->status === BookingStatus::Rejected) {
+            return response()->json(['message' => __('api.booking.check_in_rejected')], 409);
+        }
+
         if ($booking->checked_in_at !== null) {
             return response()->json(['message' => __('api.reception.already_checked_in')], 409);
         }
