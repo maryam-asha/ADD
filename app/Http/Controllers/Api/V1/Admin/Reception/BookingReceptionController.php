@@ -8,11 +8,13 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingApprovalService;
 use App\Domain\Booking\Services\BookingCancellationService;
+use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
+use App\Http\Requests\Admin\Reception\ExtendBookingRequest;
 use App\Http\Requests\Admin\Reception\RejectBookingRequest;
 use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
 use Carbon\Carbon;
@@ -111,5 +113,18 @@ class BookingReceptionController extends Controller
         $this->logSensitiveAction('booking_rejected', $booking, ['rejection_reason' => $reason]);
 
         return response()->json(['message' => __('api.booking.rejected')]);
+    }
+
+    public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
+    {
+        try {
+            $extensions->extend($booking, $request->validated('additional_minutes'));
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $this->logSensitiveAction('booking_extended', $booking, ['additional_minutes' => $request->validated('additional_minutes')]);
+
+        return response()->json(['message' => __('api.booking.extended')]);
     }
 }

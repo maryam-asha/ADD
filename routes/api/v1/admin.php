@@ -133,6 +133,7 @@ Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::
 Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionController::class, 'settlePayment']);
 Route::post('reception/bookings/{booking}/approve', [BookingReceptionController::class, 'approve']);
 Route::post('reception/bookings/{booking}/reject', [BookingReceptionController::class, 'reject']);
+Route::post('reception/bookings/{booking}/extend', [BookingReceptionController::class, 'extend']);
 
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);

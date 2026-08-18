@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCreationService;
+use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\Booking\ExtendBookingRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use Carbon\Carbon;
@@ -42,5 +45,20 @@ class BookingController extends Controller
         }
 
         return response()->json(['data' => new BookingResource($booking)], 201);
+    }
+
+    public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
+    {
+        if (! $booking->user->is($request->user())) {
+            abort(403);
+        }
+
+        try {
+            $extensions->extend($booking, $request->validated('additional_minutes'));
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        return response()->json(['message' => __('api.booking.extended')]);
     }
 }

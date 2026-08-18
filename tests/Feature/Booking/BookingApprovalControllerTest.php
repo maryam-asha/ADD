@@ -148,4 +148,46 @@ class BookingApprovalControllerTest extends TestCase
         $activity = Activity::where('description', 'booking_rejected')->latest('id')->first();
         $this->assertSame($submittedReason, $activity->properties['rejection_reason']);
     }
+
+    public function test_reception_can_extend_a_checked_in_booking_on_the_members_behalf(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace(['slot_granularity_minutes' => 30]);
+        $booking = Booking::factory()->checkedIn()->create([
+            'space_id' => $space->id,
+            'start_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'end_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'checked_in_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/extend", [
+            'additional_minutes' => 60,
+        ]);
+
+        $response->assertOk()->assertExactJson(['message' => 'Booking extended.']);
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+    }
+
+    public function test_extending_past_a_conflicting_booking_states_the_latest_possible_end_time(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace(['slot_granularity_minutes' => 30]);
+        $booking = Booking::factory()->checkedIn()->create([
+            'space_id' => $space->id,
+            'start_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'end_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'checked_in_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+        ]);
+        Booking::factory()->create([
+            'space_id' => $space->id,
+            'start_at' => Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'end_at' => Carbon::parse('2026-08-17 12:30:00', 'Asia/Damascus')->setTimezone('UTC'),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/extend", [
+            'additional_minutes' => 60,
+        ]);
+
+        $response->assertStatus(422)->assertExactJson(['message' => 'This booking cannot be extended past 2026-08-17T08:30:00+00:00.']);
+    }
 }

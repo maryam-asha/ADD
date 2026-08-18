@@ -26,6 +26,7 @@ Route::get('wallet/options', [WalletController::class, 'options']);
 // docs/decisions/booking-creation-approval-extension.md — member-facing
 // booking creation with slot granularity/buffer/approval rules.
 Route::post('bookings', [BookingController::class, 'store']);
+Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

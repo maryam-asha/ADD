@@ -143,4 +143,35 @@ class BookingControllerTest extends TestCase
             'end_at' => '2026-08-17T11:00:00+03:00',
         ])->assertForbidden();
     }
+
+    public function test_a_member_can_extend_their_own_checked_in_booking(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace(['slot_granularity_minutes' => 30]);
+        $booking = Booking::factory()->checkedIn()->create([
+            'space_id' => $space->id,
+            'user_id' => $member->id,
+            'start_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'end_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+            'checked_in_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/extend", [
+            'additional_minutes' => 60,
+        ]);
+
+        $response->assertOk()->assertExactJson(['message' => 'Booking extended.']);
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+    }
+
+    public function test_a_member_cannot_extend_another_members_booking(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        $booking = Booking::factory()->checkedIn()->create(['space_id' => $space->id]);
+
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/extend", [
+            'additional_minutes' => 60,
+        ])->assertForbidden();
+    }
 }
