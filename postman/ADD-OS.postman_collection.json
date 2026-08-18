@@ -947,7 +947,7 @@
                                                                                                 "profile"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status â€” deliberately no `roles`, unlike `/auth/me`\u0027s shared UserResource, since a member doesn\u0027t need their own Spatie roles echoed back) plus `personal` (`bio`, `city`, `avatar_url`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`). Profile fields are null until the member has ever saved one â€” there is no separate \"not found\" state; the underlying rows are only created on first PATCH."
+                                                                       "description":  "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status) plus `personal` (`bio`, `city`, `avatar_url`, `gender`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`, `instagram_url`, `behance_url`, `website_url`). Profile fields are null until the member has ever saved one. Also returns a top-level `completion` object (sibling of `data`): `score` (0-100), `threshold` (from the `profile.completion_threshold` setting), and `missing_fields`."
                                                                    }
                                                    },
                                                    {
@@ -981,7 +981,7 @@
                                                                                   ],
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"bio\": \"Coffee and code.\",\n  \"city\": \"Aleppo\",\n  \"avatar_url\": \"https://example.com/avatar.png\",\n  \"job_title\": \"Founder\",\n  \"company_name\": \"ACME\",\n  \"industry\": \"Software\",\n  \"linkedin_url\": \"https://linkedin.com/in/example\"\n}",
+                                                                                    "raw":  "{\n  \"bio\": \"Coffee and code.\",\n  \"city\": \"Aleppo\",\n  \"avatar_url\": \"https://example.com/avatar.png\",\n  \"gender\": \"male\",\n  \"job_title\": \"Founder\",\n  \"company_name\": \"ACME\",\n  \"industry\": \"Software\",\n  \"linkedin_url\": \"https://linkedin.com/in/example\",\n  \"instagram_url\": \"https://instagram.com/example\",\n  \"behance_url\": \"https://behance.net/example\",\n  \"website_url\": \"https://example.com\"\n}",
                                                                                     "options":  {
                                                                                                     "raw":  {
                                                                                                                 "language":  "json"
@@ -6336,6 +6336,180 @@
                                                                 ]
                                                    },
                                                    {
+                                                       "name":  "Contact Links",
+                                                       "item":  [
+                                                                    {
+                                                                        "name":  "List Contact Links",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/contact-links",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "contact-links"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Create Contact Link",
+                                                                        "event":  [
+                                                                                      {
+                                                                                          "listen":  "test",
+                                                                                          "script":  {
+                                                                                                         "type":  "text/javascript",
+                                                                                                         "exec":  [
+                                                                                                                      "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                                                                                      "    pm.collectionVariables.set('contact_link_id', pm.response.json().data.id);",
+                                                                                                                      "}"
+                                                                                                                  ]
+                                                                                                     }
+                                                                                      }
+                                                                                  ],
+                                                                        "request":  {
+                                                                                        "method":  "POST",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"type\": \"social_instagram\",\n  \"value\": \"https://instagram.com/adddistrict\",\n  \"label\": \"Instagram\",\n  \"sort_order\": 1\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/contact-links",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "contact-links"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "`type` is an open string, not a fixed list — a new platform is a row insert here, never a code change or migration."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Get Contact Link",
+                                                                        "request":  {
+                                                                                        "method":  "GET",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/contact-links/{{contact_link_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "contact-links",
+                                                                                                                 "{{contact_link_id}}"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Update Contact Link",
+                                                                        "request":  {
+                                                                                        "method":  "PUT",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "Content-Type",
+                                                                                                           "value":  "application/json"
+                                                                                                       },
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "body":  {
+                                                                                                     "mode":  "raw",
+                                                                                                     "raw":  "{\n  \"type\": \"social_instagram\",\n  \"value\": \"https://instagram.com/adddistrict.new\",\n  \"sort_order\": 2,\n  \"is_visible\": true\n}",
+                                                                                                     "options":  {
+                                                                                                                     "raw":  {
+                                                                                                                                 "language":  "json"
+                                                                                                                             }
+                                                                                                                 }
+                                                                                                 },
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/contact-links/{{contact_link_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "contact-links",
+                                                                                                                 "{{contact_link_id}}"
+                                                                                                             ]
+                                                                                                },
+                                                                                        "description":  "Returns `{\"message\": \"...\"}` on success, not the updated resource. Also how to reorder (`sort_order`) or toggle visibility (`is_visible`) — both are plain fields on this same endpoint, not separate actions."
+                                                                                    }
+                                                                    },
+                                                                    {
+                                                                        "name":  "Delete Contact Link",
+                                                                        "request":  {
+                                                                                        "method":  "DELETE",
+                                                                                        "header":  [
+                                                                                                       {
+                                                                                                           "key":  "lang",
+                                                                                                           "value":  "{{lang}}",
+                                                                                                           "type":  "text"
+                                                                                                       }
+                                                                                                   ],
+                                                                                        "url":  {
+                                                                                                    "raw":  "{{base_url}}/api/v1/admin/contact-links/{{contact_link_id}}",
+                                                                                                    "host":  [
+                                                                                                                 "{{base_url}}"
+                                                                                                             ],
+                                                                                                    "path":  [
+                                                                                                                 "api",
+                                                                                                                 "v1",
+                                                                                                                 "admin",
+                                                                                                                 "contact-links",
+                                                                                                                 "{{contact_link_id}}"
+                                                                                                             ]
+                                                                                                }
+                                                                                    }
+                                                                    }
+                                                                ]
+                                                   },
+                                                   {
                                                        "name":  "Community Members",
                                                        "item":  [
                                                                     {
@@ -6673,6 +6847,31 @@
                      "name":  "Public (Site)",
                      "description":  "Unauthenticated reads for the marketing website â€” only published/active rows are ever returned here.",
                      "item":  [
+                                  {
+                                      "name":  "Get Contact Links",
+                                      "request":  {
+                                                      "method":  "GET",
+                                                      "header":  [
+                                                                     {
+                                                                         "key":  "lang",
+                                                                         "value":  "{{lang}}",
+                                                                         "type":  "text"
+                                                                     }
+                                                                 ],
+                                                      "url":  {
+                                                                  "raw":  "{{base_url}}/api/v1/contact-links",
+                                                                  "host":  [
+                                                                               "{{base_url}}"
+                                                                           ],
+                                                                  "path":  [
+                                                                               "api",
+                                                                               "v1",
+                                                                               "contact-links"
+                                                                           ]
+                                                              },
+                                                      "description":  "Only `is_visible = true` rows, ordered by `sort_order`. No authentication required."
+                                                  }
+                                  },
                                   {
                                       "name":  "Get Founders",
                                       "request":  {
