@@ -33,7 +33,7 @@ class BookingController extends Controller
                 $request->validated('wallet_owner_id'),
             );
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         } catch (WalletChoiceRequiredException $e) {
             return response()->json([
                 'message' => __('api.booking.wallet_choice_required'),

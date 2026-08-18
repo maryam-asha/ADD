@@ -51,7 +51,7 @@ class BookingReceptionController extends Controller
         try {
             $closures->closeOut($booking, Carbon::parse($request->validated('checked_out_at')));
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_checked_out', $booking, ['amount_owed' => (string) $booking->amount_owed]);
@@ -64,7 +64,7 @@ class BookingReceptionController extends Controller
         try {
             $cancellations->cancel($booking);
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_cancelled', $booking);
@@ -77,7 +77,7 @@ class BookingReceptionController extends Controller
         try {
             $closures->settlePayment($booking, PaymentMethod::from($request->validated('payment_method')), $request->user());
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('payment_settled', $booking, ['payment_method' => $booking->payment_method->value]);
@@ -90,7 +90,7 @@ class BookingReceptionController extends Controller
         try {
             $approvals->approve($booking, $request->user());
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_approved', $booking);
@@ -105,7 +105,7 @@ class BookingReceptionController extends Controller
         try {
             $approvals->reject($booking, $request->user(), $reason);
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_rejected', $booking, ['rejection_reason' => $reason]);
