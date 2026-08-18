@@ -123,6 +123,7 @@ return [
         'invalid_extension_duration' => 'مدة التمديد لا تستوفي الحد الأدنى للمدة أو متطلبات فترة الحجز.',
         'extension_conflict' => 'لا يمكن تمديد هذا الحجز إلى ما بعد :latest_end_at.',
         'extended' => 'تم تمديد الحجز.',
+        'wallet_not_owned' => 'أنت غير مخول بالسحب من هذه المحفظة.',
     ],
 
 ];

@@ -301,6 +301,26 @@ class BookingCreationServiceTest extends TestCase
         $this->assertSame(1, $companyWallet->transactions()->where('amount', '-10.00')->count());
     }
 
+    public function test_creation_rejects_an_explicit_wallet_the_member_does_not_own(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $otherCompany = Company::factory()->create();
+        $otherCompanyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $otherCompany->id]);
+        (new WalletService)->creditGeneral($otherCompanyWallet, '50.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        try {
+            $this->creations->create($space, $member, $start, $end, OwnerType::Company, $otherCompany->id);
+            $this->fail('Expected a ReceptionActionException for an unowned wallet.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.wallet_not_owned', $e->messageKey);
+        }
+
+        $this->assertSame(0, Booking::count());
+        $this->assertSame(0, $otherCompanyWallet->transactions()->where('amount', '<', 0)->count());
+    }
+
     public function test_creation_stays_unpaid_when_the_computed_amount_is_zero(): void
     {
         $space = $this->openSpace(['hourly_rate' => '0.00']);

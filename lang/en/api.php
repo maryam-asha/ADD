@@ -123,6 +123,7 @@ return [
         'invalid_extension_duration' => 'The extension duration does not meet the minimum duration or granularity requirements.',
         'extension_conflict' => 'This booking cannot be extended past :latest_end_at.',
         'extended' => 'Booking extended.',
+        'wallet_not_owned' => 'You are not authorized to spend from that wallet.',
     ],
 
 ];

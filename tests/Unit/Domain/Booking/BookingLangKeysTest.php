@@ -24,6 +24,7 @@ class BookingLangKeysTest extends TestCase
             'invalid_extension_duration',
             'extension_conflict',
             'extended',
+            'wallet_not_owned',
         ];
     }
 

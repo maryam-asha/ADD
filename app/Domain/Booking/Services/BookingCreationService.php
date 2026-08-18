@@ -94,6 +94,15 @@ class BookingCreationService
         }
 
         if ($walletOwnerType !== null && $walletOwnerId !== null) {
+            $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
+            $matched = collect($options)->first(
+                fn (array $option) => $option['owner_type'] === $walletOwnerType->value && $option['owner_id'] === $walletOwnerId
+            );
+
+            if ($matched === null) {
+                throw new ReceptionActionException('api.booking.wallet_not_owned');
+            }
+
             $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
             $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
 
