@@ -43,7 +43,7 @@ no table surface yet and nothing to guard.
 | 2 | Floor/Zone are classification only | — (Phase 1) | 1 |
 | 3 | Resource is metadata, never booked independently | — (Phase 1) | 1 |
 | 4 | Seat/Desk is an address, not a seat map | — (Phase 1) | 1 |
-| 5 | Booking = prepaid + cancellable; session without booking = postpaid + not cancellable | `tests/Feature/Booking/*` (reception-ops slice, [reception-operations-scope.md](reception-operations-scope.md)); no dedicated `tests/Guards/` entry yet — full capacity-slot/extension scope still pending | 3 (slice), 5 (full) |
+| 5 | Booking = prepaid + cancellable; session without booking = postpaid + not cancellable | `tests/Feature/Booking/*` (reception-ops slice, [reception-operations-scope.md](reception-operations-scope.md); creation/approval/extension slice, [booking-creation-approval-extension.md](booking-creation-approval-extension.md)); no dedicated `tests/Guards/` entry — additive capability, not a schema-shape invariant | 3 (slice), 4 (slice), 5 (full) |
 | 6 | Hot Desk package selection creates a real booking, 24h free cancellation | — (Phase 5) | 5 |
 | 7 | Meeting rooms auto-confirm; only the event hall is manual | — (Phase 5) | 5 |
 | 8 | Operational status at Space/Resource level, no hierarchical escalation; affected-bookings on maintenance conflict | — (Phase 1 status, Phase 5 affected_bookings) | 1, 5 |

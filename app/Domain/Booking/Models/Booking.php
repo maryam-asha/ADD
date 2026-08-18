@@ -34,6 +34,9 @@ class Booking extends Model
         'paid_by',
         'paid_at',
         'cancelled_at',
+        'rejection_reason',
+        'approved_by',
+        'approved_at',
     ];
 
     protected function casts(): array
@@ -51,6 +54,7 @@ class Booking extends Model
             'payment_method' => PaymentMethod::class,
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
     }
 

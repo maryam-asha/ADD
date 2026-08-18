@@ -162,4 +162,18 @@ class BookingCancellationServiceTest extends TestCase
             $this->assertSame(409, $e->status);
         }
     }
+
+    public function test_cancelling_a_pending_booking_succeeds(): void
+    {
+        $space = Space::factory()->room()->create();
+        $booking = Booking::factory()->pending()->create([
+            'space_id' => $space->id,
+            'start_at' => now()->addHours(2),
+            'end_at' => now()->addHours(3),
+        ]);
+
+        $this->cancellations->cancel($booking);
+
+        $this->assertSame(BookingStatus::Cancelled, $booking->fresh()->status);
+    }
 }

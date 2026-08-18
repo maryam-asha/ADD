@@ -45,4 +45,17 @@ class BookingFactory extends Factory
             'cancelled_at' => now(),
         ]);
     }
+
+    public function pending(): static
+    {
+        return $this->state(fn () => ['status' => BookingStatus::Pending]);
+    }
+
+    public function rejected(): static
+    {
+        return $this->state(fn () => [
+            'status' => BookingStatus::Rejected,
+            'rejection_reason' => 'Not a good fit for this request.',
+        ]);
+    }
 }

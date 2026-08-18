@@ -29,7 +29,7 @@ class WalkInSessionController extends Controller
         try {
             $session = $capacity->start($space, $member);
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('walkin_session_started', $session);
@@ -49,7 +49,7 @@ class WalkInSessionController extends Controller
         try {
             $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at')));
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('walkin_session_checked_out', $walkinSession, ['amount_owed' => (string) $walkinSession->amount_owed]);
@@ -62,7 +62,7 @@ class WalkInSessionController extends Controller
         try {
             $closures->settlePayment($walkinSession, PaymentMethod::from($request->validated('payment_method')), $request->user());
         } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey)], $e->status);
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('payment_settled', $walkinSession, ['payment_method' => $walkinSession->payment_method->value]);

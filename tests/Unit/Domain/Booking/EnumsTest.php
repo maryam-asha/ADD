@@ -14,7 +14,7 @@ class EnumsTest extends TestCase
 {
     public function test_booking_status_cases(): void
     {
-        $this->assertSame(['confirmed', 'cancelled'], array_column(BookingStatus::cases(), 'value'));
+        $this->assertSame(['confirmed', 'cancelled', 'pending', 'rejected'], array_column(BookingStatus::cases(), 'value'));
     }
 
     public function test_payment_state_cases(): void

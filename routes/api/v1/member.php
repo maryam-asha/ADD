@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Member\AccountController;
+use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
@@ -21,6 +22,11 @@ use Illuminate\Support\Facades\Route;
 // hybrid-routing choice: every currently-spendable wallet for a category,
 // clearly labeled by source. No spend happens here.
 Route::get('wallet/options', [WalletController::class, 'options']);
+
+// docs/decisions/booking-creation-approval-extension.md — member-facing
+// booking creation with slot granularity/buffer/approval rules.
+Route::post('bookings', [BookingController::class, 'store']);
+Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

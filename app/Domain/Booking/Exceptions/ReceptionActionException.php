@@ -5,17 +5,19 @@ namespace App\Domain\Booking\Exceptions;
 use RuntimeException;
 
 /**
- * One exception type for every reception-operation precondition failure
- * across booking check-in/check-out/cancel/settlement and walk-in
- * start/check-out/settlement. Carries the translation key and HTTP status
- * the controller maps directly to a JSON error response — a proliferation
- * of one-off exception subclasses would buy nothing over this for the
- * ~15 distinct failure modes this plan needs.
+ * One exception type for every reception/booking precondition failure in
+ * this domain. Carries the translation key, HTTP status, and (optionally)
+ * Laravel-style `:placeholder` params the controller passes straight
+ * through to __(). $params defaults to [] — every pre-existing call site
+ * that doesn't need it is unaffected.
  */
 class ReceptionActionException extends RuntimeException
 {
-    public function __construct(public readonly string $messageKey, public readonly int $status = 422)
-    {
+    public function __construct(
+        public readonly string $messageKey,
+        public readonly int $status = 422,
+        public readonly array $params = [],
+    ) {
         parent::__construct($messageKey);
     }
 }
