@@ -14,6 +14,7 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 class BookingApprovalControllerTest extends TestCase
@@ -132,5 +133,19 @@ class BookingApprovalControllerTest extends TestCase
 
         $secondBooking = $creations->create($space, User::factory()->create(), $start, $end);
         $this->assertSame(BookingStatus::Pending, $secondBooking->status);
+    }
+
+    public function test_rejection_reason_is_logged_in_audit_trail(): void
+    {
+        $this->actingAsOperations();
+        $booking = Booking::factory()->pending()->create(['space_id' => $this->openSpace()->id]);
+        $submittedReason = 'Member requested cancellation without proper notice.';
+
+        $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/reject", [
+            'rejection_reason' => $submittedReason,
+        ])->assertOk();
+
+        $activity = Activity::where('description', 'booking_rejected')->latest('id')->first();
+        $this->assertSame($submittedReason, $activity->properties['rejection_reason']);
     }
 }

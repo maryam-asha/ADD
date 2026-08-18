@@ -100,13 +100,15 @@ class BookingReceptionController extends Controller
 
     public function reject(RejectBookingRequest $request, Booking $booking, BookingApprovalService $approvals): JsonResponse
     {
+        $reason = $request->validated('rejection_reason');
+
         try {
-            $approvals->reject($booking, $request->user(), $request->validated('rejection_reason'));
+            $approvals->reject($booking, $request->user(), $reason);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey)], $e->status);
         }
 
-        $this->logSensitiveAction('booking_rejected', $booking, ['rejection_reason' => $booking->rejection_reason]);
+        $this->logSensitiveAction('booking_rejected', $booking, ['rejection_reason' => $reason]);
 
         return response()->json(['message' => __('api.booking.rejected')]);
     }
