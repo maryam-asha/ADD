@@ -3,14 +3,21 @@
 namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -228,5 +235,83 @@ class BookingCreationServiceTest extends TestCase
         $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
 
         $this->assertInstanceOf(Booking::class, $booking);
+    }
+
+    public function test_creation_debits_the_single_available_wallet_and_marks_paid(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, $member, $start, $end);
+
+        $this->assertSame(PaymentState::Paid, $booking->payment_state);
+        $this->assertSame(PaymentSource::Wallet, $booking->payment_source);
+        $this->assertSame(1, $wallet->transactions()->where('amount', '-10.00')->count());
+    }
+
+    public function test_creation_stays_unpaid_when_no_balance_covers_the_cost(): void
+    {
+        $space = $this->openSpace();
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
+
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertNull($booking->payment_source);
+    }
+
+    public function test_creation_requires_an_explicit_wallet_choice_when_multiple_balances_apply(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $personalWallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($personalWallet, '50.00', WalletTransactionSource::TopUp);
+        $company = Company::factory()->create();
+        $member->companies()->attach($company->id);
+        $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        (new WalletService)->creditGeneral($companyWallet, '50.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        try {
+            $this->creations->create($space, $member, $start, $end);
+            $this->fail('Expected a WalletChoiceRequiredException.');
+        } catch (WalletChoiceRequiredException $e) {
+            $this->assertCount(2, $e->options);
+        }
+
+        $this->assertSame(0, Booking::where('user_id', $member->id)->count());
+    }
+
+    public function test_creation_debits_the_explicitly_chosen_company_wallet_when_provided(): void
+    {
+        $space = $this->openSpace();
+        $member = User::factory()->create();
+        $company = Company::factory()->create();
+        $member->companies()->attach($company->id);
+        $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        (new WalletService)->creditGeneral($companyWallet, '50.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, $member, $start, $end, OwnerType::Company, $company->id);
+
+        $this->assertSame(PaymentState::Paid, $booking->payment_state);
+        $this->assertSame(1, $companyWallet->transactions()->where('amount', '-10.00')->count());
+    }
+
+    public function test_creation_stays_unpaid_when_the_computed_amount_is_zero(): void
+    {
+        $space = $this->openSpace(['hourly_rate' => '0.00']);
+        $member = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        [$start, $end] = $this->slot(10);
+
+        $booking = $this->creations->create($space, $member, $start, $end);
+
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertSame(0, $wallet->transactions()->where('amount', '<', 0)->count());
     }
 }

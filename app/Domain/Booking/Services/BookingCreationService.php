@@ -3,14 +3,18 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -30,6 +34,7 @@ class BookingCreationService
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
+        private readonly WalletService $wallets,
     ) {}
 
     public function create(
@@ -57,25 +62,58 @@ class BookingCreationService
         $minDuration = (int) $this->settings->get('booking.min_duration_minutes', 60);
         $this->assertValidDuration($startAt, $endAt, $minDuration, $granularity);
 
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt) {
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
             $this->assertSlotAvailable($locked, $startAt, $endAt);
             $this->assertOccupancyLeavesRoom($locked);
             $this->assertBufferRespected($locked, $startAt, $endAt);
 
-            $status = BookingStatus::Confirmed;
+            [$amount] = $this->amounts->forRange($locked, $startAt, $endAt);
+            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $amount, $walletOwnerType, $walletOwnerId);
 
             return Booking::create([
                 'space_id' => $locked->id,
                 'user_id' => $member->id,
                 'start_at' => $startAt,
                 'end_at' => $endAt,
-                'status' => $status,
-                'payment_state' => PaymentState::Unpaid,
-                'payment_source' => null,
+                'status' => BookingStatus::Confirmed,
+                'payment_state' => $paymentState,
+                'payment_source' => $paymentSource,
             ]);
         });
+    }
+
+    /**
+     * @return array{0: PaymentState, 1: ?PaymentSource}
+     */
+    private function routePayment(Space $space, User $member, string $amount, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
+    {
+        if (bccomp($amount, '0.00', 2) <= 0) {
+            return [PaymentState::Unpaid, null];
+        }
+
+        if ($walletOwnerType !== null && $walletOwnerId !== null) {
+            $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
+
+            return [PaymentState::Paid, PaymentSource::Wallet];
+        }
+
+        $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
+
+        if (count($options) > 1) {
+            throw new WalletChoiceRequiredException($options);
+        }
+
+        if (count($options) === 1) {
+            $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
+
+            return [PaymentState::Paid, PaymentSource::Wallet];
+        }
+
+        return [PaymentState::Unpaid, null];
     }
 
     private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end): void
