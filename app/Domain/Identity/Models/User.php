@@ -36,6 +36,7 @@ class User extends Authenticatable
         'preferred_language',
         'preferred_currency',
         'status',
+        'fcm_token',
     ];
 
     /**
