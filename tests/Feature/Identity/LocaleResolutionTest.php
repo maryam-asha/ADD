@@ -9,7 +9,7 @@ class LocaleResolutionTest extends IdentityTestCase
     private function member(array $overrides = []): User
     {
         $user = User::factory()->create(array_merge([
-            'phone' => '0912345678',
+            'phone' => '+963912345678',
             'password' => 'correct-horse',
         ], $overrides));
 
@@ -21,7 +21,7 @@ class LocaleResolutionTest extends IdentityTestCase
     public function test_a_valid_header_is_read_on_an_unauthenticated_request(): void
     {
         $response = $this->withHeader('lang', 'ar')->postJson('/api/v1/auth/login', [
-            'phone' => '0900000000',
+            'phone' => '+963900000000',
             'password' => 'anything',
         ]);
 

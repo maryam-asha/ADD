@@ -29,7 +29,7 @@ class GlobalActiveGuardCoverageTest extends IdentityTestCase
     public function test_starting_a_registration_is_unaffected_since_no_user_is_authenticated_yet(): void
     {
         $response = $this->postJson('/api/v1/auth/register', [
-            'phone' => '0955512345',
+            'phone' => '+963955512345',
             'name' => 'Prospective Member',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',

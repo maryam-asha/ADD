@@ -14,7 +14,7 @@ use Illuminate\Testing\TestResponse;
  */
 class ApiLocalizationTest extends IdentityTestCase
 {
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     private const PASSWORD = 'correct-horse';
 

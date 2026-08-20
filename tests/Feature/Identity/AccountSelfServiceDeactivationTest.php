@@ -23,7 +23,7 @@ class AccountSelfServiceDeactivationTest extends IdentityTestCase
 {
     use InteractsWithOtp;
 
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     protected function setUp(): void
     {
@@ -104,7 +104,7 @@ class AccountSelfServiceDeactivationTest extends IdentityTestCase
         $this->member(['status' => 'active']);
 
         $known = $this->postJson('/api/v1/auth/account/reactivate', ['phone' => self::PHONE]);
-        $unknown = $this->postJson('/api/v1/auth/account/reactivate', ['phone' => '0999999999']);
+        $unknown = $this->postJson('/api/v1/auth/account/reactivate', ['phone' => '+963999999999']);
 
         $known->assertOk();
         $unknown->assertOk();

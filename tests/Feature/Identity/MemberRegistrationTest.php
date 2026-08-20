@@ -26,7 +26,7 @@ class MemberRegistrationTest extends IdentityTestCase
 {
     use InteractsWithOtp;
 
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     protected function setUp(): void
     {

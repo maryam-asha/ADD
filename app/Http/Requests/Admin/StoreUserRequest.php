@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Rules\SyrianPhoneNumber;
+use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
@@ -25,7 +25,7 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', 'unique:users,phone', new SyrianPhoneNumber],
+            'phone' => ['required', 'string', 'unique:users,phone', new PhoneNumber],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
             'role' => ['required', Rule::in(['operations', 'admin'])],

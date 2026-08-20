@@ -74,7 +74,7 @@ class MemberDirectoryControllerTest extends TestCase
 
     public function test_response_never_includes_phone_or_email(): void
     {
-        $member = User::factory()->create(['phone' => '0912345678', 'email' => 'lina@example.com']);
+        $member = User::factory()->create(['phone' => '+963912345678', 'email' => 'lina@example.com']);
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
         $this->patchJson('/api/v1/member/consents/public-directory', ['granted' => true])->assertOk();
@@ -83,7 +83,7 @@ class MemberDirectoryControllerTest extends TestCase
         $response = $this->getJson('/api/v1/member-directory');
 
         $response->assertOk();
-        $response->assertJsonMissing(['phone' => '0912345678']);
+        $response->assertJsonMissing(['phone' => '+963912345678']);
         $response->assertJsonMissing(['email' => 'lina@example.com']);
     }
 

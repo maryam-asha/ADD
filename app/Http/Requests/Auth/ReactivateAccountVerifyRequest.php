@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Rules\SyrianPhoneNumber;
+use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -22,7 +22,7 @@ class ReactivateAccountVerifyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => ['required', 'string', new SyrianPhoneNumber],
+            'phone' => ['required', 'string', new PhoneNumber],
             'code' => ['required', 'string', 'size:'.config('otp.code_length')],
         ];
     }

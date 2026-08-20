@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Rules\SyrianPhoneNumber;
+use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -25,7 +25,7 @@ class UpdateUserRequest extends FormRequest
 
         return [
             'name' => ['required', 'string', 'max:255'],
-            'phone' => ['required', 'string', Rule::unique('users', 'phone')->ignore($userId), new SyrianPhoneNumber],
+            'phone' => ['required', 'string', Rule::unique('users', 'phone')->ignore($userId), new PhoneNumber],
             'email' => ['required', 'email', Rule::unique('users', 'email')->ignore($userId)],
         ];
     }

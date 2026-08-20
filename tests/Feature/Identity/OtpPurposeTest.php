@@ -32,17 +32,17 @@ class OtpPurposeTest extends IdentityTestCase
 
     public function test_the_requested_purpose_is_persisted_on_the_issued_code(): void
     {
-        $this->otp->request('0912345678', OtpPurpose::PasswordReset);
+        $this->otp->request('+963912345678', OtpPurpose::PasswordReset);
 
         $this->assertSame(
             OtpPurpose::PasswordReset,
-            OtpVerification::where('phone', '0912345678')->sole()->purpose
+            OtpVerification::where('phone', '+963912345678')->sole()->purpose
         );
     }
 
     public function test_a_registration_code_is_rejected_when_spent_on_a_password_reset(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::Registration);
 
         $result = $this->otp->verify($phone, $this->provider->lastCodeFor($phone), OtpPurpose::PasswordReset);
@@ -52,7 +52,7 @@ class OtpPurposeTest extends IdentityTestCase
 
     public function test_a_password_reset_code_is_rejected_when_spent_on_a_registration(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::PasswordReset);
 
         $result = $this->otp->verify($phone, $this->provider->lastCodeFor($phone), OtpPurpose::Registration);
@@ -62,7 +62,7 @@ class OtpPurposeTest extends IdentityTestCase
 
     public function test_a_purpose_mismatch_does_not_consume_the_code(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::PasswordReset);
         $code = $this->provider->lastCodeFor($phone);
 
@@ -73,7 +73,7 @@ class OtpPurposeTest extends IdentityTestCase
 
     public function test_a_code_matching_its_own_purpose_verifies(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::PasswordReset);
 
         $result = $this->otp->verify($phone, $this->provider->lastCodeFor($phone), OtpPurpose::PasswordReset);
@@ -83,7 +83,7 @@ class OtpPurposeTest extends IdentityTestCase
 
     public function test_a_wrong_code_is_invalid_rather_than_a_purpose_mismatch(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::Registration);
 
         $result = $this->otp->verify($phone, '000000', OtpPurpose::PasswordReset);
@@ -98,7 +98,7 @@ class OtpPurposeTest extends IdentityTestCase
      */
     public function test_each_purpose_carries_its_own_resend_cooldown(): void
     {
-        $phone = '0912345678';
+        $phone = '+963912345678';
         $this->otp->request($phone, OtpPurpose::Registration);
         $this->otp->request($phone, OtpPurpose::PasswordReset);
 

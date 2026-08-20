@@ -61,9 +61,9 @@ class MemberOperationsIsolationTest extends IdentityTestCase
      */
     public function test_an_operations_account_cannot_sign_in_through_the_member_app(): void
     {
-        $this->userWithRoles('0955500009', 'operations');
+        $this->userWithRoles('+963955500009', 'operations');
 
-        $response = $this->login('0955500009');
+        $response = $this->login('+963955500009');
 
         $response->assertStatus(401);
         $response->assertJsonMissingPath('access_token');
@@ -73,17 +73,17 @@ class MemberOperationsIsolationTest extends IdentityTestCase
 
     public function test_an_admin_account_cannot_sign_in_through_the_member_app(): void
     {
-        $this->userWithRoles('0955500010', 'admin');
+        $this->userWithRoles('+963955500010', 'admin');
 
-        $this->login('0955500010')->assertStatus(401);
+        $this->login('+963955500010')->assertStatus(401);
         $this->assertDatabaseCount('personal_access_tokens', 0);
     }
 
     public function test_an_account_with_no_role_at_all_cannot_sign_in(): void
     {
-        $this->userWithRoles('0955500011');
+        $this->userWithRoles('+963955500011');
 
-        $this->login('0955500011')->assertStatus(401);
+        $this->login('+963955500011')->assertStatus(401);
     }
 
     /**
@@ -93,12 +93,12 @@ class MemberOperationsIsolationTest extends IdentityTestCase
      */
     public function test_refusing_an_operator_is_worded_exactly_like_a_wrong_password(): void
     {
-        $this->userWithRoles('0955500009', 'operations');
-        $this->userWithRoles('0912345678', 'member');
+        $this->userWithRoles('+963955500009', 'operations');
+        $this->userWithRoles('+963912345678', 'member');
 
-        $operator = $this->login('0955500009');
+        $operator = $this->login('+963955500009');
         $wrongPassword = $this->postJson('/api/v1/auth/login', [
-            'phone' => '0912345678',
+            'phone' => '+963912345678',
             'password' => 'not-the-password',
         ]);
 
@@ -114,11 +114,11 @@ class MemberOperationsIsolationTest extends IdentityTestCase
     public function test_the_member_recovery_flow_will_not_reset_an_operations_password(): void
     {
         $this->fakeOtpProvider();
-        $this->userWithRoles('0955500009', 'operations');
+        $this->userWithRoles('+963955500009', 'operations');
 
-        $this->postJson('/api/v1/auth/password/forgot', ['phone' => '0955500009'])->assertOk();
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963955500009'])->assertOk();
 
-        $this->assertNull($this->otpProvider->lastCodeFor('0955500009'));
+        $this->assertNull($this->otpProvider->lastCodeFor('+963955500009'));
         $this->assertDatabaseCount('otp_verifications', 0);
     }
 
@@ -128,9 +128,9 @@ class MemberOperationsIsolationTest extends IdentityTestCase
 
     public function test_a_member_can_still_sign_in_and_use_member_routes(): void
     {
-        $this->userWithRoles('0912345678', 'member');
+        $this->userWithRoles('+963912345678', 'member');
 
-        $token = $this->login('0912345678')->assertOk()->json('access_token');
+        $token = $this->login('+963912345678')->assertOk()->json('access_token');
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/member/wallet/options?category=general')
@@ -144,9 +144,9 @@ class MemberOperationsIsolationTest extends IdentityTestCase
      */
     public function test_a_dual_role_user_signs_in_but_their_app_token_cannot_reach_the_admin_api(): void
     {
-        $this->userWithRoles('0912345678', 'member', 'operations');
+        $this->userWithRoles('+963912345678', 'member', 'operations');
 
-        $token = $this->login('0912345678')->assertOk()->json('access_token');
+        $token = $this->login('+963912345678')->assertOk()->json('access_token');
 
         $this->withHeader('Authorization', 'Bearer '.$token)
             ->getJson('/api/v1/member/wallet/options?category=general')
@@ -159,9 +159,9 @@ class MemberOperationsIsolationTest extends IdentityTestCase
 
     public function test_a_refreshed_app_token_is_still_bounded(): void
     {
-        $this->userWithRoles('0912345678', 'member', 'operations');
+        $this->userWithRoles('+963912345678', 'member', 'operations');
 
-        $refreshToken = $this->login('0912345678')->json('refresh_token');
+        $refreshToken = $this->login('+963912345678')->json('refresh_token');
         $rotated = $this->postJson('/api/v1/auth/refresh', ['refresh_token' => $refreshToken])->assertOk();
 
         $this->withHeader('Authorization', 'Bearer '.$rotated->json('access_token'))
@@ -174,7 +174,7 @@ class MemberOperationsIsolationTest extends IdentityTestCase
         $this->fakeOtpProvider();
 
         $profile = [
-            'phone' => '0912345678',
+            'phone' => '+963912345678',
             'name' => 'Maryam Asha',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
@@ -196,7 +196,7 @@ class MemberOperationsIsolationTest extends IdentityTestCase
      */
     public function test_the_dashboard_session_path_still_reaches_the_admin_api(): void
     {
-        $operator = $this->userWithRoles('0955500009', 'operations');
+        $operator = $this->userWithRoles('+963955500009', 'operations');
 
         $this->actingAs($operator)
             ->getJson('/api/v1/admin/founders')

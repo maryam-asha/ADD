@@ -65,7 +65,7 @@ class WalletProvisioningTest extends TestCase
     {
         $this->fakeOtpProvider();
 
-        $phone = '0912345678';
+        $phone = '+963912345678';
 
         $payload = [
             'phone' => $phone,

@@ -2,7 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
-use App\Rules\SyrianPhoneNumber;
+use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -35,7 +35,7 @@ class RegisterRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'phone' => ['required', 'string', new SyrianPhoneNumber, Rule::unique('users', 'phone')],
+            'phone' => ['required', 'string', new PhoneNumber, Rule::unique('users', 'phone')],
             'name' => ['required', 'string', 'max:255'],
 
             // Members are identified by phone; email is a contact detail they

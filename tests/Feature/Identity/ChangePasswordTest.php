@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Hash;
  */
 class ChangePasswordTest extends IdentityTestCase
 {
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     private const OLD_PASSWORD = 'old-password';
 

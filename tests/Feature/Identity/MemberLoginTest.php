@@ -12,7 +12,7 @@ use Illuminate\Testing\TestResponse;
  */
 class MemberLoginTest extends IdentityTestCase
 {
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     private const PASSWORD = 'correct-horse';
 
@@ -82,7 +82,7 @@ class MemberLoginTest extends IdentityTestCase
         $this->member();
 
         $wrongPassword = $this->login(['password' => 'not-the-password']);
-        $unknownPhone = $this->login(['phone' => '0999999999']);
+        $unknownPhone = $this->login(['phone' => '+963999999999']);
 
         $wrongPassword->assertStatus(401);
         $unknownPhone->assertStatus(401);
@@ -149,14 +149,14 @@ class MemberLoginTest extends IdentityTestCase
     {
         $this->member();
 
-        $other = User::factory()->create(['phone' => '0911111111', 'password' => self::PASSWORD]);
+        $other = User::factory()->create(['phone' => '+963911111111', 'password' => self::PASSWORD]);
         $other->assignRole('member');
 
         for ($attempt = 1; $attempt <= 6; $attempt++) {
             $this->login(['password' => 'wrong']);
         }
 
-        $this->login(['phone' => '0911111111'])->assertOk();
+        $this->login(['phone' => '+963911111111'])->assertOk();
     }
 
     public function test_the_phone_and_password_are_both_required(): void

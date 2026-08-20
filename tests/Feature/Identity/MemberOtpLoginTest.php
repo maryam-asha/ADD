@@ -24,7 +24,7 @@ class MemberOtpLoginTest extends IdentityTestCase
         $this->fakeOtpProvider();
 
         $payload = [
-            'phone' => '0912345678',
+            'phone' => '+963912345678',
             'name' => 'Maryam Asha',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
@@ -35,9 +35,9 @@ class MemberOtpLoginTest extends IdentityTestCase
         $response = $this->postJson('/api/v1/auth/register/verify', $payload + ['code' => $code]);
 
         $response->assertOk();
-        $response->assertJsonPath('user.phone', '0912345678');
+        $response->assertJsonPath('user.phone', '+963912345678');
 
-        $user = User::where('phone', '0912345678')->first();
+        $user = User::where('phone', '+963912345678')->first();
         $this->assertTrue($user->hasRole('member'));
         $this->assertFalse($user->hasRole('operations'));
     }
