@@ -40,7 +40,7 @@ class ProfileControllerTest extends TestCase
         $response->assertJsonPath('data.professional.job_title', null);
         $response->assertJsonPath('data.professional.company_name', null);
         $response->assertJsonPath('data.professional.industry', null);
-        $response->assertJsonPath('data.professional.linkedin_url', null);
+        $response->assertJsonPath('data.links.linkedin_url', null);
         $response->assertJsonMissingPath('data.roles');
     }
 
@@ -185,9 +185,9 @@ class ProfileControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.personal.gender', null);
-        $response->assertJsonPath('data.professional.instagram_url', null);
-        $response->assertJsonPath('data.professional.behance_url', null);
-        $response->assertJsonPath('data.professional.website_url', null);
+        $response->assertJsonPath('data.links.instagram_url', null);
+        $response->assertJsonPath('data.links.behance_url', null);
+        $response->assertJsonPath('data.links.website_url', null);
     }
 
     public function test_patch_can_set_gender_and_the_new_social_links(): void

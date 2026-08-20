@@ -26,6 +26,7 @@ class MemberProfileResource extends JsonResource
             [
                 'personal' => new UserPersonalProfileResource($this->personalProfile ?? new UserPersonalProfile),
                 'professional' => new UserProfessionalProfileResource($this->professionalProfile ?? new UserProfessionalProfile),
+                'links' => new UserProfileLinksResource($this->professionalProfile ?? new UserProfessionalProfile),
             ]
         );
     }
