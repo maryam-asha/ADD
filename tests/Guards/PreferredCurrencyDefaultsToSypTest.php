@@ -21,7 +21,7 @@ class PreferredCurrencyDefaultsToSypTest extends TestCase
     {
         $id = DB::table('users')->insertGetId([
             'name' => 'No Override',
-            'phone' => '0911111111',
+            'phone' => '+963911111111',
             'password' => 'hashed',
             'status' => 'active',
             'created_at' => now(),

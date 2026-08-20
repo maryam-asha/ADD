@@ -34,7 +34,8 @@ class ExchangeRateController extends Controller
         ]);
 
         $this->logSensitiveAction('exchange_rate_created', $rate, [
-            'rate_usd_to_syp' => $rate->rate_usd_to_syp,
+            'currency_code' => $rate->currency_code,
+            'rate_to_base' => $rate->rate_to_base,
             'effective_from' => $rate->effective_from->toISOString(),
         ]);
 

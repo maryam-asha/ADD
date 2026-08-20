@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreExchangeRateRequest extends FormRequest
 {
@@ -14,7 +15,21 @@ class StoreExchangeRateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'rate_usd_to_syp' => ['required', 'numeric', 'gt:0'],
+            // The base currency (SYP) never gets a row here — its rate to
+            // itself is definitionally 1 — so is_base is explicitly excluded
+            // rather than relying on "no one would pick it".
+            'currency_code' => [
+                'required',
+                // A closure, not chained ->where() calls: Rule::exists()'s
+                // string-based rule serialization mishandles a `false`
+                // boolean where value (it collapses to an empty string,
+                // which then matches no row at all) — a closure applies the
+                // constraint directly against the query builder instead.
+                Rule::exists('currencies', 'code')->where(function ($query) {
+                    $query->where('is_active', true)->where('is_base', false);
+                }),
+            ],
+            'rate_to_base' => ['required', 'numeric', 'gt:0'],
             'effective_from' => ['required', 'date'],
         ];
     }

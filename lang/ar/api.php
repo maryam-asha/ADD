@@ -16,6 +16,8 @@ return [
         'refresh_token_invalid' => 'رمز التحديث غير صحيح أو منتهي الصلاحية.',
         'logged_out' => 'تم تسجيل الخروج.',
         'password_reset_code_sent' => 'إذا كان هذا الرقم مرتبطاً بحساب، فسيتم إرسال رمز إعادة التعيين إليه.',
+        'otp_verified' => 'تم التحقق من الرمز.',
+        'reset_token_invalid' => 'رمز إعادة التعيين غير صحيح أو منتهي الصلاحية. الرجاء طلب رمز جديد.',
         'password_updated' => 'تم تحديث كلمة المرور. الرجاء تسجيل الدخول بكلمة المرور الجديدة.',
         'too_many_attempts' => 'محاولات كثيرة جداً. الرجاء الانتظار قبل المحاولة مرة أخرى.',
         'unauthenticated' => 'غير مصادَق.',
@@ -89,6 +91,12 @@ return [
         'setting_updated' => 'تم تحديث الإعداد.',
         'business_hour_updated' => 'تم تحديث ساعات العمل.',
         'business_hour_exception_updated' => 'تم تحديث استثناء ساعات العمل.',
+        'currency_updated' => 'تم تحديث العملة.',
+        'currency_status_updated' => 'تم تحديث حالة العملة.',
+    ],
+
+    'currency' => [
+        'base_currency_status_locked' => 'لا يمكن تعطيل العملة الأساسية.',
     ],
 
     'reception' => [

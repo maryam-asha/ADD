@@ -136,7 +136,7 @@ class MembershipPurchaseTest extends TestCase
      */
     public function test_the_purchase_response_includes_a_converted_amount_on_the_nested_plan(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
 
         $member = $this->makeFundedMember('500.00');
 

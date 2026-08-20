@@ -15,7 +15,8 @@ class ExchangeRateFactory extends Factory
     public function definition(): array
     {
         return [
-            'rate_usd_to_syp' => '14700.0000',
+            'currency_code' => 'USD',
+            'rate_to_base' => '14700.0000',
             'effective_from' => now()->subDay(),
             'set_by' => null,
         ];

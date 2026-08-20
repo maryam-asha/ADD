@@ -27,15 +27,33 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson('/api/v1/admin/exchange-rates', [
-            'rate_usd_to_syp' => '14700.5000',
+            'currency_code' => 'USD',
+            'rate_to_base' => '14700.5000',
             'effective_from' => now()->toISOString(),
         ]);
 
         $response->assertCreated();
         $this->assertDatabaseHas('exchange_rates', [
-            'rate_usd_to_syp' => '14700.5000',
+            'currency_code' => 'USD',
+            'rate_to_base' => '14700.5000',
             'set_by' => $admin->id,
         ]);
+    }
+
+    public function test_the_base_currency_is_rejected_as_a_rate_target(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '1.0000',
+            'effective_from' => now()->toISOString(),
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('currency_code');
     }
 
     public function test_set_by_is_always_the_authenticated_admin_not_client_supplied(): void
@@ -46,7 +64,8 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->postJson('/api/v1/admin/exchange-rates', [
-            'rate_usd_to_syp' => '14700.0000',
+            'currency_code' => 'USD',
+            'rate_to_base' => '14700.0000',
             'effective_from' => now()->toISOString(),
             'set_by' => $otherUser->id,
         ])->assertCreated();
@@ -62,7 +81,8 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->postJson('/api/v1/admin/exchange-rates', [
-            'rate_usd_to_syp' => '14700.0000',
+            'currency_code' => 'USD',
+            'rate_to_base' => '14700.0000',
             'effective_from' => now()->toISOString(),
         ])->assertCreated();
 
@@ -70,7 +90,8 @@ class ExchangeRateControllerTest extends TestCase
 
         $this->assertNotNull($activity);
         $this->assertSame($admin->id, $activity->causer_id);
-        $this->assertSame('14700.0000', $activity->properties['rate_usd_to_syp']);
+        $this->assertSame('USD', $activity->properties['currency_code']);
+        $this->assertSame('14700.0000', $activity->properties['rate_to_base']);
     }
 
     public function test_index_returns_rates_ordered_by_effective_from_descending(): void

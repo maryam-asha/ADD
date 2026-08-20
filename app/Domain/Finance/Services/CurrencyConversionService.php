@@ -2,13 +2,17 @@
 
 namespace App\Domain\Finance\Services;
 
-use App\Domain\Finance\Enums\Currency;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 
 /**
  * Raw numeric conversion only — no locale/display formatting (that's a
- * separate, later round). USD/SYP is the only pair `exchange_rates`
- * models (docs/superpowers/plans/2026-08-09-display-currency.md).
+ * separate, later round). Generalized from the original hardcoded USD/SYP
+ * pair to N admin-managed currencies (docs/decisions/multi-currency-support.md):
+ * every non-base currency carries its own `exchange_rates` row
+ * (`rate_to_base`), and converting between two non-base currencies (e.g.
+ * USD -> EUR) routes through the fixed base currency rather than requiring
+ * a direct rate for every possible pair.
  */
 class CurrencyConversionService
 {
@@ -18,22 +22,37 @@ class CurrencyConversionService
             return $amount;
         }
 
-        $rate = ExchangeRate::current();
+        $baseCurrency = Currency::query()->where('is_base', true)->value('code');
 
-        if ($rate === null) {
+        if ($toCurrency === $baseCurrency) {
+            $rate = ExchangeRate::current($fromCurrency);
+
+            if ($rate === null) {
+                return null;
+            }
+
+            return round($amount * (float) $rate->rate_to_base, 2);
+        }
+
+        if ($fromCurrency === $baseCurrency) {
+            $rate = ExchangeRate::current($toCurrency);
+
+            if ($rate === null) {
+                return null;
+            }
+
+            return round($amount / (float) $rate->rate_to_base, 2);
+        }
+
+        $fromRate = ExchangeRate::current($fromCurrency);
+        $toRate = ExchangeRate::current($toCurrency);
+
+        if ($fromRate === null || $toRate === null) {
             return null;
         }
 
-        $rateUsdToSyp = (float) $rate->rate_usd_to_syp;
+        $amountInBase = $amount * (float) $fromRate->rate_to_base;
 
-        if ($fromCurrency === Currency::Usd->value && $toCurrency === Currency::Syp->value) {
-            return round($amount * $rateUsdToSyp, 2);
-        }
-
-        if ($fromCurrency === Currency::Syp->value && $toCurrency === Currency::Usd->value) {
-            return round($amount / $rateUsdToSyp, 2);
-        }
-
-        return null;
+        return round($amountInBase / (float) $toRate->rate_to_base, 2);
     }
 }

@@ -2,7 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
-use App\Domain\Finance\Enums\Currency;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Models\PendingRegistration;
 use App\Domain\Identity\Models\User;
@@ -134,7 +134,7 @@ class MemberAuthController extends Controller
                 // existing hash alone rather than hashing it twice.
                 'password' => $pending->password,
                 'preferred_language' => 'ar',
-                'preferred_currency' => Currency::Syp->value,
+                'preferred_currency' => Currency::query()->where('is_base', true)->value('code'),
                 'status' => 'active',
             ]);
 

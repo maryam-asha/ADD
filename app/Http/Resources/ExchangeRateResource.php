@@ -11,7 +11,8 @@ class ExchangeRateResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'rate_usd_to_syp' => $this->rate_usd_to_syp,
+            'currency_code' => $this->currency_code,
+            'rate_to_base' => $this->rate_to_base,
             'effective_from' => $this->effective_from,
             'set_by' => $this->set_by,
             'created_at' => $this->created_at,

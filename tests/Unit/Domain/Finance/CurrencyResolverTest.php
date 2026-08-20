@@ -4,11 +4,20 @@ namespace Tests\Unit\Domain\Finance;
 
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Identity\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Request;
 use Tests\TestCase;
 
+/**
+ * The `currency` header now validates against active rows in the
+ * admin-managed `currencies` table (docs/decisions/multi-currency-support.md)
+ * — SYP and USD are seeded by the `currencies` migration itself, so
+ * RefreshDatabase is enough to exercise both without a factory.
+ */
 class CurrencyResolverTest extends TestCase
 {
+    use RefreshDatabase;
+
     private function requestWithCurrencyHeader(?string $value): Request
     {
         $server = $value === null ? [] : ['HTTP_CURRENCY' => $value];

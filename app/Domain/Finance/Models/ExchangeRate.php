@@ -14,7 +14,8 @@ class ExchangeRate extends Model
     use HasFactory;
 
     protected $fillable = [
-        'rate_usd_to_syp',
+        'currency_code',
+        'rate_to_base',
         'effective_from',
         'set_by',
     ];
@@ -22,7 +23,7 @@ class ExchangeRate extends Model
     protected function casts(): array
     {
         return [
-            'rate_usd_to_syp' => 'decimal:4',
+            'rate_to_base' => 'decimal:4',
             'effective_from' => 'datetime',
         ];
     }
@@ -32,9 +33,15 @@ class ExchangeRate extends Model
         return $this->belongsTo(User::class, 'set_by');
     }
 
-    public static function current(): ?self
+    public function currency(): BelongsTo
     {
-        return static::where('effective_from', '<=', now())
+        return $this->belongsTo(Currency::class, 'currency_code', 'code');
+    }
+
+    public static function current(string $currencyCode): ?self
+    {
+        return static::where('currency_code', $currencyCode)
+            ->where('effective_from', '<=', now())
             ->orderByDesc('effective_from')
             ->orderByDesc('id')
             ->first();

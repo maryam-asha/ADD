@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Domain\Finance\Enums\Currency;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\SpaceType;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,7 +27,7 @@ class StoreSpaceRequest extends FormRequest
             'is_lockable' => ['required', 'boolean'],
             'capacity' => ['nullable', 'integer', 'min:0'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'pricing_currency' => ['nullable', Rule::enum(Currency::class)],
+            'pricing_currency' => ['nullable', Rule::exists('currencies', 'code')->where('is_active', true)],
         ];
     }
 }

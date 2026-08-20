@@ -137,9 +137,12 @@ class PlanCatalogTest extends TestCase
 
     /**
      * `pricing_currency` used to accept any size:3 string — a plan priced
-     * in e.g. EUR would pass validation but CurrencyConversionService only
-     * understands USD/SYP, silently producing no converted price ever.
-     * Rule::enum(Currency::class) closes that gap at the validation layer.
+     * in e.g. EUR would pass validation but, unless EUR exists as an active
+     * row in `currencies`, CurrencyConversionService has no rate to convert
+     * it with, silently producing no converted price ever.
+     * Rule::exists('currencies', 'code')->where('is_active', true) closes
+     * that gap at the validation layer
+     * (docs/decisions/multi-currency-support.md).
      */
     public function test_creating_a_plan_with_an_unsupported_pricing_currency_is_rejected(): void
     {

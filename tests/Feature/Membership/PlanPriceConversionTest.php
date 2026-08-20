@@ -23,7 +23,7 @@ class PlanPriceConversionTest extends TestCase
 
     public function test_a_converted_amount_is_added_when_the_users_preferred_currency_differs(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         $plan = Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD']);
         $admin = User::factory()->create(['preferred_currency' => 'SYP']);
         $admin->assignRole('admin');
@@ -76,7 +76,7 @@ class PlanPriceConversionTest extends TestCase
      */
     public function test_a_new_member_with_no_currency_override_gets_syp_by_default(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         $plan = Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD']);
         $admin = User::factory()->create();
         $admin->assignRole('admin');
@@ -91,7 +91,7 @@ class PlanPriceConversionTest extends TestCase
 
     public function test_the_currency_header_overrides_the_stored_preference(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         $plan = Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD']);
         $admin = User::factory()->create(['preferred_currency' => 'USD']);
         $admin->assignRole('admin');
@@ -106,7 +106,7 @@ class PlanPriceConversionTest extends TestCase
 
     public function test_the_currency_header_works_for_anonymous_requests_too(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         Plan::factory()->create(['price' => '14700.00', 'pricing_currency' => 'SYP', 'is_active' => true]);
 
         $response = $this->withHeader('currency', 'USD')->getJson('/api/v1/plans');
@@ -118,7 +118,7 @@ class PlanPriceConversionTest extends TestCase
 
     public function test_an_invalid_currency_header_value_falls_back_to_the_stored_preference(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         $plan = Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD']);
         $admin = User::factory()->create(['preferred_currency' => 'SYP']);
         $admin->assignRole('admin');
@@ -149,7 +149,7 @@ class PlanPriceConversionTest extends TestCase
      */
     public function test_a_blocked_members_stale_token_is_treated_as_anonymous_and_gets_the_syp_default(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
         Plan::factory()->create(['price' => '10.00', 'pricing_currency' => 'USD', 'is_active' => true]);
         $member = User::factory()->create(['status' => 'active', 'preferred_currency' => 'USD']);
         $member->assignRole('member');

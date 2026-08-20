@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Finance\Enums\Currency;
 use App\Domain\Identity\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -19,13 +18,13 @@ class AdminUserSeeder extends Seeder
     public function run(): void
     {
         $user = User::firstOrCreate(
-            ['phone' => '0900000000'],
+            ['phone' => '+963900000000'],
             [
                 'name' => 'ADD Admin',
                 'email' => 'admin@add.local',
                 'password' => 'password',
                 'preferred_language' => 'ar',
-                'preferred_currency' => Currency::Syp->value,
+                'preferred_currency' => 'SYP',
                 'status' => 'active',
             ]
         );

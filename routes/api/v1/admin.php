@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
+use App\Http\Controllers\Api\V1\Admin\CurrencyController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
@@ -92,6 +93,20 @@ Route::apiResource('contact-links', ContactLinkController::class)
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
+
+// Currencies — admin-managed lookup replacing the old hardcoded USD/SYP
+// enum (docs/decisions/multi-currency-support.md). Not a generic
+// apiResource: no destroy (a currency deactivates via status, it never
+// hard-deletes — plans/spaces/bookings/users all carry a real FK to
+// currencies.code), same reasoning UserController uses for its own
+// deviations. Same permission tier as exchange-rates above (no narrower
+// role:admin group) — this is finance-admin config, kept consistent with
+// its sibling.
+Route::get('currencies', [CurrencyController::class, 'index']);
+Route::post('currencies', [CurrencyController::class, 'store']);
+Route::get('currencies/{currency}', [CurrencyController::class, 'show']);
+Route::patch('currencies/{currency}', [CurrencyController::class, 'update']);
+Route::patch('currencies/{currency}/status', [CurrencyController::class, 'updateStatus']);
 
 // Multi-word resource name — Laravel's auto-derived {community_member}
 // placeholder (snake_case) won't implicit-bind to a camelCase controller

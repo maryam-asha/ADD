@@ -4,9 +4,13 @@ namespace App\Http\Requests\Admin;
 
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class StorePlanRequest extends FormRequest
+/**
+ * `is_base` is deliberately not a field here at all — it's fixed forever
+ * to the one seeded SYP row and never settable through this endpoint
+ * (docs/decisions/multi-currency-support.md).
+ */
+class StoreCurrencyRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,12 +25,9 @@ class StorePlanRequest extends FormRequest
         return array_merge(
             TranslatableField::rules('name'),
             [
-                'is_subscription' => ['required', 'boolean'],
-                'price' => ['required', 'numeric', 'min:0'],
-                'pricing_currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
-                'duration_days' => ['required', 'integer', 'min:1'],
-                'included_hours' => ['required', 'numeric', 'min:0'],
-                'overage_rate' => ['nullable', 'numeric', 'min:0'],
+                'code' => ['required', 'string', 'size:3', 'regex:/^[A-Z]{3}$/', 'unique:currencies,code'],
+                'symbol' => ['nullable', 'string', 'max:10'],
+                'decimal_places' => ['required', 'integer', 'min:0', 'max:6'],
                 'is_active' => ['nullable', 'boolean'],
                 'order' => ['nullable', 'integer', 'min:0'],
             ]

@@ -16,6 +16,8 @@ return [
         'refresh_token_invalid' => 'Invalid or expired refresh token.',
         'logged_out' => 'Logged out.',
         'password_reset_code_sent' => 'If that number has an account, a reset code has been sent to it.',
+        'otp_verified' => 'Code verified.',
+        'reset_token_invalid' => 'Invalid or expired reset token. Please request a new code.',
         'password_updated' => 'Password updated. Please log in with your new password.',
         'too_many_attempts' => 'Too many attempts. Please wait before trying again.',
         'unauthenticated' => 'Unauthenticated.',
@@ -89,6 +91,12 @@ return [
         'setting_updated' => 'Setting updated.',
         'business_hour_updated' => 'Business hour updated.',
         'business_hour_exception_updated' => 'Business hour exception updated.',
+        'currency_updated' => 'Currency updated.',
+        'currency_status_updated' => 'Currency status updated.',
+    ],
+
+    'currency' => [
+        'base_currency_status_locked' => 'The base currency cannot be deactivated.',
     ],
 
     'reception' => [

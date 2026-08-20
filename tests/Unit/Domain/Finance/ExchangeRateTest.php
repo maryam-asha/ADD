@@ -12,21 +12,28 @@ class ExchangeRateTest extends TestCase
 
     public function test_current_returns_the_latest_row_that_has_already_taken_effect(): void
     {
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '14000.0000', 'effective_from' => now()->subDays(5)]);
-        $latestPast = ExchangeRate::factory()->create(['rate_usd_to_syp' => '14700.0000', 'effective_from' => now()->subDay()]);
-        ExchangeRate::factory()->create(['rate_usd_to_syp' => '15000.0000', 'effective_from' => now()->addDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14000.0000', 'effective_from' => now()->subDays(5)]);
+        $latestPast = ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '15000.0000', 'effective_from' => now()->addDay()]);
 
-        $current = ExchangeRate::current();
+        $current = ExchangeRate::current('USD');
 
         $this->assertNotNull($current);
         $this->assertSame($latestPast->id, $current->id);
-        $this->assertSame('14700.0000', $current->rate_usd_to_syp);
+        $this->assertSame('14700.0000', $current->rate_to_base);
     }
 
     public function test_current_returns_null_when_no_rate_has_taken_effect_yet(): void
     {
-        ExchangeRate::factory()->create(['effective_from' => now()->addDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'effective_from' => now()->addDay()]);
 
-        $this->assertNull(ExchangeRate::current());
+        $this->assertNull(ExchangeRate::current('USD'));
+    }
+
+    public function test_current_is_scoped_to_the_given_currency_code(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
+
+        $this->assertNull(ExchangeRate::current('EUR'));
     }
 }
