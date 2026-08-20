@@ -26,6 +26,7 @@ Route::prefix('auth')->group(function () {
     // Recovery for members (phone + WhatsApp code). Fortify owns the parallel
     // email-based reset for the operations dashboard; these two don't overlap.
     Route::post('password/forgot', [MemberPasswordController::class, 'forgot'])->middleware('throttle:10,1');
+    Route::post('password/verify', [MemberPasswordController::class, 'verify'])->middleware('throttle:10,1');
     Route::post('password/reset', [MemberPasswordController::class, 'reset'])->middleware('throttle:10,1');
 
     // The deactivated-only counterpart to admin-side unblocking: a member who

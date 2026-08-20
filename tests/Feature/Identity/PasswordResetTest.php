@@ -13,12 +13,17 @@ use Tests\Support\InteractsWithOtp;
  * Recovery is the one flow that changes a credential without presenting the
  * old one, so it has to assume the old one is already in the wrong hands:
  * every session opened under it dies the moment the password changes.
+ *
+ * Three calls now, mirroring the sign-up screens: forgot (send code), verify
+ * (spend the code for a one-time reset_token), reset (spend that token for
+ * the new password). The raw code never reaches the third call — verify()
+ * marks it verified_at, which is why reset() needs a token instead.
  */
 class PasswordResetTest extends IdentityTestCase
 {
     use InteractsWithOtp;
 
-    private const PHONE = '0912345678';
+    private const PHONE = '+963912345678';
 
     private const OLD_PASSWORD = 'old-password';
 
@@ -43,13 +48,28 @@ class PasswordResetTest extends IdentityTestCase
         return $user;
     }
 
+    private function verify(?string $code = null, string $phone = self::PHONE): TestResponse
+    {
+        return $this->postJson('/api/v1/auth/password/verify', [
+            'phone' => $phone,
+            'code' => $code ?? $this->otpProvider->lastCodeFor($phone),
+        ]);
+    }
+
+    /**
+     * The full happy-path flow: forgot -> verify -> reset. Overrides land on
+     * the final reset() call only — pass 'reset_token' to replace the one this
+     * helper mints for itself.
+     */
     private function reset(array $overrides = []): TestResponse
     {
         $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
 
+        $resetToken = $this->verify()->assertOk()->json('reset_token');
+
         return $this->postJson('/api/v1/auth/password/reset', array_merge([
             'phone' => self::PHONE,
-            'code' => $this->otpProvider->lastCodeFor(self::PHONE),
+            'reset_token' => $resetToken,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ], $overrides));
@@ -152,7 +172,7 @@ class PasswordResetTest extends IdentityTestCase
         $this->member();
 
         $known = $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE]);
-        $unknown = $this->postJson('/api/v1/auth/password/forgot', ['phone' => '0999999999']);
+        $unknown = $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963999999999']);
 
         $known->assertOk();
         $unknown->assertOk();
@@ -161,17 +181,30 @@ class PasswordResetTest extends IdentityTestCase
 
     public function test_forgot_sends_nothing_to_an_unknown_number(): void
     {
-        $this->postJson('/api/v1/auth/password/forgot', ['phone' => '0999999999'])->assertOk();
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963999999999'])->assertOk();
 
-        $this->assertNull($this->otpProvider->lastCodeFor('0999999999'));
+        $this->assertNull($this->otpProvider->lastCodeFor('+963999999999'));
         $this->assertDatabaseCount('otp_verifications', 0);
+    }
+
+    /**
+     * verify() fails exactly as silently as forgot() about who has an
+     * account — a phone with no member never had a code minted for it, so
+     * this is the backstop, not the gate.
+     */
+    public function test_verify_fails_silently_for_a_phone_with_no_member_account(): void
+    {
+        $response = $this->verify('000000', '+963999999999');
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.code_invalid'));
     }
 
     /**
      * Item 11(e), the other direction: a code minted for signing up must not
      * be spendable on taking over an existing account's password.
      */
-    public function test_a_registration_code_cannot_be_spent_on_a_reset(): void
+    public function test_a_registration_code_cannot_be_spent_on_a_password_reset_verification(): void
     {
         $this->member();
 
@@ -182,14 +215,10 @@ class PasswordResetTest extends IdentityTestCase
         app(OtpService::class)->request(self::PHONE, OtpPurpose::Registration);
         $code = $this->otpProvider->lastCodeFor(self::PHONE);
 
-        $response = $this->postJson('/api/v1/auth/password/reset', [
-            'phone' => self::PHONE,
-            'code' => $code,
-            'password' => self::NEW_PASSWORD,
-            'password_confirmation' => self::NEW_PASSWORD,
-        ]);
+        $response = $this->verify($code);
 
         $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.code_purpose_mismatch_registration'));
 
         $this->postJson('/api/v1/auth/login', [
             'phone' => self::PHONE,
@@ -197,11 +226,13 @@ class PasswordResetTest extends IdentityTestCase
         ])->assertOk();
     }
 
-    public function test_an_invalid_code_is_rejected(): void
+    public function test_an_invalid_code_is_rejected_by_verify(): void
     {
         $this->member();
 
-        $this->reset(['code' => '000000'])->assertStatus(422);
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
+
+        $this->verify('000000')->assertStatus(422);
 
         $this->postJson('/api/v1/auth/login', [
             'phone' => self::PHONE,
@@ -209,26 +240,109 @@ class PasswordResetTest extends IdentityTestCase
         ])->assertOk();
     }
 
-    public function test_a_code_cannot_be_spent_on_a_reset_twice(): void
+    public function test_a_code_cannot_be_verified_twice(): void
     {
         $this->member();
 
         $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
         $code = $this->otpProvider->lastCodeFor(self::PHONE);
 
+        $this->verify($code)->assertOk();
+        $this->verify($code)->assertStatus(422);
+    }
+
+    /**
+     * The reset_token minted by verify() is single-use independent of the
+     * code that produced it — spending it once for a real reset must not
+     * leave it good for a second one.
+     */
+    public function test_a_reset_token_cannot_be_spent_twice(): void
+    {
+        $this->member();
+
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
+        $token = $this->verify()->assertOk()->json('reset_token');
+
         $this->postJson('/api/v1/auth/password/reset', [
             'phone' => self::PHONE,
-            'code' => $code,
+            'reset_token' => $token,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ])->assertOk();
 
-        $this->postJson('/api/v1/auth/password/reset', [
+        $response = $this->postJson('/api/v1/auth/password/reset', [
             'phone' => self::PHONE,
-            'code' => $code,
+            'reset_token' => $token,
             'password' => 'third-password',
             'password_confirmation' => 'third-password',
-        ])->assertStatus(422);
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+    }
+
+    public function test_reset_rejects_a_missing_reset_token(): void
+    {
+        $this->member();
+
+        $this->postJson('/api/v1/auth/password/reset', [
+            'phone' => self::PHONE,
+            'password' => self::NEW_PASSWORD,
+            'password_confirmation' => self::NEW_PASSWORD,
+        ])->assertStatus(422)->assertJsonValidationErrors('reset_token');
+    }
+
+    public function test_reset_rejects_a_garbage_reset_token(): void
+    {
+        $this->member();
+
+        $response = $this->reset(['reset_token' => 'not-a-real-token']);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+    }
+
+    public function test_reset_rejects_an_expired_reset_token(): void
+    {
+        $this->member();
+
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
+        $token = $this->verify()->assertOk()->json('reset_token');
+
+        $this->travel(config('otp.reset_token_ttl_minutes') + 1)->minutes();
+
+        $response = $this->postJson('/api/v1/auth/password/reset', [
+            'phone' => self::PHONE,
+            'reset_token' => $token,
+            'password' => self::NEW_PASSWORD,
+            'password_confirmation' => self::NEW_PASSWORD,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+    }
+
+    /**
+     * The raw OTP code is not an acceptable substitute for the reset_token
+     * verify() hands back — the two are different secrets on purpose.
+     */
+    public function test_reset_no_longer_accepts_the_raw_otp_code_in_place_of_a_token(): void
+    {
+        $this->member();
+
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
+        $code = $this->otpProvider->lastCodeFor(self::PHONE);
+        $this->verify($code)->assertOk();
+
+        $response = $this->postJson('/api/v1/auth/password/reset', [
+            'phone' => self::PHONE,
+            'reset_token' => $code,
+            'password' => self::NEW_PASSWORD,
+            'password_confirmation' => self::NEW_PASSWORD,
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
     }
 
     public function test_the_new_password_must_meet_the_minimum_length(): void

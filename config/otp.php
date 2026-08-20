@@ -18,4 +18,10 @@ return [
     // burned, independent of its time-based expiry.
     'max_verify_attempts' => 5,
 
+    // How long the one-time token issued after a successful verify() stays
+    // spendable. Short-lived on purpose: it only has to bridge the gap
+    // between the "enter code" screen and the very next "set new password"
+    // request.
+    'reset_token_ttl_minutes' => env('OTP_RESET_TOKEN_TTL_MINUTES', 10),
+
 ];

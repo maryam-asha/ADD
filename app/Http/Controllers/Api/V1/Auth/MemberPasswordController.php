@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
+use App\Http\Requests\Auth\VerifyPasswordResetRequest;
 use App\Services\Auth\TokenPairService;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
@@ -54,12 +55,12 @@ class MemberPasswordController extends Controller
     }
 
     /**
-     * Sets the new password and ends every session the account has open. The
-     * revocation is the point, not housekeeping: whoever prompted the reset may
-     * already hold the old password, and a session opened with it would
-     * otherwise outlive the credential it was granted under.
+     * Spends the code and hands back a short-lived, single-use token for the
+     * next step. The code itself can't do double duty as that proof: verify()
+     * marks it verified_at on success, which drops it out of the "outstanding"
+     * query verify() itself reads, so it cannot be checked again by reset().
      */
-    public function reset(ResetPasswordRequest $request): JsonResponse
+    public function verify(VerifyPasswordResetRequest $request): JsonResponse
     {
         $phone = $request->validated('phone');
 
@@ -83,6 +84,38 @@ class MemberPasswordController extends Controller
 
         if ($result !== OtpResult::Verified) {
             return response()->json(['message' => __('api.auth.code_invalid')], 422);
+        }
+
+        $token = $this->otp->issueResetToken($phone, OtpPurpose::PasswordReset);
+
+        return response()->json([
+            'message' => __('api.auth.otp_verified'),
+            'reset_token' => $token,
+        ]);
+    }
+
+    /**
+     * Sets the new password and ends every session the account has open. The
+     * revocation is the point, not housekeeping: whoever prompted the reset may
+     * already hold the old password, and a session opened with it would
+     * otherwise outlive the credential it was granted under.
+     */
+    public function reset(ResetPasswordRequest $request): JsonResponse
+    {
+        $phone = $request->validated('phone');
+
+        $user = $this->memberFor($phone);
+
+        // Checked before the token is spent, and answered as an invalid token
+        // so the endpoint stays as silent as forgot() about who has an account
+        // here. forgot() never mints a code for a non-member, so this should be
+        // unreachable — it is the backstop, not the gate.
+        if (! $user) {
+            return response()->json(['message' => __('api.auth.reset_token_invalid')], 422);
+        }
+
+        if (! $this->otp->consumeResetToken($phone, $request->validated('reset_token'), OtpPurpose::PasswordReset)) {
+            return response()->json(['message' => __('api.auth.reset_token_invalid')], 422);
         }
 
         DB::transaction(function () use ($user, $request) {

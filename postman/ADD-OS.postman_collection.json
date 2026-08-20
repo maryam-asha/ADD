@@ -17,6 +17,11 @@
                          "type":  "string"
                      },
                      {
+                         "key":  "member_reset_token",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
                          "key":  "founder_id",
                          "value":  "",
                          "type":  "string"
@@ -379,7 +384,67 @@
                                                                                                 "forgot"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Sends a `password_reset` code. Always answers 200 with the same neutral message whether or not the number has an account â€” that is intentional, and means a 200 here is not confirmation that anything was sent.\n\nA registered number gets the code via the mock WhatsApp driver: read it from storage/logs/laravel.log and paste it into Reset Password."
+                                                                       "description":  "Sends a `password_reset` code. Always answers 200 with the same neutral message whether or not the number has an account â€” that is intentional, and means a 200 here is not confirmation that anything was sent.\n\nA registered number gets the code via the mock WhatsApp driver: read it from storage/logs/laravel.log and paste it into Verify Password Reset."
+                                                                   }
+                                                   },
+                                                   {
+                                                       "name":  "Verify Password Reset",
+                                                       "event":  [
+                                                                     {
+                                                                         "listen":  "test",
+                                                                         "script":  {
+                                                                                        "type":  "text/javascript",
+                                                                                        "exec":  [
+                                                                                                     "if (pm.response.code === 200) {",
+                                                                                                     "    const body = pm.response.json();",
+                                                                                                     "    pm.collectionVariables.set('member_reset_token', body.reset_token);",
+                                                                                                     "    console.log('member_reset_token captured');",
+                                                                                                     "}"
+                                                                                                 ]
+                                                                                    }
+                                                                     }
+                                                                 ],
+                                                       "request":  {
+                                                                       "method":  "POST",
+                                                                       "header":  [
+                                                                                      {
+                                                                                          "key":  "Content-Type",
+                                                                                          "value":  "application/json"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "lang",
+                                                                                          "value":  "{{lang}}",
+                                                                                          "type":  "text"
+                                                                                      },
+                                                                                      {
+                                                                                          "key":  "currency",
+                                                                                          "value":  "{{currency}}",
+                                                                                          "type":  "text"
+                                                                                      }
+                                                                                  ],
+                                                                       "body":  {
+                                                                                    "mode":  "raw",
+                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
+                                                                                    "options":  {
+                                                                                                    "raw":  {
+                                                                                                                "language":  "json"
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       "url":  {
+                                                                                   "raw":  "{{base_url}}/api/v1/auth/password/verify",
+                                                                                   "host":  [
+                                                                                                "{{base_url}}"
+                                                                                            ],
+                                                                                   "path":  [
+                                                                                                "api",
+                                                                                                "v1",
+                                                                                                "auth",
+                                                                                                "password",
+                                                                                                "verify"
+                                                                                            ]
+                                                                               },
+                                                                       "description":  "Step 2 of recovery: spends the code Forgot Password sent and, on success, mints a short-lived single-use `reset_token` (captured automatically) for step 3 â€” the code itself cannot be re-checked by Reset Password, since a successful verify marks it spent.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
                                                                    }
                                                    },
                                                    {
@@ -404,7 +469,7 @@
                                                                                   ],
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
+                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"reset_token\": \"{{member_reset_token}}\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
                                                                                     "options":  {
                                                                                                     "raw":  {
                                                                                                                 "language":  "json"
@@ -424,7 +489,7 @@
                                                                                                 "reset"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Sets the new password and revokes every access and refresh token the member holds, on every device â€” the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
+                                                                       "description":  "Sets the new password and revokes every access and refresh token the member holds, on every device â€” the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\n`reset_token` must be the value Verify Password Reset just minted ({{member_reset_token}}) â€” it is single-use and short-lived, and the raw code from Forgot Password is not accepted here."
                                                                    }
                                                    },
                                                    {
@@ -1100,7 +1165,7 @@
                                                                                                 "profile"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status) plus `personal` (`bio`, `city`, `avatar_url`, `gender`) and `professional` (`job_title`, `company_name`, `industry`, `linkedin_url`, `instagram_url`, `behance_url`, `website_url`). Profile fields are null until the member has ever saved one. Also returns a top-level `completion` object (sibling of `data`): `score` (0-100), `threshold` (from the `profile.completion_threshold` setting), and `missing_fields`."
+                                                                       "description":  "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status) plus `personal` (`bio`, `city`, `avatar_url`, `gender`), `professional` (`job_title`, `company_name`, `industry`), and `links` (`linkedin_url`, `instagram_url`, `behance_url`, `website_url`). Profile fields are null until the member has ever saved one. Also returns a top-level `completion` object (sibling of `data`): `score` (0-100), `threshold` (from the `profile.completion_threshold` setting), and `missing_fields`."
                                                                    }
                                                    },
                                                    {
@@ -2853,7 +2918,7 @@
                                                                                   ],
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"name\": \"Rana Khoury\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\",\n  \"password\": \"a-strong-password\",\n  \"password_confirmation\": \"a-strong-password\",\n  \"role\": \"operations\"\n}",
+                                                                                    "raw":  "{\n  \"name\": \"Rana Khoury\",\n  \"phone\": \"+963988877766\",\n  \"email\": \"rana.khoury@add.local\",\n  \"password\": \"a-strong-password\",\n  \"password_confirmation\": \"a-strong-password\",\n  \"role\": \"operations\"\n}",
                                                                                     "options":  {
                                                                                                     "raw":  {
                                                                                                                 "language":  "json"
@@ -2928,7 +2993,7 @@
                                                                                   ],
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"name\": \"Rana Khoury-Haddad\",\n  \"phone\": \"0988877766\",\n  \"email\": \"rana.khoury@add.local\"\n}",
+                                                                                    "raw":  "{\n  \"name\": \"Rana Khoury-Haddad\",\n  \"phone\": \"+963988877766\",\n  \"email\": \"rana.khoury@add.local\"\n}",
                                                                                     "options":  {
                                                                                                     "raw":  {
                                                                                                                 "language":  "json"
