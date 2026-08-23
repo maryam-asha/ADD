@@ -7,11 +7,14 @@ use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -89,6 +92,20 @@ class ArrivalRequestTest extends TestCase
         $response->assertJsonPath('data.matched_booking_id', null);
     }
 
+    public function test_creating_a_second_arrival_request_while_one_is_pending_returns_the_existing_one(): void
+    {
+        $member = $this->actingAsMember();
+
+        $first = $this->postJson('/api/v1/member/arrival-requests');
+        $first->assertCreated();
+
+        $second = $this->postJson('/api/v1/member/arrival-requests');
+        $second->assertOk();
+
+        $this->assertSame($first->json('data.id'), $second->json('data.id'));
+        $this->assertSame(1, ArrivalRequest::where('user_id', $member->id)->count());
+    }
+
     public function test_a_non_member_cannot_create_an_arrival_request(): void
     {
         $this->actingAsOperations();
@@ -99,8 +116,7 @@ class ArrivalRequestTest extends TestCase
     public function test_operations_can_list_pending_arrival_requests(): void
     {
         $this->actingAsOperations();
-        $branch = Branch::factory()->create();
-        $pending = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(5)]);
+        $pending = ArrivalRequest::factory()->matched()->create(['requested_at' => now()->subMinutes(5)]);
         ArrivalRequest::factory()->confirmed()->create();
 
         $response = $this->getJson('/api/v1/admin/reception/arrival-requests');
@@ -108,6 +124,7 @@ class ArrivalRequestTest extends TestCase
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
         $response->assertJsonPath('data.0.id', $pending->id);
+        $response->assertJsonPath('data.0.matched_booking.space_type', SpaceType::Room->value);
     }
 
     public function test_confirming_a_matched_arrival_request_checks_in_the_booking(): void
@@ -215,9 +232,11 @@ class ArrivalRequestTest extends TestCase
 
     public function test_the_expiry_sweep_only_marks_pending_requests_past_the_window(): void
     {
-        $stale = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(45)]);
+        app(SettingService::class)->set('kiosk.arrival_request_expiry_minutes', 10, SettingValueType::Int);
+
+        $stale = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(15)]);
         $fresh = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(5)]);
-        $alreadyConfirmed = ArrivalRequest::factory()->confirmed()->create(['requested_at' => now()->subMinutes(45)]);
+        $alreadyConfirmed = ArrivalRequest::factory()->confirmed()->create(['requested_at' => now()->subMinutes(15)]);
 
         $this->artisan('kiosk:expire-stale-arrival-requests')->assertExitCode(0);
 

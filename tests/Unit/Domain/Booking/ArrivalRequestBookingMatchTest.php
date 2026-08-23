@@ -9,7 +9,6 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
-use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -38,7 +37,7 @@ class ArrivalRequestBookingMatchTest extends TestCase
             'end_at' => Carbon::parse('2026-08-23 15:00:00', 'Asia/Damascus'),
         ]);
 
-        $matched = (new ArrivalRequestMatcher(app(SettingService::class)))
+        $matched = (new ArrivalRequestMatcher)
             ->matchBookingFor($member, $branch, now());
 
         $this->assertNotNull($matched);
@@ -59,7 +58,7 @@ class ArrivalRequestBookingMatchTest extends TestCase
             'end_at' => Carbon::parse('2026-08-22 15:00:00', 'Asia/Damascus'),
         ]);
 
-        $matched = (new ArrivalRequestMatcher(app(SettingService::class)))
+        $matched = (new ArrivalRequestMatcher)
             ->matchBookingFor($member, $branch, now());
 
         $this->assertNull($matched);
@@ -79,7 +78,7 @@ class ArrivalRequestBookingMatchTest extends TestCase
             'end_at' => Carbon::parse('2026-08-23 09:30:00', 'Asia/Damascus'),
         ]);
 
-        $matched = (new ArrivalRequestMatcher(app(SettingService::class)))
+        $matched = (new ArrivalRequestMatcher)
             ->matchBookingFor($member, $branch, now());
 
         $this->assertNull($matched);
@@ -111,7 +110,7 @@ class ArrivalRequestBookingMatchTest extends TestCase
             'end_at' => Carbon::parse('2026-08-23 15:00:00', 'Asia/Damascus'),
         ]);
 
-        $matched = (new ArrivalRequestMatcher(app(SettingService::class)))
+        $matched = (new ArrivalRequestMatcher)
             ->matchBookingFor($member, $branch, now());
 
         $this->assertNotNull($matched);
@@ -139,10 +138,30 @@ class ArrivalRequestBookingMatchTest extends TestCase
             'end_at' => Carbon::parse('2026-08-23 12:00:00', 'Asia/Damascus'),
         ]);
 
-        $matched = (new ArrivalRequestMatcher(app(SettingService::class)))
+        $matched = (new ArrivalRequestMatcher)
             ->matchBookingFor($member, $branch, now());
 
         $this->assertTrue($matched->is($sooner));
         $this->assertFalse($matched->is($later));
+    }
+
+    public function test_does_not_match_a_booking_whose_window_already_ended_today(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-23 18:00:00', 'Asia/Damascus'));
+        $member = User::factory()->create();
+        $branch = Branch::factory()->create();
+        Booking::factory()->create([
+            'user_id' => $member->id,
+            'space_id' => Space::factory()->room()->for(
+                Building::factory()->for($branch)
+            ),
+            'start_at' => Carbon::parse('2026-08-23 06:00:00', 'Asia/Damascus'),
+            'end_at' => Carbon::parse('2026-08-23 07:00:00', 'Asia/Damascus'),
+        ]);
+
+        $matched = (new ArrivalRequestMatcher)
+            ->matchBookingFor($member, $branch, now());
+
+        $this->assertNull($matched);
     }
 }

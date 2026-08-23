@@ -31,8 +31,8 @@ class KioskController extends Controller
                 'plans' => $this->activePlans(),
             ],
             'social_links' => $this->visibleSocialLinks(),
-            'app_download' => ['url' => $settings->get('kiosk.app_download_url')],
-            'arrival_qr' => ['value' => $settings->get('kiosk.arrival_qr_value')],
+            'app_download' => ['url' => $settings->get('kiosk.app_download_url', 'https://example.local/download')],
+            'arrival_qr' => ['value' => $settings->get('kiosk.arrival_qr_value', 'addapp://arrival')],
         ]);
     }
 

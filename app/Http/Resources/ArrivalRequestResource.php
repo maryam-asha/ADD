@@ -25,6 +25,7 @@ class ArrivalRequestResource extends JsonResource
             'matched_booking' => $this->whenLoaded('matchedBooking', fn () => $this->matchedBooking === null ? null : [
                 'id' => $this->matchedBooking->id,
                 'space_id' => $this->matchedBooking->space_id,
+                'space_type' => $this->matchedBooking->space?->space_type,
                 'start_at' => $this->matchedBooking->start_at,
                 'end_at' => $this->matchedBooking->end_at,
             ]),
