@@ -95,6 +95,16 @@
                          "key":  "device_capability_id",
                          "value":  "",
                          "type":  "string"
+                     },
+                     {
+                         "key": "announcement_id",
+                         "value": "",
+                         "type": "string"
+                     },
+                     {
+                         "key": "arrival_request_id",
+                         "value": "",
+                         "type": "string"
                      }
                  ],
     "event":  [
@@ -967,6 +977,41 @@
                                                       "path": ["api", "v1", "member", "bookings", "{{booking_id}}", "extend"]
                                                   },
                                                   "description": "422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
+                                              }
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "name": "Kiosk",
+                                      "description": "docs/decisions/kiosk-display.md. The member's app calls this after scanning the static QR the kiosk displays. It never creates a booking or session by itself -- it only queues a row on reception's screen, which reception confirms via Admin (Dashboard) > Reception Operations > Arrival Requests.",
+                                      "item": [
+                                          {
+                                              "name": "Create Arrival Request",
+                                              "event": [
+                                                  {
+                                                      "listen": "test",
+                                                      "script": {
+                                                          "type": "text/javascript",
+                                                          "exec": [
+                                                              "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                                              "    pm.collectionVariables.set('arrival_request_id', pm.response.json().data.id);",
+                                                              "}"
+                                                          ]
+                                                      }
+                                                  }
+                                              ],
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/arrival-requests",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "arrival-requests"]
+                                                  },
+                                                  "description": "Matches the member's own booking for today at the (single) branch, if one exists with status confirmed/pending and no check-in yet -- purely informational, decides nothing. Calling this again while a request is still pending returns the existing row instead of creating a duplicate."
                                               }
                                           }
                                       ]
@@ -4292,6 +4337,108 @@
                                                       }
                                                   }
                                               ]
+                                          },
+                                          {
+                                              "name": "Arrival Requests",
+                                              "description": "docs/decisions/kiosk-display.md. A member's arrival request is created via Member (App) > Kiosk > Create Arrival Request, which auto-captures {{arrival_request_id}}. Confirming a matched request calls Check In Booking above unchanged; confirming an unmatched one (space_id required) calls Start Walk-in Session above unchanged -- no new booking/session logic exists here, this is purely a dispatch to those two actions.",
+                                              "item": [
+                                                  {
+                                                      "name": "List Pending Arrival Requests",
+                                                      "request": {
+                                                          "method": "GET",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests"]
+                                                          },
+                                                          "description": "Paginated, status = pending only, ordered by requested_at ascending, with the member's name/phone and the matched booking (if any) eager-loaded."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Confirm Arrival Request (Matched Booking)",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "confirm"]
+                                                          },
+                                                          "description": "When the request has a matched_booking_id, no body is needed -- this calls Check In Booking's own logic unchanged, including its already-checked-in/wrong-status/outside-business-hours guards, and propagates that response verbatim on failure."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Confirm Arrival Request (Unmatched -- Walk-in)",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"space_id\": {{space_id}}\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "confirm"]
+                                                          },
+                                                          "description": "When the request has no matched_booking_id, space_id is required -- this calls Start Walk-in Session's own logic unchanged, including its capacity/business-hours guards."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Confirm Arrival Request -- Error: Space Required",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "confirm"]
+                                                          },
+                                                          "description": "422 when the request is unmatched and no space_id was supplied in the body."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Confirm Arrival Request -- Error: Not Pending",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "confirm"]
+                                                          },
+                                                          "description": "409 when the request has already been confirmed, rejected, or expired."
+                                                      }
+                                                  },
+                                                  {
+                                                      "name": "Reject Arrival Request",
+                                                      "request": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/reject",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "reject"]
+                                                          },
+                                                          "description": "No refund/cancellation logic applies -- nothing was ever charged or reserved by the arrival request itself. 409 if the request is not currently pending."
+                                                      }
+                                                  }
+                                              ]
                                           }
                                       ]
                                   },
@@ -6845,6 +6992,109 @@
                                                                 ]
                                                    },
                                                    {
+                                                       "name": "Announcements",
+                                                       "description": "docs/decisions/kiosk-display.md. Banner content for the reception kiosk screen -- news/event/offer flyers. `type` is an open string, not a fixed list, same precedent as Contact Links: a new kind of announcement is a row insert, never a migration. No standalone public listing endpoint -- the public read is only through Public (Site) > Get Kiosk Data below, aggregated with the Plan catalog and Contact Links.",
+                                                       "item": [
+                                                           {
+                                                               "name": "List Announcements",
+                                                               "request": {
+                                                                   "method": "GET",
+                                                                   "header": [
+                                                                       { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                                   ],
+                                                                   "url": {
+                                                                       "raw": "{{base_url}}/api/v1/admin/announcements",
+                                                                       "host": ["{{base_url}}"],
+                                                                       "path": ["api", "v1", "admin", "announcements"]
+                                                                   }
+                                                               }
+                                                           },
+                                                           {
+                                                               "name": "Create Announcement",
+                                                               "event": [
+                                                                   {
+                                                                       "listen": "test",
+                                                                       "script": {
+                                                                           "type": "text/javascript",
+                                                                           "exec": [
+                                                                               "if (pm.response.code === 201 || pm.response.code === 200) {",
+                                                                               "    pm.collectionVariables.set('announcement_id', pm.response.json().data.id);",
+                                                                               "}"
+                                                                           ]
+                                                                       }
+                                                                   }
+                                                               ],
+                                                               "request": {
+                                                                   "method": "POST",
+                                                                   "header": [
+                                                                       { "key": "Content-Type", "value": "application/json" },
+                                                                       { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                                   ],
+                                                                   "body": {
+                                                                       "mode": "raw",
+                                                                       "raw": "{\n  \"type\": \"offer\",\n  \"image_url\": \"https://example.local/offer.png\",\n  \"link_url\": \"https://example.local/offer\",\n  \"sort_order\": 1\n}",
+                                                                       "options": { "raw": { "language": "json" } }
+                                                                   },
+                                                                   "url": {
+                                                                       "raw": "{{base_url}}/api/v1/admin/announcements",
+                                                                       "host": ["{{base_url}}"],
+                                                                       "path": ["api", "v1", "admin", "announcements"]
+                                                                   },
+                                                                   "description": "`type` accepts any string (news/event/offer are just the seeded examples). starts_at/ends_at are optional -- when set, an announcement is only \"live\" (returned by Get Kiosk Data) while is_active is true and now() falls inside that window."
+                                                               }
+                                                           },
+                                                           {
+                                                               "name": "Get Announcement",
+                                                               "request": {
+                                                                   "method": "GET",
+                                                                   "header": [
+                                                                       { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                                   ],
+                                                                   "url": {
+                                                                       "raw": "{{base_url}}/api/v1/admin/announcements/{{announcement_id}}",
+                                                                       "host": ["{{base_url}}"],
+                                                                       "path": ["api", "v1", "admin", "announcements", "{{announcement_id}}"]
+                                                                   }
+                                                               }
+                                                           },
+                                                           {
+                                                               "name": "Update Announcement",
+                                                               "request": {
+                                                                   "method": "PUT",
+                                                                   "header": [
+                                                                       { "key": "Content-Type", "value": "application/json" },
+                                                                       { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                                   ],
+                                                                   "body": {
+                                                                       "mode": "raw",
+                                                                       "raw": "{\n  \"type\": \"offer\",\n  \"image_url\": \"https://example.local/offer-v2.png\",\n  \"is_active\": false\n}",
+                                                                       "options": { "raw": { "language": "json" } }
+                                                                   },
+                                                                   "url": {
+                                                                       "raw": "{{base_url}}/api/v1/admin/announcements/{{announcement_id}}",
+                                                                       "host": ["{{base_url}}"],
+                                                                       "path": ["api", "v1", "admin", "announcements", "{{announcement_id}}"]
+                                                                   },
+                                                                   "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource. This request body must resend every required field (type, image_url), not just the ones changing."
+                                                               }
+                                                           },
+                                                           {
+                                                               "name": "Delete Announcement",
+                                                               "request": {
+                                                                   "method": "DELETE",
+                                                                   "header": [
+                                                                       { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                                   ],
+                                                                   "url": {
+                                                                       "raw": "{{base_url}}/api/v1/admin/announcements/{{announcement_id}}",
+                                                                       "host": ["{{base_url}}"],
+                                                                       "path": ["api", "v1", "admin", "announcements", "{{announcement_id}}"]
+                                                                   }
+                                                               }
+                                                           }
+                                                       ]
+                                                   },
+                                                   {
                                                        "name":  "Community Members",
                                                        "item":  [
                                                                     {
@@ -7355,6 +7605,21 @@
                                                               },
                                                       "description":  "Lists members who have an active `public_directory` consent grant, at least one filled profile (Personal and/or Professional), and an `active` account status. Never includes phone/email regardless of consent. Unauthenticated, paginated (20 per page, ordered by name), throttled, and computed fresh on every request â€” no caching."
                                                   }
+                                  },
+                                  {
+                                      "name": "Get Kiosk Data",
+                                      "request": {
+                                          "method": "GET",
+                                          "header": [
+                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                          ],
+                                          "url": {
+                                              "raw": "{{base_url}}/api/v1/public/kiosk",
+                                              "host": ["{{base_url}}"],
+                                              "path": ["api", "v1", "public", "kiosk"]
+                                          },
+                                          "description": "docs/decisions/kiosk-display.md. One aggregate call for the reception kiosk screen: banner.news/events/offers (live Announcements by type), banner.plans (the active Plan catalog, minimal shape -- no currency conversion), social_links (visible Contact Links, minimal shape), app_download.url and arrival_qr.value (Setting rows -- the frontend renders the QR client-side from arrival_qr.value, this endpoint never generates an image). Every section key is always present, even as an empty array, so the kiosk app never has to guard against a missing key."
+                                      }
                                   }
                               ]
                  }
