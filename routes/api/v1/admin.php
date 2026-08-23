@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\BusinessHourController;
@@ -90,6 +91,11 @@ Route::apiResource('plans', PlanController::class);
 // docs/decisions/profile-fields-completion-score-contact-links.md.
 Route::apiResource('contact-links', ContactLinkController::class)
     ->parameters(['contact-links' => 'contactLink']);
+
+// Reception kiosk banner content (docs/decisions/kiosk-display.md). Same
+// permission tier as Founders/Partners/ContactLinks (no narrower role:admin
+// group).
+Route::apiResource('announcements', AnnouncementController::class);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);

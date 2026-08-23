@@ -93,6 +93,7 @@ return [
         'business_hour_exception_updated' => 'Business hour exception updated.',
         'currency_updated' => 'Currency updated.',
         'currency_status_updated' => 'Currency status updated.',
+        'announcement_updated' => 'Announcement updated.',
     ],
 
     'currency' => [

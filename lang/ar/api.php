@@ -93,6 +93,7 @@ return [
         'business_hour_exception_updated' => 'تم تحديث استثناء ساعات العمل.',
         'currency_updated' => 'تم تحديث العملة.',
         'currency_status_updated' => 'تم تحديث حالة العملة.',
+        'announcement_updated' => 'تم تحديث الإعلان.',
     ],
 
     'currency' => [
