@@ -3,6 +3,7 @@
 namespace Tests\Unit\Domain\Ecosystem;
 
 use App\Domain\Ecosystem\Models\Announcement;
+use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -38,7 +39,7 @@ class AnnouncementModelTest extends TestCase
 
         $fresh = $announcement->fresh();
         $this->assertTrue($fresh->is_active);
-        $this->assertInstanceOf(\Carbon\Carbon::class, $fresh->starts_at);
-        $this->assertInstanceOf(\Carbon\Carbon::class, $fresh->ends_at);
+        $this->assertInstanceOf(Carbon::class, $fresh->starts_at);
+        $this->assertInstanceOf(Carbon::class, $fresh->ends_at);
     }
 }
