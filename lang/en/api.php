@@ -137,4 +137,11 @@ return [
         'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
     ],
 
+    'kiosk' => [
+        'arrival_request_not_pending' => 'This arrival request is no longer pending.',
+        'space_id_required' => 'A space is required to confirm an unmatched arrival request.',
+        'arrival_request_confirmed' => 'Arrival confirmed.',
+        'arrival_request_rejected' => 'Arrival request rejected.',
+    ],
+
 ];

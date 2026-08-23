@@ -137,4 +137,11 @@ return [
         'check_in_rejected' => 'تم رفض هذا الحجز ولا يمكن تسجيل دخوله.',
     ],
 
+    'kiosk' => [
+        'arrival_request_not_pending' => 'طلب الوصول هذا لم يعد قيد الانتظار.',
+        'space_id_required' => 'يجب تحديد مساحة لتأكيد طلب وصول غير مطابق لحجز.',
+        'arrival_request_confirmed' => 'تم تأكيد الوصول.',
+        'arrival_request_rejected' => 'تم رفض طلب الوصول.',
+    ],
+
 ];
