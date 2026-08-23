@@ -2,10 +2,12 @@
 
 namespace Tests\Guards;
 
+use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\TerminationSource;
+use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
@@ -57,6 +59,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        ArrivalRequest::class => [
+            'status' => ArrivalRequestStatus::class,
+        ],
         Booking::class => [
             'status' => BookingStatus::class,
             'payment_state' => PaymentState::class,
