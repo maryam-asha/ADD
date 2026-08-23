@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Member\AccountController;
+use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
@@ -27,6 +28,10 @@ Route::get('wallet/options', [WalletController::class, 'options']);
 // booking creation with slot granularity/buffer/approval rules.
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
+
+// Reception kiosk "I'm here" signal (docs/decisions/kiosk-display.md) —
+// never changes booking/session state by itself.
+Route::post('arrival-requests', [ArrivalRequestController::class, 'store']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role
