@@ -212,4 +212,17 @@ class ArrivalRequestTest extends TestCase
         $this->postJson("/api/v1/admin/reception/arrival-requests/{$arrivalRequest->id}/reject")
             ->assertStatus(409);
     }
+
+    public function test_the_expiry_sweep_only_marks_pending_requests_past_the_window(): void
+    {
+        $stale = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(45)]);
+        $fresh = ArrivalRequest::factory()->create(['requested_at' => now()->subMinutes(5)]);
+        $alreadyConfirmed = ArrivalRequest::factory()->confirmed()->create(['requested_at' => now()->subMinutes(45)]);
+
+        $this->artisan('kiosk:expire-stale-arrival-requests')->assertExitCode(0);
+
+        $this->assertSame(ArrivalRequestStatus::Expired, $stale->fresh()->status);
+        $this->assertSame(ArrivalRequestStatus::Pending, $fresh->fresh()->status);
+        $this->assertSame(ArrivalRequestStatus::Confirmed, $alreadyConfirmed->fresh()->status);
+    }
 }

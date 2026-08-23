@@ -23,3 +23,11 @@ Schedule::command('model:prune')->hourly();
  * not left open indefinitely until reception happens to notice.
  */
 Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes()->withoutOverlapping();
+
+/*
+ * Reception kiosk (docs/decisions/kiosk-display.md) — a pending arrival
+ * request older than its configured window is stale, not actionable; sweep
+ * it to `expired` so reception's queue doesn't accumulate entries from
+ * members who scanned and then left.
+ */
+Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->withoutOverlapping();
