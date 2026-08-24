@@ -20,38 +20,38 @@ class KioskControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonStructure([
-            'banner' => ['news', 'events', 'offers', 'plans'],
+            'banner',
+            'plans',
             'social_links',
             'app_download' => ['url'],
             'arrival_qr' => ['value'],
         ]);
-        $response->assertJsonPath('banner.news', []);
-        $response->assertJsonPath('banner.events', []);
-        $response->assertJsonPath('banner.offers', []);
+        $response->assertJsonPath('banner', []);
+        $response->assertJsonPath('plans', []);
         $response->assertJsonPath('social_links', []);
     }
 
-    public function test_banner_sections_respect_type_and_live_window_independently(): void
+    public function test_banner_is_one_flat_list_with_a_type_property_per_item_respecting_the_live_window(): void
     {
         $liveNews = Announcement::factory()->news()->create(['sort_order' => 1]);
         Announcement::factory()->news()->create(['is_active' => false]);
         Announcement::factory()->news()->upcoming()->create();
         Announcement::factory()->news()->expired()->create();
-        $liveOffer = Announcement::factory()->offer()->create();
+        $liveOffer = Announcement::factory()->offer()->create(['sort_order' => 2]);
         Announcement::factory()->event()->upcoming()->create();
 
         $response = $this->getJson('/api/v1/public/kiosk');
 
         $response->assertOk();
-        $response->assertJsonCount(1, 'banner.news');
-        $response->assertJsonPath('banner.news.0.id', $liveNews->id);
-        $response->assertJsonPath('banner.news.0.image_url', $liveNews->image_url);
-        $response->assertJsonCount(1, 'banner.offers');
-        $response->assertJsonPath('banner.offers.0.id', $liveOffer->id);
-        $response->assertJsonCount(0, 'banner.events');
+        $response->assertJsonCount(2, 'banner');
+        $response->assertJsonPath('banner.0.id', $liveNews->id);
+        $response->assertJsonPath('banner.0.type', 'news');
+        $response->assertJsonPath('banner.0.image_url', $liveNews->image_url);
+        $response->assertJsonPath('banner.1.id', $liveOffer->id);
+        $response->assertJsonPath('banner.1.type', 'offer');
     }
 
-    public function test_banner_plans_reads_the_existing_active_plan_catalog(): void
+    public function test_plans_is_a_top_level_section_reading_the_existing_active_plan_catalog(): void
     {
         $plan = Plan::factory()->create(['is_active' => true, 'order' => 1]);
         Plan::factory()->create(['is_active' => false]);
@@ -59,9 +59,9 @@ class KioskControllerTest extends TestCase
         $response = $this->getJson('/api/v1/public/kiosk');
 
         $response->assertOk();
-        $response->assertJsonCount(1, 'banner.plans');
-        $response->assertJsonPath('banner.plans.0.id', $plan->id);
-        $response->assertJsonPath('banner.plans.0.pricing_currency', $plan->pricing_currency);
+        $response->assertJsonCount(1, 'plans');
+        $response->assertJsonPath('plans.0.id', $plan->id);
+        $response->assertJsonPath('plans.0.pricing_currency', $plan->pricing_currency);
     }
 
     public function test_social_links_only_returns_visible_links_in_the_minimal_shape(): void

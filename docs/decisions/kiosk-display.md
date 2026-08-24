@@ -84,20 +84,26 @@ can coexist unchanged.
   `branch_id`. This is a recorded assumption, not a permanent constraint —
   see "Known follow-up" below.
 - **Response is sectioned, not flat**, so the kiosk app makes exactly one
-  request and switches on top-level keys:
+  request and switches on top-level keys. `banner` is revised (2026-08-24)
+  to be one flat, mixed-type list — the client switches on each item's own
+  `type`, rather than being handed three separately-keyed lists — and
+  `plans` moved out of `banner` to its own top-level key, since it isn't
+  banner content:
   ```json
   {
-    "banner": {
-      "news":   [{ "id": 1, "image_url": "...", "link_url": null }],
-      "events": [{ "id": 2, "image_url": "...", "link_url": null }],
-      "offers": [{ "id": 3, "image_url": "...", "link_url": "..." }],
-      "plans":  [{ "id": 1, "name": {"ar": "...", "en": "..."}, "price": "50.00", "pricing_currency": "USD", "duration_days": 30, "included_hours": "10.00" }]
-    },
+    "banner": [
+      { "id": 1, "type": "news",  "image_url": "...", "link_url": null },
+      { "id": 2, "type": "event", "image_url": "...", "link_url": null },
+      { "id": 3, "type": "offer", "image_url": "...", "link_url": "..." }
+    ],
+    "plans": [{ "id": 1, "name": {"ar": "...", "en": "..."}, "price": "50.00", "pricing_currency": "USD", "duration_days": 30, "included_hours": "10.00" }],
     "social_links": [{ "type": "instagram", "value": "https://...", "label": "..." }],
     "app_download": { "url": "https://..." },
     "arrival_qr": { "value": "..." }
   }
   ```
+  `banner` is ordered by `sort_order` across every type together, not
+  grouped by type first.
 - **`social_links` is `ContactLink::where('is_visible', true)` unchanged.**
   Zero new backend work for this section — it already exists and is
   already public (`Api\V1\Public\ContactLinkController`).
@@ -206,10 +212,10 @@ Coverage instead:
   confirming an unmatched request with `space_id` creates a walk-in
   session via the existing service; the expiry sweep only touches
   `pending` rows past the window.
-- `tests/Feature/Public/KioskControllerTest.php` — response shape; banner
-  sections respect `is_active`/window filtering independently per type;
-  `social_links`/`app_download`/`arrival_qr` are present even when
-  `announcements` is empty.
+- `tests/Feature/Public/KioskControllerTest.php` — response shape; `banner`
+  respects `is_active`/window filtering and carries the right `type` per
+  item; `plans`/`social_links`/`app_download`/`arrival_qr` are present even
+  when `announcements` is empty.
 
 ## What this changes in code
 

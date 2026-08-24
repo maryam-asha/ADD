@@ -24,12 +24,8 @@ class KioskController extends Controller
     public function show(SettingService $settings): JsonResponse
     {
         return response()->json([
-            'banner' => [
-                'news' => $this->liveAnnouncementsOfType('news'),
-                'events' => $this->liveAnnouncementsOfType('event'),
-                'offers' => $this->liveAnnouncementsOfType('offer'),
-                'plans' => $this->activePlans(),
-            ],
+            'banner' => $this->liveAnnouncements(),
+            'plans' => $this->activePlans(),
             'social_links' => $this->visibleSocialLinks(),
             'app_download' => ['url' => $settings->get('kiosk.app_download_url', 'https://example.local/download')],
             'arrival_qr' => ['value' => $settings->get('kiosk.arrival_qr_value', 'addapp://arrival')],
@@ -37,14 +33,16 @@ class KioskController extends Controller
     }
 
     /**
-     * @return array<int, array{id: int, image_url: string, link_url: ?string}>
+     * One flat, mixed-type list — the client switches on each item's own
+     * `type`, rather than being handed three separately-keyed lists.
+     *
+     * @return array<int, array{id: int, type: string, image_url: string, link_url: ?string}>
      */
-    private function liveAnnouncementsOfType(string $type): array
+    private function liveAnnouncements(): array
     {
         $now = now();
 
         return Announcement::query()
-            ->where('type', $type)
             ->where('is_active', true)
             ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
             ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
@@ -52,6 +50,7 @@ class KioskController extends Controller
             ->get()
             ->map(fn (Announcement $announcement) => [
                 'id' => $announcement->id,
+                'type' => $announcement->type,
                 'image_url' => $announcement->image_url,
                 'link_url' => $announcement->link_url,
             ])
