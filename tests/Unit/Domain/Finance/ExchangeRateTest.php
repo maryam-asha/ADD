@@ -20,7 +20,9 @@ class ExchangeRateTest extends TestCase
 
         $this->assertNotNull($current);
         $this->assertSame($latestPast->id, $current->id);
-        $this->assertSame('14700.0000', $current->rate_to_base);
+        // Model cast is now decimal:10 (2026_08_24_100000_widen_exchange_rates_rate_to_base_precision),
+        // so the accessor pads to 10 decimal places, not 4.
+        $this->assertSame('14700.0000000000', $current->rate_to_base);
     }
 
     public function test_current_returns_null_when_no_rate_has_taken_effect_yet(): void

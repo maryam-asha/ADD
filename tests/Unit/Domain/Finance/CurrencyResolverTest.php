@@ -61,10 +61,10 @@ class CurrencyResolverTest extends TestCase
         $this->assertSame('USD', $resolved);
     }
 
-    public function test_no_user_and_no_header_falls_back_to_syp(): void
+    public function test_no_user_and_no_header_falls_back_to_usd(): void
     {
         $resolved = (new CurrencyResolver)->resolve($this->requestWithCurrencyHeader(null), null);
 
-        $this->assertSame('SYP', $resolved);
+        $this->assertSame('USD', $resolved);
     }
 }

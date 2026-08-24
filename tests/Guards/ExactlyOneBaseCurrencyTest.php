@@ -25,7 +25,7 @@ class ExactlyOneBaseCurrencyTest extends TestCase
     public function test_the_base_currency_is_active(): void
     {
         $this->assertSame(
-            'SYP',
+            'USD',
             Currency::query()->where('is_base', true)->where('is_active', true)->value('code')
         );
     }

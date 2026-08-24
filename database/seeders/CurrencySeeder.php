@@ -22,7 +22,7 @@ class CurrencySeeder extends Seeder
                 'name' => ['ar' => 'ليرة سورية', 'en' => 'Syrian Pound'],
                 'symbol' => 'ل.س',
                 'decimal_places' => 2,
-                'is_base' => true,
+                'is_base' => false,
                 'is_active' => true,
                 'order' => 1,
             ]
@@ -34,7 +34,7 @@ class CurrencySeeder extends Seeder
                 'name' => ['ar' => 'دولار أمريكي', 'en' => 'US Dollar'],
                 'symbol' => '$',
                 'decimal_places' => 2,
-                'is_base' => false,
+                'is_base' => true,
                 'is_active' => true,
                 'order' => 2,
             ]

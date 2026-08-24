@@ -23,7 +23,11 @@ class ExchangeRate extends Model
     protected function casts(): array
     {
         return [
-            'rate_to_base' => 'decimal:4',
+            // Matches the column's decimal(20,10) precision
+            // (2026_08_24_100000_widen_exchange_rates_rate_to_base_precision)
+            // — a mismatched cast would silently round every read back down
+            // regardless of what the column can actually hold.
+            'rate_to_base' => 'decimal:10',
             'effective_from' => 'datetime',
         ];
     }

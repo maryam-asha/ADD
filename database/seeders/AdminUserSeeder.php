@@ -24,7 +24,7 @@ class AdminUserSeeder extends Seeder
                 'email' => 'admin@add.local',
                 'password' => 'password',
                 'preferred_language' => 'ar',
-                'preferred_currency' => 'SYP',
+                'preferred_currency' => 'USD',
                 'status' => 'active',
             ]
         );

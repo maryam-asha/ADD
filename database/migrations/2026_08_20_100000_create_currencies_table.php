@@ -11,7 +11,7 @@ return new class extends Migration
      * Currency moves off the hardcoded App\Domain\Finance\Enums\Currency
      * enum onto an admin-managed lookup table — new currencies land via
      * the dashboard, not a code deploy. `is_base` (exactly one true row,
-     * SYP) is enforced at the app layer, not a DB constraint, on purpose.
+     * USD) is enforced at the app layer, not a DB constraint, on purpose.
      *
      * SYP and USD are seeded right here in up(), not only in
      * CurrencySeeder: every migration after this one adds a real foreign
@@ -42,7 +42,7 @@ return new class extends Migration
                 'name' => json_encode(['ar' => 'ليرة سورية', 'en' => 'Syrian Pound']),
                 'symbol' => 'ل.س',
                 'decimal_places' => 2,
-                'is_base' => true,
+                'is_base' => false,
                 'is_active' => true,
                 'order' => 1,
                 'created_at' => now(),
@@ -53,7 +53,7 @@ return new class extends Migration
                 'name' => json_encode(['ar' => 'دولار أمريكي', 'en' => 'US Dollar']),
                 'symbol' => '$',
                 'decimal_places' => 2,
-                'is_base' => false,
+                'is_base' => true,
                 'is_active' => true,
                 'order' => 2,
                 'created_at' => now(),

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Model;
  * Admin-managed currency lookup, replacing the hardcoded
  * App\Domain\Finance\Enums\Currency enum — a new currency lands via the
  * dashboard, not a code deploy. Exactly one row should ever have
- * `is_base = true` (SYP); that invariant is enforced at the app layer,
+ * `is_base = true` (USD); that invariant is enforced at the app layer,
  * not a DB constraint.
  */
 class Currency extends Model

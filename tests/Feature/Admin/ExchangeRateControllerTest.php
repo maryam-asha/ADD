@@ -27,15 +27,15 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson('/api/v1/admin/exchange-rates', [
-            'currency_code' => 'USD',
-            'rate_to_base' => '14700.5000',
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
             'effective_from' => now()->toISOString(),
         ]);
 
         $response->assertCreated();
         $this->assertDatabaseHas('exchange_rates', [
-            'currency_code' => 'USD',
-            'rate_to_base' => '14700.5000',
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
             'set_by' => $admin->id,
         ]);
     }
@@ -47,7 +47,7 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson('/api/v1/admin/exchange-rates', [
-            'currency_code' => 'SYP',
+            'currency_code' => 'USD',
             'rate_to_base' => '1.0000',
             'effective_from' => now()->toISOString(),
         ]);
@@ -64,8 +64,8 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->postJson('/api/v1/admin/exchange-rates', [
-            'currency_code' => 'USD',
-            'rate_to_base' => '14700.0000',
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
             'effective_from' => now()->toISOString(),
             'set_by' => $otherUser->id,
         ])->assertCreated();
@@ -81,8 +81,8 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($admin, ['*']);
 
         $this->postJson('/api/v1/admin/exchange-rates', [
-            'currency_code' => 'USD',
-            'rate_to_base' => '14700.0000',
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
             'effective_from' => now()->toISOString(),
         ])->assertCreated();
 
@@ -90,8 +90,8 @@ class ExchangeRateControllerTest extends TestCase
 
         $this->assertNotNull($activity);
         $this->assertSame($admin->id, $activity->causer_id);
-        $this->assertSame('USD', $activity->properties['currency_code']);
-        $this->assertSame('14700.0000', $activity->properties['rate_to_base']);
+        $this->assertSame('SYP', $activity->properties['currency_code']);
+        $this->assertSame('0.0000680272', $activity->properties['rate_to_base']);
     }
 
     public function test_index_returns_rates_ordered_by_effective_from_descending(): void

@@ -15,7 +15,7 @@ class StoreExchangeRateRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // The base currency (SYP) never gets a row here — its rate to
+            // The base currency (USD) never gets a row here — its rate to
             // itself is definitionally 1 — so is_base is explicitly excluded
             // rather than relying on "no one would pick it".
             'currency_code' => [

@@ -77,7 +77,7 @@ never-4xx contract exactly.
 Current behavior: conversion fields are present only when
 `$user?->preferred_currency` is set and differs from `pricing_currency` —
 otherwise omitted entirely. New behavior: a target currency is always
-resolved (via `CurrencyResolver`, defaulting to `SYP`), so conversion is
+resolved (via `CurrencyResolver`, defaulting to `USD`), so conversion is
 attempted unconditionally:
 
 ```php

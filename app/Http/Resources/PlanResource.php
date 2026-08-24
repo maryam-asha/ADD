@@ -45,7 +45,7 @@ class PlanResource extends JsonResource
         }
 
         // Docs/superpowers/specs/2026-08-11-currency-header-design.md §2:
-        // a target currency is always resolved (defaulting to SYP), so
+        // a target currency is always resolved (defaulting to USD), so
         // conversion is now attempted unconditionally rather than only
         // when a preference happens to be set.
         $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);

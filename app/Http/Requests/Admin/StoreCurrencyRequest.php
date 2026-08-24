@@ -7,7 +7,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * `is_base` is deliberately not a field here at all — it's fixed forever
- * to the one seeded SYP row and never settable through this endpoint
+ * to the one seeded USD row and never settable through this endpoint
  * (docs/decisions/multi-currency-support.md).
  */
 class StoreCurrencyRequest extends FormRequest

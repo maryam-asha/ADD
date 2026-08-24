@@ -165,20 +165,20 @@ class CurrencyControllerTest extends TestCase
     }
 
     /**
-     * The base currency (SYP) can never be deactivated — conversion and
+     * The base currency (USD) can never be deactivated — conversion and
      * resolution both depend on exactly one always-active base row.
      */
     public function test_the_base_currency_cannot_be_deactivated(): void
     {
         $this->actingAsAdmin();
 
-        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/admin/currencies/SYP/status', [
+        $response = $this->withHeader('lang', 'en')->patchJson('/api/v1/admin/currencies/USD/status', [
             'is_active' => false,
         ]);
 
         $response->assertStatus(422);
         $response->assertJsonPath('message', 'The base currency cannot be deactivated.');
-        $this->assertDatabaseHas('currencies', ['code' => 'SYP', 'is_active' => true, 'is_base' => true]);
+        $this->assertDatabaseHas('currencies', ['code' => 'USD', 'is_active' => true, 'is_base' => true]);
     }
 
     public function test_an_operations_user_can_also_manage_currencies(): void

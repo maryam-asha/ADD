@@ -136,7 +136,7 @@ class MembershipPurchaseTest extends TestCase
      */
     public function test_the_purchase_response_includes_a_converted_amount_on_the_nested_plan(): void
     {
-        ExchangeRate::factory()->create(['currency_code' => 'USD', 'rate_to_base' => '14700.0000', 'effective_from' => now()->subDay()]);
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272', 'effective_from' => now()->subDay()]);
 
         $member = $this->makeFundedMember('500.00');
 
@@ -156,7 +156,7 @@ class MembershipPurchaseTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.plan.converted_amount', '147000.00');
+        $response->assertJsonPath('data.plan.converted_amount', '147000.02');
         $response->assertJsonPath('data.plan.converted_currency', 'SYP');
     }
 

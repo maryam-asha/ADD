@@ -22,7 +22,7 @@ two-case `App\Domain\Finance\Enums\Currency` enum.
   `false` via a dedicated status endpoint.
 - The base currency is **fixed via `is_base`**, not user-configurable and
   never multi-base: exactly one row carries `is_base = true` (seeded as
-  SYP), and that row's status can never be flipped — every conversion and
+  USD), and that row's status can never be flipped — every conversion and
   every resolved fallback (`CurrencyResolver`) assumes exactly one always-
   active base row exists. This is the one invariant the app layer enforces
   itself (no DB constraint), same as before this change.

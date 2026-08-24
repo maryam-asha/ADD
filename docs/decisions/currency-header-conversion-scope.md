@@ -10,7 +10,7 @@ only when `$user?->preferred_currency` was set and differed from the plan's
 `pricing_currency` — otherwise the keys were omitted entirely. The new
 `currency` request header (`docs/superpowers/specs/2026-08-11-currency-header-design.md`)
 changed that: a target currency is now always resolved via
-`CurrencyResolver` (header → stored preference → `SYP` default), so
+`CurrencyResolver` (header → stored preference → `USD` default), so
 conversion is attempted unconditionally on every response that embeds a
 `PlanResource`.
 
@@ -33,8 +33,8 @@ the spec stated.
 separate code path for "a plan shown standalone" versus "a plan nested
 inside a membership". Building one just to keep the nested case exempt
 from the new always-on behavior would be inconsistent scope-narrowing for
-no product reason — a member who just bought a plan in USD still
-benefits from seeing the SYP-converted amount on the confirmation
+no product reason — a member who just bought a plan in SYP still
+benefits from seeing the USD-converted amount on the confirmation
 response, exactly as they would on the listing they bought it from.
 
 ## What this changed in code
