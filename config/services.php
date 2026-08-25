@@ -57,4 +57,9 @@ return [
         'template_name' => env('WHATSAPP_OTP_TEMPLATE', 'otp_verification'),
     ],
 
+    'sptoday' => [
+        'base_url' => env('SPTODAY_BASE_URL', 'https://api-v2.sp-today.com/api/v1'),
+        'api_key' => env('SP_TODAY_KEY'),
+    ],
+
 ];
