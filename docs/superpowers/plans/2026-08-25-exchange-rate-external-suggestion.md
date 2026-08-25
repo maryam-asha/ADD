@@ -33,6 +33,7 @@
 - Create: `app/Domain/Finance/Models/ExchangeRateSuggestion.php`
 - Create: `database/factories/ExchangeRateSuggestionFactory.php`
 - Modify: `app/Domain/Finance/Models/ExchangeRate.php` (add `source`/`suggestion_id` fillable, cast, relation)
+- Modify: `database/factories/ExchangeRateFactory.php` (add `'source' => ExchangeRateSource::Manual` to `definition()` — Eloquent doesn't refetch a DB column default into the in-memory model after `create()`, so Step 9's test would otherwise see `$rate->source === null` right after creation; found and fixed during implementation, added here for the record)
 - Modify: `tests/Guards/EnumColumnsHaveBackedEnumCastsTest.php` (register the three new enum columns)
 - Test: `tests/Unit/Domain/Finance/ExchangeRateSuggestionModelTest.php`
 
