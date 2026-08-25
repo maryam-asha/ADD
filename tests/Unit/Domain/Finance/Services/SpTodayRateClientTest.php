@@ -64,7 +64,16 @@ class SpTodayRateClientTest extends TestCase
 
     public function test_it_throws_when_the_damascus_city_is_missing_for_usd(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(['data' => ['currencies' => [['code' => 'USD', 'cities' => ['alhasakah' => ['buy' => 1, 'sell' => 2]]]]]]), 200)]);
+        // Built directly rather than via fakeBody()'s array_replace_recursive:
+        // that helper merges numerically-indexed arrays element-wise, so a
+        // partial override of 'cities' would silently keep the base's
+        // 'damascus' key instead of actually removing it.
+        Http::fake(['api-v2.sp-today.com/*' => Http::response([
+            'ok' => true,
+            'data' => ['currencies' => [
+                ['code' => 'USD', 'cities' => ['alhasakah' => ['buy' => 1, 'sell' => 2]]],
+            ]],
+        ], 200)]);
 
         $this->expectException(\RuntimeException::class);
 
