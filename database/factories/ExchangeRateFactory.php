@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Models\ExchangeRate;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -24,6 +25,7 @@ class ExchangeRateFactory extends Factory
             // without the ~47% error decimal(12,4) forced.
             'currency_code' => 'SYP',
             'rate_to_base' => '0.0000680272',
+            'source' => ExchangeRateSource::Manual,
             'effective_from' => now()->subDay(),
             'set_by' => null,
         ];

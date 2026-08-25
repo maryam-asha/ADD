@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Identity\Models\User;
 use Database\Factories\ExchangeRateFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,8 @@ class ExchangeRate extends Model
     protected $fillable = [
         'currency_code',
         'rate_to_base',
+        'source',
+        'suggestion_id',
         'effective_from',
         'set_by',
     ];
@@ -29,6 +32,7 @@ class ExchangeRate extends Model
             // regardless of what the column can actually hold.
             'rate_to_base' => 'decimal:10',
             'effective_from' => 'datetime',
+            'source' => ExchangeRateSource::class,
         ];
     }
 
@@ -40,6 +44,11 @@ class ExchangeRate extends Model
     public function currency(): BelongsTo
     {
         return $this->belongsTo(Currency::class, 'currency_code', 'code');
+    }
+
+    public function suggestion(): BelongsTo
+    {
+        return $this->belongsTo(ExchangeRateSuggestion::class, 'suggestion_id');
     }
 
     public static function current(string $currencyCode): ?self

@@ -10,7 +10,12 @@ use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Enums\ExchangeRateSource;
+use App\Domain\Finance\Enums\ExchangeRateSuggestionSource;
+use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
@@ -86,6 +91,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         BusinessHour::class => [
             'day_of_week' => DayOfWeek::class,
+        ],
+        ExchangeRate::class => [
+            'source' => ExchangeRateSource::class,
+        ],
+        ExchangeRateSuggestion::class => [
+            'source' => ExchangeRateSuggestionSource::class,
+            'status' => ExchangeRateSuggestionStatus::class,
         ],
         PrivateOfficeRequest::class => [
             'status' => PrivateOfficeRequestStatus::class,
