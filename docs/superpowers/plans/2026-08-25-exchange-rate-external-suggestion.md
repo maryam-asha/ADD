@@ -1321,7 +1321,10 @@ Append to `tests/Feature/Admin/ExchangeRateControllerTest.php` (add `use App\Dom
         ])->assertCreated();
 
         $activity = \Spatie\Activitylog\Models\Activity::where('description', 'exchange_rate_created')->latest('id')->first();
-        $this->assertSame('0.0000700', $activity->properties['rate_to_base']);
+        // The audit log reads $rate->rate_to_base off the Eloquent model,
+        // which is cast decimal:10 — it always round-trips to exactly 10
+        // decimal places, so '0.0000700' becomes '0.0000700000'.
+        $this->assertSame('0.0000700000', $activity->properties['rate_to_base']);
         $this->assertSame('13275.0000000000', $activity->properties['suggested_rate_usd_to_syp']);
     }
 
