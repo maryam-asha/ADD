@@ -173,6 +173,21 @@ class ExchangeRateControllerTest extends TestCase
         $this->assertSame('13275.0000000000', $activity->properties['suggested_rate_usd_to_syp']);
     }
 
+    public function test_accepting_a_suggestion_with_an_uninverted_rate_to_base_returns_422(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create(['rate_usd_to_syp' => '13275.0000000000']);
+
+        $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '13275', // the raw suggestion number, not inverted
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('rate_to_base');
+    }
+
     public function test_accepting_a_non_pending_suggestion_returns_422(): void
     {
         $admin = User::factory()->create();

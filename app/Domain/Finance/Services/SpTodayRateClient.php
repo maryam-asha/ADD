@@ -27,14 +27,23 @@ class SpTodayRateClient
         $response = Http::baseUrl(config('services.sptoday.base_url'))
             ->withHeaders(['X-API-Key' => config('services.sptoday.api_key')])
             ->timeout(5)
-            ->retry(1, 2000)
+            // throw: false — Laravel's HTTP client would otherwise call
+            // $response->throw() itself once both attempts are exhausted
+            // and the response is still unsuccessful, raising its own
+            // Illuminate\Http\Client\RequestException before the explicit
+            // check below ever runs. That would silently replace this
+            // class's documented \RuntimeException contract (see the class
+            // docblock) with a different exception type/message for every
+            // caller — including the scheduled-only usage guard's callers,
+            // which only catch \Throwable but still rely on this message.
+            ->retry(2, 2000, throw: false)
             ->get('/currencies');
 
         if (! $response->successful()) {
             throw new \RuntimeException("sp-today request failed with status {$response->status()}");
         }
 
-        Log::info('sp-today rate fetch succeeded', [
+        Log::info('sp-today request returned a successful HTTP response', [
             'rate_limit_remaining' => $response->header('X-RateLimit-Remaining'),
         ]);
 

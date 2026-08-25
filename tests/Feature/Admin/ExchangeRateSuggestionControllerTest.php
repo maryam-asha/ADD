@@ -88,6 +88,38 @@ class ExchangeRateSuggestionControllerTest extends TestCase
         $this->assertLessThan(2.5, $deviation);
     }
 
+    public function test_it_exposes_the_correctly_inverted_rate_to_base(): void
+    {
+        $this->actingAsAdmin();
+        ExchangeRateSuggestion::factory()->create(['rate_usd_to_syp' => '13275.0000000000']);
+
+        $response = $this->getJson('/api/v1/admin/exchange-rates/suggestion');
+
+        $response->assertOk();
+        $this->assertEqualsWithDelta(1 / 13275, $response->json('suggested_rate_to_base'), 0.0000001);
+    }
+
+    public function test_suggested_rate_to_base_is_null_when_no_pending_suggestion_exists(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->getJson('/api/v1/admin/exchange-rates/suggestion');
+
+        $response->assertJsonPath('suggested_rate_to_base', null);
+    }
+
+    public function test_deviation_percent_is_null_instead_of_throwing_when_the_current_rate_is_zero(): void
+    {
+        $this->actingAsAdmin();
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000000000', 'effective_from' => now()->subDay()]);
+        ExchangeRateSuggestion::factory()->create();
+
+        $response = $this->getJson('/api/v1/admin/exchange-rates/suggestion');
+
+        $response->assertOk();
+        $this->assertNull($response->json('deviation_percent'));
+    }
+
     public function test_source_stale_is_false_within_48_hours_of_the_last_successful_fetch(): void
     {
         $this->actingAsAdmin();

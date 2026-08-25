@@ -8,6 +8,12 @@ use Tests\TestCase;
 
 class SpTodayRateClientTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::preventStrayRequests();
+    }
+
     private function fakeBody(array $overrides = []): array
     {
         return array_replace_recursive([

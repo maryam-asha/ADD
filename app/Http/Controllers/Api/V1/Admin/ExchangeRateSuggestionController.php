@@ -28,6 +28,7 @@ class ExchangeRateSuggestionController extends Controller
         return response()->json([
             'id' => $suggestion?->id,
             'rate_usd_to_syp' => $suggestion?->rate_usd_to_syp,
+            'suggested_rate_to_base' => $suggestion ? 1 / (float) $suggestion->rate_usd_to_syp : null,
             'source' => $suggestion?->source?->value,
             'fetched_at' => $suggestion?->fetched_at?->toISOString(),
             'deviation_percent' => $this->deviationPercent($suggestion),
@@ -41,7 +42,7 @@ class ExchangeRateSuggestionController extends Controller
         abort_if(
             $exchangeRateSuggestion->status !== ExchangeRateSuggestionStatus::Pending,
             422,
-            'Only a pending suggestion can be dismissed.'
+            __('api.admin.exchange_rate_suggestion_not_pending')
         );
 
         $exchangeRateSuggestion->update([
@@ -70,7 +71,7 @@ class ExchangeRateSuggestionController extends Controller
 
         $current = ExchangeRate::current('SYP');
 
-        if (! $current) {
+        if (! $current || (float) $current->rate_to_base <= 0) {
             return null;
         }
 

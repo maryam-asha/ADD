@@ -95,6 +95,7 @@ return [
         'currency_status_updated' => 'Currency status updated.',
         'announcement_updated' => 'Announcement updated.',
         'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
+        'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
     ],
 
     'currency' => [

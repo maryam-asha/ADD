@@ -14,6 +14,12 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+        Http::preventStrayRequests();
+    }
+
     private function fakeBody(int $sell, int $buy): array
     {
         return [
