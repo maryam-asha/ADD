@@ -8,7 +8,7 @@ use Illuminate\Database\Seeder;
 /**
  * Placeholder social/contact links so the public `contact-links` listing
  * and the kiosk's `social_links` section (docs/decisions/kiosk-display.md)
- * aren't empty before the real handles are entered through
+ * aren't empty before the real handles/numbers are entered through
  * `Admin\ContactLinkController`. Keyed on `type` so re-running the seeder
  * never creates duplicates.
  */
@@ -21,6 +21,8 @@ class ContactLinkSeeder extends Seeder
             ['type' => 'facebook', 'value' => 'https://facebook.example.local/add', 'label' => 'Facebook', 'sort_order' => 2],
             ['type' => 'linkedin', 'value' => 'https://linkedin.example.local/company/add', 'label' => 'LinkedIn', 'sort_order' => 3],
             ['type' => 'website', 'value' => 'https://example.local', 'label' => null, 'sort_order' => 4],
+            ['type' => 'phone', 'value' => '+963 21 000 0000', 'label' => 'الاستقبال', 'sort_order' => 5],
+            ['type' => 'whatsapp', 'value' => '+963 944 000 000', 'label' => 'واتساب', 'sort_order' => 6],
         ];
 
         foreach ($links as $link) {

@@ -134,8 +134,9 @@ can coexist unchanged.
   screen isn't empty before real content is entered through
   `Admin\AnnouncementController` / `Admin\ContactLinkController`: one
   `news`/`event`/`offer` banner each, and one link each for `instagram`,
-  `facebook`, `linkedin`, `website`. Both seeders key their `firstOrCreate`
-  lookup on a natural identifier (`image_url`, `type`) so re-running
+  `facebook`, `linkedin`, `website`, `phone`, `whatsapp`. Both seeders key
+  their `firstOrCreate` lookup on a natural identifier (`image_url`,
+  `type`) so re-running
   `db:seed` never duplicates rows or clobbers an admin edit.
 - **The backend never generates a QR image.** Every "QR" in this feature
   (social links, app download, arrival) is a plain string/URL; the kiosk

@@ -15,9 +15,9 @@ class ContactLinkSeederTest extends TestCase
     {
         $this->seed(ContactLinkSeeder::class);
 
-        $this->assertSame(4, ContactLink::query()->count());
+        $this->assertSame(6, ContactLink::query()->count());
 
-        foreach (['instagram', 'facebook', 'linkedin', 'website'] as $type) {
+        foreach (['instagram', 'facebook', 'linkedin', 'website', 'phone', 'whatsapp'] as $type) {
             $this->assertTrue(ContactLink::query()->where('type', $type)->where('is_visible', true)->exists());
         }
     }
@@ -27,6 +27,6 @@ class ContactLinkSeederTest extends TestCase
         $this->seed(ContactLinkSeeder::class);
         $this->seed(ContactLinkSeeder::class);
 
-        $this->assertSame(4, ContactLink::query()->count());
+        $this->assertSame(6, ContactLink::query()->count());
     }
 }
