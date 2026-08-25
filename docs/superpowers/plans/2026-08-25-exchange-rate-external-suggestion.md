@@ -683,7 +683,6 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
     public function test_a_non_numeric_sell_field_creates_no_suggestion(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(0, 13225), 200, [])->status(200)]);
         Http::fake(['api-v2.sp-today.com/*' => Http::response([
             'ok' => true,
             'data' => ['currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['buy' => 13225, 'sell' => 'not-a-number']]]]],
