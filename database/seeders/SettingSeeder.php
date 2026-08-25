@@ -25,7 +25,8 @@ class SettingSeeder extends Seeder
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);
-        $settings->setDefault('kiosk.app_download_url', 'https://example.local/download', SettingValueType::String);
+        $settings->setDefault('kiosk.app_store_url', 'https://apps.example.local/ios', SettingValueType::String);
+        $settings->setDefault('kiosk.google_play_url', 'https://apps.example.local/android', SettingValueType::String);
         $settings->setDefault('kiosk.arrival_qr_value', 'addapp://arrival', SettingValueType::String);
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);

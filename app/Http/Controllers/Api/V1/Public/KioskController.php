@@ -27,7 +27,10 @@ class KioskController extends Controller
             'banner' => $this->liveAnnouncements(),
             'plans' => $this->activePlans(),
             'social_links' => $this->visibleSocialLinks(),
-            'app_download' => ['url' => $settings->get('kiosk.app_download_url', 'https://example.local/download')],
+            'app_download' => [
+                'app_store' => $settings->get('kiosk.app_store_url', 'https://apps.example.local/ios'),
+                'google_play' => $settings->get('kiosk.google_play_url', 'https://apps.example.local/android'),
+            ],
             'arrival_qr' => ['value' => $settings->get('kiosk.arrival_qr_value', 'addapp://arrival')],
         ]);
     }

@@ -98,21 +98,35 @@ can coexist unchanged.
     ],
     "plans": [{ "id": 1, "name": {"ar": "...", "en": "..."}, "price": "50.00", "pricing_currency": "USD", "duration_days": 30, "included_hours": "10.00" }],
     "social_links": [{ "type": "instagram", "value": "https://...", "label": "..." }],
-    "app_download": { "url": "https://..." },
+    "app_download": { "app_store": "https://...", "google_play": "https://..." },
     "arrival_qr": { "value": "..." }
   }
   ```
   `banner` is ordered by `sort_order` across every type together, not
-  grouped by type first.
+  grouped by type first. `app_download` is revised (2026-08-25) from a
+  single `url` to two named links — `app_store` and `google_play` — since
+  the kiosk needs to show separate QR codes/buttons per store, not one
+  generic download link.
 - **`social_links` is `ContactLink::where('is_visible', true)` unchanged.**
   Zero new backend work for this section — it already exists and is
   already public (`Api\V1\Public\ContactLinkController`).
-- **`app_download.url` and `arrival_qr.value` are `Setting` rows**, not new
-  columns or a new table — `kiosk.app_download_url` and
-  `kiosk.arrival_qr_value`, both global scope, following
-  `docs/decisions/settings-key-value-store.md` exactly. Both are seeded
-  defaults (a placeholder store link and a placeholder deep-link string)
-  flagged for Maryam to fill in the real values before launch.
+- **`app_download.{app_store,google_play}` and `arrival_qr.value` are
+  `Setting` rows**, not new columns or a new table —
+  `kiosk.app_store_url`, `kiosk.google_play_url`, and
+  `kiosk.arrival_qr_value`, all global scope, following
+  `docs/decisions/settings-key-value-store.md` exactly, editable through
+  the existing generic `Admin\SettingController` (no dedicated endpoint
+  needed — settings admin is already a key/value list). All three are
+  seeded placeholder defaults, flagged for Maryam to fill in the real
+  values before launch.
+- **`banner` and `social_links` ship with seeded placeholder rows** too
+  (`AnnouncementSeeder`, `ContactLinkSeeder` — 2026-08-25), so the kiosk
+  screen isn't empty before real content is entered through
+  `Admin\AnnouncementController` / `Admin\ContactLinkController`: one
+  `news`/`event`/`offer` banner each, and one link each for `instagram`,
+  `facebook`, `linkedin`, `website`. Both seeders key their `firstOrCreate`
+  lookup on a natural identifier (`image_url`, `type`) so re-running
+  `db:seed` never duplicates rows or clobbers an admin edit.
 - **The backend never generates a QR image.** Every "QR" in this feature
   (social links, app download, arrival) is a plain string/URL; the kiosk
   frontend renders the QR client-side from that value with a standard JS
@@ -232,8 +246,11 @@ Coverage instead:
   (`index`, `confirm`, `reject`)
 - `App\Console\Commands\ExpireStaleArrivalRequests` +
   `routes/console.php` entry
-- Two new `Setting` rows seeded: `kiosk.app_download_url`,
-  `kiosk.arrival_qr_value`, plus `kiosk.arrival_request_expiry_minutes`
+- Three `Setting` rows seeded: `kiosk.app_store_url`,
+  `kiosk.google_play_url`, `kiosk.arrival_qr_value`, plus
+  `kiosk.arrival_request_expiry_minutes`
+- `Database\Seeders\AnnouncementSeeder`, `Database\Seeders\ContactLinkSeeder`
+  (placeholder banner/social-link rows, both called from `DatabaseSeeder`)
 - `routes/api/v1/public.php`, `routes/api/v1/member.php`,
   `routes/api/v1/admin.php` (`reception/arrival-requests/*`)
 - `lang/{en,ar}/api.php` (`kiosk` group)

@@ -23,7 +23,7 @@ class KioskControllerTest extends TestCase
             'banner',
             'plans',
             'social_links',
-            'app_download' => ['url'],
+            'app_download' => ['app_store', 'google_play'],
             'arrival_qr' => ['value'],
         ]);
         $response->assertJsonPath('banner', []);
@@ -82,13 +82,15 @@ class KioskControllerTest extends TestCase
 
     public function test_app_download_and_arrival_qr_read_from_settings(): void
     {
-        app(SettingService::class)->set('kiosk.app_download_url', 'https://apps.example.com/add', SettingValueType::String);
+        app(SettingService::class)->set('kiosk.app_store_url', 'https://apps.example.local/add-ios', SettingValueType::String);
+        app(SettingService::class)->set('kiosk.google_play_url', 'https://apps.example.local/add-android', SettingValueType::String);
         app(SettingService::class)->set('kiosk.arrival_qr_value', 'addapp://arrival/kiosk-1', SettingValueType::String);
 
         $response = $this->getJson('/api/v1/public/kiosk');
 
         $response->assertOk();
-        $response->assertJsonPath('app_download.url', 'https://apps.example.com/add');
+        $response->assertJsonPath('app_download.app_store', 'https://apps.example.local/add-ios');
+        $response->assertJsonPath('app_download.google_play', 'https://apps.example.local/add-android');
         $response->assertJsonPath('arrival_qr.value', 'addapp://arrival/kiosk-1');
     }
 }
