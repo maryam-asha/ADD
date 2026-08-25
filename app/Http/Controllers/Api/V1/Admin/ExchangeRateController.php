@@ -32,11 +32,28 @@ class ExchangeRateController extends Controller
 
     public function store(StoreExchangeRateRequest $request): ExchangeRateResource
     {
-        $suggestion = $request->filled('suggestion_id')
-            ? ExchangeRateSuggestion::find($request->input('suggestion_id'))
-            : null;
+        $suggestion = null;
 
-        $rate = DB::transaction(function () use ($request, $suggestion) {
+        $rate = DB::transaction(function () use ($request, &$suggestion) {
+            if ($request->filled('suggestion_id')) {
+                // Re-queried and locked here, inside the transaction — never
+                // trust the validation layer's earlier read for a decision
+                // this consequential. Same lock-then-recheck shape as
+                // SessionClosureService::autoClose() and
+                // WalkInCapacityService::start(): re-query by key under
+                // lockForUpdate(), decide only against what the lock sees.
+                $suggestion = ExchangeRateSuggestion::query()
+                    ->whereKey($request->input('suggestion_id'))
+                    ->lockForUpdate()
+                    ->first();
+
+                abort_if(
+                    ! $suggestion || $suggestion->status !== ExchangeRateSuggestionStatus::Pending,
+                    422,
+                    __('api.admin.exchange_rate_suggestion_not_pending')
+                );
+            }
+
             $rate = ExchangeRate::create([
                 'currency_code' => $request->input('currency_code'),
                 'rate_to_base' => $request->input('rate_to_base'),

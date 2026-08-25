@@ -7,7 +7,10 @@ use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
@@ -225,6 +228,45 @@ class ExchangeRateControllerTest extends TestCase
             'effective_from' => now()->toISOString(),
             'suggestion_id' => $suggestion->id,
         ])->assertStatus(422)->assertJsonValidationErrors('currency_code');
+    }
+
+    public function test_a_suggestion_accepted_between_validation_and_the_lock_is_rejected_with_no_new_row(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create();
+
+        // Injects the race at the exact moment the controller's own
+        // DB::transaction() begins — after StoreExchangeRateRequest's
+        // validation has already passed against the still-pending row, but
+        // before the controller's lockForUpdate() query runs. Not a claim
+        // of real multi-connection concurrency (see the fix's report for
+        // why that isn't reproducible against this suite's in-memory
+        // SQLite — the same limitation WalkInCapacityServiceTest.php
+        // already documents) — a direct, honest injection at the one point
+        // that matters: does the controller's own lock-and-recheck catch a
+        // status change that happened after validation, rather than
+        // trusting a stale read?
+        $fired = false;
+        Event::listen(TransactionBeginning::class, function () use (&$fired, $suggestion) {
+            if (! $fired) {
+                $fired = true;
+                DB::table('exchange_rate_suggestions')->where('id', $suggestion->id)->update(['status' => 'accepted']);
+            }
+        });
+
+        $response = $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ]);
+
+        $this->assertTrue($fired, 'The race-injection listener never fired — this test would pass vacuously without it.');
+        $response->assertStatus(422);
+        $response->assertJsonFragment(['message' => __('api.admin.exchange_rate_suggestion_not_pending')]);
+        $this->assertDatabaseCount('exchange_rates', 0);
     }
 
     public function test_manual_creation_without_a_suggestion_id_is_unchanged(): void

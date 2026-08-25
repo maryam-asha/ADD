@@ -121,3 +121,11 @@ confined to `config/services.php` (read via `env('SP_TODAY_KEY')` /
 `env('SPTODAY_BASE_URL', ...)`, both excluded from that guard's scan) and this
 doc — `SpTodayRateClient` itself only ever reads `config('services.sptoday.*')`,
 never a hardcoded URL.
+
+`POST /api/v1/admin/exchange-rates` re-locks and re-checks the suggestion's
+status inside its own transaction (`lockForUpdate()`, matching
+`SessionClosureService::autoClose()`'s pattern) immediately before accepting
+it — closing the race window between `StoreExchangeRateRequest`'s validation
+and the transaction's commit. A suggestion accepted by a concurrent request
+in that window is rejected with the same `422` a manually-resubmitted
+non-pending suggestion already gets.
