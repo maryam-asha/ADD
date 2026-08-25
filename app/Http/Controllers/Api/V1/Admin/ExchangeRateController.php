@@ -3,11 +3,15 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Finance\Enums\ExchangeRateSource;
+use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreExchangeRateRequest;
 use App\Http\Resources\ExchangeRateResource;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Doesn't extend AdminResourceController — no `order` column, and no
@@ -28,16 +32,35 @@ class ExchangeRateController extends Controller
 
     public function store(StoreExchangeRateRequest $request): ExchangeRateResource
     {
-        $rate = ExchangeRate::create([
-            ...$request->validated(),
-            'set_by' => $request->user()->id,
-        ]);
+        $suggestion = $request->filled('suggestion_id')
+            ? ExchangeRateSuggestion::find($request->input('suggestion_id'))
+            : null;
 
-        $this->logSensitiveAction('exchange_rate_created', $rate, [
+        $rate = DB::transaction(function () use ($request, $suggestion) {
+            $rate = ExchangeRate::create([
+                'currency_code' => $request->input('currency_code'),
+                'rate_to_base' => $request->input('rate_to_base'),
+                'effective_from' => $request->input('effective_from'),
+                'set_by' => $request->user()->id,
+                'source' => $suggestion ? ExchangeRateSource::ExternalAccepted : ExchangeRateSource::Manual,
+                'suggestion_id' => $suggestion?->id,
+            ]);
+
+            $suggestion?->update([
+                'status' => ExchangeRateSuggestionStatus::Accepted,
+                'accepted_rate_id' => $rate->id,
+            ]);
+
+            return $rate;
+        });
+
+        $this->logSensitiveAction('exchange_rate_created', $rate, array_filter([
             'currency_code' => $rate->currency_code,
             'rate_to_base' => $rate->rate_to_base,
             'effective_from' => $rate->effective_from->toISOString(),
-        ]);
+            'suggestion_id' => $suggestion?->id,
+            'suggested_rate_usd_to_syp' => $suggestion?->rate_usd_to_syp,
+        ], fn ($value) => $value !== null));
 
         return new ExchangeRateResource($rate);
     }

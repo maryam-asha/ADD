@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +32,24 @@ class StoreExchangeRateRequest extends FormRequest
             ],
             'rate_to_base' => ['required', 'numeric', 'gt:0'],
             'effective_from' => ['required', 'date'],
+            // docs/decisions/exchange-rate-external-suggestion.md — accepting
+            // a suggestion is purely additive to the manual-entry flow above.
+            'suggestion_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('exchange_rate_suggestions', 'id')->where('status', 'pending'),
+            ],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            // sp-today's suggestion is USD/SYP only — accepting it against
+            // any other currency would write a nonsensical rate.
+            if ($this->filled('suggestion_id') && $this->input('currency_code') !== 'SYP') {
+                $validator->errors()->add('currency_code', 'A suggestion can only be applied to the SYP currency.');
+            }
+        });
     }
 }

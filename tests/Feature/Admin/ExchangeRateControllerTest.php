@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -117,5 +119,111 @@ class ExchangeRateControllerTest extends TestCase
         Sanctum::actingAs($operator, ['*']);
 
         $this->getJson('/api/v1/admin/exchange-rates')->assertOk();
+    }
+
+    public function test_accepting_a_suggestion_creates_an_externally_accepted_rate_and_marks_it_accepted(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000668',
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ]);
+
+        $response->assertCreated();
+        $this->assertDatabaseHas('exchange_rates', [
+            'currency_code' => 'SYP',
+            'source' => 'external_accepted',
+            'suggestion_id' => $suggestion->id,
+        ]);
+        $this->assertDatabaseHas('exchange_rate_suggestions', [
+            'id' => $suggestion->id,
+            'status' => 'accepted',
+        ]);
+        $rate = ExchangeRate::where('suggestion_id', $suggestion->id)->sole();
+        $this->assertTrue($suggestion->refresh()->acceptedRate->is($rate));
+    }
+
+    public function test_accepting_with_a_rate_modified_from_the_suggestion_still_records_both_numbers_in_the_audit_log(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create(['rate_usd_to_syp' => '13275.0000000000']);
+
+        $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000700', // admin edited the number before submitting
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ])->assertCreated();
+
+        $activity = Activity::where('description', 'exchange_rate_created')->latest('id')->first();
+        // Not '0.0000700': the audit log reads $rate->rate_to_base off the
+        // Eloquent model, which casts the column as decimal:10 and always
+        // pads to exactly 10 decimal places — the same established pattern
+        // the pre-existing (unmodified) audit-log test relies on, just not
+        // visible there because that test's fixture already had 10 digits.
+        $this->assertSame('0.0000700000', $activity->properties['rate_to_base']);
+        $this->assertSame('13275.0000000000', $activity->properties['suggested_rate_usd_to_syp']);
+    }
+
+    public function test_accepting_a_non_pending_suggestion_returns_422(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create(['status' => 'dismissed']);
+
+        $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ])->assertStatus(422);
+    }
+
+    public function test_accepting_a_suggestion_against_a_different_valid_currency_code_returns_422(): void
+    {
+        // EUR isn't seeded by default (only SYP/USD are — see the decision
+        // doc's Phase 0 recon), so it's created inline here to prove the
+        // *new* currency-mismatch rule fires, not just the pre-existing
+        // currency_code exists-check that a genuinely-unknown code would
+        // trip anyway.
+        Currency::create([
+            'code' => 'EUR', 'name' => ['en' => 'Euro', 'ar' => 'يورو'], 'symbol' => '€',
+            'decimal_places' => 2, 'is_base' => false, 'is_active' => true, 'order' => 3,
+        ]);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $suggestion = ExchangeRateSuggestion::factory()->create();
+
+        $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'EUR',
+            'rate_to_base' => '0.00006',
+            'effective_from' => now()->toISOString(),
+            'suggestion_id' => $suggestion->id,
+        ])->assertStatus(422)->assertJsonValidationErrors('currency_code');
+    }
+
+    public function test_manual_creation_without_a_suggestion_id_is_unchanged(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->postJson('/api/v1/admin/exchange-rates', [
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680272',
+            'effective_from' => now()->toISOString(),
+        ])->assertCreated();
+
+        $this->assertDatabaseHas('exchange_rates', ['currency_code' => 'SYP', 'source' => 'manual', 'suggestion_id' => null]);
     }
 }
