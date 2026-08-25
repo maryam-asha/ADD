@@ -4225,6 +4225,21 @@
                                               "name": "Booking Approvals",
                                               "item": [
                                                   {
+                                                      "name": "List Pending Approval Bookings",
+                                                      "request": {
+                                                          "method": "GET",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/bookings/pending-approval",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "bookings", "pending-approval"]
+                                                          },
+                                                          "description": "Paginated (25/page), newest start_at first, status = pending only -- only Event Hall bookings ever reach pending, meeting rooms auto-confirm -- with space_type and the requester's name eager-loaded."
+                                                      }
+                                                  },
+                                                  {
                                                       "name": "Approve Booking",
                                                       "request": {
                                                           "method": "POST",
@@ -4436,6 +4451,27 @@
                                                               "path": ["api", "v1", "admin", "reception", "arrival-requests", "{{arrival_request_id}}", "reject"]
                                                           },
                                                           "description": "No refund/cancellation logic applies -- nothing was ever charged or reserved by the arrival request itself. 409 if the request is not currently pending."
+                                                      }
+                                                  }
+                                              ]
+                                          },
+                                          {
+                                              "name": "Active Sessions",
+                                              "description": "Union of currently checked-in-not-checked-out bookings and walk-ins, one flat list so a reception dashboard can render a single table instead of two. is_overdue reuses the same branch-closing-time check the reception:close-overdue-sessions scheduled command uses to auto-close sessions.",
+                                              "item": [
+                                                  {
+                                                      "name": "List Active Reception Sessions",
+                                                      "request": {
+                                                          "method": "GET",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/sessions/active",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "sessions", "active"]
+                                                          },
+                                                          "description": "Not paginated -- each row is tagged type = booking|walkin, with space_type and the checked-in user's name eager-loaded."
                                                       }
                                                   }
                                               ]
