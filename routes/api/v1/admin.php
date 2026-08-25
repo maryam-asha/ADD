@@ -22,6 +22,7 @@ use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
@@ -149,6 +150,7 @@ Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
 // — check-in, check-out, cancellation and payment settlement for bookings.
 // No narrower role gate than the file's own admin|operations group: both do
 // all of it.
+Route::get('reception/bookings/pending-approval', [BookingReceptionController::class, 'pendingApproval']);
 Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController::class, 'checkIn']);
 Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
 Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
@@ -160,6 +162,8 @@ Route::post('reception/bookings/{booking}/extend', [BookingReceptionController::
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
+
+Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
 
 Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::class, 'index']);
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm']);

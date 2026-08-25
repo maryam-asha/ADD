@@ -316,6 +316,46 @@ class BookingReceptionControllerTest extends TestCase
         $response->assertStatus(409)->assertExactJson(['message' => 'This booking has already been cancelled.']);
     }
 
+    public function test_pending_approval_lists_only_pending_bookings_ordered_by_start_at_desc(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace();
+        $earlier = Booking::factory()->pending()->create([
+            'space_id' => $space->id,
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHour(),
+        ]);
+        $later = Booking::factory()->pending()->create([
+            'space_id' => $space->id,
+            'start_at' => now()->addDays(5),
+            'end_at' => now()->addDays(5)->addHour(),
+        ]);
+        Booking::factory()->create(['space_id' => $space->id]);
+        Booking::factory()->cancelled()->create(['space_id' => $space->id]);
+        Booking::factory()->rejected()->create(['space_id' => $space->id]);
+
+        $response = $this->getJson('/api/v1/admin/reception/bookings/pending-approval');
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
+        $response->assertJsonPath('data.0.id', $later->id);
+        $response->assertJsonPath('data.1.id', $earlier->id);
+        $response->assertJsonStructure(['data', 'links', 'meta']);
+    }
+
+    public function test_pending_approval_is_paginated(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace();
+        Booking::factory()->pending()->count(26)->create(['space_id' => $space->id]);
+
+        $response = $this->getJson('/api/v1/admin/reception/bookings/pending-approval');
+
+        $response->assertOk();
+        $response->assertJsonCount(25, 'data');
+        $this->assertSame(26, $response->json('meta.total'));
+    }
+
     public function test_a_member_cannot_access_reception_routes(): void
     {
         $member = User::factory()->create();

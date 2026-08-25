@@ -17,13 +17,26 @@ use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
 use App\Http\Requests\Admin\Reception\ExtendBookingRequest;
 use App\Http\Requests\Admin\Reception\RejectBookingRequest;
 use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
+use App\Http\Resources\PendingApprovalBookingResource;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class BookingReceptionController extends Controller
 {
     use LogsSensitiveActions;
+
+    public function pendingApproval(): AnonymousResourceCollection
+    {
+        $bookings = Booking::query()
+            ->where('status', BookingStatus::Pending)
+            ->orderByDesc('start_at')
+            ->with('space.building.branch', 'user')
+            ->paginate(25);
+
+        return PendingApprovalBookingResource::collection($bookings);
+    }
 
     public function checkIn(Booking $booking, BusinessHoursService $businessHours): JsonResponse
     {
