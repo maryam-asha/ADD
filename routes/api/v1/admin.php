@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
+use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
@@ -101,6 +102,7 @@ Route::apiResource('announcements', AnnouncementController::class);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
+Route::get('exchange-rates/suggestion', [ExchangeRateSuggestionController::class, 'show']);
 
 // Currencies — admin-managed lookup replacing the old hardcoded USD/SYP
 // enum (docs/decisions/multi-currency-support.md). Not a generic
