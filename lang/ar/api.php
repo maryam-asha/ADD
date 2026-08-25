@@ -94,6 +94,7 @@ return [
         'currency_updated' => 'تم تحديث العملة.',
         'currency_status_updated' => 'تم تحديث حالة العملة.',
         'announcement_updated' => 'تم تحديث الإعلان.',
+        'exchange_rate_suggestion_dismissed' => 'تم رفض اقتراح سعر الصرف.',
     ],
 
     'currency' => [

@@ -94,6 +94,7 @@ return [
         'currency_updated' => 'Currency updated.',
         'currency_status_updated' => 'Currency status updated.',
         'announcement_updated' => 'Announcement updated.',
+        'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
     ],
 
     'currency' => [

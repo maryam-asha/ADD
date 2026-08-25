@@ -103,6 +103,7 @@ Route::apiResource('announcements', AnnouncementController::class);
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
 Route::get('exchange-rates/suggestion', [ExchangeRateSuggestionController::class, 'show']);
+Route::post('exchange-rates/suggestion/{exchangeRateSuggestion}/dismiss', [ExchangeRateSuggestionController::class, 'dismiss']);
 
 // Currencies — admin-managed lookup replacing the old hardcoded USD/SYP
 // enum (docs/decisions/multi-currency-support.md). Not a generic

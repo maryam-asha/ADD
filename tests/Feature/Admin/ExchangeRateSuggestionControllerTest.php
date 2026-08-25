@@ -121,4 +121,41 @@ class ExchangeRateSuggestionControllerTest extends TestCase
 
         $this->getJson('/api/v1/admin/exchange-rates/suggestion')->assertForbidden();
     }
+
+    public function test_dismiss_marks_a_pending_suggestion_dismissed_and_records_who(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $suggestion = ExchangeRateSuggestion::factory()->create();
+
+        $response = $this->postJson("/api/v1/admin/exchange-rates/suggestion/{$suggestion->id}/dismiss");
+
+        $response->assertOk();
+        $response->assertJson(['message' => __('api.admin.exchange_rate_suggestion_dismissed')]);
+        $this->assertDatabaseHas('exchange_rate_suggestions', [
+            'id' => $suggestion->id,
+            'status' => 'dismissed',
+            'dismissed_by' => $admin->id,
+        ]);
+    }
+
+    public function test_dismiss_a_non_pending_suggestion_returns_422(): void
+    {
+        $this->actingAsAdmin();
+        $suggestion = ExchangeRateSuggestion::factory()->create(['status' => 'accepted']);
+
+        $this->postJson("/api/v1/admin/exchange-rates/suggestion/{$suggestion->id}/dismiss")
+            ->assertStatus(422);
+    }
+
+    public function test_dismiss_writes_an_audit_log_entry(): void
+    {
+        $admin = $this->actingAsAdmin();
+        $suggestion = ExchangeRateSuggestion::factory()->create();
+
+        $this->postJson("/api/v1/admin/exchange-rates/suggestion/{$suggestion->id}/dismiss");
+
+        $activity = \Spatie\Activitylog\Models\Activity::where('description', 'exchange_rate_suggestion_dismissed')->latest('id')->first();
+        $this->assertNotNull($activity);
+        $this->assertSame($admin->id, $activity->causer_id);
+    }
 }

@@ -8,6 +8,7 @@ use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 
 class ExchangeRateSuggestionController extends Controller
@@ -33,6 +34,26 @@ class ExchangeRateSuggestionController extends Controller
             'source_stale' => $sourceStale,
             'last_successful_fetch_at' => $lastSuccessfulFetchAt ? Carbon::parse($lastSuccessfulFetchAt)->toISOString() : null,
         ]);
+    }
+
+    public function dismiss(Request $request, ExchangeRateSuggestion $exchangeRateSuggestion): JsonResponse
+    {
+        abort_if(
+            $exchangeRateSuggestion->status !== ExchangeRateSuggestionStatus::Pending,
+            422,
+            'Only a pending suggestion can be dismissed.'
+        );
+
+        $exchangeRateSuggestion->update([
+            'status' => ExchangeRateSuggestionStatus::Dismissed,
+            'dismissed_by' => $request->user()->id,
+        ]);
+
+        $this->logSensitiveAction('exchange_rate_suggestion_dismissed', $exchangeRateSuggestion, [
+            'rate_usd_to_syp' => $exchangeRateSuggestion->rate_usd_to_syp,
+        ]);
+
+        return response()->json(['message' => __('api.admin.exchange_rate_suggestion_dismissed')]);
     }
 
     /**
