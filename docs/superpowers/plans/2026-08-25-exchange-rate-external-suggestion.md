@@ -834,18 +834,26 @@ class ExchangeRateSuggestionIngestor
             return;
         }
 
-        DB::transaction(function () use ($sell, $rates) {
-            ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)
-                ->update(['status' => ExchangeRateSuggestionStatus::Superseded]);
+        try {
+            DB::transaction(function () use ($sell, $rates) {
+                ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)
+                    ->update(['status' => ExchangeRateSuggestionStatus::Superseded]);
 
-            ExchangeRateSuggestion::create([
-                'source' => ExchangeRateSuggestionSource::SpToday,
-                'rate_usd_to_syp' => $sell,
-                'raw_payload' => $rates['raw'],
-                'fetched_at' => now(),
-                'status' => ExchangeRateSuggestionStatus::Pending,
-            ]);
-        });
+                ExchangeRateSuggestion::create([
+                    'source' => ExchangeRateSuggestionSource::SpToday,
+                    'rate_usd_to_syp' => $sell,
+                    'raw_payload' => $rates['raw'],
+                    'fetched_at' => now(),
+                    'status' => ExchangeRateSuggestionStatus::Pending,
+                ]);
+            });
+        } catch (\Throwable $e) {
+            // The transaction rolls back atomically on its own — this catch
+            // only stops a local DB failure (not a vendor hiccup) from
+            // throwing past run(), per the "nothing may throw past this
+            // class" constraint.
+            Log::error('sp-today exchange rate suggestion persist failed', ['reason' => $e->getMessage()]);
+        }
     }
 }
 ```
