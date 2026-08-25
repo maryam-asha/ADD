@@ -455,7 +455,16 @@ class SpTodayRateClientTest extends TestCase
 
     public function test_it_throws_when_the_damascus_city_is_missing_for_usd(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(['data' => ['currencies' => [['code' => 'USD', 'cities' => ['alhasakah' => ['buy' => 1, 'sell' => 2]]]]]]), 200)]);
+        // Built directly rather than via fakeBody()'s array_replace_recursive:
+        // that helper merges numerically-indexed arrays element-wise, so a
+        // partial override of 'cities' would silently keep the base's
+        // 'damascus' key instead of actually removing it.
+        Http::fake(['api-v2.sp-today.com/*' => Http::response([
+            'ok' => true,
+            'data' => ['currencies' => [
+                ['code' => 'USD', 'cities' => ['alhasakah' => ['buy' => 1, 'sell' => 2]]],
+            ]],
+        ], 200)]);
 
         $this->expectException(\RuntimeException::class);
 
@@ -735,11 +744,22 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
     public function test_a_second_successful_fetch_supersedes_the_first_pending_suggestion(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(13275, 13225), 200)]);
+        // A closure-based fake, not two sequential Http::fake() calls: a
+        // second Http::fake() in the same test does not reliably override
+        // the first for a repeated call to the same URL pattern, so both
+        // artisan runs would otherwise hit the first response.
+        $callCount = 0;
+        Http::fake(['api-v2.sp-today.com/*' => function () use (&$callCount) {
+            $callCount++;
+
+            return $callCount === 1
+                ? Http::response($this->fakeBody(13275, 13225), 200)
+                : Http::response($this->fakeBody(13400, 13350), 200);
+        }]);
+
         $this->artisan('finance:fetch-exchange-rate-suggestion');
         $first = ExchangeRateSuggestion::sole();
 
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(13400, 13350), 200)]);
         $this->artisan('finance:fetch-exchange-rate-suggestion');
 
         $this->assertSame(ExchangeRateSuggestionStatus::Superseded, $first->refresh()->status);
