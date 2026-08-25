@@ -5,6 +5,7 @@ namespace Tests\Feature\Console;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
@@ -94,7 +95,7 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
     public function test_a_network_failure_creates_no_suggestion_and_does_not_throw(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timed out')]);
+        Http::fake(['api-v2.sp-today.com/*' => fn () => throw new ConnectionException('timed out')]);
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
 

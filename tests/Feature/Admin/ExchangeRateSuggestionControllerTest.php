@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Activitylog\Models\Activity;
 use Tests\TestCase;
 
 class ExchangeRateSuggestionControllerTest extends TestCase
@@ -154,7 +155,7 @@ class ExchangeRateSuggestionControllerTest extends TestCase
 
         $this->postJson("/api/v1/admin/exchange-rates/suggestion/{$suggestion->id}/dismiss");
 
-        $activity = \Spatie\Activitylog\Models\Activity::where('description', 'exchange_rate_suggestion_dismissed')->latest('id')->first();
+        $activity = Activity::where('description', 'exchange_rate_suggestion_dismissed')->latest('id')->first();
         $this->assertNotNull($activity);
         $this->assertSame($admin->id, $activity->causer_id);
     }

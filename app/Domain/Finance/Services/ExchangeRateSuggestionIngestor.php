@@ -16,9 +16,7 @@ use Illuminate\Support\Facades\Log;
  */
 class ExchangeRateSuggestionIngestor
 {
-    public function __construct(private readonly SpTodayRateClient $client)
-    {
-    }
+    public function __construct(private readonly SpTodayRateClient $client) {}
 
     public function run(): void
     {
