@@ -71,7 +71,7 @@ class KioskController extends Controller
             ->get()
             ->map(fn (Plan $plan) => [
                 'id' => $plan->id,
-                'name' => $plan->name,
+                'name' => $plan->translate('name'),
                 'price' => (string) $plan->price,
                 'pricing_currency' => $plan->pricing_currency,
                 'duration_days' => $plan->duration_days,

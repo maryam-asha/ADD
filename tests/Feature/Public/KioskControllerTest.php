@@ -53,7 +53,7 @@ class KioskControllerTest extends TestCase
 
     public function test_plans_is_a_top_level_section_reading_the_existing_active_plan_catalog(): void
     {
-        $plan = Plan::factory()->create(['is_active' => true, 'order' => 1]);
+        $plan = Plan::factory()->create(['is_active' => true, 'order' => 1, 'name' => ['ar' => 'خطة شهرية', 'en' => 'Monthly plan']]);
         Plan::factory()->create(['is_active' => false]);
 
         $response = $this->getJson('/api/v1/public/kiosk');
@@ -62,6 +62,17 @@ class KioskControllerTest extends TestCase
         $response->assertJsonCount(1, 'plans');
         $response->assertJsonPath('plans.0.id', $plan->id);
         $response->assertJsonPath('plans.0.pricing_currency', $plan->pricing_currency);
+    }
+
+    public function test_plans_name_resolves_to_one_string_for_the_current_locale_not_the_ar_en_object(): void
+    {
+        Plan::factory()->create(['is_active' => true, 'name' => ['ar' => 'خطة شهرية', 'en' => 'Monthly plan']]);
+
+        $arabicByDefault = $this->getJson('/api/v1/public/kiosk');
+        $arabicByDefault->assertJsonPath('plans.0.name', 'خطة شهرية');
+
+        $english = $this->withHeader('lang', 'en')->getJson('/api/v1/public/kiosk');
+        $english->assertJsonPath('plans.0.name', 'Monthly plan');
     }
 
     public function test_social_links_only_returns_visible_links_in_the_minimal_shape(): void

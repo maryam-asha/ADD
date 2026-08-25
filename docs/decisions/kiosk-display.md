@@ -96,7 +96,7 @@ can coexist unchanged.
       { "id": 2, "type": "event", "image_url": "...", "link_url": null },
       { "id": 3, "type": "offer", "image_url": "...", "link_url": "..." }
     ],
-    "plans": [{ "id": 1, "name": {"ar": "...", "en": "..."}, "price": "50.00", "pricing_currency": "USD", "duration_days": 30, "included_hours": "10.00" }],
+    "plans": [{ "id": 1, "name": "...", "price": "50.00", "pricing_currency": "USD", "duration_days": 30, "included_hours": "10.00" }],
     "social_links": [{ "type": "instagram", "value": "https://...", "label": "..." }],
     "app_download": { "app_store": "https://...", "google_play": "https://..." },
     "arrival_qr": { "value": "..." }
@@ -107,6 +107,16 @@ can coexist unchanged.
   single `url` to two named links — `app_store` and `google_play` — since
   the kiosk needs to show separate QR codes/buttons per store, not one
   generic download link.
+- **`plans[].name` is one resolved string, not the `{ar, en}` object**
+  (revised 2026-08-25). Every other place `Plan.name` is exposed
+  (`PlanResource`) hands back the raw translations object for the client
+  to pick from; the kiosk has no per-request user or settings screen to
+  drive that choice, so it resolves the name itself via
+  `Plan::translate('name')` — current locale (`lang` header, defaulting to
+  `ar` — see `SetLocaleFromHeader`) falling back to `en` then `ar`, same
+  rule `HasTranslations` already applies everywhere else. This is a
+  kiosk-only deviation from `PlanResource`'s shape, consistent with this
+  endpoint already building plain arrays instead of reusing Resources.
 - **`social_links` is `ContactLink::where('is_visible', true)` unchanged.**
   Zero new backend work for this section — it already exists and is
   already public (`Api\V1\Public\ContactLinkController`).
