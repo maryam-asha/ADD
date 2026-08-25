@@ -31,3 +31,11 @@ Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes()->witho
  * members who scanned and then left.
  */
 Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->withoutOverlapping();
+
+/*
+ * External exchange-rate suggestion (docs/decisions/exchange-rate-external-suggestion.md)
+ * — sp-today's nationwide USD/SYP quote, fetched once a day as a candidate
+ * for an admin to review and accept; never written to exchange_rates
+ * automatically.
+ */
+Schedule::command('finance:fetch-exchange-rate-suggestion')->dailyAt('09:00')->timezone('Asia/Damascus')->withoutOverlapping();
