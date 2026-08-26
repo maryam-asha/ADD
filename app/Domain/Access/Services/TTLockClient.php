@@ -64,7 +64,11 @@ class TTLockClient
 
     private function assertSuccess(array $response): void
     {
-        $errcode = (int) ($response['errcode'] ?? 0);
+        if (! array_key_exists('errcode', $response)) {
+            throw TTLockException::vendorError(-1, 'TTLock response missing errcode');
+        }
+
+        $errcode = (int) $response['errcode'];
 
         if ($errcode === 0) {
             return;
@@ -106,11 +110,13 @@ class TTLockClient
             return $bundle['access_token'];
         }
 
-        try {
-            $bundle = is_array($bundle) && isset($bundle['refresh_token'])
-                ? $this->refreshToken($bundle['refresh_token'])
-                : $this->fetchToken();
-        } catch (TTLockException) {
+        if (is_array($bundle) && isset($bundle['refresh_token'])) {
+            try {
+                $bundle = $this->refreshToken($bundle['refresh_token']);
+            } catch (TTLockException) {
+                $bundle = $this->fetchToken();
+            }
+        } else {
             $bundle = $this->fetchToken();
         }
 

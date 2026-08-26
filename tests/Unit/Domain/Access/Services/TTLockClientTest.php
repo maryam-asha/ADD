@@ -59,6 +59,16 @@ class TTLockClientTest extends TestCase
             && $request['deleteType'] == 2 && $request['keyboardPwdId'] == 42);
     }
 
+    public function test_delete_passcode_throws_when_response_is_missing_errcode(): void
+    {
+        $this->fakeToken();
+        Http::fake(['api.sciener.test/v3/keyboardPwd/delete' => Http::response([], 200)]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '99']);
+
+        $this->expectException(TTLockException::class);
+        app(TTLockClient::class)->deletePasscode($lock, 42);
+    }
+
     public function test_remote_unlock_success(): void
     {
         $this->fakeToken();
@@ -84,6 +94,16 @@ class TTLockClientTest extends TestCase
         }
     }
 
+    public function test_remote_unlock_throws_when_response_is_missing_errcode(): void
+    {
+        $this->fakeToken();
+        Http::fake(['api.sciener.test/v3/lock/unlock' => Http::response([], 200)]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '99']);
+
+        $this->expectException(TTLockException::class);
+        app(TTLockClient::class)->remoteUnlock($lock);
+    }
+
     public function test_remote_unlock_disabled_maps_to_named_exception(): void
     {
         $this->fakeToken();
@@ -101,6 +121,24 @@ class TTLockClientTest extends TestCase
 
         $this->expectException(TTLockException::class);
         app(TTLockClient::class)->remoteUnlock($lock);
+    }
+
+    public function test_no_cached_bundle_fetch_token_failure_calls_oauth_endpoint_only_once(): void
+    {
+        Http::fake(['api.sciener.test/oauth2/token' => Http::response(['errcode' => 10007, 'errmsg' => 'invalid account'], 200)]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '99']);
+
+        try {
+            app(TTLockClient::class)->remoteUnlock($lock);
+            $this->fail('Expected TTLockException');
+        } catch (TTLockException) {
+            // expected — asserting the request count below is the point of this test
+        }
+
+        // No cached bundle means accessToken() goes straight to fetchToken(), never
+        // refreshToken(); a fetchToken() failure must not be retried with the exact
+        // same (deterministically-failing) credentials.
+        Http::assertSentCount(1);
     }
 
     public function test_token_is_cached_across_calls(): void
