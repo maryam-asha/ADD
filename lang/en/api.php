@@ -100,6 +100,11 @@ return [
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
     ],
 
+    'access' => [
+        'activated' => 'The access grant has been activated.',
+        'grant_not_activatable' => 'This access grant cannot be activated in its current state.',
+    ],
+
     'currency' => [
         'base_currency_status_locked' => 'The base currency cannot be deactivated.',
     ],

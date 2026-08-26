@@ -100,6 +100,11 @@ return [
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
     ],
 
+    'access' => [
+        'activated' => 'تم تفعيل إذن الوصول.',
+        'grant_not_activatable' => 'لا يمكن تفعيل إذن الوصول في حالته الحالية.',
+    ],
+
     'currency' => [
         'base_currency_status_locked' => 'لا يمكن تعطيل العملة الأساسية.',
     ],

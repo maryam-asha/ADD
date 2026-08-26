@@ -21,6 +21,7 @@ use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
+use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
@@ -174,6 +175,7 @@ Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArr
 Route::post('reception/arrival-requests/{arrivalRequest}/reject', [ReceptionArrivalRequestController::class, 'reject']);
 
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
+Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
 
 // Narrower than the group above: managing accounts and roles is admin-only,
 // operations can't create or promote other accounts.
