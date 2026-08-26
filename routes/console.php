@@ -39,3 +39,12 @@ Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->wi
  * automatically.
  */
 Schedule::command('finance:fetch-exchange-rate-suggestion')->dailyAt('09:00')->timezone('Asia/Damascus')->withoutOverlapping();
+
+/*
+ * Access control (docs/decisions/qr-lock-unlock.md) — the lock passcode
+ * lifecycle: issue once a booking's cancellation window closes, revoke on
+ * a maintenance conflict, expire anything never activated in time.
+ */
+Schedule::command('access:issue-grants-on-cancellation-window-close')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('access:revoke-grants-on-maintenance')->everyFiveMinutes()->withoutOverlapping();
+Schedule::command('access:expire-unactivated-grants')->everyFiveMinutes()->withoutOverlapping();

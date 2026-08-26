@@ -2,6 +2,8 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Domain\Access\Enums\AccessSourceType;
+use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
@@ -12,6 +14,7 @@ use App\Domain\Identity\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
@@ -66,5 +69,11 @@ class Booking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function accessGrants(): HasMany
+    {
+        return $this->hasMany(AccessGrant::class, 'source_id')
+            ->where('source_type', AccessSourceType::Booking);
     }
 }
