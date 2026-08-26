@@ -105,6 +105,11 @@
                          "key": "arrival_request_id",
                          "value": "",
                          "type": "string"
+                     },
+                     {
+                         "key": "access_grant_id",
+                         "value": "",
+                         "type": "string"
                      }
                  ],
     "event":  [
@@ -1674,6 +1679,90 @@
                                                                    }
                                                    }
                                                ]
+                                  },
+                                  {
+                                      "name": "Access Control",
+                                      "description": "QR-scan unlock (docs/decisions/qr-lock-unlock.md §4). A QR sticker fixed to the lock encodes devices.qr_value -- it only identifies which lock; the member's identity comes from their own session token, not from the QR itself.",
+                                      "item": [
+                                          {
+                                              "name": "Unlock via QR",
+                                              "request": {
+                                                  "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "Content-Type", "value": "application/json" },
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "body": {
+                                                      "mode": "raw",
+                                                      "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
+                                                      "options": { "raw": { "language": "json" } }
+                                                  },
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/member/access/unlock",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "member", "access", "unlock"]
+                                                  },
+                                                  "description": "Resolves qr_value to a lock, checks for an activated access_grants row for the scanning user (or a company they belong to with door_access_enabled) still inside its active window, and calls TTLockClient::remoteUnlock() server-side. Other denial responses not shown as saved examples: 404 `lock_not_found` (qr_value matches no lock), 503 `gateway_offline`/`unlock_failed` (the vendor call itself failed)."
+                                              },
+                                              "response": [
+                                                  {
+                                                      "name": "200 OK",
+                                                      "originalRequest": {
+                                                          "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/member/access/unlock",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "member", "access", "unlock"]
+                                                          }
+                                                      },
+                                                      "status": "OK",
+                                                      "code": 200,
+                                                      "_postman_previewlanguage": "json",
+                                                      "header": [{ "key": "Content-Type", "value": "application/json" }],
+                                                      "cookie": [],
+                                                      "body": "{\n    \"message\": \"Unlocked.\"\n}"
+                                                  },
+                                                  {
+                                                      "name": "403 Forbidden — No Active Grant",
+                                                      "originalRequest": {
+                                                          "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{member_token}}" }] },
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "Content-Type", "value": "application/json" },
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "body": {
+                                                              "mode": "raw",
+                                                              "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
+                                                              "options": { "raw": { "language": "json" } }
+                                                          },
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/member/access/unlock",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "member", "access", "unlock"]
+                                                          }
+                                                      },
+                                                      "status": "Forbidden",
+                                                      "code": 403,
+                                                      "_postman_previewlanguage": "json",
+                                                      "header": [{ "key": "Content-Type", "value": "application/json" }],
+                                                      "cookie": [],
+                                                      "body": "{\n    \"message\": \"You do not have active access to this lock right now.\"\n}"
+                                                  }
+                                              ]
+                                          }
+                                      ]
                                   }
                               ]
                  },
@@ -7459,6 +7548,106 @@
                                                   },
                                                   "description": "Admin-only (not operations)."
                                               }
+                                          }
+                                      ]
+                                  },
+                                  {
+                                      "name": "Access Control",
+                                      "description": "Reception activation confirms an access_grants row after the kiosk's own TTLock SDK/Bluetooth activation succeeds; QR regeneration is a plain admin action on a lock device with no TTLock call and no effect on access_grants (docs/decisions/qr-lock-unlock.md §2/§3).",
+                                      "item": [
+                                          {
+                                              "name": "Activate Access Grant",
+                                              "request": {
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/reception/access-grants/{{access_grant_id}}/activate",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "reception", "access-grants", "{{access_grant_id}}", "activate"]
+                                                  },
+                                                  "description": "Kiosk calls this after its own TTLock SDK activation succeeds on first arrival -- sets activated_at = now(), status = activated on the matching access_grants row. 409 if the grant is not currently `issued` (already activated/expired/revoked)."
+                                              },
+                                              "response": [
+                                                  {
+                                                      "name": "200 OK",
+                                                      "originalRequest": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/access-grants/{{access_grant_id}}/activate",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "access-grants", "{{access_grant_id}}", "activate"]
+                                                          }
+                                                      },
+                                                      "status": "OK",
+                                                      "code": 200,
+                                                      "_postman_previewlanguage": "json",
+                                                      "header": [{ "key": "Content-Type", "value": "application/json" }],
+                                                      "cookie": [],
+                                                      "body": "{\n    \"message\": \"The access grant has been activated.\"\n}"
+                                                  },
+                                                  {
+                                                      "name": "409 Conflict",
+                                                      "originalRequest": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/reception/access-grants/{{access_grant_id}}/activate",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "reception", "access-grants", "{{access_grant_id}}", "activate"]
+                                                          }
+                                                      },
+                                                      "status": "Conflict",
+                                                      "code": 409,
+                                                      "_postman_previewlanguage": "json",
+                                                      "header": [{ "key": "Content-Type", "value": "application/json" }],
+                                                      "cookie": [],
+                                                      "body": "{\n    \"message\": \"This access grant cannot be activated in its current state.\"\n}"
+                                                  }
+                                              ]
+                                          },
+                                          {
+                                              "name": "Regenerate Device QR Value",
+                                              "request": {
+                                                  "method": "POST",
+                                                  "header": [
+                                                      { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                  ],
+                                                  "url": {
+                                                      "raw": "{{base_url}}/api/v1/admin/devices/{{device_id}}/regenerate-qr-value",
+                                                      "host": ["{{base_url}}"],
+                                                      "path": ["api", "v1", "admin", "devices", "{{device_id}}", "regenerate-qr-value"]
+                                                  },
+                                                  "description": "type=lock devices only -- 422 `device_not_a_lock` otherwise. The old qr_value simply stops resolving to anything; no TTLock call, no effect on access_grants."
+                                              },
+                                              "response": [
+                                                  {
+                                                      "name": "200 OK",
+                                                      "originalRequest": {
+                                                          "method": "POST",
+                                                          "header": [
+                                                              { "key": "lang", "value": "{{lang}}", "type": "text" }
+                                                          ],
+                                                          "url": {
+                                                              "raw": "{{base_url}}/api/v1/admin/devices/{{device_id}}/regenerate-qr-value",
+                                                              "host": ["{{base_url}}"],
+                                                              "path": ["api", "v1", "admin", "devices", "{{device_id}}", "regenerate-qr-value"]
+                                                          }
+                                                      },
+                                                      "status": "OK",
+                                                      "code": 200,
+                                                      "_postman_previewlanguage": "json",
+                                                      "header": [{ "key": "Content-Type", "value": "application/json" }],
+                                                      "cookie": [],
+                                                      "body": "{\n    \"message\": \"The device QR value has been regenerated.\"\n}"
+                                                  }
+                                              ]
                                           }
                                       ]
                                   }
