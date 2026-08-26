@@ -62,4 +62,19 @@ return [
         'api_key' => env('SP_TODAY_KEY'),
     ],
 
+    'ttlock' => [
+        // Verified against https://euopen.ttlock.com/doc/api/ — no EU-specific
+        // host was found documented anywhere on that portal; every example
+        // shows this generic host. UNVERIFIED against a real account —
+        // confirm before relying on it in production (see
+        // docs/decisions/qr-lock-unlock.md's verification findings).
+        'base_url' => env('TTLOCK_BASE_URL', 'https://api.sciener.com'),
+        'client_id' => env('TTLOCK_CLIENT_ID'),
+        'client_secret' => env('TTLOCK_CLIENT_SECRET'),
+        'username' => env('TTLOCK_USERNAME'),
+        // Raw password — TTLockClient MD5-hashes it at call time, per the
+        // vendor's documented requirement. Never store a pre-hashed value here.
+        'password' => env('TTLOCK_PASSWORD'),
+    ],
+
 ];
