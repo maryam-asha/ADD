@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Member\AccessUnlockController;
 use App\Http\Controllers\Api\V1\Member\AccountController;
 use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
@@ -32,6 +33,12 @@ Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 // Reception kiosk "I'm here" signal (docs/decisions/kiosk-display.md) —
 // never changes booking/session state by itself.
 Route::post('arrival-requests', [ArrivalRequestController::class, 'store']);
+
+// QR-scan unlock channel — docs/decisions/qr-lock-unlock.md §4. The member
+// scans the sticker fixed at the lock; the backend resolves qr_value to a
+// device, checks for an active access_grants row, and calls
+// TTLockClient::remoteUnlock() server-side.
+Route::post('access/unlock', [AccessUnlockController::class, 'unlock']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

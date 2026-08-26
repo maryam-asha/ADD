@@ -103,6 +103,11 @@ return [
     'access' => [
         'activated' => 'The access grant has been activated.',
         'grant_not_activatable' => 'This access grant cannot be activated in its current state.',
+        'unlocked' => 'Unlocked.',
+        'lock_not_found' => 'This QR code does not match any lock.',
+        'no_active_grant' => 'You do not have active access to this lock right now.',
+        'gateway_offline' => "This lock's gateway is currently offline — use the keypad code instead.",
+        'unlock_failed' => 'The lock could not be unlocked. Please try again or use the keypad code.',
     ],
 
     'currency' => [
