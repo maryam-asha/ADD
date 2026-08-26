@@ -15,6 +15,9 @@ class Device extends Model
         'branch_id',
         'space_id',
         'type',
+        'hardware_mac',
+        'parent_device_id',
+        'qr_value',
         'external_ref',
         'metadata',
         'status',
@@ -40,5 +43,15 @@ class Device extends Model
     public function capabilities(): HasMany
     {
         return $this->hasMany(DeviceCapability::class);
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(Device::class, 'parent_device_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(Device::class, 'parent_device_id');
     }
 }

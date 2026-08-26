@@ -75,6 +75,8 @@ return [
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
         'device_updated' => 'Device updated.',
+        'device_qr_value_regenerated' => 'The device QR value has been regenerated.',
+        'device_not_a_lock' => 'Only lock devices have a QR value.',
         'device_capability_updated' => 'Device capability updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',

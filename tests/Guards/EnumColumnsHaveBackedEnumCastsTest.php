@@ -2,6 +2,13 @@
 
 namespace Tests\Guards;
 
+use App\Domain\Access\Enums\AccessEventChannel;
+use App\Domain\Access\Enums\AccessEventType;
+use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Enums\AccessSourceType;
+use App\Domain\Access\Enums\PasscodeType;
+use App\Domain\Access\Models\AccessEvent;
+use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
@@ -64,6 +71,17 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        AccessGrant::class => [
+            'grantee_type' => OwnerType::class,
+            'source_type' => AccessSourceType::class,
+            'allocation_model' => AllocationModel::class,
+            'passcode_type' => PasscodeType::class,
+            'status' => AccessGrantStatus::class,
+        ],
+        AccessEvent::class => [
+            'event_type' => AccessEventType::class,
+            'channel' => AccessEventChannel::class,
+        ],
         ArrivalRequest::class => [
             'status' => ArrivalRequestStatus::class,
         ],

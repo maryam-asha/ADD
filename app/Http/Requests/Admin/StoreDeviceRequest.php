@@ -23,6 +23,11 @@ class StoreDeviceRequest extends FormRequest
             'type' => ['required', Rule::in([
                 'lock', 'gateway', 'camera', 'gate', 'printer', 'display', 'occupancy_sensor', 'attendance_terminal',
             ])],
+            'hardware_mac' => [
+                Rule::requiredIf(fn () => in_array($this->input('type'), ['lock', 'gateway'], true)),
+                'nullable', 'string', 'max:255',
+            ],
+            'parent_device_id' => ['nullable', 'integer', 'exists:devices,id'],
             'external_ref' => ['nullable', 'string', 'max:255'],
             'metadata' => ['nullable', 'array'],
             'status' => ['nullable', Rule::in(['online', 'offline', 'faulted'])],

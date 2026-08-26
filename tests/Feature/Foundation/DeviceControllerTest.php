@@ -47,6 +47,7 @@ class DeviceControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/devices', [
             'branch_id' => $branch->id,
             'type' => 'lock',
+            'hardware_mac' => 'AA:BB:CC:DD:EE:01',
         ]);
 
         $response->assertCreated();
@@ -62,6 +63,7 @@ class DeviceControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/devices', [
             'branch_id' => $branch->id,
             'type' => 'lock',
+            'hardware_mac' => 'AA:BB:CC:DD:EE:01',
             'status' => null,
         ]);
 
@@ -91,6 +93,7 @@ class DeviceControllerTest extends TestCase
         $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/devices/{$device->id}", [
             'branch_id' => $device->branch_id,
             'type' => $device->type,
+            'hardware_mac' => 'AA:BB:CC:DD:EE:01',
             'status' => 'online',
         ]);
 
@@ -124,5 +127,60 @@ class DeviceControllerTest extends TestCase
         Sanctum::actingAs($member, ['*']);
 
         $this->getJson('/api/v1/admin/devices')->assertForbidden();
+    }
+
+    public function test_creating_a_lock_device_auto_generates_a_qr_value(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => 'AA:BB:CC:DD:EE:01']);
+
+        $response->assertCreated();
+        $device = Device::find($response->json('data.id'));
+        $this->assertNotNull($device->qr_value);
+        $this->assertSame(40, strlen($device->qr_value));
+    }
+
+    public function test_creating_a_camera_device_does_not_generate_a_qr_value(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'camera']);
+
+        $response->assertCreated();
+        $this->assertNull(Device::find($response->json('data.id'))->qr_value);
+    }
+
+    public function test_creating_a_lock_without_hardware_mac_fails_validation(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+
+        $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => null])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('hardware_mac');
+    }
+
+    public function test_admin_can_regenerate_a_locks_qr_value(): void
+    {
+        $this->actingAsAdmin();
+        $device = Device::factory()->create(['type' => 'lock', 'qr_value' => 'old-value']);
+
+        $response = $this->postJson("/api/v1/admin/devices/{$device->id}/regenerate-qr-value");
+
+        $response->assertOk();
+        $device->refresh();
+        $this->assertNotSame('old-value', $device->qr_value);
+        $this->assertSame(40, strlen($device->qr_value));
+    }
+
+    public function test_regenerating_qr_value_on_a_non_lock_device_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+        $device = Device::factory()->create(['type' => 'camera']);
+
+        $this->postJson("/api/v1/admin/devices/{$device->id}/regenerate-qr-value")->assertStatus(422);
     }
 }

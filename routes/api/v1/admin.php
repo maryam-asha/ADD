@@ -66,6 +66,7 @@ Route::apiResource('seats-desks', SeatDeskController::class)
     ->except('destroy');
 
 Route::apiResource('devices', DeviceController::class)->except('destroy');
+Route::post('devices/{device}/regenerate-qr-value', [DeviceController::class, 'regenerateQrValue']);
 
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('device-capabilities', DeviceCapabilityController::class)

@@ -9,6 +9,7 @@ use App\Http\Resources\DeviceResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class DeviceController extends AdminResourceController
 {
@@ -45,6 +46,10 @@ class DeviceController extends AdminResourceController
         $data = $request->validated();
         $data['status'] ??= 'offline';
 
+        if ($data['type'] === 'lock') {
+            $data['qr_value'] = Str::random(40);
+        }
+
         return new DeviceResource(Device::create($data));
     }
 
@@ -53,5 +58,14 @@ class DeviceController extends AdminResourceController
         $device->update($request->validated());
 
         return response()->json(['message' => __('api.admin.device_updated')]);
+    }
+
+    public function regenerateQrValue(Device $device): JsonResponse
+    {
+        abort_if($device->type !== 'lock', 422, __('api.admin.device_not_a_lock'));
+
+        $device->update(['qr_value' => Str::random(40)]);
+
+        return response()->json(['message' => __('api.admin.device_qr_value_regenerated')]);
     }
 }
