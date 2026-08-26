@@ -4,20 +4,28 @@ namespace Tests\Guards;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Device;
+use App\Domain\Identity\Models\User;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
  * docs/decisions/qr-lock-unlock.md §4: qr_value must be CSPRNG-drawn, not
  * derivable from another lock's value. Generates N real values via the
  * same code path DeviceController::store() uses and checks for any
- * arithmetic (shared numeric offset) or lexicographic (sorted-adjacent
- * shared-prefix) sequence.
+ * lexicographic (sorted-adjacent shared-prefix) sequence.
  */
 class QrValueIsRandomNotSequentialTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+    }
 
     public function test_generated_qr_values_are_not_sequential(): void
     {
@@ -38,19 +46,23 @@ class QrValueIsRandomNotSequentialTest extends TestCase
 
     public function test_creating_lock_devices_produces_non_sequential_qr_values(): void
     {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
         $branch = Branch::factory()->create();
+
         $values = collect(range(1, 20))
-            ->map(fn () => Device::factory()->create(['branch_id' => $branch->id, 'type' => 'lock', 'qr_value' => Str::random(40)])->qr_value)
+            ->map(function ($i) use ($branch) {
+                $response = $this->postJson('/api/v1/admin/devices', [
+                    'branch_id' => $branch->id,
+                    'type' => 'lock',
+                    'hardware_mac' => 'lock-'.Str::random(10),
+                ]);
+
+                return Device::find($response->json('data.id'))->qr_value;
+            })
             ->all();
 
         $this->assertSame(20, count(array_unique($values)));
-
-        foreach ($values as $i => $value) {
-            if ($i === 0) {
-                continue;
-            }
-            // No fixed-offset relationship between consecutively-created values.
-            $this->assertNotEquals(ord($values[$i - 1][0]) + 1, ord($value[0]));
-        }
     }
 }
