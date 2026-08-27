@@ -148,12 +148,22 @@ class PasscodeIssuanceService
         AccessGrant::query()
             ->where('status', AccessGrantStatus::Issued)
             ->where('must_activate_by', '<', now())
+            ->with('lock')
             ->chunkById(100, function ($grants) use (&$count) {
                 foreach ($grants as $grant) {
-                    // TTLock's own Period passcode already auto-invalidates
-                    // on the lock after 24h unused — no vendor call needed
-                    // here, only our own status kept in sync.
+                    // TTLock's own 24h-unused auto-invalidation is measured
+                    // from the passcode's vendor-side Start Time, which is
+                    // booking->start_at (see issueForBooking()) — not
+                    // issued_at, which is what must_activate_by is still
+                    // based on. For a same-day booking issued well before a
+                    // late start_at, those two clocks no longer coincide,
+                    // so we can't rely on the vendor to have already
+                    // invalidated the code by the time we mark the grant
+                    // Expired here. Delete it explicitly instead: a DB
+                    // status of Expired must mean the door credential is
+                    // actually dead.
                     $grant->update(['status' => AccessGrantStatus::Expired]);
+                    $this->deleteVendorPasscode($grant, $grant->lock);
                     $count++;
                 }
             });
@@ -179,24 +189,30 @@ class PasscodeIssuanceService
             return;
         }
 
-        if ($revoked->vendor_keyboard_pwd_id === null) {
-            Log::warning('Skipping TTLock passcode deletion for a revoked access grant with no vendor_keyboard_pwd_id', [
-                'access_grant_id' => $revoked->id,
+        $this->deleteVendorPasscode($revoked, $lock);
+    }
+
+    private function deleteVendorPasscode(AccessGrant $grant, Device $lock): void
+    {
+        if ($grant->vendor_keyboard_pwd_id === null) {
+            Log::warning('Skipping TTLock passcode deletion for an access grant with no vendor_keyboard_pwd_id', [
+                'access_grant_id' => $grant->id,
             ]);
 
             return;
         }
 
         try {
-            $this->ttlock->deletePasscode($lock, $revoked->vendor_keyboard_pwd_id);
+            $this->ttlock->deletePasscode($lock, $grant->vendor_keyboard_pwd_id);
         } catch (\Throwable $e) {
             // Widened from `catch (TTLockException $e)`: any vendor-call
             // failure — including one Fix 4 didn't anticipate — must not
-            // escape and abort the rest of the calling ->each() batch
-            // (revokeForSpace()/revokeForBooking() revoke every other
-            // grant in the same call regardless of this one's outcome).
-            Log::error('Failed to delete TTLock passcode after revoking an access grant', [
-                'access_grant_id' => $revoked->id,
+            // escape and abort the rest of the calling ->each()/chunkById()
+            // batch (revokeForSpace()/revokeForBooking()/expireOverdue()
+            // process every other grant in the same call regardless of
+            // this one's outcome).
+            Log::error('Failed to delete TTLock passcode for an access grant', [
+                'access_grant_id' => $grant->id,
                 'error' => $e->getMessage(),
             ]);
         }

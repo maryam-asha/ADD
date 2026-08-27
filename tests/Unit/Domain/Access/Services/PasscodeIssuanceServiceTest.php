@@ -75,6 +75,7 @@ class PasscodeIssuanceServiceTest extends TestCase
 
     public function test_expire_overdue_marks_only_issued_grants_past_must_activate_by(): void
     {
+        Http::fake(['api.sciener.test/v3/keyboardPwd/delete' => Http::response(['errcode' => 0, 'errmsg' => ''], 200)]);
         $overdue = AccessGrant::factory()->create(['status' => AccessGrantStatus::Issued, 'must_activate_by' => now()->subHour()]);
         $notYet = AccessGrant::factory()->create(['status' => AccessGrantStatus::Issued, 'must_activate_by' => now()->addHour()]);
         $alreadyActivated = AccessGrant::factory()->activated()->create(['must_activate_by' => now()->subHour()]);
@@ -85,6 +86,81 @@ class PasscodeIssuanceServiceTest extends TestCase
         $this->assertSame(AccessGrantStatus::Expired, $overdue->fresh()->status);
         $this->assertSame(AccessGrantStatus::Issued, $notYet->fresh()->status);
         $this->assertSame(AccessGrantStatus::Activated, $alreadyActivated->fresh()->status);
+    }
+
+    /**
+     * TTLock's own 24h-unused auto-invalidation is measured from the
+     * passcode's vendor-side Start Time, which is booking->start_at, not
+     * issued_at (which must_activate_by is based on) — the two clocks can
+     * diverge for a same-day booking issued well before a late start_at.
+     * expireOverdue() must therefore delete the vendor passcode itself
+     * rather than relying on the vendor to have already invalidated it.
+     */
+    public function test_expire_overdue_deletes_the_vendor_passcode_for_an_expired_grant(): void
+    {
+        Http::fake(['api.sciener.test/v3/keyboardPwd/delete' => Http::response(['errcode' => 0, 'errmsg' => ''], 200)]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '77']);
+        $overdue = AccessGrant::factory()->create([
+            'lock_id' => $lock->id,
+            'status' => AccessGrantStatus::Issued,
+            'must_activate_by' => now()->subHour(),
+            'vendor_keyboard_pwd_id' => 42,
+        ]);
+
+        app(PasscodeIssuanceService::class)->expireOverdue();
+
+        $this->assertSame(AccessGrantStatus::Expired, $overdue->fresh()->status);
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.sciener.test/v3/keyboardPwd/delete'
+            && $request['lockId'] === '77'
+            && $request['keyboardPwdId'] === 42);
+    }
+
+    /**
+     * Mirrors revoke()'s null-guard — a grant with no vendor_keyboard_pwd_id
+     * (never actually reached the vendor, or already cleared) must not
+     * attempt a vendor call, and expiring it must not throw.
+     */
+    public function test_expire_overdue_skips_the_vendor_delete_call_when_vendor_keyboard_pwd_id_is_null(): void
+    {
+        Log::spy();
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '77']);
+        $overdue = AccessGrant::factory()->create([
+            'lock_id' => $lock->id,
+            'status' => AccessGrantStatus::Issued,
+            'must_activate_by' => now()->subHour(),
+            'vendor_keyboard_pwd_id' => null,
+        ]);
+
+        $count = app(PasscodeIssuanceService::class)->expireOverdue();
+
+        $this->assertSame(1, $count);
+        $this->assertSame(AccessGrantStatus::Expired, $overdue->fresh()->status);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'keyboardPwd/delete'));
+        Log::shouldHaveReceived('warning')->once();
+    }
+
+    /**
+     * A vendor-delete failure during expiry is logged, not a reason to
+     * leave the grant Issued or roll back the status change already made —
+     * a DB status of Expired must stick even when the vendor call fails.
+     */
+    public function test_expire_overdue_leaves_the_grant_expired_even_when_the_vendor_delete_call_fails(): void
+    {
+        Http::fake([
+            'api.sciener.test/v3/keyboardPwd/delete' => fn () => throw new ConnectionException('Connection timed out'),
+        ]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '77']);
+        $overdue = AccessGrant::factory()->create([
+            'lock_id' => $lock->id,
+            'status' => AccessGrantStatus::Issued,
+            'must_activate_by' => now()->subHour(),
+            'vendor_keyboard_pwd_id' => 42,
+        ]);
+
+        $count = app(PasscodeIssuanceService::class)->expireOverdue();
+
+        $this->assertSame(1, $count);
+        $this->assertSame(AccessGrantStatus::Expired, $overdue->fresh()->status);
     }
 
     public function test_revoke_for_space_revokes_and_deletes_vendor_passcode_for_issued_and_activated_grants(): void
