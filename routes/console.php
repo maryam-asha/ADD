@@ -48,3 +48,8 @@ Schedule::command('finance:fetch-exchange-rate-suggestion')->dailyAt('09:00')->t
 Schedule::command('access:issue-grants-on-cancellation-window-close')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('access:revoke-grants-on-maintenance')->everyFiveMinutes()->withoutOverlapping();
 Schedule::command('access:expire-unactivated-grants')->everyFiveMinutes()->withoutOverlapping();
+// Final whole-branch review C1 — BookingCancellationService::cancel() never
+// touches the Access domain; this polls Booking's already-public status
+// instead, so a same-day booking's grant doesn't survive its own
+// cancellation.
+Schedule::command('access:revoke-grants-on-booking-cancellation')->everyFiveMinutes()->withoutOverlapping();

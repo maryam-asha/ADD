@@ -5,10 +5,12 @@ namespace App\Domain\Access\Services;
 use App\Domain\Access\Enums\AccessEventChannel;
 use App\Domain\Access\Enums\AccessEventType;
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Exceptions\LockAccessDeniedException;
 use App\Domain\Access\Exceptions\TTLockException;
 use App\Domain\Access\Models\AccessEvent;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -62,7 +64,7 @@ class UnlockService
 
         $userGrant = $base()->where('grantee_type', OwnerType::User)->where('grantee_id', $user->id)->first();
 
-        if ($userGrant) {
+        if ($userGrant && $this->isUsable($userGrant)) {
             return $userGrant;
         }
 
@@ -72,7 +74,33 @@ class UnlockService
             return null;
         }
 
-        return $base()->where('grantee_type', OwnerType::Company)->whereIn('grantee_id', $companyIds)->first();
+        $companyGrant = $base()->where('grantee_type', OwnerType::Company)->whereIn('grantee_id', $companyIds)->first();
+
+        return $companyGrant && $this->isUsable($companyGrant) ? $companyGrant : null;
+    }
+
+    /**
+     * Defense-in-depth for a cancelled booking's grant (final-review C1) —
+     * the primary fix is the scheduled RevokeAccessGrantsOnBookingCancellation
+     * command, but a grant can still be `Activated` for a few minutes
+     * between cancellation and the next run. `loadMissing` is a single
+     * additional query per candidate grant (a no-op once already loaded),
+     * never N+1 across candidates — this method runs at most twice per
+     * unlock attempt (once for the user grant, once for a company grant).
+     */
+    private function isUsable(AccessGrant $grant): bool
+    {
+        // source_id is always set for a real booking-sourced grant
+        // (PasscodeIssuanceService::issueForBooking() always passes
+        // $booking->id) — null here means this grant isn't actually tied
+        // to a real booking row, so there's nothing to check.
+        if ($grant->source_type !== AccessSourceType::Booking || $grant->source_id === null) {
+            return true;
+        }
+
+        $grant->loadMissing('booking');
+
+        return $grant->booking?->status === BookingStatus::Confirmed;
     }
 
     private function logEvent(Device $lock, ?AccessGrant $grant, AccessEventType $type, User $actor): void

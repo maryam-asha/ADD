@@ -31,6 +31,15 @@ class AccessGrant extends Model
         'issued_at', 'must_activate_by', 'activated_at', 'expires_at', 'status',
     ];
 
+    /**
+     * Defense-in-depth (final-review bundled minors) — the raw passcode
+     * must never leave the app via serialization; nothing currently
+     * returns an AccessGrant directly (both admin/member endpoints return
+     * a message or a hand-picked array), but this closes the gap for any
+     * future toArray()/toJson() call.
+     */
+    protected $hidden = ['passcode_value'];
+
     protected function casts(): array
     {
         return [

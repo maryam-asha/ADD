@@ -6,6 +6,7 @@ use App\Domain\Access\Exceptions\TTLockException;
 use App\Domain\Access\Services\TTLockClient;
 use App\Domain\Foundation\Models\Device;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
@@ -92,6 +93,29 @@ class TTLockClientTest extends TestCase
         } catch (TTLockException $e) {
             $this->assertSame(-2012, $e->vendorErrorCode);
         }
+    }
+
+    public function test_connection_exception_on_the_v3_call_is_converted_to_a_ttlock_exception(): void
+    {
+        $this->fakeToken();
+        Http::fake([
+            'api.sciener.test/v3/lock/unlock' => fn () => throw new ConnectionException('Connection timed out'),
+        ]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '99']);
+
+        $this->expectException(TTLockException::class);
+        app(TTLockClient::class)->remoteUnlock($lock);
+    }
+
+    public function test_connection_exception_on_the_token_request_is_converted_to_a_ttlock_exception(): void
+    {
+        Http::fake([
+            'api.sciener.test/oauth2/token' => fn () => throw new ConnectionException('Connection timed out'),
+        ]);
+        $lock = Device::factory()->create(['type' => 'lock', 'external_ref' => '99']);
+
+        $this->expectException(TTLockException::class);
+        app(TTLockClient::class)->remoteUnlock($lock);
     }
 
     public function test_remote_unlock_throws_when_response_is_missing_errcode(): void

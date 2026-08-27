@@ -26,6 +26,7 @@ class IssueAccessGrantsOnCancellationWindowClose extends Command
     {
         Booking::query()
             ->where('status', BookingStatus::Confirmed)
+            ->where('end_at', '>', now())
             ->whereDoesntHave('accessGrants')
             ->with('space')
             ->chunkById(100, function ($bookings) use ($issuance, $settings) {

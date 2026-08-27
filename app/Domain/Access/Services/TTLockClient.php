@@ -4,6 +4,7 @@ namespace App\Domain\Access\Services;
 
 use App\Domain\Access\Exceptions\TTLockException;
 use App\Domain\Foundation\Models\Device;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 
@@ -46,7 +47,7 @@ class TTLockClient
         ];
     }
 
-    public function deletePasscode(Device $lock, int $vendorPasscodeId): void
+    public function deletePasscode(Device $lock, ?int $vendorPasscodeId): void
     {
         $this->assertSuccess($this->callV3('/v3/keyboardPwd/delete', [
             'lockId' => $lock->external_ref,
@@ -90,10 +91,14 @@ class TTLockClient
         // from its own clock (errcode 80000) — always the real current time.
         $params['date'] = (int) (microtime(true) * 1000);
 
-        $response = Http::asForm()
-            ->baseUrl(config('services.ttlock.base_url'))
-            ->timeout(10)
-            ->post($path, $params);
+        try {
+            $response = Http::asForm()
+                ->baseUrl(config('services.ttlock.base_url'))
+                ->timeout(10)
+                ->post($path, $params);
+        } catch (ConnectionException $e) {
+            throw TTLockException::networkError($e->getMessage());
+        }
 
         if (! $response->successful()) {
             throw TTLockException::vendorError($response->status(), "HTTP {$response->status()} from TTLock");
@@ -151,10 +156,14 @@ class TTLockClient
 
     private function requestToken(array $params): array
     {
-        $response = Http::asForm()
-            ->baseUrl(config('services.ttlock.base_url'))
-            ->timeout(10)
-            ->post('/oauth2/token', $params);
+        try {
+            $response = Http::asForm()
+                ->baseUrl(config('services.ttlock.base_url'))
+                ->timeout(10)
+                ->post('/oauth2/token', $params);
+        } catch (ConnectionException $e) {
+            throw TTLockException::networkError($e->getMessage());
+        }
 
         $body = $response->json() ?? [];
 

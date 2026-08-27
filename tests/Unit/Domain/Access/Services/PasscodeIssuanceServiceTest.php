@@ -11,7 +11,9 @@ use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 class PasscodeIssuanceServiceTest extends TestCase
@@ -47,6 +49,30 @@ class PasscodeIssuanceServiceTest extends TestCase
         $this->assertEqualsWithDelta($grant->issued_at->addHours(24)->timestamp, $grant->must_activate_by->timestamp, 2);
     }
 
+    /**
+     * Final-review I3 — the vendor-facing passcode window must start at the
+     * booking's own start time, not at issuance, or the keypad code would
+     * be live (and overlap whoever holds the space earlier) hours before
+     * the booked slot begins.
+     */
+    public function test_issue_for_booking_sends_the_bookings_start_at_as_the_vendor_window_start(): void
+    {
+        Http::fake(['api.sciener.test/v3/keyboardPwd/get' => Http::response(['keyboardPwd' => '112233', 'keyboardPwdId' => 5], 200)]);
+        $space = Space::factory()->create(['allocation_model' => AllocationModel::BookingHourly]);
+        Device::factory()->create(['space_id' => $space->id, 'type' => 'lock', 'external_ref' => '77']);
+        $booking = Booking::factory()->create([
+            'space_id' => $space->id,
+            'start_at' => now()->addHours(5),
+            'end_at' => now()->addHours(6),
+        ]);
+
+        app(PasscodeIssuanceService::class)->issueForBooking($booking);
+
+        $expectedStartDate = $booking->start_at->getTimestamp() * 1000;
+        Http::assertSent(fn ($request) => $request->url() === 'https://api.sciener.test/v3/keyboardPwd/get'
+            && (int) $request['startDate'] === $expectedStartDate);
+    }
+
     public function test_expire_overdue_marks_only_issued_grants_past_must_activate_by(): void
     {
         $overdue = AccessGrant::factory()->create(['status' => AccessGrantStatus::Issued, 'must_activate_by' => now()->subHour()]);
@@ -75,5 +101,78 @@ class PasscodeIssuanceServiceTest extends TestCase
         $this->assertSame(AccessGrantStatus::Revoked, $issued->fresh()->status);
         $this->assertSame(AccessGrantStatus::Revoked, $activated->fresh()->status);
         Http::assertSentCount(3); // token + 2 deletes (not 3 — the already-revoked grant is untouched)
+    }
+
+    /**
+     * Bundled minor — vendor_keyboard_pwd_id is a nullable column;
+     * deletePasscode() was being called with it unconditionally, which
+     * would throw a TypeError instead of the vendor call it was meant to
+     * make. Revocation of our own status must still succeed.
+     */
+    public function test_revoke_for_space_skips_the_vendor_delete_call_when_vendor_keyboard_pwd_id_is_null(): void
+    {
+        Log::spy();
+        $space = Space::factory()->create(['status' => OperationalStatus::Maintenance]);
+        $lock = Device::factory()->create(['space_id' => $space->id, 'type' => 'lock', 'external_ref' => '77']);
+        $grant = AccessGrant::factory()->create([
+            'lock_id' => $lock->id, 'status' => AccessGrantStatus::Issued, 'vendor_keyboard_pwd_id' => null,
+        ]);
+
+        app(PasscodeIssuanceService::class)->revokeForSpace($space);
+
+        $this->assertSame(AccessGrantStatus::Revoked, $grant->fresh()->status);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), 'keyboardPwd/delete'));
+        Log::shouldHaveReceived('warning')->once();
+    }
+
+    /**
+     * Final-review I2 (fault-isolation half) — a non-TTLockException
+     * failure (e.g. the ConnectionException Fix 4 now converts) inside one
+     * grant's vendor delete call must not abort the rest of the ->each()
+     * batch.
+     */
+    public function test_revoke_for_space_isolates_one_grants_vendor_failure_from_the_rest_of_the_batch(): void
+    {
+        Http::fake([
+            'api.sciener.test/v3/keyboardPwd/delete' => fn () => throw new ConnectionException('Connection timed out'),
+        ]);
+        $space = Space::factory()->create(['status' => OperationalStatus::Maintenance]);
+        $lock = Device::factory()->create(['space_id' => $space->id, 'type' => 'lock', 'external_ref' => '77']);
+        $first = AccessGrant::factory()->create(['lock_id' => $lock->id, 'status' => AccessGrantStatus::Issued]);
+        $second = AccessGrant::factory()->create(['lock_id' => $lock->id, 'status' => AccessGrantStatus::Issued]);
+
+        app(PasscodeIssuanceService::class)->revokeForSpace($space);
+
+        // Both grants are revoked in our own DB regardless of the vendor
+        // call's outcome — the widened catch means the first grant's
+        // ConnectionException doesn't stop the second from being
+        // processed.
+        $this->assertSame(AccessGrantStatus::Revoked, $first->fresh()->status);
+        $this->assertSame(AccessGrantStatus::Revoked, $second->fresh()->status);
+    }
+
+    /**
+     * Final-review C1 — the new method PasscodeIssuanceService::revokeForBooking()
+     * scopes revocation to one booking's own grants, not every grant on
+     * its space's lock.
+     */
+    public function test_revoke_for_booking_only_revokes_that_bookings_own_grants(): void
+    {
+        Http::fake(['api.sciener.test/v3/keyboardPwd/delete' => Http::response(['errcode' => 0, 'errmsg' => ''], 200)]);
+        $space = Space::factory()->create(['allocation_model' => AllocationModel::BookingHourly]);
+        $lock = Device::factory()->create(['space_id' => $space->id, 'type' => 'lock', 'external_ref' => '77']);
+        $booking = Booking::factory()->create(['space_id' => $space->id]);
+        $otherBooking = Booking::factory()->create(['space_id' => $space->id]);
+        $thisBookingsGrant = AccessGrant::factory()->create([
+            'lock_id' => $lock->id, 'status' => AccessGrantStatus::Issued, 'source_id' => $booking->id,
+        ]);
+        $otherBookingsGrant = AccessGrant::factory()->create([
+            'lock_id' => $lock->id, 'status' => AccessGrantStatus::Issued, 'source_id' => $otherBooking->id,
+        ]);
+
+        app(PasscodeIssuanceService::class)->revokeForBooking($booking);
+
+        $this->assertSame(AccessGrantStatus::Revoked, $thisBookingsGrant->fresh()->status);
+        $this->assertSame(AccessGrantStatus::Issued, $otherBookingsGrant->fresh()->status);
     }
 }

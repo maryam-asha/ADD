@@ -163,6 +163,10 @@ Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionCont
 Route::post('reception/bookings/{booking}/approve', [BookingReceptionController::class, 'approve']);
 Route::post('reception/bookings/{booking}/reject', [BookingReceptionController::class, 'reject']);
 Route::post('reception/bookings/{booking}/extend', [BookingReceptionController::class, 'extend']);
+// Access-grant read surface for reception (final-review C3b) — resolves the
+// grant a given booking needs activated, since there was previously no way
+// to discover a grant's id from its booking.
+Route::get('reception/bookings/{booking}/access-grant', [AccessActivationController::class, 'forBooking']);
 
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);

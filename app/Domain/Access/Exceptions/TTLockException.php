@@ -41,4 +41,14 @@ class TTLockException extends RuntimeException
     {
         return new self("TTLock error {$code}: {$message}", $code);
     }
+
+    /**
+     * A connection-level failure (timeout, DNS failure, TLS failure,
+     * connection refused) — the request never reached TTLock at all, so
+     * there is no vendor error code to attach, unlike vendorError().
+     */
+    public static function networkError(string $detail): self
+    {
+        return new self("Could not reach TTLock: {$detail}");
+    }
 }

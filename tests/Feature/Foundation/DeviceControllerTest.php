@@ -142,6 +142,33 @@ class DeviceControllerTest extends TestCase
         $this->assertSame(40, strlen($device->qr_value));
     }
 
+    /**
+     * Final-review C3a — operations needs qr_value/hardware_mac to print the
+     * door sticker and parent_device_id to see which gateway a lock pairs
+     * through; none of these were previously returned by DeviceResource.
+     */
+    public function test_device_response_includes_qr_value_hardware_mac_and_parent_device_id(): void
+    {
+        $this->actingAsAdmin();
+        $gateway = Device::factory()->create(['type' => 'gateway', 'hardware_mac' => 'GW:00:00:00:00:01']);
+        $lock = Device::factory()->create([
+            'type' => 'lock',
+            'hardware_mac' => 'AA:BB:CC:DD:EE:01',
+            'parent_device_id' => $gateway->id,
+            'qr_value' => 'sticker-value',
+        ]);
+
+        $response = $this->getJson("/api/v1/admin/devices?branch_id={$lock->branch_id}");
+
+        $response->assertOk();
+        $response->assertJsonFragment([
+            'id' => $lock->id,
+            'hardware_mac' => 'AA:BB:CC:DD:EE:01',
+            'parent_device_id' => $gateway->id,
+            'qr_value' => 'sticker-value',
+        ]);
+    }
+
     public function test_creating_a_camera_device_does_not_generate_a_qr_value(): void
     {
         $this->actingAsAdmin();

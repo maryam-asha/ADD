@@ -60,14 +60,25 @@ class LockCredentialsNeverReachMemberTest extends TestCase
     {
         $violations = [];
 
-        foreach ($this->phpFilesIn(app_path('Http/Controllers/Api/V1/Member')) as $path => $contents) {
-            foreach (['passcode_value', 'vendor_keyboard_pwd_id', 'lockData'] as $needle) {
-                if (str_contains($contents, $needle)) {
-                    $violations[] = "{$path} references \"{$needle}\"";
+        $dirs = [
+            app_path('Http/Controllers/Api/V1/Member'),
+            // Final-review C3/bundled-minors — Resources are just as
+            // capable of leaking vendor/credential material into a member
+            // response as a controller is; the original sweep only
+            // covered the latter.
+            app_path('Http/Resources'),
+        ];
+
+        foreach ($dirs as $dir) {
+            foreach ($this->phpFilesIn($dir) as $path => $contents) {
+                foreach (['passcode_value', 'vendor_keyboard_pwd_id', 'lockData'] as $needle) {
+                    if (str_contains($contents, $needle)) {
+                        $violations[] = "{$path} references \"{$needle}\"";
+                    }
                 }
             }
         }
 
-        $this->assertSame([], $violations, "No Member-namespaced controller may reference vendor/credential fields:\n".implode("\n", $violations));
+        $this->assertSame([], $violations, "No Member-namespaced controller or Resource may reference vendor/credential fields:\n".implode("\n", $violations));
     }
 }

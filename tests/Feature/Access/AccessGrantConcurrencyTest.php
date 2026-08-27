@@ -6,6 +6,7 @@ use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Access\Exceptions\LockAccessDeniedException;
 use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Access\Services\PasscodeIssuanceService;
+use App\Domain\Identity\Models\User;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -48,6 +49,7 @@ class AccessGrantConcurrencyTest extends TestCase
     public function test_activation_racing_a_maintenance_revoke_is_rejected_not_silently_activated(): void
     {
         $grant = AccessGrant::factory()->create(['status' => AccessGrantStatus::Issued]);
+        $actor = User::factory()->create();
 
         $fired = false;
         Event::listen(TransactionBeginning::class, function () use (&$fired, $grant) {
@@ -60,7 +62,7 @@ class AccessGrantConcurrencyTest extends TestCase
         $this->expectException(LockAccessDeniedException::class);
 
         try {
-            app(PasscodeIssuanceService::class)->activate($grant);
+            app(PasscodeIssuanceService::class)->activate($grant, $actor);
         } finally {
             $this->assertTrue($fired, 'The race-injection listener never fired — this test would pass vacuously without it.');
         }
