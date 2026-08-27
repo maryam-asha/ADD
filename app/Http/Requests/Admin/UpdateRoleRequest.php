@@ -5,7 +5,7 @@ namespace App\Http\Requests\Admin;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class AssignRoleRequest extends FormRequest
+class UpdateRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,7 +18,9 @@ class AssignRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::exists('roles', 'name')],
+            'name' => ['sometimes', 'string', 'max:255', Rule::unique('roles', 'name')->ignore($this->route('role'))],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
         ];
     }
 }

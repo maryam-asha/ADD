@@ -6,6 +6,7 @@ use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
+use Spatie\Permission\Models\Role;
 
 class StoreUserRequest extends FormRequest
 {
@@ -28,7 +29,7 @@ class StoreUserRequest extends FormRequest
             'phone' => ['required', 'string', 'unique:users,phone', new PhoneNumber],
             'email' => ['required', 'email', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::defaults()],
-            'role' => ['required', Rule::in(['operations', 'admin'])],
+            'role' => ['required', Rule::in(Role::query()->where('name', '!=', 'member')->pluck('name'))],
         ];
     }
 }

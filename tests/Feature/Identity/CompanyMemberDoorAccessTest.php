@@ -46,13 +46,21 @@ class CompanyMemberDoorAccessTest extends IdentityTestCase
         $this->assertFalse(Gate::forUser($nonMember)->allows('useDoorAccess', $company));
     }
 
-    public function test_admin_bypasses_the_door_access_check_like_every_other_ability(): void
+    /**
+     * The dynamic-permission pilot removes AppServiceProvider's unconditional
+     * `Gate::before` admin bypass (see App\Providers\AppServiceProvider) —
+     * CompanyPolicy itself is untouched, but it no longer has an implicit
+     * admin-bypass caller in front of it. An admin with no actual
+     * relationship to this company is correctly denied, same as anyone else;
+     * this closes a blanket-access gap rather than regressing one.
+     */
+    public function test_admin_no_longer_bypasses_the_door_access_check_without_actual_company_membership(): void
     {
         $company = Company::factory()->create();
         $admin = User::factory()->create();
         $admin->assignRole('admin');
 
-        $this->assertTrue(Gate::forUser($admin)->allows('useDoorAccess', $company));
+        $this->assertFalse(Gate::forUser($admin)->allows('useDoorAccess', $company));
     }
 
     public function test_operations_can_add_a_member_with_door_access_via_the_api(): void

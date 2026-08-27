@@ -3,9 +3,8 @@
 namespace App\Http\Requests\Admin;
 
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
-class AssignRoleRequest extends FormRequest
+class StoreRoleRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -18,7 +17,9 @@ class AssignRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'role' => ['required', Rule::exists('roles', 'name')],
+            'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
+            'permissions' => ['sometimes', 'array'],
+            'permissions.*' => ['string', 'exists:permissions,name'],
         ];
     }
 }

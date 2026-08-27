@@ -98,6 +98,14 @@ return [
         'announcement_updated' => 'Announcement updated.',
         'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
+        'role_updated' => 'Role updated.',
+        'role_deleted' => 'Role deleted.',
+    ],
+
+    'role' => [
+        'protected_rename' => 'This role cannot be renamed.',
+        'protected_delete' => 'This role cannot be deleted.',
+        'role_in_use' => 'This role is currently assigned to one or more users. Reassign them before deleting it.',
     ],
 
     'access' => [

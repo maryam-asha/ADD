@@ -189,6 +189,10 @@ Route::middleware('role:admin')->group(function () {
     Route::patch('users/{user}/role', [UserController::class, 'assignRole']);
 
     Route::get('roles', [RoleController::class, 'index']);
+    Route::post('roles', [RoleController::class, 'store']);
+    Route::match(['put', 'patch'], 'roles/{role}', [RoleController::class, 'update']);
+    Route::delete('roles/{role}', [RoleController::class, 'destroy']);
+    Route::get('permissions', [RoleController::class, 'permissions']);
 
     Route::delete('error-logs/{errorLog}', [ErrorLogController::class, 'destroy']);
 
