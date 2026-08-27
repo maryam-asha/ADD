@@ -4,6 +4,7 @@ namespace Tests\Feature\Foundation;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
+use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -17,6 +18,10 @@ class BranchControllerTest extends TestCase
     {
         parent::setUp();
         $this->seed(RoleSeeder::class);
+        // Branches now sits behind granular `permission:` middleware
+        // (docs/decisions/rbac-permission-pilot.md), not just role:admin —
+        // an admin-role test user needs the permission actually seeded too.
+        $this->seed(PermissionSeeder::class);
     }
 
     private function actingAsAdmin(): User
