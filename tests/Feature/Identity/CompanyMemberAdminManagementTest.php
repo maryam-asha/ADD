@@ -12,10 +12,12 @@ use Spatie\Activitylog\Models\Activity;
  * A company admin (company_user.is_admin) manages their own company's
  * members directly — a regular member cannot, even for a fellow member's
  * flags, and never for their own (CompanyPolicy::manageMembers,
- * docs/decisions/rbac-scoping.md). Operations bypasses this unconditionally
- * via the existing Gate::before, both through the admin-dashboard routes
- * (already covered by CompanyMemberDoorAccessTest) and here for the new
- * is_admin field specifically.
+ * docs/decisions/rbac-scoping.md). Operations manages both fields
+ * unconditionally through the admin-dashboard routes instead — not a Policy
+ * bypass, that controller never calls CompanyPolicy at all — both through
+ * routes already covered by CompanyMemberDoorAccessTest and here for the
+ * is_admin field specifically (see e.g.
+ * test_operations_bootstraps_a_companys_first_admin_via_store below).
  */
 class CompanyMemberAdminManagementTest extends IdentityTestCase
 {

@@ -49,7 +49,7 @@ Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
 Route::get('settings', [SettingController::class, 'index']);
 
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
-// destroy() is admin-only for the remaining 8 of these (see the role:admin
+// destroy() is admin-only for the remaining 10 of these (see the role:admin
 // group below): a delete cascades through the DB's own FKs and can wipe out
 // every Building/Floor/Zone/Space/Resource/SeatDesk/Device beneath it in one
 // request. Branches itself is carved out of both this apiResource line and
@@ -213,7 +213,7 @@ Route::middleware('role:admin')->group(function () {
 
     Route::delete('error-logs/{errorLog}', [ErrorLogController::class, 'destroy']);
 
-    // Spatial Hierarchy destroys are admin-only for the remaining 8 of these
+    // Spatial Hierarchy destroys are admin-only for the remaining 10 of these
     // — a delete cascades through the DB's own FKs down to every Building/
     // Floor/Zone/Space/Resource/SeatDesk/Device beneath it in one request.
     // Branches' own destroy moved to the permission-gated block above
