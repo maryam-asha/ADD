@@ -21,6 +21,7 @@ class UserResource extends JsonResource
             'preferred_currency' => $this->preferred_currency,
             'status' => $this->status,
             'roles' => $this->getRoleNames(),
+            'permissions' => $this->getAllPermissions()->pluck('name'),
         ];
     }
 }
