@@ -177,8 +177,7 @@ class RoleControllerTest extends TestCase
 
         $response = $this->withHeader('lang', 'en')->deleteJson("/api/v1/admin/roles/{$role->id}");
 
-        $response->assertOk();
-        $response->assertExactJson(['message' => 'Role deleted.']);
+        $response->assertNoContent();
         $this->assertDatabaseMissing('roles', ['id' => $role->id]);
     }
 
@@ -201,8 +200,13 @@ class RoleControllerTest extends TestCase
         }
     }
 
-    public function test_update_and_destroy_responses_are_message_only(): void
+    public function test_update_response_is_message_only_and_destroy_response_is_no_content(): void
     {
+        // Every other admin destroy endpoint (AdminResourceController,
+        // ErrorLogController, CompanyMemberController) returns 204 no
+        // content, not a message — the CLAUDE.md "message not resource"
+        // convention documents PATCH/PUT update endpoints specifically, not
+        // DELETE.
         $this->actingAsAdmin();
         $role = Role::create(['name' => 'front-desk', 'guard_name' => 'web']);
 
@@ -211,8 +215,7 @@ class RoleControllerTest extends TestCase
         $this->assertSame(['message'], array_keys($updateResponse->json()));
 
         $destroyResponse = $this->deleteJson('/api/v1/admin/roles/'.Role::findByName('reception', 'web')->id);
-        $destroyResponse->assertOk();
-        $this->assertSame(['message'], array_keys($destroyResponse->json()));
+        $destroyResponse->assertNoContent();
     }
 
     public function test_a_non_admin_operations_role_gets_403_on_mutating_role_actions(): void
@@ -227,5 +230,73 @@ class RoleControllerTest extends TestCase
         $this->patchJson("/api/v1/admin/roles/{$role->id}", ['name' => 'renamed'])->assertForbidden();
         $this->deleteJson("/api/v1/admin/roles/{$role->id}")->assertForbidden();
         $this->getJson('/api/v1/admin/permissions')->assertForbidden();
+    }
+
+    public function test_admin_cannot_sync_permissions_onto_the_member_role_in_english(): void
+    {
+        $this->actingAsAdmin();
+        $memberRole = Role::findByName('member', 'web');
+        $permissionName = Permission::query()->value('name');
+
+        $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/roles/{$memberRole->id}", [
+            'permissions' => [$permissionName],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertExactJson(['message' => "Member accounts don't participate in the admin permission system; the member role can't be assigned any admin-panel permissions."]);
+        $this->assertFalse($memberRole->fresh()->hasPermissionTo($permissionName));
+    }
+
+    public function test_admin_cannot_sync_permissions_onto_the_member_role_in_arabic(): void
+    {
+        $this->actingAsAdmin();
+        $memberRole = Role::findByName('member', 'web');
+        $permissionName = Permission::query()->value('name');
+
+        $response = $this->withHeader('lang', 'ar')->patchJson("/api/v1/admin/roles/{$memberRole->id}", [
+            'permissions' => [$permissionName],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertExactJson(['message' => 'حسابات الأعضاء (member) لا تشارك في نظام صلاحيات لوحة التحكم؛ لا يمكن إسناد أي صلاحيات إدارية لدور العضو.']);
+    }
+
+    public function test_renaming_or_deleting_the_member_role_is_still_protected_and_unaffected_by_the_permission_guard(): void
+    {
+        $this->actingAsAdmin();
+        $memberRole = Role::findByName('member', 'web');
+
+        $renameResponse = $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/roles/{$memberRole->id}", [
+            'name' => 'renamed-member',
+        ]);
+        $renameResponse->assertStatus(422);
+        $renameResponse->assertExactJson(['message' => 'This role cannot be renamed.']);
+        $this->assertDatabaseHas('roles', ['id' => $memberRole->id, 'name' => 'member']);
+
+        $deleteResponse = $this->withHeader('lang', 'en')->deleteJson("/api/v1/admin/roles/{$memberRole->id}");
+        $deleteResponse->assertStatus(422);
+        $deleteResponse->assertExactJson(['message' => 'This role cannot be deleted.']);
+        $this->assertDatabaseHas('roles', ['id' => $memberRole->id]);
+    }
+
+    public function test_admin_can_still_sync_permissions_onto_a_custom_role_and_onto_admin_and_operations(): void
+    {
+        $this->actingAsAdmin();
+        $permissionName = Permission::query()->value('name');
+
+        $customRole = Role::create(['name' => 'front-desk', 'guard_name' => 'web']);
+        $this->patchJson("/api/v1/admin/roles/{$customRole->id}", ['permissions' => [$permissionName]])
+            ->assertOk();
+        $this->assertTrue($customRole->fresh()->hasPermissionTo($permissionName));
+
+        $operationsRole = Role::findByName('operations', 'web');
+        $this->patchJson("/api/v1/admin/roles/{$operationsRole->id}", ['permissions' => [$permissionName]])
+            ->assertOk();
+        $this->assertTrue($operationsRole->fresh()->hasPermissionTo($permissionName));
+
+        $adminRole = Role::findByName('admin', 'web');
+        $this->patchJson("/api/v1/admin/roles/{$adminRole->id}", ['permissions' => [$permissionName]])
+            ->assertOk();
+        $this->assertTrue($adminRole->fresh()->hasPermissionTo($permissionName));
     }
 }

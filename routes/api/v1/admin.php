@@ -39,6 +39,11 @@ use Illuminate\Support\Facades\Route;
 
 // Every route in this file already sits behind auth:sanctum + role:admin|operations
 // — that's applied once, from the group wrapping this file in routes/api.php.
+// One documented exception: Branches opts out of that role: check below via
+// Route::withoutMiddleware('role:admin|operations') and enforces
+// permission:branches.* middleware per route instead
+// (docs/decisions/rbac-permission-pilot.md) — every other resource in this
+// file is unaffected.
 Route::get('me', [CurrentUserController::class, 'show']);
 
 // Privacy Policy
@@ -49,11 +54,12 @@ Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
 Route::get('settings', [SettingController::class, 'index']);
 
 // Spatial Hierarchy — Branch is the top level (docs/decisions/district-removed.md).
-// destroy() is admin-only for the remaining 10 of these (see the role:admin
+// destroy() is admin-only for the remaining 8 of these (see the role:admin
 // group below): a delete cascades through the DB's own FKs and can wipe out
 // every Building/Floor/Zone/Space/Resource/SeatDesk/Device beneath it in one
-// request. Branches itself is carved out of both this apiResource line and
-// that role:admin group — see the permission-based block below.
+// request. Branches' own routes (including destroy) are registered entirely
+// separately, in the permission-gated block below — they were never part of
+// an apiResource line here, and aren't in that role:admin group either.
 
 // Pilot: permission-based enforcement (docs/decisions/rbac-permission-pilot.md,
 // written after this lands). A custom role must be able to reach these
@@ -63,11 +69,11 @@ Route::get('settings', [SettingController::class, 'index']);
 // auth:sanctum and abilities:dashboard, applied by that same group, are
 // untouched.
 Route::withoutMiddleware('role:admin|operations')->group(function () {
-    Route::get('branches', [BranchController::class, 'index'])->middleware('permission:branches.view');
-    Route::get('branches/{branch}', [BranchController::class, 'show'])->middleware('permission:branches.view');
-    Route::post('branches', [BranchController::class, 'store'])->middleware('permission:branches.create');
-    Route::match(['put', 'patch'], 'branches/{branch}', [BranchController::class, 'update'])->middleware('permission:branches.update');
-    Route::delete('branches/{branch}', [BranchController::class, 'destroy'])->middleware('permission:branches.delete');
+    Route::get('branches', [BranchController::class, 'index'])->middleware('permission:branches.view')->name('branches.index');
+    Route::get('branches/{branch}', [BranchController::class, 'show'])->middleware('permission:branches.view')->name('branches.show');
+    Route::post('branches', [BranchController::class, 'store'])->middleware('permission:branches.create')->name('branches.store');
+    Route::match(['put', 'patch'], 'branches/{branch}', [BranchController::class, 'update'])->middleware('permission:branches.update')->name('branches.update');
+    Route::delete('branches/{branch}', [BranchController::class, 'destroy'])->middleware('permission:branches.delete')->name('branches.destroy');
 });
 
 Route::apiResource('buildings', BuildingController::class)->except('destroy');
@@ -213,7 +219,7 @@ Route::middleware('role:admin')->group(function () {
 
     Route::delete('error-logs/{errorLog}', [ErrorLogController::class, 'destroy']);
 
-    // Spatial Hierarchy destroys are admin-only for the remaining 10 of these
+    // Spatial Hierarchy destroys are admin-only for the remaining 8 of these
     // — a delete cascades through the DB's own FKs down to every Building/
     // Floor/Zone/Space/Resource/SeatDesk/Device beneath it in one request.
     // Branches' own destroy moved to the permission-gated block above

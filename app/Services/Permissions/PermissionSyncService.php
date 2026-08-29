@@ -22,11 +22,21 @@ use Spatie\Permission\PermissionRegistrar;
 class PermissionSyncService
 {
     /**
-     * Controllers that deliberately don't extend AdminResourceController (see
-     * each controller's own class docblock for why — no `order` column,
-     * destructive-delete/status semantics that don't fit the generic CRUD
-     * shape), so reflection-based discovery never finds them. Their
-     * permission set is hardcoded here instead of derived from routes.
+     * A deliberately partial, hand-picked list — NOT every controller that
+     * fails to extend AdminResourceController. It covers exactly these four
+     * (see each controller's own class docblock for why — no `order`
+     * column, destructive-delete/status semantics that don't fit the
+     * generic CRUD shape), because this pilot only converted those four to
+     * permission-derived coverage. At least a dozen more admin controllers
+     * (`CompanyController`, `CompanyMemberController`, `CurrencyController`,
+     * `ExchangeRateController`, `ExchangeRateSuggestionController`,
+     * `PrivacyPolicyController`, and all six `Reception/*Controller`
+     * classes) also don't extend AdminResourceController and get NO
+     * permission coverage today — an acknowledged gap, not a silent one:
+     * see docs/decisions/rbac-permission-pilot.md's "Explicitly not done
+     * here", and `uncoveredControllers()` below, which surfaces the
+     * non-Reception half of that gap in `permissions:sync`'s own output so
+     * it stays visible rather than assumed-exhaustive.
      *
      * @var array<class-string, array<string, list<string>>>
      */
@@ -61,7 +71,7 @@ class PermissionSyncService
     ];
 
     /**
-     * @return array{total: int, created: string[], stale: string[]}
+     * @return array{total: int, created: string[], stale: string[], uncovered: string[]}
      */
     public function sync(): array
     {
@@ -76,13 +86,18 @@ class PermissionSyncService
             }
         }
 
-        // Fresh, unfiltered Permission::all() — not just what this run
-        // created — so admin ends up with every permission that exists in
-        // the table, including ones from a previous run or a manual
-        // Permission::create() elsewhere. This is what makes admin
-        // self-healing if it's ever edited down via the role-management UI:
-        // re-running the sync restores it to everything.
-        Role::findOrCreate('admin', 'web')->syncPermissions(Permission::all());
+        // Fresh, unfiltered Permission::query()->where('guard_name', 'web')
+        // — not just what this run created — so admin ends up with every
+        // web-guard permission that exists in the table, including ones
+        // from a previous run or a manual Permission::create() elsewhere.
+        // This is what makes admin self-healing if it's ever edited down
+        // via the role-management UI: re-running the sync restores it to
+        // everything. The explicit guard_name filter makes the "only 'web'
+        // exists today" assumption explicit rather than implicit — nothing
+        // else in this app uses a different guard yet.
+        Role::findOrCreate('admin', 'web')->syncPermissions(
+            Permission::query()->where('guard_name', 'web')->get()
+        );
 
         $stale = Permission::query()
             ->whereNotIn('name', $derivedNames)
@@ -95,6 +110,7 @@ class PermissionSyncService
             'total' => Permission::count(),
             'created' => $created,
             'stale' => $stale,
+            'uncovered' => $this->uncoveredControllers(),
         ];
     }
 
@@ -124,7 +140,9 @@ class PermissionSyncService
 
     /**
      * Flat (non-recursive) glob, deliberately: this does NOT reach
-     * Api/V1/Admin/Reception/*Controller.php, which is out of scope.
+     * Api/V1/Admin/Reception/*Controller.php, which is out of scope — see
+     * uncoveredControllers() below, which uses the same glob for the same
+     * reason.
      *
      * @return list<class-string>
      */
@@ -191,5 +209,48 @@ class PermissionSyncService
         }
 
         return array_values(array_unique($names));
+    }
+
+    /**
+     * Admin controllers that get no permission coverage at all today:
+     * neither reflected by discoverControllers() (they don't extend
+     * AdminResourceController) nor listed in MANUAL_REGISTRATIONS. This
+     * makes the gap `permissions:sync` reports visible instead of a silent
+     * assumption that the manual list is exhaustive.
+     *
+     * Same flat, non-recursive glob as discoverControllers(), so
+     * Api/V1/Admin/Reception/*Controller.php is excluded here too, on
+     * purpose, not by omission: its actions (checkIn/checkOut/approve/
+     * reject/settlePayment/...) don't fit the index/show/store/update/
+     * destroy vocabulary this service derives module.action permissions
+     * from at all, so flagging it here wouldn't point at an actionable fix
+     * the same way the other controllers in this list do — it would need
+     * its own custom permission-naming scheme first. See
+     * docs/decisions/rbac-permission-pilot.md's "Explicitly not done here"
+     * for the full reasoning and the six Reception controller names.
+     *
+     * @return list<class-string>
+     */
+    private function uncoveredControllers(): array
+    {
+        $covered = array_merge($this->discoverControllers(), array_keys(self::MANUAL_REGISTRATIONS));
+
+        $uncovered = [];
+
+        foreach (glob(app_path('Http/Controllers/Api/V1/Admin/*Controller.php')) ?: [] as $file) {
+            $class = 'App\\Http\\Controllers\\Api\\V1\\Admin\\'.basename($file, '.php');
+
+            if ($class === AdminResourceController::class || ! class_exists($class)) {
+                continue;
+            }
+
+            if (! in_array($class, $covered, true)) {
+                $uncovered[] = $class;
+            }
+        }
+
+        sort($uncovered);
+
+        return $uncovered;
     }
 }

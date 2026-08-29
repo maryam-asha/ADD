@@ -10,6 +10,7 @@ use App\Http\Resources\RoleResource;
 use App\Support\ProtectedRoles;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Response;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Spatie\Permission\Models\Permission;
@@ -50,6 +51,15 @@ class RoleController extends Controller
             return response()->json(['message' => __('api.role.protected_rename')], 422);
         }
 
+        // member is entirely out of scope for the admin permission system —
+        // members never touch the admin dashboard, so the member role must
+        // never hold an admin-panel permission (docs/decisions/rbac-permission-pilot.md).
+        // Only member is restricted this way: admin/operations permission
+        // edits are an intentional, already-accepted part of this pilot.
+        if ($role->name === 'member' && $request->has('permissions')) {
+            return response()->json(['message' => __('api.role.member_out_of_scope')], 422);
+        }
+
         $before = ['name' => $role->name, 'permissions' => $role->permissions()->pluck('name')];
 
         if ($newName !== null) {
@@ -68,7 +78,7 @@ class RoleController extends Controller
         return response()->json(['message' => __('api.admin.role_updated')]);
     }
 
-    public function destroy(Role $role): JsonResponse
+    public function destroy(Role $role): JsonResponse|Response
     {
         if (in_array($role->name, ProtectedRoles::NAMES, true)) {
             return response()->json(['message' => __('api.role.protected_delete')], 422);
@@ -82,7 +92,7 @@ class RoleController extends Controller
 
         $role->delete();
 
-        return response()->json(['message' => __('api.admin.role_deleted')]);
+        return response()->noContent();
     }
 
     public function permissions(): JsonResponse

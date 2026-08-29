@@ -20,10 +20,14 @@ Two backend tasks, scoped to the admin/operations dashboard only —
    PermissionSyncService` derives them by reflecting over every
    non-abstract `AdminResourceController` subclass's actually-registered
    routes (`index`/`show` → `view`, `store` → `create`, `update` →
-   `update`, `destroy` → `delete`), plus a short hardcoded map for the four
-   controllers that don't extend that base class — `UserController`,
-   `ErrorLogController`, `RoleController`, `SettingController`, each for
-   its own documented reason (see their class docblocks). Both the
+   `update`, `destroy` → `delete`), plus a short hardcoded map covering
+   exactly four of the controllers that don't extend that base class —
+   `UserController`, `ErrorLogController`, `RoleController`,
+   `SettingController`, each for its own documented reason (see their
+   class docblocks). This is a deliberately partial list, not a claim that
+   these are the only such controllers — see "Explicitly not done here"
+   below for the dozen more that currently get zero permission coverage,
+   and how that gap is now surfaced rather than silent. Both the
    `permissions:sync` Artisan command
    (`App\Console\Commands\SyncPermissionsCommand`) and `PermissionSeeder`
    call `PermissionSyncService::sync()` as the one source of truth.
@@ -62,8 +66,11 @@ separate claim that has to be kept in sync by hand.
   `RoleController::permissions()`'s response.
 - **Derived, not hand-typed** — see "Why" above.
   `PermissionSyncService::MANUAL_REGISTRATIONS` is the explicit, narrow
-  exception for the four controllers reflection can't reach, not a general
-  opt-out from derivation.
+  exception for four specific controllers this pilot chose to cover by
+  hand, not a claim that those are the only controllers reflection can't
+  reach, and not a general opt-out from derivation. A dozen more admin
+  controllers are in the same "doesn't extend AdminResourceController"
+  boat and are simply not covered yet — see "Explicitly not done here".
 - **`admin` is a normal seeded role holding every permission**, not a
   hardcoded `Gate::before` bypass. `PermissionSyncService::sync()`
   re-attaches `Permission::all()` to `admin` on every run
@@ -97,6 +104,43 @@ separate claim that has to be kept in sync by hand.
   on the original `role:admin|operations`/narrower `role:admin` middleware.
   Converting the rest is deliberate follow-up work, evaluated resource by
   resource, not assumed.
+- **Not full permission *coverage* either — a real, acknowledged gap, not
+  an oversight.** `PermissionSyncService::MANUAL_REGISTRATIONS` covers
+  exactly four controllers that don't extend `AdminResourceController`
+  (`UserController`, `ErrorLogController`, `RoleController`,
+  `SettingController`). At least a dozen more admin controllers also don't
+  extend it and get **no permission coverage at all** today — no
+  `permission:` middleware could even be wired to them yet, since no
+  permission for them exists:
+  - `CompanyController`
+  - `CompanyMemberController`
+  - `CurrencyController`
+  - `ExchangeRateController`
+  - `ExchangeRateSuggestionController`
+  - `PrivacyPolicyController`
+  - `Reception\AccessActivationController`
+  - `Reception\ArrivalRequestController`
+  - `Reception\BookingReceptionController`
+  - `Reception\ReceptionSessionsController`
+  - `Reception\WalkInSessionController`
+  - `Reception\WalletTopUpController`
+
+  This isn't silent: `PermissionSyncService::sync()` returns an `uncovered`
+  list (the six non-Reception controllers above, resolved by diffing every
+  `Api/V1/Admin/*Controller.php` file against the union of reflected +
+  manually-registered classes), and `permissions:sync` prints it as a
+  warning section on every run, the same way it already warns about stale
+  permissions. The six `Reception/*` controllers are deliberately excluded
+  from even that visibility check — same flat, non-recursive glob
+  `discoverControllers()` already uses to skip them — because their
+  actions (`checkIn`/`checkOut`/`approve`/`reject`/`settlePayment`/...)
+  don't fit the `index`/`show`/`store`/`update`/`destroy` vocabulary this
+  service derives `module.action` names from at all; surfacing them in the
+  same warning wouldn't point at an actionable fix the way the other six
+  do, since they'd need their own custom permission-naming scheme first,
+  not just an entry added to `MANUAL_REGISTRATIONS`. Converting any of
+  these 12 to real permission coverage is future work, evaluated
+  controller by controller like the route-enforcement rollout above.
 
 ## Relationship to D.8
 
@@ -154,13 +198,46 @@ Task B2 (`d8e4736`) — Branches switched to enforce it:
   already had pre-switch (not `branches.delete`, which was already
   `role:admin`-only, so `operations` never had it)
 - `bootstrap/app.php` — a translated `render()` branch for spatie's
-  `UnauthorizedException` (thrown by `PermissionMiddleware` on denial),
-  matching the existing `AccessDeniedHttpException` handling
+  `UnauthorizedException`, matching the existing `AccessDeniedHttpException`
+  handling. This exception type isn't specific to `PermissionMiddleware`:
+  spatie's `RoleMiddleware` and `RoleOrPermissionMiddleware` throw the same
+  class on denial, so this one branch also fixes the untranslated,
+  English-only 403 body for every existing `role:`-based denial app-wide
+  (every `role:admin`, `role:admin|operations`, `role:member` route in the
+  app, not just Branches' new `permission:` checks) — a bigger fix than
+  "Branches' 403s are now translated" alone would suggest.
 - Tests: `tests/Feature/Foundation/BranchPermissionEnforcementTest.php`
   (new — a custom role reaching Branches via permissions alone, the admin
   self-heal safeguard, the operations-parity regression, translated en/ar
   403 bodies, seeder idempotency); `tests/Feature/Foundation/
   BranchControllerTest.php` updated to seed `PermissionSeeder`
+
+Final-review fix pass (post-`e0deeac`) — see
+`.superpowers/sdd/recursive-enchanting-hippo/task-B-finalfix-report.md` for
+the full list; the two behavioral/decision-relevant ones:
+- `RoleController::update()` now rejects `PATCH admin/roles/{role}` with a
+  `permissions` key when the target role is `member` (422,
+  `api.role.member_out_of_scope`) — closes the gap where `member` could be
+  handed admin-panel permissions even though this decision always intended
+  it to be entirely out of scope. Admin/operations permission edits are
+  unaffected — only `member` is restricted this way.
+- `RoleController::destroy()` now returns `204 No Content` on success
+  instead of a `{message}` body, matching every other admin destroy
+  endpoint in the app (`AdminResourceController::destroy()`,
+  `ErrorLogController::destroy()`, `CompanyMemberController::destroy()`) —
+  the message-on-destroy was a one-off inconsistency in the original
+  RoleController implementation, not a deliberate second convention.
+
+## Deploy ordering
+
+On a fresh deploy, the `permissions` table starts empty. Until
+`permissions:sync` (or `PermissionSeeder`, which calls the same service)
+runs, `permission:branches.*` middleware finds nothing granted to any
+role — including `admin` — so Branches becomes unreachable for everyone
+until that first sync completes. This means `permissions:sync` (or
+seeding) must run as a required step of every deploy, not as an
+afterthought left to whoever remembers — the same way `migrate` is a
+required step, not optional polish.
 
 ## Guard
 

@@ -27,11 +27,19 @@ Policy method — not a second dimension on the role system:
 - `CompanyPolicy::manageMembers(User $user, Company $company): bool` — same
   shape, checking `is_admin` instead. A company admin can change another
   member's `door_access_enabled` or `is_admin`; a regular member cannot,
-  not even for themselves. Operations/admin bypass both checks
-  unconditionally via the existing `Gate::before`, and remain the only way
-  a company gets its first admin (`StoreCompanyMemberRequest` accepts
-  `is_admin` at creation) — a company admin can only grant `is_admin` to an
-  *existing* member, so nothing can bootstrap the first one.
+  not even for themselves. At the time this decision was written,
+  operations/admin bypassed both checks unconditionally via the
+  then-existing `Gate::before` — **update:** that bypass was removed by
+  `docs/decisions/rbac-permission-pilot.md`, so operations/admin no longer
+  get an automatic pass here; they now need a real
+  `is_admin=true`/`door_access_enabled=true` row on that specific company's
+  pivot like anyone else (see that doc's "Relationship to D.8" section for
+  the accepted behavior change this introduced — the rest of this decision,
+  flat roles and the pivot-flag mechanism itself, is unaffected). Operations/
+  admin remain the only way a company gets its first admin
+  (`StoreCompanyMemberRequest` accepts `is_admin` at creation) — a company
+  admin can only grant `is_admin` to an *existing* member, so nothing can
+  bootstrap the first one.
 
 A company member is still just a `member` role-wise. Both extra
 capabilities are a fact about one row in one pivot table, each checked by

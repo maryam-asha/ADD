@@ -31,13 +31,14 @@ class SyncPermissionsCommandTest extends TestCase
         $this->assertDatabaseHas('permissions', ['name' => 'branches.create']);
         $this->assertDatabaseHas('permissions', ['name' => 'branches.update']);
 
-        // routes/api/v1/admin.php registers `branches` via
-        // ->apiResource(...)->except('destroy') at the top level, but a
-        // separate role:admin-gated `Route::delete('branches/{branch}', ...)`
-        // pointed at the same BranchController@destroy is registered further
-        // down the same file — route introspection matches on the live
-        // Route objects, not on how they were registered, so that second
-        // route still produces branches.delete.
+        // routes/api/v1/admin.php registers `branches` entirely by hand
+        // (not via ->apiResource(...)) inside a
+        // Route::withoutMiddleware('role:admin|operations') group, with
+        // each action — including destroy — gated by its own
+        // permission:branches.* middleware (docs/decisions/rbac-permission-pilot.md).
+        // Route introspection matches on the live Route objects regardless
+        // of which block registered them, so branches.delete is still
+        // derived correctly from that hand-written destroy route.
         $this->assertDatabaseHas('permissions', ['name' => 'branches.delete']);
     }
 
@@ -113,5 +114,18 @@ class SyncPermissionsCommandTest extends TestCase
         // fresh, unfiltered Permission::all()) still holds it too.
         $admin = Role::findByName('admin', 'web');
         $this->assertTrue($admin->hasPermissionTo('ghost.view'));
+    }
+
+    public function test_it_warns_about_admin_controllers_with_no_permission_coverage_at_all(): void
+    {
+        // CompanyController is one of at least 12 currently-uncovered admin
+        // controllers (docs/decisions/rbac-permission-pilot.md's
+        // "Explicitly not done here") — it neither extends
+        // AdminResourceController (so discoverControllers() never finds it)
+        // nor appears in PermissionSyncService::MANUAL_REGISTRATIONS. This
+        // proves the gap is surfaced, not silent.
+        $this->artisan('permissions:sync')
+            ->expectsOutputToContain('CompanyController')
+            ->assertExitCode(0);
     }
 }

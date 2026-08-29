@@ -26,6 +26,11 @@ class SyncPermissionsCommand extends Command
             $this->table(['Stale'], array_map(fn ($n) => [$n], $result['stale']));
         }
 
+        if ($result['uncovered']) {
+            $this->components->warn('Admin controllers with NO permission coverage at all (neither reflected nor manually registered — see PermissionSyncService::MANUAL_REGISTRATIONS docblock):');
+            $this->table(['Uncovered controller'], array_map(fn ($n) => [$n], $result['uncovered']));
+        }
+
         return self::SUCCESS;
     }
 }
