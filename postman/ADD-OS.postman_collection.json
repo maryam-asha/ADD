@@ -57,6 +57,11 @@
                          "type":  "string"
                      },
                      {
+                         "key":  "role_id",
+                         "value":  "",
+                         "type":  "string"
+                     },
+                     {
                          "key":  "building_id",
                          "value":  "",
                          "type":  "string"
@@ -3244,14 +3249,14 @@
                                                                                                 "role"
                                                                                             ]
                                                                                },
-                                                                       "description":  "role must be member, operations, or admin. admin-only route. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
+                                                                       "description":  "role must be the name of an existing role (dynamic — not limited to member/operations/admin; see the Roles folder for managing custom roles). admin-only route. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
                                                                    }
                                                    }
                                                ]
                                   },
                                   {
                                       "name":  "Roles",
-                                      "description":  "Just the assignable role names â€” no granular permissions yet (D.8).",
+                                      "description":  "Dynamic role CRUD with auto-derived, granular permissions (docs/decisions/rbac-permission-pilot.md). member/operations/admin are protected and can never be renamed or deleted; member can never hold a permission. These five routes are themselves still gated by role:admin only, not by permission:* middleware — Branches is the sole pilot resource with real route-level permission enforcement in this pass. A custom role can be granted roles.view/create/update/delete (they exist and sync via PermissionSyncService), but a user holding only that custom role cannot yet call these endpoints on the strength of those permissions alone; only an actual admin/operations account can.",
                                       "item":  [
                                                    {
                                                        "name":  "List Roles",
@@ -3282,6 +3287,171 @@
                                                                                             ]
                                                                                }
                                                                    }
+                                                   },
+                                                   {
+                                                       "name": "Create Role",
+                                                       "event": [
+                                                           {
+                                                               "listen": "test",
+                                                               "script": {
+                                                                   "type": "text/javascript",
+                                                                   "exec": [
+                                                                       "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                                                       "    pm.collectionVariables.set('role_id', pm.response.json().data.id);",
+                                                                       "}"
+                                                                   ]
+                                                               }
+                                                           }
+                                                       ],
+                                                       "request": {
+                                                           "method": "POST",
+                                                           "header": [
+                                                               {
+                                                                   "key": "Content-Type",
+                                                                   "value": "application/json"
+                                                               },
+                                                               {
+                                                                   "key": "lang",
+                                                                   "value": "{{lang}}",
+                                                                   "type": "text"
+                                                               },
+                                                               {
+                                                                   "key": "currency",
+                                                                   "value": "{{currency}}",
+                                                                   "type": "text"
+                                                               }
+                                                           ],
+                                                           "body": {
+                                                               "mode": "raw",
+                                                               "raw": "{\n  \"name\": \"branch-manager\",\n  \"permissions\": [\"branches.view\", \"branches.update\"]\n}",
+                                                               "options": {
+                                                                   "raw": {
+                                                                       "language": "json"
+                                                                   }
+                                                               }
+                                                           },
+                                                           "url": {
+                                                               "raw": "{{base_url}}/api/v1/admin/roles",
+                                                               "host": [
+                                                                   "{{base_url}}"
+                                                               ],
+                                                               "path": [
+                                                                   "api",
+                                                                   "v1",
+                                                                   "admin",
+                                                                   "roles"
+                                                               ]
+                                                           },
+                                                           "description": "admin-only route. name must be unique; each permissions entry must already exist (see List Permissions). Any name is allowed for a new custom role — the three built-in names are already taken, so a client can't recreate them through this route."
+                                                       }
+                                                   },
+                                                   {
+                                                       "name": "Update Role",
+                                                       "request": {
+                                                           "method": "PUT",
+                                                           "header": [
+                                                               {
+                                                                   "key": "Content-Type",
+                                                                   "value": "application/json"
+                                                               },
+                                                               {
+                                                                   "key": "lang",
+                                                                   "value": "{{lang}}",
+                                                                   "type": "text"
+                                                               },
+                                                               {
+                                                                   "key": "currency",
+                                                                   "value": "{{currency}}",
+                                                                   "type": "text"
+                                                               }
+                                                           ],
+                                                           "body": {
+                                                               "mode": "raw",
+                                                               "raw": "{\n  \"name\": \"branch-manager\",\n  \"permissions\": [\"branches.view\", \"branches.update\", \"branches.create\"]\n}",
+                                                               "options": {
+                                                                   "raw": {
+                                                                       "language": "json"
+                                                                   }
+                                                               }
+                                                           },
+                                                           "url": {
+                                                               "raw": "{{base_url}}/api/v1/admin/roles/{{role_id}}",
+                                                               "host": [
+                                                                   "{{base_url}}"
+                                                               ],
+                                                               "path": [
+                                                                   "api",
+                                                                   "v1",
+                                                                   "admin",
+                                                                   "roles",
+                                                                   "{{role_id}}"
+                                                               ]
+                                                           },
+                                                           "description": "admin-only route (PUT or PATCH, both accepted). Renaming a protected role (member/operations/admin) is rejected with 422 (api.role.protected_rename). Sending a permissions key for the member role is always rejected with 422 (api.role.member_out_of_scope) — member never touches the admin dashboard, so it's out of scope for permissions regardless of rename intent. Returns `{\"message\": \"...\"}` on success, not the updated role resource."
+                                                       }
+                                                   },
+                                                   {
+                                                       "name": "Delete Role",
+                                                       "request": {
+                                                           "method": "DELETE",
+                                                           "header": [
+                                                               {
+                                                                   "key": "lang",
+                                                                   "value": "{{lang}}",
+                                                                   "type": "text"
+                                                               },
+                                                               {
+                                                                   "key": "currency",
+                                                                   "value": "{{currency}}",
+                                                                   "type": "text"
+                                                               }
+                                                           ],
+                                                           "url": {
+                                                               "raw": "{{base_url}}/api/v1/admin/roles/{{role_id}}",
+                                                               "host": [
+                                                                   "{{base_url}}"
+                                                               ],
+                                                               "path": [
+                                                                   "api",
+                                                                   "v1",
+                                                                   "admin",
+                                                                   "roles",
+                                                                   "{{role_id}}"
+                                                               ]
+                                                           },
+                                                           "description": "admin-only route. Rejects the three protected roles (422, api.role.protected_delete) and any role still assigned to a user (422, api.role.role_in_use — reassign those users first). Returns 204 No Content on success, not a message body."
+                                                       }
+                                                   },
+                                                   {
+                                                       "name": "List Permissions",
+                                                       "request": {
+                                                           "method": "GET",
+                                                           "header": [
+                                                               {
+                                                                   "key": "lang",
+                                                                   "value": "{{lang}}",
+                                                                   "type": "text"
+                                                               },
+                                                               {
+                                                                   "key": "currency",
+                                                                   "value": "{{currency}}",
+                                                                   "type": "text"
+                                                               }
+                                                           ],
+                                                           "url": {
+                                                               "raw": "{{base_url}}/api/v1/admin/permissions",
+                                                               "host": [
+                                                                   "{{base_url}}"
+                                                               ],
+                                                               "path": [
+                                                                   "api",
+                                                                   "v1",
+                                                                   "admin",
+                                                                   "permissions"
+                                                               ]
+                                                           },
+                                                           "description": "admin-only route. Every permission in the system, auto-derived from actual admin routes by PermissionSyncService (docs/decisions/rbac-permission-pilot.md) and grouped by module: `{data: [{module, actions: [{name, action}]}]}`. Coverage is deliberately partial today — AdminResourceController subclasses plus a short manual list (Users/ErrorLogs/Roles/Settings); about a dozen other admin controllers (Company, CompanyMember, Currency, ExchangeRate, ExchangeRateSuggestion, PrivacyPolicy, all six Reception/* controllers) aren't covered yet, and `permissions:sync` prints an \"uncovered controllers\" warning for the non-Reception half of that gap."
+                                                       }
                                                    }
                                                ]
                                   },

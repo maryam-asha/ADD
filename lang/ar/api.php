@@ -98,6 +98,14 @@ return [
         'announcement_updated' => 'تم تحديث الإعلان.',
         'exchange_rate_suggestion_dismissed' => 'تم رفض اقتراح سعر الصرف.',
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
+        'role_updated' => 'تم تحديث الدور.',
+    ],
+
+    'role' => [
+        'protected_rename' => 'لا يمكن إعادة تسمية هذا الدور.',
+        'protected_delete' => 'لا يمكن حذف هذا الدور.',
+        'role_in_use' => 'هذا الدور مسند حالياً لمستخدم واحد أو أكثر. يرجى إعادة إسنادهم قبل حذف الدور.',
+        'member_out_of_scope' => 'حسابات الأعضاء (member) لا تشارك في نظام صلاحيات لوحة التحكم؛ لا يمكن إسناد أي صلاحيات إدارية لدور العضو.',
     ],
 
     'access' => [

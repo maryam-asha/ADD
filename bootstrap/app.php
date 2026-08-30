@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\SetLocaleFromHeader;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -10,6 +11,7 @@ use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
+use Spatie\Permission\Exceptions\UnauthorizedException;
 use Spatie\Permission\Middleware\PermissionMiddleware;
 use Spatie\Permission\Middleware\RoleMiddleware;
 use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
@@ -65,7 +67,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // caller instead of an unconditional redirect() — see the class
             // docblock for why `redirectGuestsTo(fn () => null)` below only
             // covers the opposite direction.
-            'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+            'guest' => RedirectIfAuthenticated::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —
@@ -85,7 +87,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // which doesn't exist (Fortify's view routes are disabled).
         $exceptions->shouldRenderJsonWhen(fn () => true);
 
-        // Five specific exception shapes get a translated `message` instead
+        // Six specific exception shapes get a translated `message` instead
         // of Laravel's English-only default. Anything else (e.g. an
         // abort(403, __('api.auth.account_inactive')) elsewhere in the app)
         // already carries its own translated message and falls through to
@@ -117,6 +119,22 @@ return Application::configure(basePath: dirname(__DIR__))
         // assertion could not catch: api.auth.forbidden's English wording is
         // byte-identical to Laravel's own default.
         $exceptions->render(fn (AccessDeniedHttpException $e) => response()->json([
+            'message' => __('api.auth.forbidden'),
+        ], 403));
+
+        // Spatie's PermissionMiddleware (the `permission:`/`role:`/
+        // `role_or_permission:` route-middleware aliases registered above)
+        // throws this on denial rather than AccessDeniedHttpException — it
+        // does carry a real HTTP status (confirmed empirically: it already
+        // rendered as 403 before this branch existed), so it never reached
+        // the Throwable catch-all below, but its message was the package's
+        // untranslated English default ("User does not have the right
+        // permissions.") rather than this app's api.auth.forbidden — the
+        // same gap AccessDeniedHttpException had above, for a different
+        // reason. Verified with the Arabic assertion in
+        // BranchPermissionEnforcementTest, same reasoning as the comment on
+        // AccessDeniedHttpException above.
+        $exceptions->render(fn (UnauthorizedException $e) => response()->json([
             'message' => __('api.auth.forbidden'),
         ], 403));
 

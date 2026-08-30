@@ -67,10 +67,13 @@ class CompanyMemberController extends Controller
     }
 
     /**
-     * Operations grants/revokes company-admin status unconditionally
-     * (Gate::before bypass) — this is also the only way a company ever
-     * gets its first admin, since a company admin can only grant is_admin
-     * to an *existing* member (CompanyPolicy::manageMembers).
+     * Operations grants/revokes company-admin status unconditionally — not
+     * via a Gate::before/Policy bypass, this controller never calls
+     * CompanyPolicy::manageMembers() at all, so the role:admin|operations
+     * route gate is its only authorization. This is also the only way a
+     * company ever gets its first admin, since a company admin can only
+     * grant is_admin to an *existing* member (CompanyPolicy::manageMembers,
+     * enforced on the member-facing endpoint instead).
      */
     public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): JsonResponse
     {

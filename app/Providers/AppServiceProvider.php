@@ -3,7 +3,6 @@
 namespace App\Providers;
 
 use App\Domain\Identity\Models\Company;
-use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Policies\CompanyPolicy;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
 use App\Listeners\SetLocaleFromUserPreference;
@@ -32,8 +31,6 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        Gate::before(fn (User $user, string $ability) => $user->hasRole('admin') ? true : null);
-
         // Registered FIRST, and the order is load-bearing: corrects the
         // provisional locale SetLocaleFromHeader set before auth resolved, to
         // the user's preferred_language — but only when no valid `lang` header
