@@ -95,6 +95,7 @@ return [
         'business_hour_exception_updated' => 'تم تحديث استثناء ساعات العمل.',
         'currency_updated' => 'تم تحديث العملة.',
         'currency_status_updated' => 'تم تحديث حالة العملة.',
+        'currency_base_updated' => 'تم تحديث العملة الأساسية.',
         'announcement_updated' => 'تم تحديث الإعلان.',
         'exchange_rate_suggestion_dismissed' => 'تم رفض اقتراح سعر الصرف.',
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
@@ -120,6 +121,9 @@ return [
 
     'currency' => [
         'base_currency_status_locked' => 'لا يمكن تعطيل العملة الأساسية.',
+        'already_base' => 'هذه العملة هي العملة الأساسية بالفعل.',
+        'inactive_cannot_be_base' => 'لا يمكن تعيين عملة غير نشطة كعملة أساسية.',
+        'exchange_rates_block_reassignment' => 'لا يمكن إعادة تعيين العملة الأساسية بينما يوجد سجل لأسعار الصرف.',
     ],
 
     'reception' => [

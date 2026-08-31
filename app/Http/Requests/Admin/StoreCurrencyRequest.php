@@ -6,9 +6,9 @@ use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * `is_base` is deliberately not a field here at all — it's fixed forever
- * to the one seeded USD row and never settable through this endpoint
- * (docs/decisions/multi-currency-support.md).
+ * `is_base` is deliberately not a field here at all — a brand-new currency
+ * starting as base makes no sense; use PATCH currencies/{currency}/base to
+ * reassign the base after creation (docs/decisions/multi-currency-support.md).
  */
 class StoreCurrencyRequest extends FormRequest
 {

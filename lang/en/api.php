@@ -95,6 +95,7 @@ return [
         'business_hour_exception_updated' => 'Business hour exception updated.',
         'currency_updated' => 'Currency updated.',
         'currency_status_updated' => 'Currency status updated.',
+        'currency_base_updated' => 'Base currency updated.',
         'announcement_updated' => 'Announcement updated.',
         'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
@@ -120,6 +121,9 @@ return [
 
     'currency' => [
         'base_currency_status_locked' => 'The base currency cannot be deactivated.',
+        'already_base' => 'This currency is already the base currency.',
+        'inactive_cannot_be_base' => 'An inactive currency cannot be set as the base currency.',
+        'exchange_rates_block_reassignment' => 'Cannot reassign the base currency while exchange rate history exists.',
     ],
 
     'reception' => [

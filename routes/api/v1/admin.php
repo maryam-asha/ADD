@@ -143,6 +143,7 @@ Route::post('currencies', [CurrencyController::class, 'store']);
 Route::get('currencies/{currency}', [CurrencyController::class, 'show']);
 Route::patch('currencies/{currency}', [CurrencyController::class, 'update']);
 Route::patch('currencies/{currency}/status', [CurrencyController::class, 'updateStatus']);
+Route::patch('currencies/{currency}/base', [CurrencyController::class, 'updateBase']);
 
 // Multi-word resource name — Laravel's auto-derived {community_member}
 // placeholder (snake_case) won't implicit-bind to a camelCase controller

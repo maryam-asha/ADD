@@ -7,11 +7,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * docs/decisions/multi-currency-support.md: the base currency is fixed via
- * `currencies.is_base` — not user-configurable, and never multi-base.
- * CurrencyConversionService/CurrencyResolver both assume exactly one
- * always-active base row exists; this guard checks that invariant against
- * the migrated schema state itself, not just prose.
+ * docs/decisions/multi-currency-support.md (+ 2026-08-31 addendum): exactly
+ * one `currencies` row carries `is_base = true` at all times, and that row
+ * must be active. Which code it is is no longer a guaranteed invariant —
+ * PATCH currencies/{currency}/base can reassign it — so these tests assert
+ * the structural invariant only, not the identity of the base currency.
  */
 class ExactlyOneBaseCurrencyTest extends TestCase
 {
@@ -24,9 +24,20 @@ class ExactlyOneBaseCurrencyTest extends TestCase
 
     public function test_the_base_currency_is_active(): void
     {
-        $this->assertSame(
-            'USD',
-            Currency::query()->where('is_base', true)->where('is_active', true)->value('code')
-        );
+        $base = Currency::query()->where('is_base', true)->first();
+
+        $this->assertNotNull($base, 'No base currency found.');
+        $this->assertTrue((bool) $base->is_active, 'The base currency must be active.');
+    }
+
+    public function test_invariant_holds_after_reassignment(): void
+    {
+        $newBase = Currency::factory()->create(['code' => 'EUR', 'is_active' => true, 'is_base' => false]);
+
+        Currency::where('is_base', true)->update(['is_base' => false]);
+        $newBase->update(['is_base' => true]);
+
+        $this->assertSame(1, Currency::query()->where('is_base', true)->count());
+        $this->assertSame(1, Currency::query()->where('is_base', true)->where('is_active', true)->count());
     }
 }

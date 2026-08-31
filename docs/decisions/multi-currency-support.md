@@ -52,3 +52,24 @@ two-case `App\Domain\Finance\Enums\Currency` enum.
 [`ExactlyOneBaseCurrencyTest`](../../tests/Guards/ExactlyOneBaseCurrencyTest.php)
 asserts exactly one `currencies` row has `is_base = true`, and that it's
 active, against the migrated schema state.
+
+## Addendum (2026-08-31): base currency becomes reassignable
+
+Superseded clause: "not user-configurable and never multi-base... that
+row's status can never be flipped." Reversed deliberately, pre-launch,
+while no real exchange-rate history exists to invalidate — reassignment
+is expected once branch expansion needs a different natural base.
+
+- `is_base` becomes settable through one dedicated, guarded action
+  (never a plain field on the generic create/update requests — same
+  separation-of-concerns precedent as `is_active`/status).
+- The single-base invariant (`ExactlyOneBaseCurrencyTest`) still holds
+  at all times — this only changes *which* row it's true for, never
+  "exactly one."
+- Reassignment is blocked outright while any `exchange_rates` row
+  exists: every stored `rate_to_base` is meaningless once the base it
+  was computed against changes, and this decision does not attempt to
+  recompute financial history automatically. A future reassignment at
+  real-expansion time requires clearing/archiving `exchange_rates`
+  first, as its own deliberate, separate step — not something this
+  endpoint does silently.

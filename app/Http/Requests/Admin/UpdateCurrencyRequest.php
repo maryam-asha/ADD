@@ -7,8 +7,9 @@ use Illuminate\Foundation\Http\FormRequest;
 
 /**
  * `code`, `is_base` and `is_active` are deliberately absent — the code is
- * the immutable primary key, `is_base` never changes after seeding, and
- * `is_active` is a separate action (see UpdateCurrencyStatusRequest).
+ * the immutable primary key, `is_base` is reassignable only via the dedicated
+ * PATCH currencies/{currency}/base endpoint, and `is_active` is a separate
+ * action (see UpdateCurrencyStatusRequest).
  */
 class UpdateCurrencyRequest extends FormRequest
 {
