@@ -56,6 +56,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Where the AddDashboard SPA is served from. This API renders no views, so
+    | a link mailed to a user — a password reset, for one — has to point at the
+    | SPA rather than at a route here. Defaults to the first
+    | CORS_ALLOWED_ORIGINS entry, the dashboard's origin by convention, so a
+    | deploy that already configured that list has one less variable it can
+    | forget to set.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL') ?: explode(',', env('CORS_ALLOWED_ORIGINS') ?: 'http://localhost:5173')[0],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
