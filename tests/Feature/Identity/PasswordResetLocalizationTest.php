@@ -16,7 +16,17 @@ class PasswordResetLocalizationTest extends IdentityTestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('message', 'إذا كان هذا الرقم مرتبطاً بحساب، فسيتم إرسال رمز إعادة التعيين إليه.');
+        $response->assertJsonPath('message', 'تم إرسال رمز إعادة تعيين كلمة المرور إلى واتساب.');
+    }
+
+    public function test_forgot_password_rejects_unknown_number_in_arabic(): void
+    {
+        $response = $this->withHeader('lang', 'ar')->postJson('/api/v1/auth/password/forgot', [
+            'phone' => '+963999999999',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', 'هذا الرقم غير مسجّل لدينا.');
     }
 
     public function test_verify_with_an_invalid_code_is_translated(): void

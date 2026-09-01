@@ -449,7 +449,7 @@
                                                                                                 "forgot"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Sends a `password_reset` code. Always answers 200 with the same neutral message whether or not the number has an account â€” that is intentional, and means a 200 here is not confirmation that anything was sent.\n\nA registered number gets the code via the mock WhatsApp driver: read it from storage/logs/laravel.log and paste it into Verify Password Reset."
+                                                                       “description”:  “Sends a `password_reset` code to the number's WhatsApp.\n\n200 â€” code sent, proceed to Verify Password Reset.\n422 â€” number is not registered (message says so explicitly).\n429 â€” too many requests, `retry_after` (seconds) tells you when to retry.\n\nRead the code from storage/logs/laravel.log (mock driver) and paste it into Verify Password Reset.”
                                                                    }
                                                    },
                                                    {

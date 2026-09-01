@@ -166,23 +166,23 @@ class PasswordResetTest extends IdentityTestCase
         $response->assertJsonMissingPath('refresh_token');
     }
 
-    public function test_forgot_answers_an_unknown_number_exactly_as_a_known_one(): void
+    public function test_forgot_sends_code_to_a_registered_number(): void
     {
         $this->member();
 
-        $known = $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE]);
-        $unknown = $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963999999999']);
+        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])
+            ->assertOk()
+            ->assertJsonPath('message', __('api.auth.password_reset_code_sent'));
 
-        $known->assertOk();
-        $unknown->assertOk();
-        $this->assertSame($known->json(), $unknown->json());
+        $this->assertNotNull($this->otpProvider->lastCodeFor(self::PHONE));
     }
 
-    public function test_forgot_sends_nothing_to_an_unknown_number(): void
+    public function test_forgot_rejects_an_unregistered_number(): void
     {
-        $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963999999999'])->assertOk();
+        $response = $this->postJson('/api/v1/auth/password/forgot', ['phone' => '+963999999999']);
 
-        $this->assertNull($this->otpProvider->lastCodeFor('+963999999999'));
+        $response->assertStatus(422);
+        $response->assertJsonPath('message', __('api.auth.phone_not_found'));
         $this->assertDatabaseCount('otp_verifications', 0);
     }
 

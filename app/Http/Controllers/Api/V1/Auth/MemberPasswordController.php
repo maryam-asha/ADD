@@ -28,25 +28,23 @@ class MemberPasswordController extends Controller
         private readonly TokenPairService $tokens,
     ) {}
 
-    /**
-     * Always answers the same way, whether or not the number has an account.
-     *
-     * The throttle exception is swallowed rather than surfaced for the same
-     * reason: a 429 on the second call would mark the numbers that actually
-     * received something, and a plain 200 on the rest. The cooldown still does
-     * its job — the code simply isn't re-sent — and route-level throttling
-     * covers outright abuse of the endpoint.
-     */
     public function forgot(ForgotPasswordRequest $request): JsonResponse
     {
         $phone = $request->validated('phone');
 
-        if ($this->memberFor($phone)) {
-            try {
-                $this->otp->request($phone, OtpPurpose::PasswordReset);
-            } catch (OtpThrottledException) {
-                // Intentionally indistinguishable from the success path.
-            }
+        if (! $this->memberFor($phone)) {
+            return response()->json([
+                'message' => __('api.auth.phone_not_found'),
+            ], 422);
+        }
+
+        try {
+            $this->otp->request($phone, OtpPurpose::PasswordReset);
+        } catch (OtpThrottledException $e) {
+            return response()->json([
+                'message' => __('api.auth.otp_request_throttled'),
+                'retry_after' => $e->retryAfterSeconds,
+            ], 429);
         }
 
         return response()->json([
