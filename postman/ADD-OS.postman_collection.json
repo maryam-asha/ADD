@@ -17,11 +17,6 @@
                          "type":  "string"
                      },
                      {
-                         "key":  "member_reset_token",
-                         "value":  "",
-                         "type":  "string"
-                     },
-                     {
                          "key":  "founder_id",
                          "value":  "",
                          "type":  "string"
@@ -244,11 +239,56 @@
                                                                                                 "verify"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Step 2 of sign-up, and ACCOUNT CREATION ONLY â€” this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the \u0027member\u0027 role, provisions an empty wallet, and discards the parked row â€” all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile â€” step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between â€” a race, not the normal \"already registered\" answer, which step 1 gives you as a 422."
+                                                                       "description":  "Step 2 of sign-up, and ACCOUNT CREATION ONLY â€” this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the \u0027member\u0027 role, provisions an empty wallet, and discards the parked row â€” all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile â€” step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between â€” a race, not the normal \”already registered\” answer, which step 1 gives you as a 422.”
                                                                    }
                                                    },
                                                    {
-                                                       "name":  "Login",
+                                                       “name”:  “Register â€” Resend Code”,
+                                                       “request”:  {
+                                                                       “method”:  “POST”,
+                                                                       “header”:  [
+                                                                                      {
+                                                                                          “key”:  “Content-Type”,
+                                                                                          “value”:  “application/json”
+                                                                                      },
+                                                                                      {
+                                                                                          “key”:  “lang”,
+                                                                                          “value”:  “{{lang}}”,
+                                                                                          “type”:  “text”
+                                                                                      },
+                                                                                      {
+                                                                                          “key”:  “currency”,
+                                                                                          “value”:  “{{currency}}”,
+                                                                                          “type”:  “text”
+                                                                                      }
+                                                                                  ],
+                                                                       “body”:  {
+                                                                                    “mode”:  “raw”,
+                                                                                    “raw”:  “{\n  \”phone\”: \”{{member_phone}}\”\n}”,
+                                                                                    “options”:  {
+                                                                                                    “raw”:  {
+                                                                                                                “language”:  “json”
+                                                                                                            }
+                                                                                                }
+                                                                                },
+                                                                       “url”:  {
+                                                                                   “raw”:  “{{base_url}}/api/v1/auth/register/resend”,
+                                                                                   “host”:  [
+                                                                                                “{{base_url}}”
+                                                                                            ],
+                                                                                   “path”:  [
+                                                                                                “api”,
+                                                                                                “v1”,
+                                                                                                “auth”,
+                                                                                                “register”,
+                                                                                                “resend”
+                                                                                            ]
+                                                                               },
+                                                                       “description”:  “Resends the registration OTP for a phone that already has a pending registration parked by Register â€” Send Code. Only needed if the code did not arrive.\n\nUnlike Forgot Password, a throttled resend returns 429 with `retry_after` (seconds) â€” the caller already knows they are mid sign-up, so the wait time is actionable. Outside the cooldown window the code is re-sent and 200 is returned.\n\n200 with the same neutral message whether or not a usable pending entry exists (does not reveal whether the number is in the system). If the 5-minute session has expired, run Register again from the beginning.”
+                                                                   }
+                                                   },
+                                                   {
+                                                       “name”:  “Login”,
                                                        "event":  [
                                                                      {
                                                                          "listen":  "test",
@@ -414,21 +454,6 @@
                                                    },
                                                    {
                                                        "name":  "Verify Password Reset",
-                                                       "event":  [
-                                                                     {
-                                                                         "listen":  "test",
-                                                                         "script":  {
-                                                                                        "type":  "text/javascript",
-                                                                                        "exec":  [
-                                                                                                     "if (pm.response.code === 200) {",
-                                                                                                     "    const body = pm.response.json();",
-                                                                                                     "    pm.collectionVariables.set('member_reset_token', body.reset_token);",
-                                                                                                     "    console.log('member_reset_token captured');",
-                                                                                                     "}"
-                                                                                                 ]
-                                                                                    }
-                                                                     }
-                                                                 ],
                                                        "request":  {
                                                                        "method":  "POST",
                                                                        "header":  [
@@ -469,7 +494,7 @@
                                                                                                 "verify"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Step 2 of recovery: spends the code Forgot Password sent and, on success, mints a short-lived single-use `reset_token` (captured automatically) for step 3 â€” the code itself cannot be re-checked by Reset Password, since a successful verify marks it spent.\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so."
+                                                                       “description”:  “Step 2 of recovery: spends the code Forgot Password sent and, on success, authorizes the reset server-side â€” the code itself cannot be re-checked by Reset Password, since a successful verify marks it spent.\n\nOn 200, proceed directly to Reset Password with just phone + new password (no token to copy).\n\nThe code must have been issued by Forgot Password. A sign-up code sent here is refused with 422 and a message saying so.”
                                                                    }
                                                    },
                                                    {
@@ -494,7 +519,7 @@
                                                                                   ],
                                                                        "body":  {
                                                                                     "mode":  "raw",
-                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"reset_token\": \"{{member_reset_token}}\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
+                                                                                    "raw":  "{\n  \"phone\": \"{{member_phone}}\",\n  \"password\": \"{{member_password}}\",\n  \"password_confirmation\": \"{{member_password}}\"\n}",
                                                                                     "options":  {
                                                                                                     "raw":  {
                                                                                                                 "language":  "json"
@@ -514,7 +539,7 @@
                                                                                                 "reset"
                                                                                             ]
                                                                                },
-                                                                       "description":  "Sets the new password and revokes every access and refresh token the member holds, on every device â€” the old password may already be compromised, so nothing opened under it survives.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\n`reset_token` must be the value Verify Password Reset just minted ({{member_reset_token}}) â€” it is single-use and short-lived, and the raw code from Forgot Password is not accepted here."
+                                                                       “description”:  “Step 3 of recovery: sets the new password and revokes every access and refresh token the member holds, on every device â€” the old password may already be compromised, so nothing opened under it survives.\n\nNo token needed in the body â€” Verify Password Reset left a server-side authorization flag that this call spends. Just send phone + new password.\n\nIssues no token on purpose: run Login afterwards with the new password. {{member_token}} and {{member_refresh_token}} are stale until you do.\n\n422 means the authorization from step 2 has expired or was already spent â€” run Forgot Password again to start over.”
                                                                    }
                                                    },
                                                    {

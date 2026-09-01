@@ -17,9 +17,9 @@ class ResetPasswordRequest extends FormRequest
      * stated in one place per flow, so a member can never end up with a
      * password the sign-up path would have refused.
      *
-     * `reset_token` replaces the raw code here: the code was already spent
-     * against `auth/password/verify`, which is where this step's proof of
-     * having received it belongs instead.
+     * The reset step requires no proof beyond the phone: `auth/password/verify`
+     * already spent the code and left a server-side authorization flag, so the
+     * only input needed here is the new credential itself.
      *
      * @return array<string, mixed>
      */
@@ -27,7 +27,6 @@ class ResetPasswordRequest extends FormRequest
     {
         return [
             'phone' => ['required', 'string', new PhoneNumber],
-            'reset_token' => ['required', 'string'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
         ];
     }

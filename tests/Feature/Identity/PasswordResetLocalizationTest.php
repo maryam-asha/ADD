@@ -33,19 +33,18 @@ class PasswordResetLocalizationTest extends IdentityTestCase
         $response->assertJsonPath('message', 'Invalid or expired code.');
     }
 
-    public function test_reset_with_an_invalid_reset_token_is_translated(): void
+    public function test_reset_without_prior_verify_is_translated(): void
     {
         $member = User::factory()->create(['phone' => '+963912345678']);
         $member->assignRole('member');
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/auth/password/reset', [
             'phone' => '+963912345678',
-            'reset_token' => 'not-a-real-token',
             'password' => 'new-password',
             'password_confirmation' => 'new-password',
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('message', 'Invalid or expired reset token. Please request a new code.');
+        $response->assertJsonPath('message', 'Password reset authorization expired or invalid. Please request a new code.');
     }
 }

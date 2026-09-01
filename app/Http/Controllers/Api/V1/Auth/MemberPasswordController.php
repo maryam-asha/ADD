@@ -55,10 +55,10 @@ class MemberPasswordController extends Controller
     }
 
     /**
-     * Spends the code and hands back a short-lived, single-use token for the
-     * next step. The code itself can't do double duty as that proof: verify()
-     * marks it verified_at on success, which drops it out of the "outstanding"
-     * query verify() itself reads, so it cannot be checked again by reset().
+     * Spends the code and authorizes the reset step server-side. The code
+     * itself can't do double duty as that proof: verify() marks it verified_at
+     * on success, which drops it out of the "outstanding" query verify() itself
+     * reads, so it cannot be checked again by reset().
      */
     public function verify(VerifyPasswordResetRequest $request): JsonResponse
     {
@@ -86,12 +86,9 @@ class MemberPasswordController extends Controller
             return response()->json(['message' => __('api.auth.code_invalid')], 422);
         }
 
-        $token = $this->otp->issueResetToken($phone, OtpPurpose::PasswordReset);
+        $this->otp->authorizeReset($phone, OtpPurpose::PasswordReset);
 
-        return response()->json([
-            'message' => __('api.auth.otp_verified'),
-            'reset_token' => $token,
-        ]);
+        return response()->json(['message' => __('api.auth.otp_verified')]);
     }
 
     /**
@@ -106,16 +103,16 @@ class MemberPasswordController extends Controller
 
         $user = $this->memberFor($phone);
 
-        // Checked before the token is spent, and answered as an invalid token
-        // so the endpoint stays as silent as forgot() about who has an account
-        // here. forgot() never mints a code for a non-member, so this should be
-        // unreachable — it is the backstop, not the gate.
+        // Checked before the authorization is spent, and answered as an
+        // invalid code so the endpoint stays as silent as forgot() about who
+        // has an account here. forgot() never mints a code for a non-member,
+        // so this should be unreachable — it is the backstop, not the gate.
         if (! $user) {
-            return response()->json(['message' => __('api.auth.reset_token_invalid')], 422);
+            return response()->json(['message' => __('api.auth.reset_authorization_invalid')], 422);
         }
 
-        if (! $this->otp->consumeResetToken($phone, $request->validated('reset_token'), OtpPurpose::PasswordReset)) {
-            return response()->json(['message' => __('api.auth.reset_token_invalid')], 422);
+        if (! $this->otp->consumeResetAuthorization($phone, OtpPurpose::PasswordReset)) {
+            return response()->json(['message' => __('api.auth.reset_authorization_invalid')], 422);
         }
 
         DB::transaction(function () use ($user, $request) {

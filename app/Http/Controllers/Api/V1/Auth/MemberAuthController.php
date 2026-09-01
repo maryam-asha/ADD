@@ -9,6 +9,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Http\Requests\Auth\RegisterRequest;
@@ -68,6 +69,36 @@ class MemberAuthController extends Controller
                 'message' => __('api.auth.otp_request_throttled'),
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
+        }
+
+        return response()->json(['message' => __('api.auth.otp_sent')]);
+    }
+
+    /**
+     * Resend the registration OTP for a phone that already has a pending
+     * registration parked by step one. The response is deliberately identical
+     * whether or not a usable pending entry exists — the same reason forgot()
+     * gives for not confirming account existence.
+     *
+     * Unlike forgot(), a throttled resend is surfaced as 429: the caller
+     * already knows they are in the middle of sign-up, so a "wait N seconds"
+     * response costs nothing in information and lets the UI give useful feedback.
+     */
+    public function resendRegistration(ForgotPasswordRequest $request): JsonResponse
+    {
+        $phone = $request->validated('phone');
+
+        $pending = PendingRegistration::where('phone', $phone)->first();
+
+        if ($pending && $pending->isUsable()) {
+            try {
+                $this->otp->request($phone, OtpPurpose::Registration);
+            } catch (OtpThrottledException $e) {
+                return response()->json([
+                    'message' => __('api.auth.otp_request_throttled'),
+                    'retry_after' => $e->retryAfterSeconds,
+                ], 429);
+            }
         }
 
         return response()->json(['message' => __('api.auth.otp_sent')]);

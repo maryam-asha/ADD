@@ -14,10 +14,11 @@ use Tests\Support\InteractsWithOtp;
  * old one, so it has to assume the old one is already in the wrong hands:
  * every session opened under it dies the moment the password changes.
  *
- * Three calls now, mirroring the sign-up screens: forgot (send code), verify
- * (spend the code for a one-time reset_token), reset (spend that token for
- * the new password). The raw code never reaches the third call — verify()
- * marks it verified_at, which is why reset() needs a token instead.
+ * Three calls: forgot (send code), verify (spend the code, authorize the
+ * reset server-side), reset (phone + new password — no token in the body,
+ * the server holds the proof). The raw code never reaches the third call —
+ * verify() marks it verified_at, which is why reset() relies on a server-side
+ * authorization flag instead of re-checking the code.
  */
 class PasswordResetTest extends IdentityTestCase
 {
@@ -58,18 +59,16 @@ class PasswordResetTest extends IdentityTestCase
 
     /**
      * The full happy-path flow: forgot -> verify -> reset. Overrides land on
-     * the final reset() call only — pass 'reset_token' to replace the one this
-     * helper mints for itself.
+     * the final reset() call only.
      */
     private function reset(array $overrides = []): TestResponse
     {
         $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
 
-        $resetToken = $this->verify()->assertOk()->json('reset_token');
+        $this->verify()->assertOk();
 
         return $this->postJson('/api/v1/auth/password/reset', array_merge([
             'phone' => self::PHONE,
-            'reset_token' => $resetToken,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ], $overrides));
@@ -252,97 +251,61 @@ class PasswordResetTest extends IdentityTestCase
     }
 
     /**
-     * The reset_token minted by verify() is single-use independent of the
-     * code that produced it — spending it once for a real reset must not
-     * leave it good for a second one.
+     * The authorization minted by verify() is single-use — spending it once
+     * for a real reset must not leave it open for a second one.
      */
-    public function test_a_reset_token_cannot_be_spent_twice(): void
+    public function test_reset_authorization_is_single_use(): void
     {
         $this->member();
 
-        $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
-        $token = $this->verify()->assertOk()->json('reset_token');
-
-        $this->postJson('/api/v1/auth/password/reset', [
-            'phone' => self::PHONE,
-            'reset_token' => $token,
-            'password' => self::NEW_PASSWORD,
-            'password_confirmation' => self::NEW_PASSWORD,
-        ])->assertOk();
+        $this->reset()->assertOk();
 
         $response = $this->postJson('/api/v1/auth/password/reset', [
             'phone' => self::PHONE,
-            'reset_token' => $token,
             'password' => 'third-password',
             'password_confirmation' => 'third-password',
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+        $response->assertJsonPath('message', __('api.auth.reset_authorization_invalid'));
     }
 
-    public function test_reset_rejects_a_missing_reset_token(): void
-    {
-        $this->member();
-
-        $this->postJson('/api/v1/auth/password/reset', [
-            'phone' => self::PHONE,
-            'password' => self::NEW_PASSWORD,
-            'password_confirmation' => self::NEW_PASSWORD,
-        ])->assertStatus(422)->assertJsonValidationErrors('reset_token');
-    }
-
-    public function test_reset_rejects_a_garbage_reset_token(): void
-    {
-        $this->member();
-
-        $response = $this->reset(['reset_token' => 'not-a-real-token']);
-
-        $response->assertStatus(422);
-        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
-    }
-
-    public function test_reset_rejects_an_expired_reset_token(): void
+    public function test_reset_authorization_expires(): void
     {
         $this->member();
 
         $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
-        $token = $this->verify()->assertOk()->json('reset_token');
+        $this->verify()->assertOk();
 
         $this->travel(config('otp.reset_token_ttl_minutes') + 1)->minutes();
 
         $response = $this->postJson('/api/v1/auth/password/reset', [
             'phone' => self::PHONE,
-            'reset_token' => $token,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+        $response->assertJsonPath('message', __('api.auth.reset_authorization_invalid'));
     }
 
     /**
-     * The raw OTP code is not an acceptable substitute for the reset_token
-     * verify() hands back — the two are different secrets on purpose.
+     * reset() without a prior verify() — no authorization on record.
      */
-    public function test_reset_no_longer_accepts_the_raw_otp_code_in_place_of_a_token(): void
+    public function test_reset_without_verify_is_rejected(): void
     {
         $this->member();
 
         $this->postJson('/api/v1/auth/password/forgot', ['phone' => self::PHONE])->assertOk();
-        $code = $this->otpProvider->lastCodeFor(self::PHONE);
-        $this->verify($code)->assertOk();
 
         $response = $this->postJson('/api/v1/auth/password/reset', [
             'phone' => self::PHONE,
-            'reset_token' => $code,
             'password' => self::NEW_PASSWORD,
             'password_confirmation' => self::NEW_PASSWORD,
         ]);
 
         $response->assertStatus(422);
-        $response->assertJsonPath('message', __('api.auth.reset_token_invalid'));
+        $response->assertJsonPath('message', __('api.auth.reset_authorization_invalid'));
     }
 
     public function test_the_new_password_must_meet_the_minimum_length(): void

@@ -97,55 +97,44 @@ class OtpService
     }
 
     /**
-     * Mint a fresh single-use secret for the row `verify()` just marked
-     * verified, so a later step can prove it without re-presenting (and
-     * re-spending) the original code.
+     * Mark the row `verify()` just stamped as authorized to reset the password.
+     * The authorization is time-limited and single-use — `consumeResetAuthorization()`
+     * clears it the moment it is spent, whether the reset succeeds or not.
      *
      * Only ever called immediately after `verify()` has returned
-     * OtpResult::Verified for this exact phone/purpose, so the row this looks
-     * up should always exist — `firstOrFail()` turns "somehow it doesn't"
-     * into a clear error instead of a silently issued token for nothing.
+     * OtpResult::Verified for this exact phone/purpose.
      */
-    public function issueResetToken(string $phone, OtpPurpose $purpose): string
+    public function authorizeReset(string $phone, OtpPurpose $purpose): void
+    {
+        OtpVerification::where('phone', $phone)
+            ->where('purpose', $purpose)
+            ->whereNotNull('verified_at')
+            ->latest('id')
+            ->firstOrFail()
+            ->update([
+                'password_reset_authorized_at' => now()->addMinutes(config('otp.reset_token_ttl_minutes')),
+            ]);
+    }
+
+    /**
+     * Spend the authorization minted by authorizeReset(). Single-use: the
+     * timestamp is cleared on first match, so the same window cannot be spent
+     * twice independent of what the caller does with the result.
+     */
+    public function consumeResetAuthorization(string $phone, OtpPurpose $purpose): bool
     {
         $otp = OtpVerification::where('phone', $phone)
             ->where('purpose', $purpose)
             ->whereNotNull('verified_at')
+            ->where('password_reset_authorized_at', '>', now())
             ->latest('id')
-            ->firstOrFail();
-
-        $plain = bin2hex(random_bytes(32));
-
-        $otp->update([
-            'reset_token_hash' => hash('sha256', $plain),
-            'reset_token_expires_at' => now()->addMinutes(config('otp.reset_token_ttl_minutes')),
-        ]);
-
-        return $plain;
-    }
-
-    /**
-     * Spend a token minted by issueResetToken(). Single-use: whether or not
-     * it matches, a match is cleared the moment it's found, so the same token
-     * can never be presented twice — independent of what the caller goes on
-     * to do with the result.
-     */
-    public function consumeResetToken(string $phone, string $plainToken, OtpPurpose $purpose): bool
-    {
-        $otp = OtpVerification::where('phone', $phone)
-            ->where('purpose', $purpose)
-            ->where('reset_token_hash', hash('sha256', $plainToken))
-            ->where('reset_token_expires_at', '>', now())
             ->first();
 
         if (! $otp) {
             return false;
         }
 
-        $otp->update([
-            'reset_token_hash' => null,
-            'reset_token_expires_at' => null,
-        ]);
+        $otp->update(['password_reset_authorized_at' => null]);
 
         return true;
     }

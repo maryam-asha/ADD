@@ -13,6 +13,7 @@ Route::prefix('auth')->group(function () {
     // signs in at 'login' instead.
     Route::post('register', [MemberAuthController::class, 'register'])->middleware('throttle:10,1');
     Route::post('register/verify', [MemberAuthController::class, 'verifyRegistration'])->middleware('throttle:10,1');
+    Route::post('register/resend', [MemberAuthController::class, 'resendRegistration'])->middleware('throttle:10,1');
 
     // 'member-login' is a named limiter (AppServiceProvider) keyed on phone+IP
     // rather than IP alone — the plain throttle middleware can't see the body.

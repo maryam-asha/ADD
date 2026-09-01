@@ -18,8 +18,7 @@ class OtpVerification extends Model
         'attempts',
         'expires_at',
         'verified_at',
-        'reset_token_hash',
-        'reset_token_expires_at',
+        'password_reset_authorized_at',
     ];
 
     protected function casts(): array
@@ -28,7 +27,7 @@ class OtpVerification extends Model
             'purpose' => OtpPurpose::class,
             'expires_at' => 'datetime',
             'verified_at' => 'datetime',
-            'reset_token_expires_at' => 'datetime',
+            'password_reset_authorized_at' => 'datetime',
         ];
     }
 }
