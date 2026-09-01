@@ -16,7 +16,7 @@ return [
         'refresh_token_invalid' => 'Invalid or expired refresh token.',
         'logged_out' => 'Logged out.',
         'phone_not_found' => 'This number is not registered.',
-        'password_reset_code_sent' => 'A password reset code has been sent to your WhatsApp.',
+        'password_reset_code_sent' => 'A password reset code has been sent.',
         'otp_verified' => 'Code verified.',
         'reset_authorization_invalid' => 'Password reset authorization expired or invalid. Please request a new code.',
         'password_updated' => 'Password updated. Please log in with your new password.',

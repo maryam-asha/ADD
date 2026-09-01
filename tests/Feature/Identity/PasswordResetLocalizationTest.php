@@ -16,7 +16,7 @@ class PasswordResetLocalizationTest extends IdentityTestCase
         ]);
 
         $response->assertOk();
-        $response->assertJsonPath('message', 'تم إرسال رمز إعادة تعيين كلمة المرور إلى واتساب.');
+        $response->assertJsonPath('message', 'تم إرسال رمز إعادة تعيين كلمة المرور.');
     }
 
     public function test_forgot_password_rejects_unknown_number_in_arabic(): void
