@@ -16,13 +16,18 @@ use App\Domain\Finance\Models\ExchangeRate;
  */
 class CurrencyConversionService
 {
+    public function baseCurrencyCode(): string
+    {
+        return Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+    }
+
     public function convert(float $amount, string $fromCurrency, string $toCurrency): ?float
     {
         if ($fromCurrency === $toCurrency) {
             return $amount;
         }
 
-        $baseCurrency = Currency::query()->where('is_base', true)->value('code');
+        $baseCurrency = $this->baseCurrencyCode();
 
         if ($toCurrency === $baseCurrency) {
             $rate = ExchangeRate::current($fromCurrency);

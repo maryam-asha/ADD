@@ -30,5 +30,6 @@ class SettingSeeder extends Seeder
         $settings->setDefault('kiosk.arrival_qr_value', 'addapp://arrival', SettingValueType::String);
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
+        $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
     }
 }
