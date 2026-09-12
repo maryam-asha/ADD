@@ -94,8 +94,7 @@ class SpaceSeeder extends Seeder
                 'allocation_model' => AllocationModel::Open,
                 'is_lockable' => false,
                 'capacity' => 1,
-                'hourly_rate' => 3.00,
-                'pricing_currency' => 'USD',
+                'hourly_rate_points' => 30,
                 'cancellation_window_minutes' => 60,
                 'slot_granularity_minutes' => 60,
                 'buffer_minutes' => 0,
@@ -128,8 +127,7 @@ class SpaceSeeder extends Seeder
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
-                'hourly_rate' => 12.00,
-                'pricing_currency' => 'USD',
+                'hourly_rate_points' => 120,
                 'cancellation_window_minutes' => 60,
                 'slot_granularity_minutes' => 30,
                 'buffer_minutes' => 0,
@@ -155,8 +153,7 @@ class SpaceSeeder extends Seeder
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
-                'hourly_rate' => 18.00,
-                'pricing_currency' => 'USD',
+                'hourly_rate_points' => 180,
                 'cancellation_window_minutes' => 120,
                 'slot_granularity_minutes' => 60,
                 'buffer_minutes' => 0,
@@ -181,8 +178,7 @@ class SpaceSeeder extends Seeder
                 'allocation_model' => AllocationModel::BookingDaily,
                 'is_lockable' => true,
                 'capacity' => 80,
-                'hourly_rate' => 120.00,
-                'pricing_currency' => 'USD',
+                'hourly_rate_points' => 1200,
                 'cancellation_window_minutes' => 1440,
                 'slot_granularity_minutes' => 60,
                 'buffer_minutes' => 30,
@@ -199,7 +195,7 @@ class SpaceSeeder extends Seeder
     }
 
     /**
-     * @param array<int, array{name: string, category: ResourceCategory, quantity: int}> $resources
+     * @param  array<int, array{name: string, category: ResourceCategory, quantity: int}>  $resources
      */
     private function seedResources(Space $space, array $resources): void
     {

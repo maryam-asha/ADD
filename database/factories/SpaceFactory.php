@@ -31,8 +31,7 @@ class SpaceFactory extends Factory
             // mismatch does so explicitly.
             'is_lockable' => $type->isLockable(),
             'capacity' => fake()->numberBetween(4, 40),
-            'hourly_rate' => null,
-            'pricing_currency' => null,
+            'hourly_rate_points' => 120,
             'status' => OperationalStatus::Active,
         ];
     }
@@ -48,16 +47,14 @@ class SpaceFactory extends Factory
     public function room(): static
     {
         return $this->ofType(SpaceType::Room)->state([
-            'hourly_rate' => fake()->randomFloat(2, 5, 50),
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => fake()->numberBetween(50, 500),
         ]);
     }
 
     public function eventHall(): static
     {
         return $this->ofType(SpaceType::EventHall)->state([
-            'hourly_rate' => fake()->randomFloat(2, 50, 300),
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => fake()->numberBetween(500, 3000),
         ]);
     }
 

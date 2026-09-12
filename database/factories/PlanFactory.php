@@ -23,11 +23,10 @@ class PlanFactory extends Factory
                 'ar' => 'خطة '.fake()->word(),
             ],
             'is_subscription' => true,
-            'price' => fake()->randomFloat(2, 20, 200),
-            'pricing_currency' => 'USD',
+            'price_points' => 500,
             'duration_days' => 30,
             'included_hours' => 0,
-            'overage_rate' => null,
+            'overage_rate_points' => 30,
             'is_active' => true,
             'order' => 0,
         ];
