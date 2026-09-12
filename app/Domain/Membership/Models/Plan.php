@@ -5,15 +5,13 @@ namespace App\Domain\Membership\Models;
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Public catalog (two-tier Admin/Public controller, later phase). `price`
- * and `overage_rate` use the same `decimal:2` cast as the one existing
- * money column in this codebase (`Space::hourly_rate`) — decision #15's
- * DECIMAL-only rule applies to the cast too, not just the migration column.
+ * Public catalog (two-tier Admin/Public controller, later phase). `price_points`
+ * and `overage_rate_points` are whole ADD Points — a cardinal quantity, cast
+ * as integers rather than the decimal cast used for the old dollar columns.
  */
 class Plan extends Model
 {
@@ -24,11 +22,10 @@ class Plan extends Model
         'name',
         'subtitle',
         'is_subscription',
-        'price',
-        'pricing_currency',
+        'price_points',
+        'overage_rate_points',
         'duration_days',
         'included_hours',
-        'overage_rate',
         'is_active',
         'order',
     ];
@@ -39,9 +36,9 @@ class Plan extends Model
             'name' => 'array',
             'subtitle' => 'array',
             'is_subscription' => 'boolean',
-            'price' => 'decimal:2',
+            'price_points' => 'integer',
             'included_hours' => 'decimal:2',
-            'overage_rate' => 'decimal:2',
+            'overage_rate_points' => 'integer',
             'is_active' => 'boolean',
         ];
     }

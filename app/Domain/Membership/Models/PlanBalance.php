@@ -16,7 +16,7 @@ class PlanBalance extends Model
     protected $fillable = [
         'plan_id',
         'category',
-        'amount',
+        'amount_points',
         'restricted_space_id',
         'description',
         'order',
@@ -26,7 +26,7 @@ class PlanBalance extends Model
     {
         return [
             'category' => WalletTransactionCategory::class,
-            'amount' => 'decimal:2',
+            'amount_points' => 'integer',
             'restricted_space_id' => 'integer',
             'description' => 'array',
             'order' => 'integer',
