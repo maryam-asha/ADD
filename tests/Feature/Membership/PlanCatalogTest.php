@@ -4,6 +4,7 @@ namespace Tests\Feature\Membership;
 
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanModule;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -30,11 +31,10 @@ class PlanCatalogTest extends TestCase
         return array_merge([
             'name' => ['en' => 'Flex Desk', 'ar' => 'مكتب مرن'],
             'is_subscription' => true,
-            'price' => 50000,
-            'pricing_currency' => 'SYP',
+            'price_points' => 500,
             'duration_days' => 30,
             'included_hours' => 40,
-            'overage_rate' => 1500,
+            'overage_rate_points' => 15,
             'is_active' => true,
             'order' => 1,
         ], $overrides);
@@ -50,7 +50,7 @@ class PlanCatalogTest extends TestCase
 
         $createResponse->assertCreated();
         $createResponse->assertJsonPath('data.name.en', 'Flex Desk');
-        $createResponse->assertJsonPath('data.pricing_currency', 'SYP');
+        $createResponse->assertJsonPath('data.price_points', 500);
 
         $planId = $createResponse->json('data.id');
 
@@ -63,7 +63,7 @@ class PlanCatalogTest extends TestCase
             ->assertJsonPath('data.id', $planId);
 
         $updateResponse = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/plans/{$planId}", $this->payload([
-            'price' => 60000,
+            'price_points' => 600,
             'is_active' => false,
         ]));
 
@@ -71,7 +71,7 @@ class PlanCatalogTest extends TestCase
         $updateResponse->assertExactJson(['message' => 'Plan updated.']);
         $this->assertDatabaseHas('plans', [
             'id' => $planId,
-            'price' => 60000,
+            'price_points' => 600,
             'is_active' => false,
         ]);
 
@@ -136,23 +136,23 @@ class PlanCatalogTest extends TestCase
     }
 
     /**
-     * `pricing_currency` used to accept any size:3 string — a plan priced
-     * in e.g. EUR would pass validation but, unless EUR exists as an active
-     * row in `currencies`, CurrencyConversionService has no rate to convert
-     * it with, silently producing no converted price ever.
-     * Rule::exists('currencies', 'code')->where('is_active', true) closes
-     * that gap at the validation layer
-     * (docs/decisions/multi-currency-support.md).
+     * Replaces the old `pricing_currency` validation test — plans are now
+     * denominated in whole ADD Points, so there is no per-plan currency to
+     * validate. The equivalent boundary invariant is that a point price
+     * must be a whole number: `integer` is what rejects a fractional one
+     * at the request boundary rather than silently truncating it at charge
+     * time (2026-09-12 add-point-system design, Invariant 2).
      */
-    public function test_creating_a_plan_with_an_unsupported_pricing_currency_is_rejected(): void
+    public function test_creating_a_plan_with_a_fractional_point_price_is_rejected(): void
     {
         $admin = User::factory()->create();
         $admin->assignRole('admin');
         Sanctum::actingAs($admin, ['*']);
 
-        $response = $this->postJson('/api/v1/admin/plans', $this->payload(['pricing_currency' => 'EUR']));
+        $response = $this->postJson('/api/v1/admin/plans', $this->payload(['price_points' => 12.5]));
 
         $response->assertStatus(422);
+        $response->assertJsonValidationErrors('price_points');
     }
 
     public function test_admin_can_create_and_update_plan_with_module_balances_and_features(): void
@@ -161,7 +161,7 @@ class PlanCatalogTest extends TestCase
         $admin->assignRole('admin');
         Sanctum::actingAs($admin, ['*']);
 
-        $module = \App\Domain\Membership\Models\PlanModule::create([
+        $module = PlanModule::create([
             'name' => ['en' => 'Flexi Desk', 'ar' => 'مكتب مرن'],
             'slug' => 'flexi_desk',
         ]);
@@ -172,13 +172,13 @@ class PlanCatalogTest extends TestCase
             'balances' => [
                 [
                     'category' => 'cafe',
-                    'amount' => 40.00,
+                    'amount_points' => 400,
                     'description' => ['en' => 'Cafe grant', 'ar' => 'رصيد كافيه'],
                     'order' => 1,
                 ],
                 [
                     'category' => 'printing_internet',
-                    'amount' => 25.00,
+                    'amount_points' => 250,
                     'description' => ['en' => 'Printing grant', 'ar' => 'رصيد طباعة'],
                     'order' => 2,
                 ],
@@ -201,7 +201,7 @@ class PlanCatalogTest extends TestCase
         $createResponse->assertJsonCount(2, 'data.balances');
         $createResponse->assertJsonCount(1, 'data.features');
         $createResponse->assertJsonPath('data.balances.0.category', 'cafe');
-        $createResponse->assertJsonPath('data.balances.0.amount', 40);
+        $createResponse->assertJsonPath('data.balances.0.amount_points', 400);
         $createResponse->assertJsonPath('data.features.0.value.en', '8 Hours');
 
         $planId = $createResponse->json('data.id');
@@ -212,7 +212,7 @@ class PlanCatalogTest extends TestCase
             'balances' => [
                 [
                     'category' => 'cafe',
-                    'amount' => 60.00,
+                    'amount_points' => 600,
                     'description' => ['en' => 'Updated Cafe grant', 'ar' => 'رصيد كافيه معدل'],
                 ],
             ],
@@ -236,7 +236,7 @@ class PlanCatalogTest extends TestCase
         $showResponse = $this->getJson("/api/v1/admin/plans/{$planId}");
         $showResponse->assertOk();
         $showResponse->assertJsonCount(1, 'data.balances');
-        $showResponse->assertJsonPath('data.balances.0.amount', 60);
+        $showResponse->assertJsonPath('data.balances.0.amount_points', 600);
         $showResponse->assertJsonCount(2, 'data.features');
         $showResponse->assertJsonPath('data.features.0.name.en', 'Unlimited Coffee');
         $showResponse->assertJsonPath('data.features.1.name.en', 'Access to Locker');

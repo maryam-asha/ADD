@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -29,7 +30,7 @@ class MembershipController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function store(StoreMembershipRequest $request, WalletService $wallets): MembershipResource
+    public function store(StoreMembershipRequest $request, WalletService $wallets, PointConversionService $points): MembershipResource
     {
         $plan = Plan::findOrFail($request->validated('plan_id'));
 
@@ -46,10 +47,13 @@ class MembershipController extends Controller
         }
 
         try {
-            $membership = DB::transaction(function () use ($wallets, $plan, $ownerType, $ownerId) {
+            $membership = DB::transaction(function () use ($wallets, $points, $plan, $ownerType, $ownerId) {
                 $wallet = $wallets->walletFor($ownerType, $ownerId);
 
-                $wallets->debitGeneral($wallet, (string) $plan->price, "Membership purchase: plan #{$plan->id}");
+                // TODO(spec-C): the wallet still stores currency, so the plan's
+                // point price is converted at this call site. Task 8 removes this
+                // conversion once WalletService takes points directly.
+                $wallets->debitGeneral($wallet, $points->pointsToUsd((int) $plan->price_points), "Membership purchase: plan #{$plan->id}");
 
                 $membership = Membership::create([
                     'plan_id' => $plan->id,
@@ -66,12 +70,12 @@ class MembershipController extends Controller
                             ?? "{$grant->category->value} allowance for membership #{$membership->id}";
 
                         if ($grant->category === WalletTransactionCategory::General) {
-                            $wallets->creditGeneral($wallet, (string) $grant->amount, WalletTransactionSource::SubscriptionGrant, $desc);
+                            $wallets->creditGeneral($wallet, $points->pointsToUsd((int) $grant->amount_points), WalletTransactionSource::SubscriptionGrant, $desc);
                         } else {
                             $wallets->creditCategorized(
                                 $wallet,
                                 $grant->category,
-                                (string) $grant->amount,
+                                $points->pointsToUsd((int) $grant->amount_points),
                                 WalletTransactionSource::SubscriptionGrant,
                                 $membership->current_period_end,
                                 $grant->restricted_space_id,
@@ -97,7 +101,7 @@ class MembershipController extends Controller
                     'plan_id' => $plan->id,
                     'owner_type' => $ownerType->value,
                     'owner_id' => $ownerId,
-                    'price' => (string) $plan->price,
+                    'price_points' => (int) $plan->price_points,
                 ]);
 
                 return $membership;

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Membership\Services;
 
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -12,11 +13,14 @@ use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\PlanFeature;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
-use Carbon\Carbon;
 use Illuminate\Support\Str;
 
 class PackageBrowseService
 {
+    public function __construct(
+        private readonly PointConversionService $points,
+    ) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -175,14 +179,15 @@ class PackageBrowseService
         }
 
         $plans = $query->orderBy('order')
-            ->orderBy('price')
+            ->orderBy('price_points')
             ->get();
 
         return $plans->map(function (Plan $plan) use ($activeMembership) {
             $isCurrent = $activeMembership !== null && $activeMembership->plan_id === $plan->id;
-            $price = (float) $plan->price;
-            $currency = $plan->pricing_currency ?? 'USD';
-            $symbol = $currency === 'USD' ? '$' : $currency;
+            $pricePoints = (int) $plan->price_points;
+            $price = (float) $this->points->pointsToUsd($pricePoints);
+            $currency = 'USD';
+            $symbol = '$';
             $formattedPrice = sprintf('%s%.2f /%s', $symbol, $price, __('api.package.per_month'));
 
             $name = $plan->translate('name') ?? 'Plan';
@@ -195,7 +200,7 @@ class PackageBrowseService
                     str_contains($lower, 'enter') => 'enterprise',
                     default => 'starter',
                 };
-                $subtitle = __('api.package.subtitles.' . $subtitleKey);
+                $subtitle = __('api.package.subtitles.'.$subtitleKey);
             }
 
             $features = $plan->features->isNotEmpty()
@@ -211,9 +216,10 @@ class PackageBrowseService
             $balancesGrant = $plan->balances->isNotEmpty()
                 ? $plan->balances->map(fn (PlanBalance $b) => [
                     'category' => $b->category->value,
-                    'title' => $b->translate('description') ?? __('api.package.balances.' . ($b->category === WalletTransactionCategory::Cafe ? 'cafe' : 'printing')),
-                    'amount' => (float) $b->amount,
-                    'formatted' => sprintf('$%.2f', (float) $b->amount),
+                    'title' => $b->translate('description') ?? __('api.package.balances.'.($b->category === WalletTransactionCategory::Cafe ? 'cafe' : 'printing')),
+                    'amount_points' => (int) $b->amount_points,
+                    'amount' => (float) $this->points->pointsToUsd((int) $b->amount_points),
+                    'formatted' => sprintf('$%.2f', (float) $this->points->pointsToUsd((int) $b->amount_points)),
                     'icon' => match ($b->category) {
                         WalletTransactionCategory::Cafe => 'coffee',
                         WalletTransactionCategory::PrintingInternet => 'printer',
@@ -246,6 +252,7 @@ class PackageBrowseService
                     'icon' => $plan->planModule->icon,
                 ] : null,
                 'subtitle' => $subtitle,
+                'price_points' => $pricePoints,
                 'price' => $price,
                 'currency' => $currency,
                 'currency_symbol' => $symbol,

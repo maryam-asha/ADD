@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Finance\Services\CurrencyResolver;
+use App\Domain\Finance\Services\PointConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,21 +20,10 @@ class SpaceResource extends JsonResource
         } catch (\Throwable) {
         }
 
-        $baseCurrency = $this->pricing_currency ?? 'USD';
-        $targetCurrency = app(\App\Domain\Finance\Services\CurrencyResolver::class)->resolve($request, $user);
-        $rateUsd = $this->hourly_rate !== null ? (float) $this->hourly_rate : 0.0;
-        $rateDisplay = number_format($rateUsd, 2, '.', '');
+        $points = app(PointConversionService::class);
+        $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
 
-        if ($rateUsd > 0 && $targetCurrency !== $baseCurrency) {
-            $converted = app(\App\Domain\Finance\Services\CurrencyConversionService::class)->convert(
-                $rateUsd,
-                $baseCurrency,
-                $targetCurrency
-            );
-            if ($converted !== null) {
-                $rateDisplay = number_format($converted, 2, '.', '');
-            }
-        }
+        $rate = $this->hourly_rate_points !== null ? (int) $this->hourly_rate_points : null;
 
         return [
             'id' => $this->id,
@@ -45,10 +36,11 @@ class SpaceResource extends JsonResource
             'image_url' => $this->image_url,
             'main_image' => $this->main_image,
             'images' => $this->images,
-            'hourly_rate' => $this->hourly_rate,
-            'pricing_currency' => $this->pricing_currency,
-            'hourly_rate_usd' => $rateUsd,
-            'hourly_rate_display' => $rateDisplay,
+            'hourly_rate_points' => $rate,
+            'hourly_rate_usd' => $rate !== null ? $points->pointsToUsd($rate) : null,
+            'hourly_rate_display' => $rate !== null
+                ? ($points->pointsToCurrency($rate, $targetCurrency) ?? $points->pointsToUsd($rate))
+                : null,
             'currency' => $targetCurrency,
             'status' => $this->status,
             'status_reason' => $this->status_reason,

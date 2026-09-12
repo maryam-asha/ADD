@@ -32,17 +32,17 @@ class PreferredCurrencyIsDisplayOnlyTest extends TestCase
 
     public function test_changing_preferred_currency_does_not_mutate_pricing_records(): void
     {
-        $plan = Plan::factory()->create(['pricing_currency' => 'USD', 'price' => '10.00']);
+        $plan = Plan::factory()->create(['price_points' => 100]);
         $wallet = Wallet::factory()->create();
         $transaction = WalletTransaction::factory()->create(['wallet_id' => $wallet->id, 'amount' => '25.00']);
-        $space = Space::factory()->create(['hourly_rate' => '15.00', 'pricing_currency' => 'USD']);
+        $space = Space::factory()->create(['hourly_rate_points' => 150]);
         $member = User::factory()->create(['preferred_currency' => 'USD']);
         $member->assignRole('member');
         Sanctum::actingAs($member, ['*']);
 
-        $planBefore = $plan->only(['pricing_currency', 'price']);
+        $planBefore = $plan->only(['price_points']);
         $transactionBefore = $transaction->only(['amount']);
-        $spaceBefore = $space->only(['hourly_rate', 'pricing_currency']);
+        $spaceBefore = $space->only(['hourly_rate_points']);
 
         $this->patchJson('/api/v1/member/preferences/currency', ['preferred_currency' => 'SYP'])
             ->assertOk();
@@ -51,13 +51,13 @@ class PreferredCurrencyIsDisplayOnlyTest extends TestCase
         $transaction->refresh();
         $space->refresh();
 
-        $this->assertSame($planBefore, $plan->only(['pricing_currency', 'price']));
+        $this->assertSame($planBefore, $plan->only(['price_points']));
         $this->assertSame($transactionBefore, $transaction->only(['amount']));
-        $this->assertSame($spaceBefore, $space->only(['hourly_rate', 'pricing_currency']));
+        $this->assertSame($spaceBefore, $space->only(['hourly_rate_points']));
 
-        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'pricing_currency' => 'USD', 'price' => '10.00']);
+        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'price_points' => 100]);
         $this->assertDatabaseHas('wallet_transactions', ['id' => $transaction->id, 'amount' => '25.00']);
-        $this->assertDatabaseHas('spaces', ['id' => $space->id, 'hourly_rate' => '15.00', 'pricing_currency' => 'USD']);
+        $this->assertDatabaseHas('spaces', ['id' => $space->id, 'hourly_rate_points' => 150]);
     }
 
     /**
@@ -69,9 +69,9 @@ class PreferredCurrencyIsDisplayOnlyTest extends TestCase
      */
     public function test_the_currency_header_does_not_mutate_pricing_records(): void
     {
-        $plan = Plan::factory()->create(['pricing_currency' => 'USD', 'price' => '10.00', 'is_active' => true]);
+        $plan = Plan::factory()->create(['price_points' => 100, 'is_active' => true]);
 
-        $planBefore = $plan->only(['pricing_currency', 'price']);
+        $planBefore = $plan->only(['price_points']);
 
         $this->withHeader('currency', 'SYP')
             ->getJson('/api/v1/plans')
@@ -79,7 +79,7 @@ class PreferredCurrencyIsDisplayOnlyTest extends TestCase
 
         $plan->refresh();
 
-        $this->assertSame($planBefore, $plan->only(['pricing_currency', 'price']));
-        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'pricing_currency' => 'USD', 'price' => '10.00']);
+        $this->assertSame($planBefore, $plan->only(['price_points']));
+        $this->assertDatabaseHas('plans', ['id' => $plan->id, 'price_points' => 100]);
     }
 }

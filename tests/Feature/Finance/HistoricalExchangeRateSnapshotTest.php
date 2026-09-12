@@ -33,8 +33,7 @@ class HistoricalExchangeRateSnapshotTest extends TestCase
 
         $member = User::factory()->create(['preferred_currency' => 'USD']);
         $space = Space::factory()->create([
-            'hourly_rate' => '50.00',
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => 500,
         ]);
 
         // 2. Create a booking that snapshots price at this moment

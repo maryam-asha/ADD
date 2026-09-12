@@ -88,7 +88,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => true,
             'is_active' => true,
-            'price' => '120.00',
+            'price_points' => 1200,
             'duration_days' => 30,
             'included_hours' => '40.00',
         ]);
@@ -132,7 +132,7 @@ class MembershipPurchaseTest extends TestCase
      * always-on conversion reaches the nested `data.plan` on
      * `MembershipResource` too, not just direct plan-listing responses —
      * the `currency` header (or a differing stored preference) must produce
-     * `converted_amount`/`converted_currency` here as well.
+     * a converted `price_display`/`currency` here as well.
      */
     public function test_the_purchase_response_includes_a_converted_amount_on_the_nested_plan(): void
     {
@@ -143,8 +143,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => true,
             'is_active' => true,
-            'price' => '10.00',
-            'pricing_currency' => 'USD',
+            'price_points' => 100,
             'duration_days' => 30,
             'included_hours' => '0.00',
         ]);
@@ -156,8 +155,9 @@ class MembershipPurchaseTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.plan.converted_amount', '147000.02');
-        $response->assertJsonPath('data.plan.converted_currency', 'SYP');
+        $response->assertJsonPath('data.plan.price_display', '147000.02');
+        $response->assertJsonPath('data.plan.currency', 'SYP');
+        $response->assertJsonPath('data.plan.price_points', 100);
     }
 
     public function test_insufficient_balance_fails_with_no_partial_state(): void
@@ -167,7 +167,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => true,
             'is_active' => true,
-            'price' => '120.00',
+            'price_points' => 1200,
             'duration_days' => 30,
             'included_hours' => '40.00',
         ]);
@@ -194,7 +194,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => false,
             'is_active' => true,
-            'price' => '50.00',
+            'price_points' => 500,
         ]);
 
         Sanctum::actingAs($member, ['*']);
@@ -220,7 +220,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => true,
             'is_active' => true,
-            'price' => '120.00',
+            'price_points' => 1200,
             'duration_days' => 30,
             'included_hours' => '0.00',
         ]);
@@ -251,7 +251,7 @@ class MembershipPurchaseTest extends TestCase
         $plan = Plan::factory()->create([
             'is_subscription' => true,
             'is_active' => true,
-            'price' => '120.00',
+            'price_points' => 1200,
             'duration_days' => 30,
         ]);
 

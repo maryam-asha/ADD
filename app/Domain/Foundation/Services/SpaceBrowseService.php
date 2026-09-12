@@ -2,6 +2,7 @@
 
 namespace App\Domain\Foundation\Services;
 
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -18,6 +19,7 @@ class SpaceBrowseService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
+        private readonly PointConversionService $points,
     ) {}
 
     /**
@@ -97,7 +99,7 @@ class SpaceBrowseService
 
         // 4. Paginate spaces (default: 10 per page)
         $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 10)));
-        $paginator = $spacesQuery->orderBy('hourly_rate', 'asc')->paginate($perPage);
+        $paginator = $spacesQuery->orderBy('hourly_rate_points', 'asc')->paginate($perPage);
 
         // 5. Transform Space Cards
         $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space));
@@ -153,7 +155,7 @@ class SpaceBrowseService
     }
 
     /**
-     * @param array<int, array{open_time: string, close_time: string}> $periods
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods
      * @return array<string, mixed>|null
      */
     private function buildWorkingHoursBanner(array $periods, CarbonInterface $targetDate, string $timezone): ?array
@@ -214,7 +216,7 @@ class SpaceBrowseService
         $title = match ($space->space_type) {
             SpaceType::CoSpace => 'Hot Desk',
             SpaceType::Room => 'Meeting Room A',
-            SpaceType::Business => 'Private Office ' . ($space->id),
+            SpaceType::Business => 'Private Office '.($space->id),
             SpaceType::EventHall => 'Event Hall',
         };
 
@@ -223,9 +225,10 @@ class SpaceBrowseService
             default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
         };
 
-        $rate = (float) ($space->hourly_rate ?? 0);
-        $currency = $space->pricing_currency ?? 'USD';
-        $symbol = $currency === 'USD' ? '$' : $currency;
+        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
+        $rate = (float) $this->points->pointsToUsd($ratePoints);
+        $currency = 'USD';
+        $symbol = '$';
         $isStartingFrom = $space->space_type === SpaceType::CoSpace;
 
         $amenities = $this->buildAmenities($space);
@@ -236,7 +239,7 @@ class SpaceBrowseService
             'subtitle' => $subtitle,
             'badge' => $badge,
             'status' => $space->status->value,
-            'status_label' => __('api.space.statuses.' . $space->status->value),
+            'status_label' => __('api.space.statuses.'.$space->status->value),
             'space_type' => $space->space_type->value,
             'capacity' => $space->capacity,
             'capacity_label' => $space->space_type === SpaceType::CoSpace
@@ -244,6 +247,7 @@ class SpaceBrowseService
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
             'pricing' => [
                 'starting_from' => $isStartingFrom,
+                'hourly_rate_points' => $ratePoints,
                 'hourly_rate' => $rate,
                 'currency' => $currency,
                 'currency_symbol' => $symbol,
@@ -265,7 +269,7 @@ class SpaceBrowseService
             $amenities[] = ['key' => 'seat', 'label' => __('api.space.single_seat'), 'icon' => 'user'];
         }
 
-        /** @var Resource $res */
+        /** @var resource $res */
         foreach ($space->resources as $res) {
             if ($res->status !== OperationalStatus::Active) {
                 continue;
@@ -366,7 +370,7 @@ class SpaceBrowseService
         $title = match ($space->space_type) {
             SpaceType::CoSpace => 'Hot Desk',
             SpaceType::Room => 'Meeting Room A',
-            SpaceType::Business => 'Private Office ' . ($space->id),
+            SpaceType::Business => 'Private Office '.($space->id),
             SpaceType::EventHall => 'Event Hall',
         };
 
@@ -375,12 +379,13 @@ class SpaceBrowseService
             default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
         };
 
-        $descriptionKey = 'api.space.descriptions.' . $space->space_type->value;
+        $descriptionKey = 'api.space.descriptions.'.$space->space_type->value;
         $description = __($descriptionKey);
 
-        $rate = (float) ($space->hourly_rate ?? 0);
-        $currency = $space->pricing_currency ?? 'USD';
-        $symbol = $currency === 'USD' ? '$' : $currency;
+        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
+        $rate = (float) $this->points->pointsToUsd($ratePoints);
+        $currency = 'USD';
+        $symbol = '$';
         $isStartingFrom = $space->space_type === SpaceType::CoSpace;
 
         $quickFeatures = $this->buildQuickFeatures($space);
@@ -403,9 +408,10 @@ class SpaceBrowseService
             'quick_features' => $quickFeatures,
             'details' => [
                 'status' => $space->status->value,
-                'status_label' => __('api.space.statuses.' . $space->status->value),
+                'status_label' => __('api.space.statuses.'.$space->status->value),
                 'price' => [
                     'starting_from' => $isStartingFrom,
+                    'hourly_rate_points' => $ratePoints,
                     'hourly_rate' => $rate,
                     'currency' => $currency,
                     'currency_symbol' => $symbol,
@@ -497,7 +503,7 @@ class SpaceBrowseService
                     default => 'check-circle',
                 };
                 $checklist[] = [
-                    'key' => $res->category->value . '_' . $res->id,
+                    'key' => $res->category->value.'_'.$res->id,
                     'name' => $res->name,
                     'icon' => $icon,
                 ];

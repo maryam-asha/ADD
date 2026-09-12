@@ -2,8 +2,8 @@
 
 namespace App\Http\Resources;
 
-use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\CurrencyResolver;
+use App\Domain\Finance\Services\PointConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -27,17 +27,14 @@ class PlanResource extends JsonResource
             'name' => $this->name,
             'subtitle' => $this->subtitle,
             'is_subscription' => $this->is_subscription,
-            'price' => $this->price,
-            'pricing_currency' => $this->pricing_currency,
             'duration_days' => $this->duration_days,
             'included_hours' => $this->included_hours,
-            'overage_rate' => $this->overage_rate,
             'is_active' => $this->is_active,
             'order' => $this->order,
             'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
                 'id' => $b->id,
                 'category' => $b->category->value,
-                'amount' => (float) $b->amount,
+                'amount_points' => (int) $b->amount_points,
                 'restricted_space_id' => $b->restricted_space_id,
                 'description' => $b->description,
                 'order' => $b->order,
@@ -68,28 +65,20 @@ class PlanResource extends JsonResource
             $user = null;
         }
 
-        // Docs/superpowers/specs/2026-08-11-currency-header-design.md §2:
-        // a target currency is always resolved (defaulting to USD), so
-        // conversion is now attempted unconditionally rather than only
-        // when a preference happens to be set.
+        // price_points is the authoritative stored value; price_usd and
+        // price_display are derived per request from the point rate and the
+        // resolved target currency (docs/superpowers/specs/2026-09-12-add-point-system-design.md).
+        $points = app(PointConversionService::class);
         $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
 
-        if ($targetCurrency !== $this->pricing_currency) {
-            $converted = app(CurrencyConversionService::class)->convert(
-                (float) $this->price,
-                $this->pricing_currency,
-                $targetCurrency
-            );
-
-            if ($converted !== null) {
-                $data['converted_amount'] = number_format($converted, 2, '.', '');
-                $data['converted_currency'] = $targetCurrency;
-            }
-        }
-
-        $data['price_usd'] = (float) $this->price;
-        $data['price_display'] = $data['converted_amount'] ?? number_format((float) $this->price, 2, '.', '');
+        $data['price_points'] = (int) $this->price_points;
+        $data['price_usd'] = $points->pointsToUsd((int) $this->price_points);
+        $data['price_display'] = $points->pointsToCurrency((int) $this->price_points, $targetCurrency)
+            ?? $data['price_usd'];
         $data['currency'] = $targetCurrency;
+        $data['overage_rate_points'] = $this->overage_rate_points !== null
+            ? (int) $this->overage_rate_points
+            : null;
 
         return $data;
     }

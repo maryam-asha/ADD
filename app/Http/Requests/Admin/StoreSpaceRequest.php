@@ -41,8 +41,7 @@ class StoreSpaceRequest extends FormRequest
             'images' => ['nullable', 'array'],
             'images.*' => ['string', 'max:2048'],
             'image_url' => ['nullable', 'string', 'max:2048'],
-            'hourly_rate' => ['nullable', 'numeric', 'min:0'],
-            'pricing_currency' => ['nullable', Rule::exists('currencies', 'code')->where('is_active', true)],
+            'hourly_rate_points' => ['nullable', 'integer', 'min:0'],
         ];
     }
 }

@@ -61,7 +61,7 @@ class KioskControllerTest extends TestCase
         $response->assertOk();
         $response->assertJsonCount(1, 'plans');
         $response->assertJsonPath('plans.0.id', $plan->id);
-        $response->assertJsonPath('plans.0.pricing_currency', $plan->pricing_currency);
+        $response->assertJsonPath('plans.0.price_points', $plan->price_points);
     }
 
     public function test_plans_name_resolves_to_one_string_for_the_current_locale_not_the_ar_en_object(): void
