@@ -269,7 +269,11 @@ class SpaceBrowseService
             $amenities[] = ['key' => 'seat', 'label' => __('api.space.single_seat'), 'icon' => 'user'];
         }
 
-        /** @var resource $res */
+        // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
+        // bare `Resource` to PHP's builtin `resource` stream pseudo-type, which
+        // silently breaks static analysis of this Eloquent model. The FQCN is
+        // left alone by that fixer.
+        /** @var \App\Domain\Foundation\Models\Resource $res */
         foreach ($space->resources as $res) {
             if ($res->status !== OperationalStatus::Active) {
                 continue;

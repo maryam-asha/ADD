@@ -61,7 +61,12 @@ class PlanPriceConversionTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.currency', 'USD');
-        $response->assertJsonPath('data.price_display', $response->json('data.price_usd'));
+        // 100 points at the 0.10 point rate is $10.00. Pinned as a literal
+        // rather than compared against price_usd from the same response —
+        // a self-comparison holds whatever value both fields carry, so it
+        // could not tell a correct price from a 10x-inflated one.
+        $response->assertJsonPath('data.price_usd', '10.00');
+        $response->assertJsonPath('data.price_display', '10.00');
     }
 
     public function test_no_converted_amount_when_no_exchange_rate_exists(): void
@@ -75,8 +80,12 @@ class PlanPriceConversionTest extends TestCase
 
         $response->assertOk();
         // No SYP rate exists, so pointsToCurrency() returns null and the
-        // display falls back to the unconverted USD value.
-        $response->assertJsonPath('data.price_display', $response->json('data.price_usd'));
+        // display falls back to the unconverted USD value — 100 points at
+        // the 0.10 point rate, i.e. $10.00. Pinned as a literal rather than
+        // compared against price_usd from the same response, which would
+        // hold for any value the two fields happened to share.
+        $response->assertJsonPath('data.price_usd', '10.00');
+        $response->assertJsonPath('data.price_display', '10.00');
     }
 
     /**
