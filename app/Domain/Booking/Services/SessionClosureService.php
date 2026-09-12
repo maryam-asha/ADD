@@ -8,6 +8,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
@@ -129,7 +130,9 @@ class SessionClosureService
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
-        [$amount, $currency] = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
+        // TODO(spec-C): drop conversion once ledger stores points
+        $points = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
+        $amount = app(PointConversionService::class)->pointsToUsd($points);
 
         $session->forceFill([
             // Normalize to UTC: Eloquent's datetime cast stores the Carbon value's
@@ -140,7 +143,8 @@ class SessionClosureService
             'checked_out_at' => $checkedOutAt->copy()->setTimezone('UTC'),
             'termination_source' => $source,
             'amount_owed' => $amount,
-            'currency' => $currency,
+            // TODO(spec-C): drop conversion once ledger stores points
+            'currency' => 'USD',
         ])->save();
     }
 

@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -64,9 +65,12 @@ class BookingExtensionService
                 ]);
             }
 
-            [$oldAmount] = $this->amounts->forRange($space, $lockedBooking->start_at, $lockedBooking->end_at);
-            [$newAmount] = $this->amounts->forRange($space, $lockedBooking->start_at, $newEndAt);
-            $difference = bcsub($newAmount, $oldAmount, 2);
+            $oldPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $lockedBooking->end_at);
+            $newPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $newEndAt);
+            $differencePoints = $newPoints - $oldPoints;
+
+            // TODO(spec-C): drop conversion once ledger stores points
+            $difference = app(PointConversionService::class)->pointsToUsd($differencePoints);
 
             $paymentState = $lockedBooking->payment_state;
 

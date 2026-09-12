@@ -89,8 +89,7 @@ class BookingApprovalServiceTest extends TestCase
     public function test_rejecting_a_wallet_paid_booking_refunds_the_member(): void
     {
         $space = Space::factory()->room()->create([
-            'hourly_rate' => '10.00',
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => 100,
             'requires_approval' => true,
         ]);
         BusinessHour::factory()->create([

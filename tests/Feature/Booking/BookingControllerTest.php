@@ -49,8 +49,7 @@ class BookingControllerTest extends TestCase
     private function openSpace(array $attributes = []): Space
     {
         $space = Space::factory()->room()->create(array_merge([
-            'hourly_rate' => '10.00',
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => 100,
         ], $attributes));
 
         BusinessHour::factory()->create([

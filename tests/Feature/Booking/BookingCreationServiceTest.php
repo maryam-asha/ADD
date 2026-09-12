@@ -48,8 +48,7 @@ class BookingCreationServiceTest extends TestCase
     private function openSpace(array $attributes = []): Space
     {
         $space = Space::factory()->room()->create(array_merge([
-            'hourly_rate' => '10.00',
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => 100,
         ], $attributes));
 
         BusinessHour::factory()->create([
@@ -100,7 +99,7 @@ class BookingCreationServiceTest extends TestCase
 
     public function test_creation_fails_when_the_window_spans_a_closed_gap_between_two_periods(): void
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
         BusinessHour::factory()->create(['branch_id' => $space->building->branch_id, 'day_of_week' => DayOfWeek::Monday, 'open_time' => '08:00', 'close_time' => '12:00']);
         BusinessHour::factory()->create(['branch_id' => $space->building->branch_id, 'day_of_week' => DayOfWeek::Monday, 'open_time' => '13:00', 'close_time' => '20:00']);
         $start = Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus');
@@ -378,7 +377,7 @@ class BookingCreationServiceTest extends TestCase
 
     public function test_creation_stays_unpaid_when_the_computed_amount_is_zero(): void
     {
-        $space = $this->openSpace(['hourly_rate' => '0.00']);
+        $space = $this->openSpace(['hourly_rate_points' => 0]);
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);

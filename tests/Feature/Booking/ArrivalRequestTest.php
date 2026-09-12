@@ -60,7 +60,7 @@ class ArrivalRequestTest extends TestCase
     {
         $building = Building::factory()->for($branch)->create();
 
-        return Space::factory()->room()->for($building)->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
+        return Space::factory()->room()->for($building)->create(['hourly_rate_points' => 100]);
     }
 
     public function test_creating_an_arrival_request_matches_todays_confirmed_booking(): void

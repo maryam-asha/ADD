@@ -39,8 +39,7 @@ class BookingExtensionServiceTest extends TestCase
     private function checkedInBooking(array $attributes = []): Booking
     {
         $space = Space::factory()->room()->create([
-            'hourly_rate' => '10.00',
-            'pricing_currency' => 'USD',
+            'hourly_rate_points' => 100,
             'slot_granularity_minutes' => 30,
         ]);
 

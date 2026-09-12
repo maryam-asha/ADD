@@ -9,6 +9,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\NotificationLog;
@@ -70,8 +71,11 @@ class BookingCreationService
             $this->assertOccupancyLeavesRoom($locked);
             $this->assertBufferRespected($locked, $startAt, $endAt);
 
-            [$amount] = $this->amounts->forRange($locked, $startAt, $endAt);
-            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $amount, $walletOwnerType, $walletOwnerId);
+            // TODO(spec-C): drop conversion once ledger stores points
+            $points = $this->amounts->forRange($locked, $startAt, $endAt);
+            $amount = app(PointConversionService::class)->pointsToUsd($points);
+
+            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $points, $amount, $walletOwnerType, $walletOwnerId);
 
             $status = $locked->requires_approval ? BookingStatus::Pending : BookingStatus::Confirmed;
 
@@ -82,7 +86,8 @@ class BookingCreationService
                 'end_at' => $endAt,
                 'status' => $status,
                 'amount_owed' => $amount,
-                'currency' => $locked->pricing_currency ?? 'USD',
+                // TODO(spec-C): drop conversion once ledger stores points
+                'currency' => 'USD',
                 'payment_state' => $paymentState,
                 'payment_source' => $paymentSource,
             ]);
@@ -117,9 +122,9 @@ class BookingCreationService
     /**
      * @return array{0: PaymentState, 1: ?PaymentSource}
      */
-    private function routePayment(Space $space, User $member, string $amount, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
+    private function routePayment(Space $space, User $member, int $points, string $amount, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
     {
-        if (bccomp($amount, '0.00', 2) <= 0) {
+        if ($points <= 0) {
             return [PaymentState::Unpaid, null];
         }
 

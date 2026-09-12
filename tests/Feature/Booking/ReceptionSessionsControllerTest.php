@@ -43,7 +43,7 @@ class ReceptionSessionsControllerTest extends TestCase
 
     private function openSpace(): Space
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
         BusinessHour::factory()->create([
             'branch_id' => $space->building->branch_id,
             'day_of_week' => DayOfWeek::Monday,

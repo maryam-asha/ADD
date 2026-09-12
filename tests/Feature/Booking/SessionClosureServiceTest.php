@@ -28,9 +28,9 @@ class SessionClosureServiceTest extends TestCase
         $this->closures = app(SessionClosureService::class);
     }
 
-    private function openSpace(string $hourlyRate = '10.00'): Space
+    private function openSpace(int $hourlyRatePoints = 100): Space
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => $hourlyRate, 'pricing_currency' => 'USD']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => $hourlyRatePoints]);
         BusinessHour::factory()->create([
             'branch_id' => $space->building->branch_id,
             'day_of_week' => DayOfWeek::Monday,
@@ -43,7 +43,7 @@ class SessionClosureServiceTest extends TestCase
 
     public function test_checkout_computes_amount_from_actual_elapsed_duration(): void
     {
-        $space = $this->openSpace('10.00');
+        $space = $this->openSpace(100);
         $checkedInAt = Carbon::parse('2026-08-17 09:00:00');
         $session = WalkinSession::factory()->create(['space_id' => $space->id, 'checked_in_at' => $checkedInAt]);
 
@@ -58,7 +58,7 @@ class SessionClosureServiceTest extends TestCase
 
     public function test_checkout_works_identically_for_a_booking(): void
     {
-        $space = $this->openSpace('10.00');
+        $space = $this->openSpace(100);
         $checkedInAt = Carbon::parse('2026-08-17 09:00:00');
         $booking = Booking::factory()->create([
             'space_id' => $space->id,

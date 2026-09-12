@@ -39,7 +39,7 @@ class BookingCancellationServiceTest extends TestCase
 
     public function test_cancelling_within_the_global_window_succeeds(): void
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
         $booking = Booking::factory()->create([
             'space_id' => $space->id,
             'start_at' => now()->addHours(2),
@@ -55,7 +55,7 @@ class BookingCancellationServiceTest extends TestCase
 
     public function test_cancelling_a_wallet_paid_booking_refunds_the_planned_amount(): void
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => '10.00', 'pricing_currency' => 'USD']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         $booking = Booking::factory()->create([
@@ -80,7 +80,7 @@ class BookingCancellationServiceTest extends TestCase
 
     public function test_cancelling_a_cash_paid_booking_does_not_touch_any_wallet(): void
     {
-        $space = Space::factory()->room()->create(['hourly_rate' => '10.00']);
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         $booking = Booking::factory()->create([
