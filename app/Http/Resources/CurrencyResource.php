@@ -12,15 +12,13 @@ class CurrencyResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
+        $headerLang = strtolower((string) ($request->header('lang') ?: $request->header('Accept-Language') ?: app()->getLocale()));
+        $locale = str_contains($headerLang, 'en') ? 'en' : (str_contains($headerLang, 'ar') ? 'ar' : app()->getLocale());
+
         return [
             'code' => $this->code,
-            'name' => $this->name,
+            'name' => $this->translate('name', $locale),
             'symbol' => $this->symbol,
-            'decimal_places' => $this->decimal_places,
-            'is_base' => $this->is_base,
-            'is_active' => $this->is_active,
-            'order' => $this->order,
-            'created_at' => $this->created_at,
         ];
     }
 }

@@ -134,4 +134,30 @@ class CompanyMemberDoorAccessTest extends IdentityTestCase
         $response->assertNoContent();
         $this->assertFalse($company->members()->where('users.id', $member->id)->exists());
     }
+
+    public function test_operations_can_list_company_members_via_the_api(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        $company = Company::factory()->create();
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        $company->members()->attach($member->id, [
+            'door_access_enabled' => true,
+            'is_admin' => false,
+        ]);
+
+        $response = $this->getJson("/api/v1/admin/companies/{$company->id}/members");
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.user.id', $member->id);
+        $response->assertJsonPath('data.0.user.name', $member->name);
+        $response->assertJsonPath('data.0.user.phone', $member->phone);
+        $response->assertJsonPath('data.0.door_access_enabled', true);
+        $response->assertJsonPath('data.0.is_admin', false);
+        $this->assertNotNull($response->json('data.0.id'));
+    }
 }

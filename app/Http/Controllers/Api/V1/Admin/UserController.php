@@ -27,7 +27,7 @@ class UserController extends Controller
 
     public function index(Request $request): AnonymousResourceCollection
     {
-        $query = User::query()->with('roles')->latest();
+        $query = User::query()->with(['roles', 'companies', 'personalProfile', 'professionalProfile'])->latest();
 
         if ($role = $request->query('role')) {
             $query->role($role);
@@ -55,7 +55,7 @@ class UserController extends Controller
 
     public function show(User $user): UserResource
     {
-        return new UserResource($user);
+        return new UserResource($user->loadMissing(['roles', 'companies', 'personalProfile', 'professionalProfile']));
     }
 
     public function update(UpdateUserRequest $request, User $user): JsonResponse

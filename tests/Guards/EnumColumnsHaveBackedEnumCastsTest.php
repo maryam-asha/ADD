@@ -49,6 +49,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Settings\Enums\SettingScope;
@@ -142,6 +143,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Membership::class => [
             'owner_type' => OwnerType::class,
             'status' => MembershipStatus::class,
+        ],
+        PlanBalance::class => [
+            'category' => WalletTransactionCategory::class,
         ],
         WalletTransaction::class => [
             'category' => WalletTransactionCategory::class,

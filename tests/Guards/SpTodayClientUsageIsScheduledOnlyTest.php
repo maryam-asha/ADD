@@ -18,6 +18,7 @@ class SpTodayClientUsageIsScheduledOnlyTest extends TestCase
 
     private const ALLOWED_FILES = [
         'app/Console/Commands/FetchExchangeRateSuggestion.php',
+        'app/Console/Commands/SyncExchangeRatesCommand.php',
         'app/Domain/Finance/Services/ExchangeRateSuggestionIngestor.php',
         'app/Domain/Finance/Services/SpTodayRateClient.php',
     ];

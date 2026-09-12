@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Concerns\LogsSensitiveActions;
 use App\Http\Controllers\Controller;
 use App\Services\Auth\TokenPairService;
+use App\Services\Media\ImageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -46,21 +47,46 @@ class AccountController extends Controller
         return response()->json(['message' => __('api.auth.account_deactivated')]);
     }
 
-    public function updateProfileImage(Request $request): JsonResponse
+    public function updateProfileImage(Request $request, ImageService $imageService): JsonResponse
     {
-        $validated = $request->validate([
-            'avatar_url' => 'required|image|max:5120',
+        $fileKey = null;
+        foreach (['avatar_url', 'avatar', 'image', 'file'] as $key) {
+            if ($request->hasFile($key)) {
+                $fileKey = $key;
+                break;
+            }
+        }
+
+        $keyToValidate = $fileKey ?? 'avatar_url';
+
+        $request->validate([
+            $keyToValidate => ['required', 'file', 'max:5120', 'mimes:jpeg,png,jpg,webp,gif'],
         ]);
 
-        $file = $request->file('avatar_url');
-        $path = $file->store('users/'.auth()->id(), 'public');
+        $user = auth()->user();
+        $file = $request->file($keyToValidate);
 
-        auth()->user()->personalProfile()->updateOrCreate(
-            ['user_id' => auth()->id()],
-            ['avatar_url' => $path]
+        // Store new avatar first
+        $result = $imageService->store($file, 'users/'.$user->id);
+
+        $profile = $user->personalProfile()->first();
+        $oldAvatar = $profile?->getRawOriginal('avatar_url');
+
+        // Save new avatar path
+        $user->personalProfile()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['avatar_url' => $result['path']]
         );
 
-        return response()->json(['message' => __('api.profile.image_updated')]);
+        // Delete previous avatar after successful save only
+        if ($oldAvatar && $oldAvatar !== $result['path']) {
+            $imageService->delete($oldAvatar);
+        }
+
+        return response()->json([
+            'message' => __('api.profile.image_updated'),
+            'avatar_url' => $result['url'],
+        ]);
     }
 
     /**

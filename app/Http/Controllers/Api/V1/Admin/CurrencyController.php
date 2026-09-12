@@ -9,7 +9,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCurrencyRequest;
 use App\Http\Requests\Admin\UpdateCurrencyRequest;
 use App\Http\Requests\Admin\UpdateCurrencyStatusRequest;
-use App\Http\Resources\CurrencyResource;
+use App\Http\Resources\AdminCurrencyResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Support\Facades\DB;
@@ -29,12 +29,12 @@ class CurrencyController extends Controller
 
     public function index(): AnonymousResourceCollection
     {
-        return CurrencyResource::collection(
+        return AdminCurrencyResource::collection(
             Currency::query()->orderBy('order')->get()
         );
     }
 
-    public function store(StoreCurrencyRequest $request): CurrencyResource
+    public function store(StoreCurrencyRequest $request): AdminCurrencyResource
     {
         $currency = Currency::create(array_merge(
             ['is_active' => true, 'is_base' => false],
@@ -43,12 +43,12 @@ class CurrencyController extends Controller
 
         $this->logSensitiveAction('currency_created', $currency, $request->validated());
 
-        return new CurrencyResource($currency);
+        return new AdminCurrencyResource($currency);
     }
 
-    public function show(Currency $currency): CurrencyResource
+    public function show(Currency $currency): AdminCurrencyResource
     {
-        return new CurrencyResource($currency);
+        return new AdminCurrencyResource($currency);
     }
 
     public function update(UpdateCurrencyRequest $request, Currency $currency): JsonResponse

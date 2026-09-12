@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use Illuminate\Support\Facades\Cache;
+
 /**
  * Top of the spatial hierarchy (docs/decisions/district-removed.md) —
  * Branch itself carries the name and geography that would distinguish a
@@ -25,6 +27,7 @@ class Branch extends Model
         'city',
         'timezone',
         'is_active',
+        'is_default',
     ];
 
     protected function casts(): array
@@ -33,7 +36,42 @@ class Branch extends Model
             'name' => 'array',
             'city' => 'array',
             'is_active' => 'boolean',
+            'is_default' => 'boolean',
         ];
+    }
+
+    public static function defaultId(): ?int
+    {
+        return Cache::rememberForever('default_branch_id', function () {
+            return static::where('is_default', true)->value('id')
+                ?? static::orderBy('id')->value('id');
+        });
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Branch $branch) {
+            if ($branch->is_default) {
+                static::where('id', '!=', $branch->id)
+                    ->where('is_default', true)
+                    ->update(['is_default' => false]);
+            }
+        });
+
+        static::saved(function () {
+            Cache::forget('default_branch_id');
+        });
+
+        static::deleted(function (Branch $branch) {
+            Cache::forget('default_branch_id');
+
+            if ($branch->is_default) {
+                $nextBranch = static::orderBy('id')->first();
+                if ($nextBranch) {
+                    $nextBranch->update(['is_default' => true]);
+                }
+            }
+        });
     }
 
     public function buildings(): HasMany

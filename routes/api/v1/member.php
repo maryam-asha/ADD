@@ -6,11 +6,16 @@ use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
+use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
+use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
+use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
+use App\Http\Controllers\Api\V1\Member\EventController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
+use App\Http\Controllers\Api\V1\Member\SpaceController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +29,10 @@ use Illuminate\Support\Facades\Route;
 // hybrid-routing choice: every currently-spendable wallet for a category,
 // clearly labeled by source. No spend happens here.
 Route::get('wallet/options', [WalletController::class, 'options']);
+
+// Browse spaces for members with working hours, filtering, amenities, and available slots
+Route::get('spaces', [SpaceController::class, 'index']);
+Route::get('spaces/{space}', [SpaceController::class, 'show']);
 
 // docs/decisions/booking-creation-approval-extension.md — member-facing
 // booking creation with slot granularity/buffer/approval rules.
@@ -51,6 +60,9 @@ Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberControlle
 // docs/decisions/wallet-points-categorization.md.
 Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationController::class, 'store']);
 
+// Browse packages and member's current subscription
+Route::get('packages', [PackageController::class, 'index']);
+
 // A member buys a plan for themselves, or (via an optional company_id in the
 // body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
 // their company — one endpoint, self-service checked in the controller.
@@ -76,8 +88,25 @@ Route::patch('consents/public-directory', [PublicDirectoryConsentController::cla
 Route::delete('account', [AccountController::class, 'delete']);
 Route::patch('account/deactivate', [AccountController::class, 'deactivate']);
 Route::patch('account/password', [AccountController::class, 'changePassword']);
-Route::patch('profile/image', [AccountController::class, 'updateProfileImage']);
+Route::match(['post', 'patch'], 'profile/image', [AccountController::class, 'updateProfileImage']);
 
 // Privacy Policy
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
 Route::post('privacy-policy/consent', [PrivacyPolicyController::class, 'consent']);
+
+// Notifications — in-app notification inbox (database channel).
+Route::get('notifications', [MemberNotificationController::class, 'index']);
+Route::patch('notifications/{id}/read', [MemberNotificationController::class, 'markAsRead']);
+Route::post('notifications/read-all', [MemberNotificationController::class, 'markAllAsRead']);
+Route::get('notifications/unread-count', [MemberNotificationController::class, 'unreadCount']);
+
+// Device token — register/remove the FCM token used for push notifications.
+Route::put('device-token', [MemberDeviceTokenController::class, 'update']);
+Route::delete('device-token', [MemberDeviceTokenController::class, 'destroy']);
+
+
+// Mobile events calendar, categories, and details for members
+Route::get('events', [EventController::class, 'index']);
+Route::get('events/categories', [EventController::class, 'categories']);
+Route::get('event-categories', [EventController::class, 'categories']);
+Route::get('events/{event}', [EventController::class, 'show']);

@@ -39,6 +39,7 @@ Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->wi
  * automatically.
  */
 Schedule::command('finance:fetch-exchange-rate-suggestion')->dailyAt('09:00')->timezone('Asia/Damascus')->withoutOverlapping();
+Schedule::command('finance:sync-exchange-rates')->everySixHours()->withoutOverlapping();
 
 /*
  * Access control (docs/decisions/qr-lock-unlock.md) — the lock passcode

@@ -3,6 +3,11 @@
 namespace App\Http\Requests\Admin\Reception;
 
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Currency;
+use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Identity\Enums\CompanyStatus;
+use App\Domain\Identity\Models\Company;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,10 +25,31 @@ class StoreWalletTopUpRequest extends FormRequest
     {
         return [
             'amount' => ['required', 'numeric', 'min:0.01'],
+            'currency' => ['nullable', 'string', 'exists:currencies,code'],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
             'company_id' => ['required_without:user_id', 'integer', 'exists:companies,id'],
             'description' => ['nullable', 'string', 'max:255'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->filled('company_id')) {
+                $company = Company::find($this->input('company_id'));
+                if ($company && $company->status !== CompanyStatus::Active) {
+                    $validator->errors()->add('company_id', 'Cannot top up wallet for an inactive company.');
+                }
+            }
+
+            if ($this->filled('currency')) {
+                $currencyCode = $this->input('currency');
+                $baseCode = Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+                if ($currencyCode !== $baseCode && ExchangeRate::current($currencyCode) === null) {
+                    $validator->errors()->add('currency', "No active exchange rate found for currency {$currencyCode}.");
+                }
+            }
+        });
     }
 }

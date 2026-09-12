@@ -2,6 +2,7 @@
 
 namespace App\Domain\Experience\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Foundation\Models\Branch;
@@ -16,13 +17,16 @@ class Event extends Model
 
     protected $fillable = [
         'branch_id',
+        'category_id',
         'title',
         'description',
-        'category',
         'start_at',
         'end_at',
         'location',
         'capacity',
+        'is_free',
+        'price',
+        'currency',
         'image_url',
         'status',
         'order',
@@ -31,17 +35,25 @@ class Event extends Model
     protected function casts(): array
     {
         return [
+            'category_id' => 'integer',
             'title' => 'array',
             'description' => 'array',
-            'category' => 'array',
             'start_at' => 'datetime',
             'end_at' => 'datetime',
+            'is_free' => 'boolean',
+            'price' => 'decimal:2',
+            'image_url' => AsMediaUrl::class,
         ];
     }
 
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(EventCategory::class, 'category_id');
     }
 
     public function attendees(): HasMany

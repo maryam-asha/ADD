@@ -83,6 +83,9 @@ return [
         'partner_updated' => 'Partner updated.',
         'contact_link_updated' => 'Contact link updated.',
         'plan_updated' => 'Plan updated.',
+        'plan_module_updated' => 'Plan module updated.',
+        'event_category_updated' => 'Event category updated.',
+        'event_updated' => 'Event updated.',
         'community_member_updated' => 'Community member updated.',
         'private_office_request_updated' => 'Private office request updated.',
         'company_status_updated' => 'Company status updated.',
@@ -101,6 +104,11 @@ return [
         'exchange_rate_suggestion_dismissed' => 'Exchange rate suggestion dismissed.',
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
         'role_updated' => 'Role updated.',
+        'inquiry_updated' => 'Inquiry updated.',
+    ],
+
+    'public' => [
+        'inquiry_submitted' => 'Your inquiry has been received. Thank you for reaching out.',
     ],
 
     'role' => [
@@ -169,6 +177,91 @@ return [
         'space_id_required' => 'A space is required to confirm an unmatched arrival request.',
         'arrival_request_confirmed' => 'Arrival confirmed.',
         'arrival_request_rejected' => 'Arrival request rejected.',
+    ],
+
+    'notification' => [
+        'device_token_updated' => 'Device token updated.',
+        'device_token_removed' => 'Device token removed.',
+        'marked_as_read' => 'Notification marked as read.',
+        'all_marked_as_read' => 'All notifications marked as read.',
+        'broadcast_sent' => 'Notification broadcast sent.',
+    ],
+
+    'finance' => [
+        'cash_register_already_open' => 'You already have an active open cash register session.',
+        'cash_register_already_closed' => 'This cash register session is already closed.',
+    ],
+
+    'space' => [
+        'browse_title' => 'Browse Spaces',
+        'browse_subtitle' => 'Find and book the right workspace for your day.',
+        'working_hours_notice' => 'Times shown are within branch working hours',
+        'requires_approval_notice' => 'Your request will be reviewed by operations before confirmation.',
+        'statuses' => [
+            'active' => 'Active',
+            'maintenance' => 'Under Maintenance',
+            'retired' => 'Retired',
+        ],
+        'starting_from' => 'Starting from',
+        'per_hour' => 'hour',
+        'per_day' => 'day',
+        'up_to_people' => 'Up to :count people',
+        'single_seat' => '1 seat',
+        'min_duration_note' => ':granularity-min start slots • Min. :min_duration',
+        'book_this_space' => 'Book This Space',
+        'person' => ':count person',
+        'people' => ':count people',
+        'seat' => ':count Seat',
+        'seats' => ':count Seats',
+        'open_area' => 'Open Area',
+        'private_area' => 'Private Area',
+        'descriptions' => [
+            'co_space' => 'Flexible open workspace designed for focus and productivity in a vibrant community environment.',
+            'room' => 'Private and fully-equipped meeting room designed for productive discussions, collaborative workshops, and client presentations.',
+            'business' => 'Quiet, dedicated private office designed for maximum focus, confidentiality, comfort, and security.',
+            'event_hall' => 'Spacious and versatile hall equipped with modern AV technology, ideal for conferences, large workshops, and gatherings.',
+        ],
+    ],
+
+    'package' => [
+        'title' => 'Packages & Subscription',
+        'subtitle' => 'Choose the right plan for your business.',
+        'tabs' => [
+            'packages' => 'Packages',
+            'my_subscription' => 'My Subscription',
+        ],
+        'current_plan_tag' => 'YOUR CURRENT PLAN',
+        'active_until' => 'Active until :date',
+        'renew_plan' => 'Renew Plan',
+        'change_plan' => 'Change Plan',
+        'current_plan' => 'Current Plan',
+        'select_plan' => 'Select Plan',
+        'view_details' => 'View details',
+        'benefits_title' => 'Plan Benefits',
+        'expires_on' => 'Expires :date',
+        'per_month' => 'mo',
+        'benefits' => [
+            'cafe_access' => 'Café Access',
+            'printing_credits' => 'Printing Credits',
+            'meeting_rooms' => 'Meeting Rooms',
+            'member_discounts' => 'Member Discounts',
+            'included' => 'Included',
+        ],
+        'balances' => [
+            'cafe' => 'Café Balance',
+            'printing' => 'Printing Balance',
+        ],
+        'tags' => [
+            'cafe' => 'Café',
+            'printing' => 'Printing',
+            'meeting' => 'Meeting',
+            'discounts' => 'Discounts',
+        ],
+        'subtitles' => [
+            'starter' => 'Perfect for individuals and small teams.',
+            'professional' => 'Everything you need to grow your business.',
+            'enterprise' => 'Advanced features for large teams and organizations.',
+        ],
     ],
 
 ];

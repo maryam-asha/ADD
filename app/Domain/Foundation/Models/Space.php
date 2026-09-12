@@ -2,6 +2,7 @@
 
 namespace App\Domain\Foundation\Models;
 
+use App\Casts\AsMediaUrlArray;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -22,6 +23,7 @@ class Space extends Model
         'allocation_model',
         'is_lockable',
         'capacity',
+        'images',
         'hourly_rate',
         'pricing_currency',
         'cancellation_window_minutes',
@@ -45,7 +47,24 @@ class Space extends Model
             'status' => OperationalStatus::class,
             'status_from' => 'datetime',
             'status_until' => 'datetime',
+            'images' => AsMediaUrlArray::class,
         ];
+    }
+
+    /**
+     * Primary / cover image derived from the first image in the images collection.
+     */
+    public function getImageUrlAttribute(): ?string
+    {
+        return $this->images[0] ?? null;
+    }
+
+    /**
+     * Alias for image_url as main_image.
+     */
+    public function getMainImageAttribute(): ?string
+    {
+        return $this->image_url;
     }
 
     public function building(): BelongsTo

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +39,7 @@ class CommunityMember extends Model
             'social_links' => 'array',
             'skills' => 'array',
             'published' => 'boolean',
+            'photo_url' => AsMediaUrl::class,
         ];
     }
 }

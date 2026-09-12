@@ -96,6 +96,11 @@ class User extends Authenticatable
         return $this->hasMany(NotificationLog::class);
     }
 
+    public function deviceTokens(): HasMany
+    {
+        return $this->hasMany(DeviceToken::class);
+    }
+
     public function refreshTokens(): HasMany
     {
         return $this->hasMany(RefreshToken::class);
@@ -105,7 +110,7 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(Company::class, 'company_user')
             ->using(CompanyUser::class)
-            ->withPivot('door_access_enabled', 'is_admin')
+            ->withPivot('id', 'door_access_enabled', 'is_admin')
             ->withTimestamps();
     }
 

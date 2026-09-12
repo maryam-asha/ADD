@@ -23,6 +23,7 @@ class StoreBranchRequest extends FormRequest
             [
                 'timezone' => ['required', 'string', 'max:255'],
                 'is_active' => ['nullable', 'boolean'],
+                'is_default' => ['nullable', 'boolean'],
             ]
         );
     }

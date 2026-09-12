@@ -18,6 +18,7 @@ class BranchResource extends JsonResource
             'city' => $this->city,
             'timezone' => $this->timezone,
             'is_active' => $this->is_active,
+            'is_default' => (bool) $this->is_default,
         ];
     }
 }

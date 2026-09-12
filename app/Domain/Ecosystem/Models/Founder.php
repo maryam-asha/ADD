@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ class Founder extends Model
             'name' => 'array',
             'role' => 'array',
             'bio' => 'array',
+            'photo_url' => AsMediaUrl::class,
         ];
     }
 }

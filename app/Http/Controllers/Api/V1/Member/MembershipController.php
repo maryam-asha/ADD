@@ -60,7 +60,27 @@ class MembershipController extends Controller
                     'current_period_end' => now()->addDays($plan->duration_days),
                 ]);
 
-                if (bccomp((string) $plan->included_hours, '0.00', 2) > 0) {
+                if ($plan->balances()->exists()) {
+                    foreach ($plan->balances as $grant) {
+                        $desc = $grant->translate('description')
+                            ?? "{$grant->category->value} allowance for membership #{$membership->id}";
+
+                        if ($grant->category === WalletTransactionCategory::General) {
+                            $wallets->creditGeneral($wallet, (string) $grant->amount, WalletTransactionSource::SubscriptionGrant, $desc);
+                        } else {
+                            $wallets->creditCategorized(
+                                $wallet,
+                                $grant->category,
+                                (string) $grant->amount,
+                                WalletTransactionSource::SubscriptionGrant,
+                                $membership->current_period_end,
+                                $grant->restricted_space_id,
+                                [],
+                                $desc
+                            );
+                        }
+                    }
+                } elseif (bccomp((string) $plan->included_hours, '0.00', 2) > 0) {
                     $wallets->creditCategorized(
                         $wallet,
                         WalletTransactionCategory::SpaceSpecific,

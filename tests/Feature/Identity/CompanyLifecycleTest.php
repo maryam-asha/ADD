@@ -85,4 +85,30 @@ class CompanyLifecycleTest extends IdentityTestCase
             ->assertOk()
             ->assertJsonPath('data.status', 'inactive');
     }
+
+    public function test_operations_creates_a_company_without_branch_id_and_uses_default_branch(): void
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        $defaultBranch = Branch::factory()->default()->create();
+        $poRequest = PrivateOfficeRequest::factory()->quoted()->create();
+
+        // branch_id is completely omitted from the payload
+        $response = $this->postJson('/api/v1/admin/companies', [
+            'private_office_request_id' => $poRequest->id,
+            'legal_name' => 'Auto Branch LLC',
+            'contract_ref' => 'C-AUTO-1',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.legal_name', 'Auto Branch LLC');
+        $response->assertJsonPath('data.branch_id', $defaultBranch->id);
+
+        $this->assertDatabaseHas('companies', [
+            'legal_name' => 'Auto Branch LLC',
+            'branch_id' => $defaultBranch->id,
+        ]);
+    }
 }

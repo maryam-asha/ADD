@@ -205,7 +205,7 @@ class CompanyMemberAdminManagementTest extends IdentityTestCase
 
         $activity = Activity::where('description', 'company_member_admin_changed')->latest('id')->first();
         $this->assertNotNull($activity);
-        $this->assertSame($operator->id, $activity->causer_id);
+        $this->assertEquals($operator->id, $activity->causer_id);
         $this->assertSame($member->id, $activity->properties['user_id']);
         $this->assertTrue($activity->properties['is_admin']);
     }

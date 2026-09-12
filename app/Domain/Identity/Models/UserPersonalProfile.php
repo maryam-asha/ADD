@@ -2,6 +2,7 @@
 
 namespace App\Domain\Identity\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Domain\Identity\Enums\Gender;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,7 @@ class UserPersonalProfile extends Model
     {
         return [
             'gender' => Gender::class,
+            'avatar_url' => AsMediaUrl::class,
         ];
     }
 

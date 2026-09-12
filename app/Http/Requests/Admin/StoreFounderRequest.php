@@ -22,7 +22,7 @@ class StoreFounderRequest extends FormRequest
             TranslatableField::rules('role', required: false),
             TranslatableField::rules('bio', required: false),
             [
-                'photo_url' => ['nullable', 'url'],
+                'photo_url' => ['nullable', 'string', 'max:2048'],
                 'linkedin_url' => ['nullable', 'url'],
                 'twitter_url' => ['nullable', 'url'],
                 'order' => ['nullable', 'integer', 'min:0'],

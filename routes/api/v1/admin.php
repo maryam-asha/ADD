@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
@@ -13,17 +14,22 @@ use App\Http\Controllers\Api\V1\Admin\CurrencyController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
+use App\Http\Controllers\Api\V1\Admin\EventCategoryController;
+use App\Http\Controllers\Api\V1\Admin\EventController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
+use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
+use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
@@ -31,6 +37,7 @@ use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
+use App\Http\Controllers\Api\V1\Admin\SiteInquiryController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
@@ -112,6 +119,8 @@ Route::apiResource('business-hour-exceptions', BusinessHourExceptionController::
 Route::apiResource('founders', FounderController::class);
 Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
+Route::apiResource('plan-modules', PlanModuleController::class)
+    ->parameters(['plan-modules' => 'planModule']);
 
 // Contact Links — public org content (social/app-store/website/phone
 // links), admin-managed. Same permission tier as Founders/Partners (no
@@ -124,9 +133,13 @@ Route::apiResource('contact-links', ContactLinkController::class)
 // permission tier as Founders/Partners/ContactLinks (no narrower role:admin
 // group).
 Route::apiResource('announcements', AnnouncementController::class);
+Route::apiResource('event-categories', EventCategoryController::class)
+    ->parameters(['event-categories' => 'eventCategory']);
+Route::apiResource('events', EventController::class);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
+Route::post('exchange-rates/sync', [ExchangeRateController::class, 'sync']);
 Route::get('exchange-rates/suggestion', [ExchangeRateSuggestionController::class, 'show']);
 Route::post('exchange-rates/suggestion/{exchangeRateSuggestion}/dismiss', [ExchangeRateSuggestionController::class, 'dismiss']);
 
@@ -202,13 +215,32 @@ Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::cla
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm']);
 Route::post('reception/arrival-requests/{arrivalRequest}/reject', [ReceptionArrivalRequestController::class, 'reject']);
 
+Route::get('reception/wallet-balance', [WalletTopUpController::class, 'balance']);
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
 Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
 
-// Narrower than the group above: managing accounts and roles is admin-only,
-// operations can't create or promote other accounts.
+// Cash Register Sessions per staff member per shift (S6-BE-03 / PRD 5.9)
+Route::get('reception/cash-register-sessions', [CashRegisterSessionController::class, 'index']);
+Route::get('reception/cash-register-sessions/current', [CashRegisterSessionController::class, 'current']);
+Route::post('reception/cash-register-sessions/open', [CashRegisterSessionController::class, 'open']);
+Route::post('reception/cash-register-sessions/{cashRegisterSession}/close', [CashRegisterSessionController::class, 'close']);
+
+// Site Inquiries from public website (S7-BE-06)
+Route::get('site-inquiries', [SiteInquiryController::class, 'index']);
+Route::get('site-inquiries/{siteInquiry}', [SiteInquiryController::class, 'show']);
+Route::patch('site-inquiries/{siteInquiry}', [SiteInquiryController::class, 'update']);
+
+// File & Media Upload
+Route::post('media/upload', [MediaUploadController::class, 'upload']);
+
+// Reading users is permitted for operations (e.g. reception member search) & admin
+Route::get('users', [UserController::class, 'index']);
+Route::get('users/{user}', [UserController::class, 'show']);
+
+// Narrower than the group above: creating, mutating accounts, and managing roles is admin-only
 Route::middleware('role:admin')->group(function () {
-    Route::apiResource('users', UserController::class)->except('destroy');
+    Route::post('users', [UserController::class, 'store']);
+    Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update']);
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
     Route::patch('users/{user}/role', [UserController::class, 'assignRole']);
 
@@ -237,4 +269,8 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('business-hour-exceptions/{businessHourException}', [BusinessHourExceptionController::class, 'destroy']);
 
     Route::patch('settings/{key}', [SettingController::class, 'update']);
+
+    // Notification broadcast — admin-only, sends push + in-app notifications
+    // to targeted users (all, by role, or specific user IDs).
+    Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
 });

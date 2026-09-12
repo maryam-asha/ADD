@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\RedirectIfAuthenticated;
+use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
@@ -40,6 +41,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // handling before routing fails, closing that gap (and the same one
         // for MethodNotAllowedHttpException, right path/wrong verb).
         $middleware->prepend(SetLocaleFromHeader::class);
+        $middleware->append(ResolveDefaultBranch::class);
 
         $middleware->statefulApi();
 

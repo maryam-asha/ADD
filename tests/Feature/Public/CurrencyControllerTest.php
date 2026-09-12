@@ -31,4 +31,25 @@ class CurrencyControllerTest extends TestCase
     {
         $this->getJson('/api/v1/currencies')->assertOk();
     }
+
+    public function test_public_listing_returns_only_code_symbol_and_localized_name_based_on_header(): void
+    {
+        $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/currencies');
+        $responseAr->assertOk();
+        $sypAr = collect($responseAr->json('data'))->firstWhere('code', 'SYP');
+        $this->assertEquals([
+            'code' => 'SYP',
+            'name' => 'ليرة سورية',
+            'symbol' => 'ل.س',
+        ], $sypAr);
+
+        $responseEn = $this->withHeader('lang', 'en')->getJson('/api/v1/currencies');
+        $responseEn->assertOk();
+        $sypEn = collect($responseEn->json('data'))->firstWhere('code', 'SYP');
+        $this->assertEquals([
+            'code' => 'SYP',
+            'name' => 'Syrian Pound',
+            'symbol' => 'ل.س',
+        ], $sypEn);
+    }
 }

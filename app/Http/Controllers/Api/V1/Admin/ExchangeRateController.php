@@ -10,7 +10,9 @@ use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreExchangeRateRequest;
 use App\Http\Resources\ExchangeRateResource;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -80,5 +82,19 @@ class ExchangeRateController extends Controller
         ], fn ($value) => $value !== null));
 
         return new ExchangeRateResource($rate);
+    }
+
+    public function sync(): JsonResponse
+    {
+        $exitCode = Artisan::call('finance:sync-exchange-rates');
+
+        $currentRate = ExchangeRate::current('SYP');
+
+        return response()->json([
+            'message' => $exitCode === 0
+                ? 'Exchange rates synced successfully.'
+                : 'Exchange rates sync finished with warnings or errors.',
+            'data' => $currentRate ? new ExchangeRateResource($currentRate) : null,
+        ]);
     }
 }

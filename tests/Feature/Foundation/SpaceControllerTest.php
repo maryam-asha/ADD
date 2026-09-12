@@ -123,9 +123,72 @@ class SpaceControllerTest extends TestCase
 
         $activity = Activity::where('description', 'space_status_changed')->latest('id')->first();
         $this->assertNotNull($activity);
-        $this->assertSame($admin->id, $activity->causer_id);
+        $this->assertSame((int) $admin->id, (int) $activity->causer_id);
         $this->assertSame('active', $activity->properties['before']);
         $this->assertSame('maintenance', $activity->properties['after']);
+    }
+
+    public function test_admin_can_create_a_space_with_images_and_primary_image_is_first(): void
+    {
+        $this->actingAsAdmin();
+        $building = Building::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/spaces', [
+            'building_id' => $building->id,
+            'space_type' => 'room',
+            'is_lockable' => true,
+            'capacity' => 6,
+            'images' => [
+                'https://example.com/primary.jpg',
+                'https://example.com/secondary.jpg',
+            ],
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.main_image', 'https://example.com/primary.jpg');
+        $response->assertJsonCount(2, 'data.images');
+        $response->assertJsonPath('data.images.0', 'https://example.com/primary.jpg');
+        $response->assertJsonPath('data.images.1', 'https://example.com/secondary.jpg');
+    }
+
+    public function test_admin_can_create_a_space_with_null_images(): void
+    {
+        $this->actingAsAdmin();
+        $building = Building::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/spaces', [
+            'building_id' => $building->id,
+            'space_type' => 'room',
+            'is_lockable' => true,
+            'capacity' => 4,
+            'images' => null,
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.main_image', null);
+        $response->assertJsonPath('data.images', null);
+    }
+
+    public function test_admin_can_update_space_images(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->create([
+            'images' => ['https://example.com/old.jpg'],
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/spaces/{$space->id}", [
+            'building_id' => $space->building_id,
+            'space_type' => $space->space_type->value,
+            'is_lockable' => $space->is_lockable,
+            'images' => [
+                'https://example.com/new-main.jpg',
+                'https://example.com/new-second.jpg',
+            ],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame('https://example.com/new-main.jpg', $space->fresh()->image_url);
+        $this->assertCount(2, $space->fresh()->images);
     }
 
     public function test_admin_can_delete_a_space(): void

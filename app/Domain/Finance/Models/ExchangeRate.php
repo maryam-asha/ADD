@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use Illuminate\Support\Facades\Cache;
+
 class ExchangeRate extends Model
 {
     /** @use HasFactory<ExchangeRateFactory> */
@@ -36,6 +38,17 @@ class ExchangeRate extends Model
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::saved(function (ExchangeRate $rate) {
+            Cache::forget("exchange_rate_current_{$rate->currency_code}");
+        });
+
+        static::deleted(function (ExchangeRate $rate) {
+            Cache::forget("exchange_rate_current_{$rate->currency_code}");
+        });
+    }
+
     public function setBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'set_by');
@@ -53,10 +66,12 @@ class ExchangeRate extends Model
 
     public static function current(string $currencyCode): ?self
     {
-        return static::where('currency_code', $currencyCode)
-            ->where('effective_from', '<=', now())
-            ->orderByDesc('effective_from')
-            ->orderByDesc('id')
-            ->first();
+        return Cache::remember("exchange_rate_current_{$currencyCode}", now()->addDay(), function () use ($currencyCode) {
+            return static::where('currency_code', $currencyCode)
+                ->where('effective_from', '<=', now())
+                ->orderByDesc('effective_from')
+                ->orderByDesc('id')
+                ->first();
+        });
     }
 }

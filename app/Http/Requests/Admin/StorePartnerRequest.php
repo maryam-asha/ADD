@@ -22,7 +22,7 @@ class StorePartnerRequest extends FormRequest
             TranslatableField::rules('name'),
             TranslatableField::rules('description', required: false),
             [
-                'logo_url' => ['nullable', 'url'],
+                'logo_url' => ['nullable', 'string', 'max:2048'],
                 'website_url' => ['nullable', 'url'],
                 'category' => ['required', Rule::in(['local', 'global'])],
                 'order' => ['nullable', 'integer', 'min:0'],

@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Created exclusively by operations after a contract is signed (PRD §5.1) —
@@ -43,11 +44,16 @@ class Company extends Model
         return $this->belongsTo(PrivateOfficeRequest::class, 'created_from_request_id');
     }
 
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(CompanyUser::class);
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'company_user')
             ->using(CompanyUser::class)
-            ->withPivot('door_access_enabled', 'is_admin')
+            ->withPivot('id', 'door_access_enabled', 'is_admin')
             ->withTimestamps();
     }
 }

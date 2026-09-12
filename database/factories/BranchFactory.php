@@ -28,6 +28,12 @@ class BranchFactory extends Factory
             ],
             'timezone' => 'Asia/Damascus',
             'is_active' => true,
+            'is_default' => false,
         ];
+    }
+
+    public function default(): static
+    {
+        return $this->state(['is_default' => true]);
     }
 }

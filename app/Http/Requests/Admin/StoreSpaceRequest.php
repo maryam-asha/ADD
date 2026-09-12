@@ -15,6 +15,18 @@ class StoreSpaceRequest extends FormRequest
     }
 
     /**
+     * Prepare the data for validation.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('image_url') && ! $this->has('images') && $this->input('image_url') !== null) {
+            $this->merge([
+                'images' => [$this->input('image_url')],
+            ]);
+        }
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -26,6 +38,9 @@ class StoreSpaceRequest extends FormRequest
             'allocation_model' => ['nullable', Rule::enum(AllocationModel::class)],
             'is_lockable' => ['required', 'boolean'],
             'capacity' => ['nullable', 'integer', 'min:0'],
+            'images' => ['nullable', 'array'],
+            'images.*' => ['string', 'max:2048'],
+            'image_url' => ['nullable', 'string', 'max:2048'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'pricing_currency' => ['nullable', Rule::exists('currencies', 'code')->where('is_active', true)],
         ];

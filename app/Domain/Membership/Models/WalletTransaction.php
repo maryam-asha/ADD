@@ -34,6 +34,9 @@ class WalletTransaction extends Model
         'expires_at',
         'performed_by_user_id',
         'payment_method',
+        'payment_currency',
+        'payment_amount',
+        'exchange_rate_to_base',
     ];
 
     protected function casts(): array
@@ -44,6 +47,8 @@ class WalletTransaction extends Model
             'source' => WalletTransactionSource::class,
             'expires_at' => 'datetime',
             'payment_method' => PaymentMethod::class,
+            'payment_amount' => 'decimal:2',
+            'exchange_rate_to_base' => 'decimal:10',
         ];
     }
 

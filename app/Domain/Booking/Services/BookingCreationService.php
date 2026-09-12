@@ -81,6 +81,8 @@ class BookingCreationService
                 'start_at' => $startAt,
                 'end_at' => $endAt,
                 'status' => $status,
+                'amount_owed' => $amount,
+                'currency' => $locked->pricing_currency ?? 'USD',
                 'payment_state' => $paymentState,
                 'payment_source' => $paymentSource,
             ]);

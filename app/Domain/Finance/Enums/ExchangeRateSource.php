@@ -6,4 +6,5 @@ enum ExchangeRateSource: string
 {
     case Manual = 'manual';
     case ExternalAccepted = 'external_accepted';
+    case Api = 'api';
 }

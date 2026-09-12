@@ -22,6 +22,15 @@ class UserResource extends JsonResource
             'status' => $this->status,
             'roles' => $this->getRoleNames(),
             'permissions' => $this->getAllPermissions()->pluck('name'),
+            'companies' => $this->whenLoaded('companies', fn () => $this->companies->map(fn ($c) => [
+                'id' => $c->id,
+                'legal_name' => $c->legal_name,
+                'status' => $c->status?->value ?? (string) $c->status,
+                'is_admin' => (bool) $c->pivot?->is_admin,
+            ])),
+            'personal_profile' => $this->whenLoaded('personalProfile', fn () => new UserPersonalProfileResource($this->personalProfile)),
+            'professional_profile' => $this->whenLoaded('professionalProfile', fn () => new UserProfessionalProfileResource($this->professionalProfile)),
+            'profile_links' => $this->whenLoaded('professionalProfile', fn () => new UserProfileLinksResource($this->professionalProfile)),
         ];
     }
 }

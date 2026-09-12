@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,9 @@ class StorePlanRequest extends FormRequest
     {
         return array_merge(
             TranslatableField::rules('name'),
+            TranslatableField::rules('subtitle', false),
             [
+                'plan_module_id' => ['nullable', 'integer', 'exists:plan_modules,id'],
                 'is_subscription' => ['required', 'boolean'],
                 'price' => ['required', 'numeric', 'min:0'],
                 'pricing_currency' => ['required', Rule::exists('currencies', 'code')->where('is_active', true)],
@@ -29,6 +32,26 @@ class StorePlanRequest extends FormRequest
                 'overage_rate' => ['nullable', 'numeric', 'min:0'],
                 'is_active' => ['nullable', 'boolean'],
                 'order' => ['nullable', 'integer', 'min:0'],
+
+                'balances' => ['nullable', 'array'],
+                'balances.*.category' => ['required', Rule::enum(WalletTransactionCategory::class)],
+                'balances.*.amount' => ['required', 'numeric', 'min:0'],
+                'balances.*.restricted_space_id' => ['nullable', 'integer', 'exists:spaces,id'],
+                'balances.*.description' => ['nullable', 'array'],
+                'balances.*.description.ar' => ['nullable', 'string'],
+                'balances.*.description.en' => ['nullable', 'string'],
+                'balances.*.order' => ['nullable', 'integer', 'min:0'],
+
+                'features' => ['nullable', 'array'],
+                'features.*.name' => ['required', 'array'],
+                'features.*.name.ar' => ['nullable', 'string'],
+                'features.*.name.en' => ['nullable', 'string'],
+                'features.*.value' => ['nullable', 'array'],
+                'features.*.value.ar' => ['nullable', 'string'],
+                'features.*.value.en' => ['nullable', 'string'],
+                'features.*.icon' => ['nullable', 'string', 'max:100'],
+                'features.*.is_included' => ['nullable', 'boolean'],
+                'features.*.order' => ['nullable', 'integer', 'min:0'],
             ]
         );
     }

@@ -1,0 +1,254 @@
+<?php
+
+namespace Tests\Feature\Experience;
+
+use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Identity\Models\User;
+use Database\Seeders\RoleSeeder;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
+use Tests\TestCase;
+
+class EventTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->seed(RoleSeeder::class);
+    }
+
+    private function actingAsAdmin(): User
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        return $admin;
+    }
+
+    public function test_admin_can_create_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $category = EventCategory::create([
+            'name' => ['en' => 'Workshops', 'ar' => 'ورش عمل'],
+            'slug' => 'workshops',
+        ]);
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Tech Talk', 'ar' => 'حديث تقني'],
+            'description' => ['en' => 'All about AI', 'ar' => 'كل شيء عن الذكاء الاصطناعي'],
+            'category_id' => $category->id,
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+            'location' => 'Main Hall',
+            'capacity' => 50,
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.title.en', 'Tech Talk');
+        $response->assertJsonPath('data.capacity', 50);
+        $response->assertJsonPath('data.category_id', $category->id);
+        $response->assertJsonPath('data.category.slug', 'workshops');
+
+        $this->assertDatabaseHas('events', [
+            'category_id' => $category->id,
+            'location' => 'Main Hall',
+            'status' => 'published',
+            'capacity' => 50,
+        ]);
+    }
+
+    public function test_admin_cannot_create_event_with_non_existent_category_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Invalid Event', 'ar' => 'فعالية غير صالحة'],
+            'category_id' => 99999,
+            'start_at' => now()->addDays(1)->toDateTimeString(),
+            'end_at' => now()->addDays(1)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['category_id']);
+    }
+
+    public function test_deleting_event_category_nullifies_event_category_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $category = EventCategory::create([
+            'name' => ['en' => 'Temp Cat', 'ar' => 'فئة مؤقتة'],
+            'slug' => 'temp-cat',
+        ]);
+
+        $event = Event::create([
+            'title' => ['en' => 'Cat Event', 'ar' => 'فعالية فئة'],
+            'category_id' => $category->id,
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(2),
+        ]);
+
+        $this->assertEquals($category->id, $event->fresh()->category_id);
+
+        $category->delete();
+
+        $this->assertNull($event->fresh()->category_id);
+    }
+
+    public function test_admin_can_update_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => ['en' => 'Old Title', 'ar' => 'عنوان قديم'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+            'status' => 'draft',
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/events/{$event->id}", [
+            'title' => ['en' => 'Updated Title', 'ar' => 'عنوان محدث'],
+            'start_at' => now()->addDays(1)->toDateTimeString(),
+            'end_at' => now()->addDays(1)->addHours(2)->toDateTimeString(),
+            'status' => 'published',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson(['message' => 'Event updated.']);
+
+        $this->assertEquals('Updated Title', $event->fresh()->translate('title', 'en'));
+        $this->assertEquals('published', $event->fresh()->status);
+    }
+
+    public function test_admin_can_delete_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $event = Event::create([
+            'title' => ['en' => 'To Delete', 'ar' => 'للحذف'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+        ]);
+
+        $response = $this->deleteJson("/api/v1/admin/events/{$event->id}");
+
+        $response->assertNoContent();
+        $this->assertDatabaseMissing('events', ['id' => $event->id]);
+    }
+
+    public function test_public_can_only_view_published_events(): void
+    {
+        Event::create([
+            'title' => ['en' => 'Draft Event', 'ar' => 'مسودة'],
+            'start_at' => now()->addDays(1),
+            'end_at' => now()->addDays(1)->addHours(1),
+            'status' => 'draft',
+        ]);
+
+        Event::create([
+            'title' => ['en' => 'Published Event', 'ar' => 'منشور'],
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHours(1),
+            'status' => 'published',
+        ]);
+
+        $response = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/events');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'data');
+        $response->assertJsonPath('data.0.title', 'Published Event');
+    }
+
+    public function test_admin_can_create_paid_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Paid Masterclass', 'ar' => 'دورة متقدمة مدفوعة'],
+            'start_at' => now()->addDays(3)->toDateTimeString(),
+            'end_at' => now()->addDays(3)->addHours(2)->toDateTimeString(),
+            'is_free' => false,
+            'price' => 15.00,
+            'currency' => 'USD',
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.is_free', false);
+        $response->assertJsonPath('data.price', 15);
+        $response->assertJsonPath('data.currency', 'USD');
+
+        $this->assertDatabaseHas('events', [
+            'is_free' => false,
+            'price' => 15.00,
+            'currency' => 'USD',
+        ]);
+    }
+
+    public function test_admin_can_create_free_event(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Community Gathering', 'ar' => 'لقاء مجتمعي'],
+            'start_at' => now()->addDays(4)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->addHours(2)->toDateTimeString(),
+            'is_free' => true,
+            'price' => 0.00,
+            'currency' => 'USD',
+            'status' => 'published',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.is_free', true);
+        $response->assertJsonPath('data.price', 0);
+        $response->assertJsonPath('data.currency', 'USD');
+
+        $this->assertDatabaseHas('events', [
+            'is_free' => true,
+            'price' => 0.00,
+            'currency' => 'USD',
+        ]);
+    }
+
+    public function test_event_prices_are_returned_in_both_usd_and_preferred_display_currency(): void
+    {
+        // Set up exchange rate: 1 USD = 10,000 SYP (rate_to_base = 0.0001)
+        \App\Domain\Finance\Models\ExchangeRate::create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0001000000',
+            'source' => \App\Domain\Finance\Enums\ExchangeRateSource::Manual,
+            'effective_from' => now(),
+        ]);
+
+        $event = Event::create([
+            'title' => ['en' => 'AI Conference', 'ar' => 'مؤتمر الذكاء الاصطناعي'],
+            'start_at' => now()->addDays(5),
+            'end_at' => now()->addDays(5)->addHours(3),
+            'is_free' => false,
+            'price' => 10.00, // 10 USD
+            'currency' => 'USD',
+            'status' => 'published',
+        ]);
+
+        $member = User::factory()->create(['preferred_currency' => 'SYP']);
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/events');
+
+        $response->assertOk();
+        $item = collect($response->json('data'))->firstWhere('id', $event->id);
+        $this->assertNotNull($item);
+        $this->assertEquals(10.0, $item['price_usd']);
+        // 10 USD / 0.0001 = 100000 SYP
+        $this->assertEquals('100000.00', $item['price_display']);
+        $this->assertSame('SYP', $item['display_currency']);
+    }
+}

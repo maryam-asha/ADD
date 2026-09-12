@@ -28,7 +28,7 @@ class StoreCommunityMemberRequest extends FormRequest
             [
                 'category' => ['required', Rule::in(['pioneers', 'growth_partners', 'investors', 'impact_partners'])],
                 'year_joined' => ['nullable', 'integer', 'min:2000', 'max:'.(now()->year + 1)],
-                'photo_url' => ['nullable', 'url'],
+                'photo_url' => ['nullable', 'string', 'max:1000'],
                 'social_links' => ['nullable', 'array'],
                 'skills' => ['nullable', 'array'],
                 'skills.*' => ['string'],

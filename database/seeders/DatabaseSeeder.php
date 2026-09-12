@@ -21,5 +21,8 @@ class DatabaseSeeder extends Seeder
         $this->call(AnnouncementSeeder::class);
         $this->call(ContactLinkSeeder::class);
         $this->call(AdminUserSeeder::class);
+        $this->call(SpaceSeeder::class);
+        $this->call(PlanModuleSeeder::class);
+        $this->call(PlanSeeder::class);
     }
 }

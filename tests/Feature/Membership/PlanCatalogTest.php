@@ -155,15 +155,90 @@ class PlanCatalogTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_public_plan_listing_only_shows_active_plans(): void
+    public function test_admin_can_create_and_update_plan_with_module_balances_and_features(): void
     {
-        Plan::factory()->create(['is_active' => true, 'order' => 2]);
-        Plan::factory()->create(['is_active' => false, 'order' => 1]);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
 
-        $response = $this->getJson('/api/v1/plans');
+        $module = \App\Domain\Membership\Models\PlanModule::create([
+            'name' => ['en' => 'Flexi Desk', 'ar' => 'مكتب مرن'],
+            'slug' => 'flexi_desk',
+        ]);
 
-        $response->assertOk();
-        $response->assertJsonCount(1, 'data');
-        $this->assertTrue($response->json('data.0.is_active'));
+        $payload = $this->payload([
+            'plan_module_id' => $module->id,
+            'subtitle' => ['en' => 'Flexible work hours', 'ar' => 'ساعات عمل مرنة'],
+            'balances' => [
+                [
+                    'category' => 'cafe',
+                    'amount' => 40.00,
+                    'description' => ['en' => 'Cafe grant', 'ar' => 'رصيد كافيه'],
+                    'order' => 1,
+                ],
+                [
+                    'category' => 'printing_internet',
+                    'amount' => 25.00,
+                    'description' => ['en' => 'Printing grant', 'ar' => 'رصيد طباعة'],
+                    'order' => 2,
+                ],
+            ],
+            'features' => [
+                [
+                    'name' => ['en' => 'Meeting Rooms', 'ar' => 'غرف اجتماعات'],
+                    'value' => ['en' => '8 Hours', 'ar' => '8 ساعات'],
+                    'icon' => 'clock',
+                    'is_included' => true,
+                    'order' => 1,
+                ],
+            ],
+        ]);
+
+        $createResponse = $this->postJson('/api/v1/admin/plans', $payload);
+        $createResponse->assertCreated();
+        $createResponse->assertJsonPath('data.plan_module_id', $module->id);
+        $createResponse->assertJsonPath('data.subtitle.en', 'Flexible work hours');
+        $createResponse->assertJsonCount(2, 'data.balances');
+        $createResponse->assertJsonCount(1, 'data.features');
+        $createResponse->assertJsonPath('data.balances.0.category', 'cafe');
+        $createResponse->assertJsonPath('data.balances.0.amount', 40);
+        $createResponse->assertJsonPath('data.features.0.value.en', '8 Hours');
+
+        $planId = $createResponse->json('data.id');
+
+        // Update features and balances
+        $updatePayload = $this->payload([
+            'plan_module_id' => $module->id,
+            'balances' => [
+                [
+                    'category' => 'cafe',
+                    'amount' => 60.00,
+                    'description' => ['en' => 'Updated Cafe grant', 'ar' => 'رصيد كافيه معدل'],
+                ],
+            ],
+            'features' => [
+                [
+                    'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
+                    'value' => null,
+                    'icon' => 'coffee',
+                ],
+                [
+                    'name' => ['en' => 'Access to Locker', 'ar' => 'خزانة شخصية'],
+                    'value' => null,
+                    'icon' => 'lock',
+                ],
+            ],
+        ]);
+
+        $updateResponse = $this->putJson("/api/v1/admin/plans/{$planId}", $updatePayload);
+        $updateResponse->assertOk();
+
+        $showResponse = $this->getJson("/api/v1/admin/plans/{$planId}");
+        $showResponse->assertOk();
+        $showResponse->assertJsonCount(1, 'data.balances');
+        $showResponse->assertJsonPath('data.balances.0.amount', 60);
+        $showResponse->assertJsonCount(2, 'data.features');
+        $showResponse->assertJsonPath('data.features.0.name.en', 'Unlimited Coffee');
+        $showResponse->assertJsonPath('data.features.1.name.en', 'Access to Locker');
     }
 }

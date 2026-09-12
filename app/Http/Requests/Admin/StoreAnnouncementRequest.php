@@ -18,7 +18,7 @@ class StoreAnnouncementRequest extends FormRequest
     {
         return [
             'type' => ['required', 'string', 'max:50'],
-            'image_url' => ['required', 'string', 'max:2048', 'url'],
+            'image_url' => ['required', 'string', 'max:2048'],
             'link_url' => ['nullable', 'string', 'max:2048', 'url'],
             'sort_order' => ['nullable', 'integer', 'min:0'],
             'starts_at' => ['nullable', 'date'],

@@ -17,7 +17,15 @@ class PlanResource extends JsonResource
     {
         $data = [
             'id' => $this->id,
+            'plan_module_id' => $this->plan_module_id,
+            'plan_module' => $this->whenLoaded('planModule', fn () => [
+                'id' => $this->planModule->id,
+                'name' => $this->planModule->name,
+                'slug' => $this->planModule->slug,
+                'icon' => $this->planModule->icon,
+            ]),
             'name' => $this->name,
+            'subtitle' => $this->subtitle,
             'is_subscription' => $this->is_subscription,
             'price' => $this->price,
             'pricing_currency' => $this->pricing_currency,
@@ -26,6 +34,22 @@ class PlanResource extends JsonResource
             'overage_rate' => $this->overage_rate,
             'is_active' => $this->is_active,
             'order' => $this->order,
+            'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
+                'id' => $b->id,
+                'category' => $b->category->value,
+                'amount' => (float) $b->amount,
+                'restricted_space_id' => $b->restricted_space_id,
+                'description' => $b->description,
+                'order' => $b->order,
+            ])),
+            'features' => $this->whenLoaded('features', fn () => $this->features->map(fn ($f) => [
+                'id' => $f->id,
+                'name' => $f->name,
+                'value' => $f->value,
+                'icon' => $f->icon,
+                'is_included' => $f->is_included,
+                'order' => $f->order,
+            ])),
             'created_at' => $this->created_at,
         ];
 
@@ -62,6 +86,10 @@ class PlanResource extends JsonResource
                 $data['converted_currency'] = $targetCurrency;
             }
         }
+
+        $data['price_usd'] = (float) $this->price;
+        $data['price_display'] = $data['converted_amount'] ?? number_format((float) $this->price, 2, '.', '');
+        $data['currency'] = $targetCurrency;
 
         return $data;
     }

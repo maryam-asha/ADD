@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ class Partner extends Model
             'name' => 'array',
             'description' => 'array',
             'is_active' => 'boolean',
+            'logo_url' => AsMediaUrl::class,
         ];
     }
 }

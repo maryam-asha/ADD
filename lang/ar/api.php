@@ -83,6 +83,9 @@ return [
         'partner_updated' => 'تم تحديث الشريك.',
         'contact_link_updated' => 'تم تحديث رابط التواصل.',
         'plan_updated' => 'تم تحديث الباقة.',
+        'plan_module_updated' => 'تم تحديث موديول الباقة بنجاح.',
+        'event_category_updated' => 'تم تحديث فئة الفعالية.',
+        'event_updated' => 'تم تحديث الفعالية.',
         'community_member_updated' => 'تم تحديث عضو المجتمع.',
         'private_office_request_updated' => 'تم تحديث طلب المكتب الخاص.',
         'company_status_updated' => 'تم تحديث حالة الشركة.',
@@ -101,6 +104,11 @@ return [
         'exchange_rate_suggestion_dismissed' => 'تم رفض اقتراح سعر الصرف.',
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
         'role_updated' => 'تم تحديث الدور.',
+        'inquiry_updated' => 'تم تحديث الاستفسار.',
+    ],
+
+    'public' => [
+        'inquiry_submitted' => 'تم استلام استفسارك بنجاح. شكراً لتواصلك معنا.',
     ],
 
     'role' => [
@@ -169,6 +177,91 @@ return [
         'space_id_required' => 'يجب تحديد مساحة لتأكيد طلب وصول غير مطابق لحجز.',
         'arrival_request_confirmed' => 'تم تأكيد الوصول.',
         'arrival_request_rejected' => 'تم رفض طلب الوصول.',
+    ],
+
+    'notification' => [
+        'device_token_updated' => 'تم تحديث رمز الجهاز.',
+        'device_token_removed' => 'تم حذف رمز الجهاز.',
+        'marked_as_read' => 'تم تحديد الإشعار كمقروء.',
+        'all_marked_as_read' => 'تم تحديد جميع الإشعارات كمقروءة.',
+        'broadcast_sent' => 'تم إرسال الإشعار الجماعي.',
+    ],
+
+    'finance' => [
+        'cash_register_already_open' => 'لديك بالفعل جلسة صندوق مفتوحة حالياً.',
+        'cash_register_already_closed' => 'جلسة الصندوق هذه مغلقة بالفعل.',
+    ],
+
+    'space' => [
+        'browse_title' => 'تصفح المساحات',
+        'browse_subtitle' => 'ابحث واحجز مساحة العمل المناسبة ليومك.',
+        'working_hours_notice' => 'الأوقات المعروضة تقع ضمن ساعات عمل الفرع',
+        'requires_approval_notice' => 'سيتم مراجعة طلبك من قبل إدارة العمليات قبل التأكيد.',
+        'statuses' => [
+            'active' => 'نشط',
+            'maintenance' => 'تحت الصيانة',
+            'retired' => 'خارج الخدمة',
+        ],
+        'starting_from' => 'يبدأ من',
+        'per_hour' => 'ساعة',
+        'per_day' => 'يوم',
+        'up_to_people' => 'حتى :count أشخاص',
+        'single_seat' => 'مقعد واحد',
+        'min_duration_note' => 'فترات تبدأ كل :granularity دقيقة • الحد الأدنى :min_duration',
+        'book_this_space' => 'احجز هذه المساحة',
+        'person' => 'شخص واحد',
+        'people' => ':count أشخاص',
+        'seat' => 'مقعد واحد',
+        'seats' => ':count مقاعد',
+        'open_area' => 'مساحة مفتوحة',
+        'private_area' => 'مساحة خاصة',
+        'descriptions' => [
+            'co_space' => 'مساحة عمل مفتوحة ومرنة مصممة للتركيز والإنتاجية ضمن بيئة مجتمعية تفاعلية حيوية.',
+            'room' => 'غرفة اجتماعات خاصة ومجهزة بالكامل مصممة للنقاشات المثمرة، ورش العمل التعاونية، وعروض العملاء.',
+            'business' => 'مكتب خاص هادئ ومخصص يوفر أقصى درجات التركيز والخصوصية والراحة والأمان.',
+            'event_hall' => 'قاعة واسعة ومتعددة الاستخدامات مجهزة بأحدث التقنيات الصوتية والمرئية، مثالية للمؤتمرات وورش العمل الكبرى والفعاليات.',
+        ],
+    ],
+
+    'package' => [
+        'title' => 'الباقات والاشتراكات',
+        'subtitle' => 'اختر الباقة المناسبة لأعمالك.',
+        'tabs' => [
+            'packages' => 'الباقات',
+            'my_subscription' => 'اشتراكي',
+        ],
+        'current_plan_tag' => 'باقتك الحالية',
+        'active_until' => 'نشط حتى :date',
+        'renew_plan' => 'تجديد الباقة',
+        'change_plan' => 'تغيير الباقة',
+        'current_plan' => 'الباقة الحالية',
+        'select_plan' => 'اختيار الباقة',
+        'view_details' => 'عرض التفاصيل',
+        'benefits_title' => 'مزايا الباقة',
+        'expires_on' => 'ينتهي في :date',
+        'per_month' => 'شهرياً',
+        'benefits' => [
+            'cafe_access' => 'دخول الكافيه',
+            'printing_credits' => 'رصيد الطباعة',
+            'meeting_rooms' => 'غرف الاجتماعات',
+            'member_discounts' => 'خصومات الأعضاء',
+            'included' => 'مشمول',
+        ],
+        'balances' => [
+            'cafe' => 'رصيد الكافيه',
+            'printing' => 'رصيد الطباعة',
+        ],
+        'tags' => [
+            'cafe' => 'كافيه',
+            'printing' => 'طباعة',
+            'meeting' => 'اجتماعات',
+            'discounts' => 'خصومات',
+        ],
+        'subtitles' => [
+            'starter' => 'مثالية للأفراد والفرق الصغيرة.',
+            'professional' => 'كل ما تحتاجه لتنمية وتطوير أعمالك.',
+            'enterprise' => 'ميزات متقدمة للشركات والفرق الكبيرة.',
+        ],
     ],
 
 ];

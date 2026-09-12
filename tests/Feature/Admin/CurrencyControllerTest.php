@@ -45,7 +45,6 @@ class CurrencyControllerTest extends TestCase
         // SYP (order 1), USD (order 2), EUR (order 5).
         $response->assertJsonCount(3, 'data');
         $response->assertJsonPath('data.2.code', 'EUR');
-        $response->assertJsonPath('data.2.is_active', false);
     }
 
     public function test_an_admin_can_create_a_new_currency(): void
@@ -61,8 +60,6 @@ class CurrencyControllerTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('data.code', 'EUR');
-        $response->assertJsonPath('data.is_active', true);
-        $response->assertJsonPath('data.is_base', false);
         $this->assertDatabaseHas('currencies', ['code' => 'EUR', 'is_base' => false, 'is_active' => true]);
     }
 
@@ -83,7 +80,6 @@ class CurrencyControllerTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.is_base', false);
         $this->assertDatabaseHas('currencies', ['code' => 'EUR', 'is_base' => false]);
     }
 

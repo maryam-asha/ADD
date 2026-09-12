@@ -26,7 +26,9 @@ class CompanyMemberController extends Controller
 
     public function index(Company $company): AnonymousResourceCollection
     {
-        return CompanyMemberResource::collection($company->members()->get());
+        return CompanyMemberResource::collection(
+            $company->memberships()->with(['user' => fn ($query) => $query->withTrashed()])->get()
+        );
     }
 
     public function store(StoreCompanyMemberRequest $request, Company $company): JsonResponse

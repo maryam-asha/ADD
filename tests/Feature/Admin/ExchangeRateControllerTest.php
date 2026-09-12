@@ -94,7 +94,7 @@ class ExchangeRateControllerTest extends TestCase
         $activity = Activity::where('description', 'exchange_rate_created')->latest('id')->first();
 
         $this->assertNotNull($activity);
-        $this->assertSame($admin->id, $activity->causer_id);
+        $this->assertEquals($admin->id, $activity->causer_id);
         $this->assertSame('SYP', $activity->properties['currency_code']);
         $this->assertSame('0.0000680272', $activity->properties['rate_to_base']);
     }
@@ -282,5 +282,29 @@ class ExchangeRateControllerTest extends TestCase
         ])->assertCreated();
 
         $this->assertDatabaseHas('exchange_rates', ['currency_code' => 'SYP', 'source' => 'manual', 'suggestion_id' => null]);
+    }
+
+    public function test_admin_can_trigger_exchange_rates_sync(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        ExchangeRate::factory()->create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000757576',
+            'source' => 'api',
+        ]);
+
+        \Illuminate\Support\Facades\Artisan::shouldReceive('call')
+            ->once()
+            ->with('finance:sync-exchange-rates')
+            ->andReturn(0);
+
+        $response = $this->postJson('/api/v1/admin/exchange-rates/sync');
+
+        $response->assertOk()
+            ->assertJsonPath('message', 'Exchange rates synced successfully.')
+            ->assertJsonPath('data.currency_code', 'SYP');
     }
 }

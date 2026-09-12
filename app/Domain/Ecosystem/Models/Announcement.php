@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Casts\AsMediaUrl;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
@@ -32,6 +33,7 @@ class Announcement extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
             'is_active' => 'boolean',
+            'image_url' => AsMediaUrl::class,
         ];
     }
 }
