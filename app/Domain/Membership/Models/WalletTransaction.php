@@ -37,18 +37,20 @@ class WalletTransaction extends Model
         'payment_currency',
         'payment_amount',
         'exchange_rate_to_base',
+        'point_rate_usd',
     ];
 
     protected function casts(): array
     {
         return [
-            'amount' => 'decimal:2',
+            'amount' => 'integer',
             'category' => WalletTransactionCategory::class,
             'source' => WalletTransactionSource::class,
             'expires_at' => 'datetime',
             'payment_method' => PaymentMethod::class,
             'payment_amount' => 'decimal:2',
             'exchange_rate_to_base' => 'decimal:10',
+            'point_rate_usd' => 'decimal:4',
         ];
     }
 

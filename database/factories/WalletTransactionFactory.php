@@ -22,7 +22,7 @@ class WalletTransactionFactory extends Factory
     {
         return [
             'wallet_id' => Wallet::factory(),
-            'amount' => fake()->randomFloat(2, 5, 100),
+            'amount' => 250,
             'description' => fake()->sentence(),
             'category' => WalletTransactionCategory::General,
             'restricted_space_id' => null,
