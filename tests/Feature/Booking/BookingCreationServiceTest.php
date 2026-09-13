@@ -264,14 +264,14 @@ class BookingCreationServiceTest extends TestCase
         $space = $this->openSpace();
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 500, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         $booking = $this->creations->create($space, $member, $start, $end);
 
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(PaymentSource::Wallet, $booking->payment_source);
-        $this->assertSame(1, $wallet->transactions()->where('amount', '-10.00')->count());
+        $this->assertSame(1, $wallet->transactions()->where('amount', -100)->count());
     }
 
     public function test_creation_stays_unpaid_when_no_balance_covers_the_cost(): void
@@ -290,7 +290,7 @@ class BookingCreationServiceTest extends TestCase
         $space = $this->openSpace();
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '5.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 50, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         $booking = $this->creations->create($space, $member, $start, $end);
@@ -307,7 +307,7 @@ class BookingCreationServiceTest extends TestCase
         $company = Company::factory()->create();
         $member->companies()->attach($company->id);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        (new WalletService)->creditGeneral($companyWallet, '5.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($companyWallet, 50, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         $booking = $this->creations->create($space, $member, $start, $end, OwnerType::Company, $company->id);
@@ -322,11 +322,11 @@ class BookingCreationServiceTest extends TestCase
         $space = $this->openSpace();
         $member = User::factory()->create();
         $personalWallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($personalWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($personalWallet, 500, WalletTransactionSource::TopUp);
         $company = Company::factory()->create();
         $member->companies()->attach($company->id);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        (new WalletService)->creditGeneral($companyWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         try {
@@ -346,13 +346,13 @@ class BookingCreationServiceTest extends TestCase
         $company = Company::factory()->create();
         $member->companies()->attach($company->id);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        (new WalletService)->creditGeneral($companyWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         $booking = $this->creations->create($space, $member, $start, $end, OwnerType::Company, $company->id);
 
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
-        $this->assertSame(1, $companyWallet->transactions()->where('amount', '-10.00')->count());
+        $this->assertSame(1, $companyWallet->transactions()->where('amount', -100)->count());
     }
 
     public function test_creation_rejects_an_explicit_wallet_the_member_does_not_own(): void
@@ -361,7 +361,7 @@ class BookingCreationServiceTest extends TestCase
         $member = User::factory()->create();
         $otherCompany = Company::factory()->create();
         $otherCompanyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $otherCompany->id]);
-        (new WalletService)->creditGeneral($otherCompanyWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($otherCompanyWallet, 500, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         try {
@@ -380,7 +380,7 @@ class BookingCreationServiceTest extends TestCase
         $space = $this->openSpace(['hourly_rate_points' => 0]);
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 500, WalletTransactionSource::TopUp);
         [$start, $end] = $this->slot(10);
 
         $booking = $this->creations->create($space, $member, $start, $end);

@@ -38,7 +38,7 @@ class MembershipPurchaseTest extends TestCase
         $this->wallets = new WalletService;
     }
 
-    private function makeFundedMember(string $generalBalance = '500.00'): User
+    private function makeFundedMember(int $generalBalance = 5000): User
     {
         $member = User::factory()->create();
         $member->assignRole('member');
@@ -52,7 +52,7 @@ class MembershipPurchaseTest extends TestCase
     /**
      * @return array{company: Company, wallet: Wallet, admin: User, member: User}
      */
-    private function makeCompanyWithAdminAndMember(string $generalBalance = '500.00'): array
+    private function makeCompanyWithAdminAndMember(int $generalBalance = 5000): array
     {
         $company = Company::factory()->create();
         $wallet = Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
@@ -69,12 +69,12 @@ class MembershipPurchaseTest extends TestCase
         return compact('company', 'wallet', 'admin', 'member');
     }
 
-    private function rawGeneralBalance(Wallet $wallet): string
+    private function rawGeneralBalance(Wallet $wallet): int
     {
-        $total = '0.00';
+        $total = 0;
 
         foreach (WalletTransaction::where('wallet_id', $wallet->id)->where('category', WalletTransactionCategory::General)->get() as $transaction) {
-            $total = bcadd($total, (string) $transaction->amount, 2);
+            $total += (int) $transaction->amount;
         }
 
         return $total;
@@ -82,7 +82,7 @@ class MembershipPurchaseTest extends TestCase
 
     public function test_a_funded_member_can_buy_a_subscription_plan_for_themselves(): void
     {
-        $member = $this->makeFundedMember('500.00');
+        $member = $this->makeFundedMember(5000);
         $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->first();
 
         $plan = Plan::factory()->create([
@@ -104,7 +104,7 @@ class MembershipPurchaseTest extends TestCase
         $response->assertJsonPath('data.owner_id', $member->id);
         $response->assertJsonPath('data.plan.id', $plan->id);
 
-        $this->assertSame('380.00', $this->rawGeneralBalance($wallet->fresh()));
+        $this->assertSame(3800, $this->rawGeneralBalance($wallet->fresh()));
 
         $membership = Membership::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->first();
         $this->assertNotNull($membership);
@@ -120,7 +120,7 @@ class MembershipPurchaseTest extends TestCase
             ->first();
 
         $this->assertNotNull($hoursCredit);
-        $this->assertSame('40.00', (string) $hoursCredit->amount);
+        $this->assertSame(40, (int) $hoursCredit->amount);
         $this->assertSame(
             $membership->current_period_end->toDateTimeString(),
             $hoursCredit->expires_at->toDateTimeString()
@@ -138,7 +138,7 @@ class MembershipPurchaseTest extends TestCase
     {
         ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272', 'effective_from' => now()->subDay()]);
 
-        $member = $this->makeFundedMember('500.00');
+        $member = $this->makeFundedMember(5000);
 
         $plan = Plan::factory()->create([
             'is_subscription' => true,
@@ -162,7 +162,7 @@ class MembershipPurchaseTest extends TestCase
 
     public function test_insufficient_balance_fails_with_no_partial_state(): void
     {
-        $member = $this->makeFundedMember('10.00');
+        $member = $this->makeFundedMember(100);
 
         $plan = Plan::factory()->create([
             'is_subscription' => true,
@@ -189,7 +189,7 @@ class MembershipPurchaseTest extends TestCase
 
     public function test_a_one_time_package_plan_cannot_be_purchased_as_a_membership(): void
     {
-        $member = $this->makeFundedMember('500.00');
+        $member = $this->makeFundedMember(5000);
 
         $plan = Plan::factory()->create([
             'is_subscription' => false,
@@ -211,11 +211,11 @@ class MembershipPurchaseTest extends TestCase
 
     public function test_a_company_admin_can_buy_a_plan_on_behalf_of_their_company(): void
     {
-        ['company' => $company, 'wallet' => $companyWallet, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember('500.00');
+        ['company' => $company, 'wallet' => $companyWallet, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember(5000);
 
         // The admin also has their own personal wallet, which must stay untouched.
         $personalWallet = Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $admin->id]);
-        $this->wallets->creditGeneral($personalWallet, '30.00', WalletTransactionSource::TopUp);
+        $this->wallets->creditGeneral($personalWallet, 300, WalletTransactionSource::TopUp);
 
         $plan = Plan::factory()->create([
             'is_subscription' => true,
@@ -236,8 +236,8 @@ class MembershipPurchaseTest extends TestCase
         $response->assertJsonPath('data.owner_type', 'company');
         $response->assertJsonPath('data.owner_id', $company->id);
 
-        $this->assertSame('380.00', $this->rawGeneralBalance($companyWallet->fresh()));
-        $this->assertSame('30.00', $this->rawGeneralBalance($personalWallet->fresh()));
+        $this->assertSame(3800, $this->rawGeneralBalance($companyWallet->fresh()));
+        $this->assertSame(300, $this->rawGeneralBalance($personalWallet->fresh()));
 
         $membership = Membership::where('owner_type', OwnerType::Company)->where('owner_id', $company->id)->first();
         $this->assertNotNull($membership);
@@ -246,7 +246,7 @@ class MembershipPurchaseTest extends TestCase
 
     public function test_a_plain_company_member_cannot_buy_a_plan_on_behalf_of_the_company(): void
     {
-        ['company' => $company, 'member' => $member] = $this->makeCompanyWithAdminAndMember('500.00');
+        ['company' => $company, 'member' => $member] = $this->makeCompanyWithAdminAndMember(5000);
 
         $plan = Plan::factory()->create([
             'is_subscription' => true,

@@ -7,6 +7,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -96,14 +97,21 @@ class WalletTopUpController extends Controller
 
         $previousBalance = $this->calculateGeneralBalance($wallet);
 
+        // TODO(spec-C): this endpoint's request and response are still
+        // USD-denominated, so the credited amount is converted to points at
+        // the ledger boundary here. Task 8 moves the whole path to points.
         $transaction = $wallets->creditGeneral(
             $wallet,
-            $creditedAmount,
+            app(PointConversionService::class)->usdToPoints($creditedAmount),
             WalletTransactionSource::TopUp,
             $request->validated('description')
         );
 
-        $newBalance = bcadd($previousBalance, (string) $transaction->amount, 2);
+        $newBalance = bcadd(
+            $previousBalance,
+            app(PointConversionService::class)->pointsToUsd((int) $transaction->amount),
+            2
+        );
 
         $transaction->forceFill([
             'performed_by_user_id' => $request->user()->id,
@@ -132,7 +140,7 @@ class WalletTopUpController extends Controller
             'data' => [
                 'id' => $transaction->id,
                 'transaction_code' => $transactionCode,
-                'amount' => (string) $transaction->amount,
+                'amount' => app(PointConversionService::class)->pointsToUsd((int) $transaction->amount),
                 'currency' => $baseCurrency,
                 'payment_amount' => (string) $paymentAmount,
                 'payment_currency' => $paymentCurrency,
@@ -162,11 +170,11 @@ class WalletTopUpController extends Controller
             })
             ->get();
 
-        $total = '0.00';
+        $totalPoints = 0;
         foreach ($transactions as $tx) {
-            $total = bcadd($total, (string) $tx->amount, 2);
+            $totalPoints += (int) $tx->amount;
         }
 
-        return $total;
+        return app(PointConversionService::class)->pointsToUsd($totalPoints);
     }
 }

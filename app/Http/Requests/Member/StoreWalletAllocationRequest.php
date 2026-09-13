@@ -36,7 +36,9 @@ class StoreWalletAllocationRequest extends FormRequest
                 WalletTransactionCategory::SpaceSpecific->value,
             ])],
             'restricted_space_id' => ['nullable', 'integer', 'exists:spaces,id'],
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            // The ledger is point-denominated, so an allocation moves a whole
+            // number of points — never a fractional currency amount.
+            'amount' => ['required', 'integer', 'min:1'],
             'user_ids' => ['required', 'array', 'min:1'],
             'user_ids.*' => ['required', 'integer', 'distinct', 'exists:users,id'],
             'expires_at' => ['required', 'date', 'after:now'],

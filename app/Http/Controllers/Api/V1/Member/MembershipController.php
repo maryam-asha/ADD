@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
-use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -30,7 +29,7 @@ class MembershipController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function store(StoreMembershipRequest $request, WalletService $wallets, PointConversionService $points): MembershipResource
+    public function store(StoreMembershipRequest $request, WalletService $wallets): MembershipResource
     {
         $plan = Plan::findOrFail($request->validated('plan_id'));
 
@@ -47,13 +46,10 @@ class MembershipController extends Controller
         }
 
         try {
-            $membership = DB::transaction(function () use ($wallets, $points, $plan, $ownerType, $ownerId) {
+            $membership = DB::transaction(function () use ($wallets, $plan, $ownerType, $ownerId) {
                 $wallet = $wallets->walletFor($ownerType, $ownerId);
 
-                // TODO(spec-C): the wallet still stores currency, so the plan's
-                // point price is converted at this call site. Task 8 removes this
-                // conversion once WalletService takes points directly.
-                $wallets->debitGeneral($wallet, $points->pointsToUsd((int) $plan->price_points), "Membership purchase: plan #{$plan->id}");
+                $wallets->debitGeneral($wallet, (int) $plan->price_points, "Membership purchase: plan #{$plan->id}");
 
                 $membership = Membership::create([
                     'plan_id' => $plan->id,
@@ -70,12 +66,12 @@ class MembershipController extends Controller
                             ?? "{$grant->category->value} allowance for membership #{$membership->id}";
 
                         if ($grant->category === WalletTransactionCategory::General) {
-                            $wallets->creditGeneral($wallet, $points->pointsToUsd((int) $grant->amount_points), WalletTransactionSource::SubscriptionGrant, $desc);
+                            $wallets->creditGeneral($wallet, (int) $grant->amount_points, WalletTransactionSource::SubscriptionGrant, $desc);
                         } else {
                             $wallets->creditCategorized(
                                 $wallet,
                                 $grant->category,
-                                $points->pointsToUsd((int) $grant->amount_points),
+                                (int) $grant->amount_points,
                                 WalletTransactionSource::SubscriptionGrant,
                                 $membership->current_period_end,
                                 $grant->restricted_space_id,
@@ -85,10 +81,15 @@ class MembershipController extends Controller
                         }
                     }
                 } elseif (bccomp((string) $plan->included_hours, '0.00', 2) > 0) {
+                    // TODO(spec-C): `included_hours` is an hours figure, not a
+                    // point count, and was already being written into the ledger
+                    // 1:1 before the ledger became point-denominated. Cast
+                    // preserves exactly that pre-existing behaviour; deciding
+                    // the real hours->points rule belongs with the pricing work.
                     $wallets->creditCategorized(
                         $wallet,
                         WalletTransactionCategory::SpaceSpecific,
-                        (string) $plan->included_hours,
+                        (int) $plan->included_hours,
                         WalletTransactionSource::SubscriptionGrant,
                         $membership->current_period_end,
                         null,

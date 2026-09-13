@@ -7,7 +7,6 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -69,18 +68,15 @@ class BookingExtensionService
             $newPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $newEndAt);
             $differencePoints = $newPoints - $oldPoints;
 
-            // TODO(spec-C): drop conversion once ledger stores points
-            $difference = app(PointConversionService::class)->pointsToUsd($differencePoints);
-
             $paymentState = $lockedBooking->payment_state;
 
             if ($lockedBooking->payment_state === PaymentState::Paid && $lockedBooking->payment_source === PaymentSource::Wallet) {
                 $personalOption = collect($this->wallets->spendOptions($lockedBooking->user, WalletTransactionCategory::SpaceSpecific))
                     ->firstWhere('owner_type', OwnerType::User->value);
 
-                if ($personalOption !== null && bccomp($personalOption['usable_balance'], $difference, 2) >= 0) {
+                if ($personalOption !== null && $personalOption['usable_balance'] >= $differencePoints) {
                     $wallet = $this->wallets->walletFor(OwnerType::User, $lockedBooking->user_id);
-                    $this->wallets->debit($wallet, $lockedBooking->user, WalletTransactionCategory::SpaceSpecific, $difference, "Booking #{$lockedBooking->id} extension");
+                    $this->wallets->debit($wallet, $lockedBooking->user, WalletTransactionCategory::SpaceSpecific, $differencePoints, "Booking #{$lockedBooking->id} extension");
                 } else {
                     $paymentState = PaymentState::Unpaid;
                 }

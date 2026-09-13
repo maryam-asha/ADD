@@ -37,12 +37,14 @@ class CompanyWalletAllocationController extends Controller
 
         try {
             $allocation = DB::transaction(function () use ($request, $company, $wallets, $wallet) {
-                $wallets->debitGeneral($wallet, $request->validated('amount'), 'Allocation to company members');
+                $points = (int) $request->validated('amount');
+
+                $wallets->debitGeneral($wallet, $points, 'Allocation to company members');
 
                 $allocation = $wallets->creditCategorized(
                     $wallet,
                     WalletTransactionCategory::from($request->validated('category')),
-                    $request->validated('amount'),
+                    $points,
                     WalletTransactionSource::CompanyAdminAllocation,
                     Carbon::parse($request->validated('expires_at')),
                     $request->validated('restricted_space_id'),
@@ -53,7 +55,7 @@ class CompanyWalletAllocationController extends Controller
                 $this->logSensitiveAction('wallet_allocation_created', $allocation, [
                     'company_id' => $company->id,
                     'category' => $allocation->category->value,
-                    'amount' => $request->validated('amount'),
+                    'amount' => $points,
                     'user_ids' => $request->validated('user_ids'),
                 ]);
 
@@ -67,7 +69,7 @@ class CompanyWalletAllocationController extends Controller
             'data' => [
                 'id' => $allocation->id,
                 'category' => $allocation->category->value,
-                'amount' => (string) $allocation->amount,
+                'amount' => (int) $allocation->amount,
                 'restricted_space_id' => $allocation->restricted_space_id,
                 'source' => $allocation->source->value,
                 'expires_at' => $allocation->expires_at?->toIso8601String(),

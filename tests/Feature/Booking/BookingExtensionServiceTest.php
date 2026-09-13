@@ -129,7 +129,7 @@ class BookingExtensionServiceTest extends TestCase
     {
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 500, WalletTransactionSource::TopUp);
         $booking = $this->checkedInBooking([
             'user_id' => $member->id,
             'payment_state' => PaymentState::Paid,
@@ -138,7 +138,7 @@ class BookingExtensionServiceTest extends TestCase
 
         $this->extensions->extend($booking, 60);
 
-        $this->assertSame(1, $wallet->transactions()->where('amount', '-10.00')->count());
+        $this->assertSame(1, $wallet->transactions()->where('amount', -100)->count());
         $this->assertSame(PaymentState::Paid, $booking->fresh()->payment_state);
     }
 
@@ -146,7 +146,7 @@ class BookingExtensionServiceTest extends TestCase
     {
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '5.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 50, WalletTransactionSource::TopUp);
         $booking = $this->checkedInBooking([
             'user_id' => $member->id,
             'payment_state' => PaymentState::Paid,

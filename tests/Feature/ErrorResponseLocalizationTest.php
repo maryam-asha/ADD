@@ -69,7 +69,7 @@ class ErrorResponseLocalizationTest extends TestCase
     {
         $company = Company::factory()->create();
         $wallet = Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        (new WalletService)->creditGeneral($wallet, '100.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 1000, WalletTransactionSource::TopUp);
 
         $member = User::factory()->create();
         $member->assignRole('member');
@@ -79,7 +79,7 @@ class ErrorResponseLocalizationTest extends TestCase
 
         $payload = [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ];

@@ -44,7 +44,7 @@ class WalletNoRolloverTest extends TestCase
         $service->creditCategorized(
             $wallet,
             WalletTransactionCategory::SpaceSpecific,
-            '10.00',
+            100,
             WalletTransactionSource::SubscriptionGrant,
             $expiresAt
         );
@@ -52,8 +52,8 @@ class WalletNoRolloverTest extends TestCase
         // Before the expiry instant: fully usable via the category pool.
         $before = $service->spendOptions($user, WalletTransactionCategory::SpaceSpecific);
         $this->assertCount(1, $before);
-        $this->assertSame('10.00', $before[0]['category_balance']);
-        $this->assertSame('10.00', $before[0]['usable_balance']);
+        $this->assertSame(100, $before[0]['category_balance']);
+        $this->assertSame(100, $before[0]['usable_balance']);
 
         // Move time past the expiry instant.
         Carbon::setTestNow($expiresAt->copy()->addMinute());
@@ -68,7 +68,7 @@ class WalletNoRolloverTest extends TestCase
             $threw = false;
 
             try {
-                $service->debit($wallet, $user, WalletTransactionCategory::SpaceSpecific, '3.00');
+                $service->debit($wallet, $user, WalletTransactionCategory::SpaceSpecific, 30);
             } catch (InsufficientBalanceException) {
                 $threw = true;
             }
@@ -82,7 +82,7 @@ class WalletNoRolloverTest extends TestCase
                 ->first();
 
             $this->assertNotNull($grant);
-            $this->assertSame('10.00', (string) $grant->amount);
+            $this->assertSame(100, (int) $grant->amount);
         } finally {
             Carbon::setTestNow(null);
         }
@@ -94,7 +94,7 @@ class WalletNoRolloverTest extends TestCase
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $user->id]);
         $service = new WalletService;
 
-        $service->creditGeneral($wallet, '25.00', WalletTransactionSource::TopUp);
+        $service->creditGeneral($wallet, 250, WalletTransactionSource::TopUp);
 
         Carbon::setTestNow(Carbon::now()->addDays(400));
 
@@ -102,11 +102,11 @@ class WalletNoRolloverTest extends TestCase
             $options = $service->spendOptions($user, WalletTransactionCategory::General);
 
             $this->assertCount(1, $options);
-            $this->assertSame('25.00', $options[0]['general_balance']);
-            $this->assertSame('25.00', $options[0]['usable_balance']);
+            $this->assertSame(250, $options[0]['general_balance']);
+            $this->assertSame(250, $options[0]['usable_balance']);
 
-            $debit = $service->debitGeneral($wallet, '10.00');
-            $this->assertSame('-10.00', (string) $debit->amount);
+            $debit = $service->debitGeneral($wallet, 100);
+            $this->assertSame(-100, (int) $debit->amount);
         } finally {
             Carbon::setTestNow(null);
         }

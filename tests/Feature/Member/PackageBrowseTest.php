@@ -223,10 +223,10 @@ class PackageBrowseTest extends TestCase
 
         // Member wallet with enough general balance
         $wallet = $wallets->walletFor(OwnerType::User, $member->id);
-        $wallets->creditGeneral($wallet, '300.00', WalletTransactionSource::TopUp, 'Top-up for purchase');
+        $wallets->creditGeneral($wallet, 3000, WalletTransactionSource::TopUp, 'Top-up for purchase');
 
-        // Buy The Dedicated + (id: 6, price: 250.00)
-        // Grants: Cafe ($50.00), Printing ($35.00), SpaceSpecific (8.00 hours)
+        // Buy The Dedicated + (id: 6, price: 2500 points)
+        // Grants: Cafe (500 points), Printing (350), SpaceSpecific (80)
         $response = $this->postJson('/api/v1/member/memberships', [
             'plan_id' => 6,
         ]);
@@ -242,21 +242,21 @@ class PackageBrowseTest extends TestCase
         // Cafe grant
         $cafeTx = $transactions->where('category', WalletTransactionCategory::Cafe)->first();
         $this->assertNotNull($cafeTx);
-        $this->assertEquals('50.00', $cafeTx->amount);
+        $this->assertSame(500, (int) $cafeTx->amount);
         $this->assertEquals(WalletTransactionSource::SubscriptionGrant, $cafeTx->source);
         $this->assertNotNull($cafeTx->expires_at);
 
         // Printing grant
         $printingTx = $transactions->where('category', WalletTransactionCategory::PrintingInternet)->first();
         $this->assertNotNull($printingTx);
-        $this->assertEquals('35.00', $printingTx->amount);
+        $this->assertSame(350, (int) $printingTx->amount);
         $this->assertEquals(WalletTransactionSource::SubscriptionGrant, $printingTx->source);
         $this->assertNotNull($printingTx->expires_at);
 
         // SpaceSpecific grant
         $spaceTx = $transactions->where('category', WalletTransactionCategory::SpaceSpecific)->first();
         $this->assertNotNull($spaceTx);
-        $this->assertEquals('8.00', $spaceTx->amount);
+        $this->assertSame(80, (int) $spaceTx->amount);
         $this->assertEquals(WalletTransactionSource::SubscriptionGrant, $spaceTx->source);
         $this->assertNotNull($spaceTx->expires_at);
     }

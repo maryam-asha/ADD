@@ -41,7 +41,7 @@ class WalletHybridRoutingOptionsTest extends TestCase
         $member->assignRole('member');
 
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        $this->wallets->creditGeneral($wallet, '25.00', WalletTransactionSource::TopUp);
+        $this->wallets->creditGeneral($wallet, 250, WalletTransactionSource::TopUp);
 
         Sanctum::actingAs($member, ['*']);
 
@@ -51,7 +51,7 @@ class WalletHybridRoutingOptionsTest extends TestCase
         $response->assertJsonCount(1, 'data');
         $response->assertJsonPath('data.0.owner_type', 'user');
         $response->assertJsonPath('data.0.owner_label', 'Personal');
-        $response->assertJsonPath('data.0.usable_balance', '25.00');
+        $response->assertJsonPath('data.0.usable_balance', 250);
     }
 
     public function test_a_member_with_a_personal_and_a_company_balance_gets_both_options_labeled(): void
@@ -60,12 +60,12 @@ class WalletHybridRoutingOptionsTest extends TestCase
         $member->assignRole('member');
 
         $personalWallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        $this->wallets->creditGeneral($personalWallet, '25.00', WalletTransactionSource::TopUp);
+        $this->wallets->creditGeneral($personalWallet, 250, WalletTransactionSource::TopUp);
 
         $company = Company::factory()->create();
         $company->members()->attach($member->id, ['door_access_enabled' => false]);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        $this->wallets->creditGeneral($companyWallet, '40.00', WalletTransactionSource::TopUp);
+        $this->wallets->creditGeneral($companyWallet, 400, WalletTransactionSource::TopUp);
 
         Sanctum::actingAs($member, ['*']);
 

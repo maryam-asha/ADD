@@ -33,7 +33,7 @@ class ReceptionAdditiveColumnsTest extends TestCase
     {
         $wallet = Wallet::factory()->create();
         $operator = User::factory()->create();
-        $transaction = (new WalletService)->creditGeneral($wallet, '10.00', WalletTransactionSource::TopUp);
+        $transaction = (new WalletService)->creditGeneral($wallet, 100, WalletTransactionSource::TopUp);
 
         $transaction->forceFill([
             'performed_by_user_id' => $operator->id,
@@ -48,7 +48,7 @@ class ReceptionAdditiveColumnsTest extends TestCase
     public function test_a_wallet_transaction_without_an_operator_has_null_performed_by(): void
     {
         $wallet = Wallet::factory()->create();
-        $transaction = (new WalletService)->creditGeneral($wallet, '10.00', WalletTransactionSource::TopUp);
+        $transaction = (new WalletService)->creditGeneral($wallet, 100, WalletTransactionSource::TopUp);
 
         $this->assertNull($transaction->fresh()->performed_by_user_id);
         $this->assertNull($transaction->fresh()->payment_method);

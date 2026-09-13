@@ -98,11 +98,11 @@ class BookingControllerTest extends TestCase
         $member = $this->actingAsMember();
         $space = $this->openSpace();
         $personalWallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($personalWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($personalWallet, 500, WalletTransactionSource::TopUp);
         $company = Company::factory()->create();
         $member->companies()->attach($company->id);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        (new WalletService)->creditGeneral($companyWallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
             'space_id' => $space->id,

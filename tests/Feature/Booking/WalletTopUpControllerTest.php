@@ -215,7 +215,8 @@ class WalletTopUpControllerTest extends TestCase
         $response->assertJsonPath('data.new_balance', '10.00');
 
         $transaction = $wallet->fresh()->transactions()->latest('id')->first();
-        $this->assertEquals('10.00', $transaction->amount);
+        // The ledger is point-denominated: $10.00 credited is 100 points.
+        $this->assertSame(100, (int) $transaction->amount);
         $this->assertEquals('SYP', $transaction->payment_currency);
         $this->assertEquals('150000.00', $transaction->payment_amount);
     }

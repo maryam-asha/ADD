@@ -16,8 +16,10 @@ use Illuminate\Support\Facades\DB;
  * Implements the read-time balance computation and debit-resolution
  * algorithm from docs/decisions/phase-3-membership-plan-wallet-mechanics.md
  * and docs/decisions/wallet-points-categorization.md. No stored balance —
- * every "balance" here is a sum of `wallet_transactions.amount` computed on
- * the spot via bcmath, never the DB query builder's float-coercing `sum()`.
+ * every "balance" here is a whole point count, summed from
+ * `wallet_transactions.amount` on the spot with bcmath at scale 0 and cast
+ * to int at the boundary, never the DB query builder's float-coercing
+ * `sum()`.
  */
 class WalletService
 {
@@ -35,10 +37,12 @@ class WalletService
      */
     public function creditGeneral(
         Wallet $wallet,
-        string $amount,
+        int $points,
         WalletTransactionSource $source,
         ?string $description = null
     ): WalletTransaction {
+        $amount = (string) $points;
+
         return $wallet->transactions()->create([
             'amount' => $amount,
             'category' => WalletTransactionCategory::General,
@@ -57,7 +61,7 @@ class WalletService
     public function creditCategorized(
         Wallet $wallet,
         WalletTransactionCategory $category,
-        string $amount,
+        int $points,
         WalletTransactionSource $source,
         \DateTimeInterface $expiresAt,
         ?int $restrictedSpaceId = null,
@@ -69,6 +73,8 @@ class WalletService
                 'creditCategorized() cannot be used for the General category — use creditGeneral() instead.'
             );
         }
+
+        $amount = (string) $points;
 
         return DB::transaction(function () use (
             $wallet,
@@ -103,24 +109,26 @@ class WalletService
      * debits can't both read the same balance and both succeed when only
      * one should.
      */
-    public function debitGeneral(Wallet $wallet, string $amount, ?string $description = null): WalletTransaction
+    public function debitGeneral(Wallet $wallet, int $points, ?string $description = null): WalletTransaction
     {
-        return DB::transaction(function () use ($wallet, $amount, $description) {
+        $amount = (string) $points;
+
+        return DB::transaction(function () use ($wallet, $points, $amount, $description) {
             $balance = $this->lockedGeneralBalance($wallet);
 
-            if (bccomp($balance, $amount, 2) < 0) {
+            if (bccomp((string) $balance, $amount, 0) < 0) {
                 throw new InsufficientBalanceException(sprintf(
-                    'Wallet %d has insufficient general balance: needs %s, has %s (short %s).',
+                    'Wallet %d has insufficient general balance: needs %d points, has %d (short %d).',
                     $wallet->id,
-                    $amount,
+                    $points,
                     $balance,
-                    bcsub($amount, $balance, 2)
+                    $points - $balance
                 ));
             }
 
             return WalletTransaction::create([
                 'wallet_id' => $wallet->id,
-                'amount' => bcsub('0', $amount, 2),
+                'amount' => bcsub('0', $amount, 0),
                 'category' => WalletTransactionCategory::General,
                 'restricted_space_id' => null,
                 'source' => WalletTransactionSource::TopUp,
@@ -144,12 +152,14 @@ class WalletService
         Wallet $wallet,
         User $spendingUser,
         WalletTransactionCategory $category,
-        string $amount,
+        int $points,
         ?string $description = null
     ): array {
         if ($category === WalletTransactionCategory::General) {
-            return [$this->debitGeneral($wallet, $amount, $description)];
+            return [$this->debitGeneral($wallet, $points, $description)];
         }
+
+        $amount = (string) $points;
 
         DB::beginTransaction();
 
@@ -161,7 +171,7 @@ class WalletService
             throw $e;
         }
 
-        if (bccomp($stillNeeded, '0.00', 2) <= 0) {
+        if (bccomp($stillNeeded, '0', 0) <= 0) {
             DB::commit();
 
             return $created;
@@ -172,7 +182,7 @@ class WalletService
         // fall back to general for the original full amount.
         DB::rollBack();
 
-        return [$this->debitGeneral($wallet, $amount, $description)];
+        return [$this->debitGeneral($wallet, $points, $description)];
     }
 
     /**
@@ -181,7 +191,7 @@ class WalletService
      * general per wallet). Read-only, plain filtered sums — no locking, no
      * signature/consumption logic.
      *
-     * @return list<array{wallet_id: int, owner_type: string, owner_id: int, owner_label: string, category: string, category_balance: string, general_balance: string, usable_balance: string}>
+     * @return list<array{wallet_id: int, owner_type: string, owner_id: int, owner_label: string, category: string, category_balance: int, general_balance: int, usable_balance: int}>
      */
     public function spendOptions(User $user, WalletTransactionCategory $category): array
     {
@@ -215,11 +225,28 @@ class WalletService
     }
 
     /**
+     * Unlocked read of the general (never-expiring) point balance — for
+     * display and receipts. Debits use lockedGeneralBalance() instead.
+     */
+    public function generalBalance(Wallet $wallet): int
+    {
+        $transactions = WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->where('category', WalletTransactionCategory::General)
+            ->where(function ($query) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
+            })
+            ->get();
+
+        return $this->sumAmounts($transactions);
+    }
+
+    /**
      * Sums the wallet's non-expired General transactions with
      * `lockForUpdate()` — the row locking `debitGeneral()` uses to prevent
      * two concurrent debits from both reading the same balance.
      */
-    private function lockedGeneralBalance(Wallet $wallet): string
+    private function lockedGeneralBalance(Wallet $wallet): int
     {
         $transactions = WalletTransaction::query()
             ->where('wallet_id', $wallet->id)
@@ -271,7 +298,7 @@ class WalletService
 
         foreach ($debits as $debit) {
             $signature = $this->signatureFor($debit->allowedUsers);
-            $debitedBySignature[$signature] = bcadd($debitedBySignature[$signature] ?? '0.00', (string) $debit->amount, 2);
+            $debitedBySignature[$signature] = bcadd($debitedBySignature[$signature] ?? '0', (string) $debit->amount, 0);
         }
 
         // Credits sharing the same restriction signature are one fungible
@@ -288,13 +315,13 @@ class WalletService
 
             if (! isset($groups[$signature])) {
                 $groups[$signature] = [
-                    'amountSum' => '0.00',
+                    'amountSum' => '0',
                     'soonestExpiresAt' => null,
                     'allowedUserIds' => $credit->allowedUsers->pluck('id')->all(),
                 ];
             }
 
-            $groups[$signature]['amountSum'] = bcadd($groups[$signature]['amountSum'], (string) $credit->amount, 2);
+            $groups[$signature]['amountSum'] = bcadd($groups[$signature]['amountSum'], (string) $credit->amount, 0);
 
             if ($credit->expires_at !== null
                 && ($groups[$signature]['soonestExpiresAt'] === null || $credit->expires_at->lt($groups[$signature]['soonestExpiresAt']))) {
@@ -305,9 +332,9 @@ class WalletService
         $candidates = [];
 
         foreach ($groups as $signature => $group) {
-            $remaining = bcadd($group['amountSum'], $debitedBySignature[$signature] ?? '0.00', 2);
+            $remaining = bcadd($group['amountSum'], $debitedBySignature[$signature] ?? '0', 0);
 
-            if (bccomp($remaining, '0.00', 2) <= 0) {
+            if (bccomp($remaining, '0', 0) <= 0) {
                 continue;
             }
 
@@ -337,17 +364,17 @@ class WalletService
         $stillNeeded = $amount;
 
         foreach ($candidates as $candidate) {
-            if (bccomp($stillNeeded, '0.00', 2) <= 0) {
+            if (bccomp($stillNeeded, '0', 0) <= 0) {
                 break;
             }
 
-            $consume = bccomp($candidate['remaining'], $stillNeeded, 2) < 0
+            $consume = bccomp($candidate['remaining'], $stillNeeded, 0) < 0
                 ? $candidate['remaining']
                 : $stillNeeded;
 
             $debitRow = WalletTransaction::create([
                 'wallet_id' => $wallet->id,
-                'amount' => bcsub('0', $consume, 2),
+                'amount' => bcsub('0', $consume, 0),
                 'category' => $category,
                 'restricted_space_id' => null,
                 'source' => WalletTransactionSource::TopUp,
@@ -360,7 +387,7 @@ class WalletService
             }
 
             $created[] = $debitRow;
-            $stillNeeded = bcsub($stillNeeded, $consume, 2);
+            $stillNeeded = bcsub($stillNeeded, $consume, 0);
         }
 
         return [$created, $stillNeeded];
@@ -376,9 +403,9 @@ class WalletService
         $categoryBalance = $this->eligibleBalance($wallet, $user, $category);
         $generalBalance = $this->eligibleBalance($wallet, $user, WalletTransactionCategory::General);
 
-        $usableBalance = bccomp($categoryBalance, '0.00', 2) > 0 ? $categoryBalance : $generalBalance;
+        $usableBalance = $categoryBalance > 0 ? $categoryBalance : $generalBalance;
 
-        if (bccomp($usableBalance, '0.00', 2) <= 0) {
+        if ($usableBalance <= 0) {
             return null;
         }
 
@@ -400,7 +427,7 @@ class WalletService
      * eligible for, which nets correctly against exact-signature debits
      * created by `debit()`.
      */
-    private function eligibleBalance(Wallet $wallet, User $user, WalletTransactionCategory $category): string
+    private function eligibleBalance(Wallet $wallet, User $user, WalletTransactionCategory $category): int
     {
         $transactions = WalletTransaction::query()
             ->where('wallet_id', $wallet->id)
@@ -422,15 +449,15 @@ class WalletService
     /**
      * @param  Collection<int, WalletTransaction>  $transactions
      */
-    private function sumAmounts(Collection $transactions): string
+    private function sumAmounts(Collection $transactions): int
     {
-        $total = '0.00';
+        $total = '0';
 
         foreach ($transactions as $transaction) {
-            $total = bcadd($total, (string) $transaction->amount, 2);
+            $total = bcadd($total, (string) $transaction->amount, 0);
         }
 
-        return $total;
+        return (int) $total;
     }
 
     /**

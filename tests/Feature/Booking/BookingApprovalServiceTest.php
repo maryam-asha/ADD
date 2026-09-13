@@ -101,7 +101,7 @@ class BookingApprovalServiceTest extends TestCase
 
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        (new WalletService)->creditGeneral($wallet, '50.00', WalletTransactionSource::TopUp);
+        (new WalletService)->creditGeneral($wallet, 500, WalletTransactionSource::TopUp);
 
         // 2026-08-17 is a Monday.
         $start = Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus');
@@ -119,7 +119,7 @@ class BookingApprovalServiceTest extends TestCase
         $refund = $wallet->transactions()->where('source', WalletTransactionSource::Refund)->first();
 
         $this->assertNotNull($refund);
-        $this->assertSame('10.00', (string) $refund->amount);
+        $this->assertSame(100, (int) $refund->amount);
     }
 
     public function test_approving_an_already_decided_booking_fails(): void

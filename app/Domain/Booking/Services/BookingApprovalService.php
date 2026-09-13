@@ -7,7 +7,6 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -59,12 +58,10 @@ class BookingApprovalService
             ])->save();
 
             if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
-                // TODO(spec-C): drop conversion once ledger stores points
                 $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
-                $refundAmount = app(PointConversionService::class)->pointsToUsd($points);
 
                 $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
-                $this->wallets->creditGeneral($wallet, $refundAmount, WalletTransactionSource::Refund, 'Booking rejection refund');
+                $this->wallets->creditGeneral($wallet, $points, WalletTransactionSource::Refund, 'Booking rejection refund');
             }
 
             $this->notify($locked->user_id, 'booking.rejected');

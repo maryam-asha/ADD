@@ -138,12 +138,12 @@ class BookingCreationService
                 throw new ReceptionActionException('api.booking.wallet_not_owned');
             }
 
-            if (bccomp($matched['usable_balance'], $amount, 2) < 0) {
+            if ($matched['usable_balance'] < $points) {
                 return [PaymentState::Unpaid, null];
             }
 
             $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, "Booking for space #{$space->id}");
 
             return [PaymentState::Paid, PaymentSource::Wallet];
         }
@@ -154,9 +154,9 @@ class BookingCreationService
             throw new WalletChoiceRequiredException($options);
         }
 
-        if (count($options) === 1 && bccomp($options[0]['usable_balance'], $amount, 2) >= 0) {
+        if (count($options) === 1 && $options[0]['usable_balance'] >= $points) {
             $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $amount, "Booking for space #{$space->id}");
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, "Booking for space #{$space->id}");
 
             return [PaymentState::Paid, PaymentSource::Wallet];
         }

@@ -75,7 +75,7 @@ class BookingCancellationServiceTest extends TestCase
             ->first();
 
         $this->assertNotNull($refund);
-        $this->assertSame('20.00', (string) $refund->amount);
+        $this->assertSame(200, (int) $refund->amount);
     }
 
     public function test_cancelling_a_cash_paid_booking_does_not_touch_any_wallet(): void

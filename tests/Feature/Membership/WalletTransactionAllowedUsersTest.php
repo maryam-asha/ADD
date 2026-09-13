@@ -42,7 +42,7 @@ class WalletTransactionAllowedUsersTest extends TestCase
     /**
      * @return array{company: Company, wallet: Wallet, admin: User, member: User}
      */
-    private function makeCompanyWithAdminAndMember(string $generalBalance = '100.00'): array
+    private function makeCompanyWithAdminAndMember(int $generalBalance = 1000): array
     {
         $company = Company::factory()->create();
         $wallet = Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
@@ -59,12 +59,12 @@ class WalletTransactionAllowedUsersTest extends TestCase
         return compact('company', 'wallet', 'admin', 'member');
     }
 
-    private function rawGeneralBalance(Wallet $wallet): string
+    private function rawGeneralBalance(Wallet $wallet): int
     {
-        $total = '0.00';
+        $total = 0;
 
         foreach (WalletTransaction::where('wallet_id', $wallet->id)->where('category', WalletTransactionCategory::General)->get() as $transaction) {
-            $total = bcadd($total, (string) $transaction->amount, 2);
+            $total += (int) $transaction->amount;
         }
 
         return $total;
@@ -72,23 +72,23 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_a_company_admin_can_allocate_cafe_credit_restricted_to_a_member(): void
     {
-        ['company' => $company, 'wallet' => $wallet, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'wallet' => $wallet, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember(1000);
 
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.category', 'cafe');
-        $response->assertJsonPath('data.amount', '20.00');
+        $response->assertJsonPath('data.amount', 200);
         $response->assertJsonPath('data.allowed_user_ids', [$member->id]);
 
-        $this->assertSame('80.00', $this->rawGeneralBalance($wallet->fresh()));
+        $this->assertSame(800, $this->rawGeneralBalance($wallet->fresh()));
 
         $cafeTransaction = WalletTransaction::where('wallet_id', $wallet->id)
             ->where('category', WalletTransactionCategory::Cafe)
@@ -96,19 +96,19 @@ class WalletTransactionAllowedUsersTest extends TestCase
             ->first();
 
         $this->assertNotNull($cafeTransaction);
-        $this->assertSame('20.00', (string) $cafeTransaction->amount);
+        $this->assertSame(200, (int) $cafeTransaction->amount);
         $this->assertSame([$member->id], $cafeTransaction->allowedUsers->pluck('id')->all());
     }
 
     public function test_a_plain_member_cannot_allocate_wallet_credit(): void
     {
-        ['company' => $company, 'member' => $member] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'member' => $member] = $this->makeCompanyWithAdminAndMember(1000);
 
         Sanctum::actingAs($member, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -118,7 +118,7 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_allocating_more_than_the_available_general_balance_fails_with_no_partial_state(): void
     {
-        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember('10.00');
+        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember(100);
 
         $countBefore = WalletTransaction::count();
 
@@ -126,7 +126,7 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -139,13 +139,13 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_space_specific_category_without_a_restricted_space_id_is_rejected(): void
     {
-        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember(1000);
 
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'space_specific',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -156,13 +156,13 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_general_category_is_rejected_since_an_allocation_must_be_categorized(): void
     {
-        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember(1000);
 
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'general',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -173,14 +173,14 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_a_user_id_outside_the_company_is_rejected(): void
     {
-        ['company' => $company, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember(1000);
         $outsider = User::factory()->create();
 
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$outsider->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -198,13 +198,13 @@ class WalletTransactionAllowedUsersTest extends TestCase
      */
     public function test_a_duplicated_user_id_is_a_validation_error_not_a_500(): void
     {
-        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'admin' => $admin, 'member' => $member] = $this->makeCompanyWithAdminAndMember(1000);
 
         Sanctum::actingAs($admin, ['*']);
 
         $response = $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '20.00',
+            'amount' => 200,
             'user_ids' => [$member->id, $member->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ]);
@@ -215,7 +215,7 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
     public function test_one_employees_allocation_spend_does_not_touch_another_employees_allocation(): void
     {
-        ['company' => $company, 'wallet' => $wallet, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember('100.00');
+        ['company' => $company, 'wallet' => $wallet, 'admin' => $admin] = $this->makeCompanyWithAdminAndMember(1000);
 
         $employeeA = User::factory()->create();
         $employeeA->assignRole('member');
@@ -229,27 +229,27 @@ class WalletTransactionAllowedUsersTest extends TestCase
 
         $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '15.00',
+            'amount' => 150,
             'user_ids' => [$employeeA->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ])->assertCreated();
 
         $this->postJson("/api/v1/member/companies/{$company->id}/wallet-allocations", [
             'category' => 'cafe',
-            'amount' => '25.00',
+            'amount' => 250,
             'user_ids' => [$employeeB->id],
             'expires_at' => now()->addDays(30)->toIso8601String(),
         ])->assertCreated();
 
-        // A spends an amount fully covered by A's own 15.00 allocation.
-        $this->wallets->debit($wallet->fresh(), $employeeA, WalletTransactionCategory::Cafe, '15.00');
+        // A spends an amount fully covered by A's own 150-point allocation.
+        $this->wallets->debit($wallet->fresh(), $employeeA, WalletTransactionCategory::Cafe, 150);
 
         $bOptions = $this->wallets->spendOptions($employeeB, WalletTransactionCategory::Cafe);
         $this->assertCount(1, $bOptions);
-        $this->assertSame('25.00', $bOptions[0]['category_balance']);
-        $this->assertSame('25.00', $bOptions[0]['usable_balance']);
+        $this->assertSame(250, $bOptions[0]['category_balance']);
+        $this->assertSame(250, $bOptions[0]['usable_balance']);
 
         $aOptions = $this->wallets->spendOptions($employeeA, WalletTransactionCategory::Cafe);
-        $this->assertSame('0.00', $aOptions[0]['category_balance']);
+        $this->assertSame(0, $aOptions[0]['category_balance']);
     }
 }
