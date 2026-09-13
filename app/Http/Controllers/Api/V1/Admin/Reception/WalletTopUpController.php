@@ -4,34 +4,42 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentMethod;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
-use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StoreWalletTopUpRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 /**
  * S2-BE-06: WalletService::creditGeneral() already exists and is tested —
  * this is the missing reception/admin-facing endpoint over it. No parallel
  * top-up mechanism; reuses the existing wallet transaction categorisation
  * fields exactly as they are.
+ *
+ * The ledger is point-denominated. Cash taken at the till converts to
+ * points exactly once, here, on the way in; every currency figure this
+ * controller reports is derived back out of the stored point count, never
+ * carried over from the pre-conversion payment, so a receipt can never
+ * claim a value the wallet does not hold (Invariant 3).
  */
 class WalletTopUpController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function balance(Request $request, WalletService $wallets, CurrencyConversionService $conversion): JsonResponse
-    {
+    public function balance(
+        Request $request,
+        WalletService $wallets,
+        PointConversionService $points,
+        CurrencyConversionService $conversion,
+    ): JsonResponse {
         $validated = $request->validate([
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
             'company_id' => ['required_without:user_id', 'integer', 'exists:companies,id'],
@@ -44,19 +52,20 @@ class WalletTopUpController extends Controller
 
         $wallet = $wallets->walletFor($ownerType, $ownerId);
 
-        $generalBalance = $this->calculateGeneralBalance($wallet);
-        $baseCurrency = Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+        $generalBalancePoints = $wallets->generalBalance($wallet);
+        $baseCurrency = $conversion->baseCurrencyCode();
 
         $owner = $ownerType === OwnerType::Company
             ? Company::find($ownerId)
             : User::with('companies')->find($ownerId);
 
         $requestedCurrency = $validated['currency'] ?? null;
+        $displayCurrency = $requestedCurrency ?? $baseCurrency;
+
         $convertedBalance = null;
 
         if ($requestedCurrency !== null && $requestedCurrency !== $baseCurrency) {
-            $converted = $conversion->convert((float) $generalBalance, $baseCurrency, $requestedCurrency);
-            $convertedBalance = $converted !== null ? (string) $converted : null;
+            $convertedBalance = $points->pointsToCurrency($generalBalancePoints, $requestedCurrency);
         }
 
         return response()->json([
@@ -66,85 +75,104 @@ class WalletTopUpController extends Controller
                 'owner_name' => $ownerType === OwnerType::Company ? $owner?->legal_name : $owner?->name,
                 'owner_phone' => $ownerType === OwnerType::Company ? $owner?->contract_ref : $owner?->phone,
                 'status' => $owner?->status?->value ?? (string) $owner?->status,
-                'general_balance' => (string) $generalBalance,
+                'balance_points' => $generalBalancePoints,
+                'balance_usd' => $points->pointsToUsd($generalBalancePoints),
+                'balance_display' => $points->pointsToCurrency($generalBalancePoints, $displayCurrency),
+                // Retained for the dashboard's current receipt view, which
+                // still reads these: both are derived from the point balance
+                // above, so they cannot drift from it.
+                'general_balance' => $points->pointsToUsd($generalBalancePoints),
                 'currency' => $baseCurrency,
                 'converted_balance' => $convertedBalance,
-                'display_currency' => $requestedCurrency ?? $baseCurrency,
+                'display_currency' => $displayCurrency,
             ],
         ]);
     }
 
-    public function store(StoreWalletTopUpRequest $request, WalletService $wallets): JsonResponse
-    {
+    public function store(
+        StoreWalletTopUpRequest $request,
+        WalletService $wallets,
+        PointConversionService $points,
+        CurrencyConversionService $conversion,
+    ): JsonResponse {
         [$ownerType, $ownerId] = $request->validated('company_id')
             ? [OwnerType::Company, (int) $request->validated('company_id')]
             : [OwnerType::User, (int) $request->validated('user_id')];
 
         $wallet = $wallets->walletFor($ownerType, $ownerId);
 
-        $baseCurrency = Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+        $baseCurrency = $conversion->baseCurrencyCode();
         $paymentCurrency = $request->validated('currency') ?? $baseCurrency;
-        $paymentAmount = $request->validated('amount');
+        $paymentAmount = (string) $request->validated('amount');
 
-        $exchangeRate = null;
-        if ($paymentCurrency === $baseCurrency) {
-            $creditedAmount = $paymentAmount;
-        } else {
-            $rateModel = ExchangeRate::current($paymentCurrency);
-            $exchangeRate = (float) $rateModel->rate_to_base;
-            $creditedAmount = number_format(round(((float) $paymentAmount) * $exchangeRate, 2), 2, '.', '');
-        }
+        [$usd, $exchangeRate] = $this->paymentInBaseCurrency($paymentAmount, $paymentCurrency, $baseCurrency);
 
-        $previousBalance = $this->calculateGeneralBalance($wallet);
+        // Credit direction: floor. The member is never credited more value
+        // than the cash actually covers (Invariant 2). A payment too small
+        // to buy a single point never reaches here — StoreWalletTopUpRequest
+        // rejects it rather than write a row that credits nothing.
+        $pointsCredited = $points->usdToPoints($usd);
+        $pointRate = $points->rate();
 
-        // TODO(spec-C): this endpoint's request and response are still
-        // USD-denominated, so the credited amount is converted to points at
-        // the ledger boundary here. Task 8 moves the whole path to points.
-        $transaction = $wallets->creditGeneral(
-            $wallet,
-            app(PointConversionService::class)->usdToPoints($creditedAmount),
-            WalletTransactionSource::TopUp,
-            $request->validated('description')
-        );
+        $previousBalancePoints = $wallets->generalBalance($wallet);
 
-        $newBalance = bcadd(
-            $previousBalance,
-            app(PointConversionService::class)->pointsToUsd((int) $transaction->amount),
-            2
-        );
+        // One transaction: a credited balance must never exist without the
+        // audit trail saying who took the money, in what currency, at what
+        // rate. Previously these were two writes with no transaction.
+        $transaction = DB::transaction(function () use (
+            $wallets, $wallet, $pointsCredited, $request,
+            $paymentCurrency, $paymentAmount, $exchangeRate, $pointRate
+        ) {
+            $transaction = $wallets->creditGeneral(
+                $wallet,
+                $pointsCredited,
+                WalletTransactionSource::TopUp,
+                $request->validated('description')
+            );
 
-        $transaction->forceFill([
-            'performed_by_user_id' => $request->user()->id,
-            'payment_method' => PaymentMethod::from($request->validated('payment_method')),
-            'payment_currency' => $paymentCurrency,
-            'payment_amount' => $paymentAmount,
-            'exchange_rate_to_base' => $exchangeRate !== null ? (string) $exchangeRate : null,
-        ])->save();
+            $transaction->forceFill([
+                'performed_by_user_id' => $request->user()->id,
+                'payment_method' => PaymentMethod::from($request->validated('payment_method')),
+                'payment_currency' => $paymentCurrency,
+                'payment_amount' => $paymentAmount,
+                'exchange_rate_to_base' => $exchangeRate,
+                'point_rate_usd' => $pointRate,
+            ])->save();
 
+            return $transaction;
+        });
+
+        $newBalancePoints = $previousBalancePoints + $pointsCredited;
+
+        // Every figure logged is either the points actually stored or a
+        // verbatim record of what was handed over. The pre-truncation base
+        // -currency figure is deliberately absent: it was never credited, so
+        // reporting it here would put the audit trail at odds with the ledger.
         $this->logSensitiveAction('wallet_top_up', $transaction, [
             'owner_type' => $ownerType->value,
             'owner_id' => $ownerId,
-            'amount' => $creditedAmount,
+            'points_credited' => $pointsCredited,
             'payment_amount' => $paymentAmount,
             'payment_currency' => $paymentCurrency,
             'payment_method' => $request->validated('payment_method'),
+            'point_rate_usd' => $pointRate,
         ]);
 
         $owner = $ownerType === OwnerType::Company
             ? Company::find($ownerId)
             : User::find($ownerId);
 
-        $transactionCode = sprintf('TOP-%s-%04d', now()->format('Ymd'), $transaction->id);
-
         return response()->json([
             'data' => [
                 'id' => $transaction->id,
-                'transaction_code' => $transactionCode,
-                'amount' => app(PointConversionService::class)->pointsToUsd((int) $transaction->amount),
-                'currency' => $baseCurrency,
-                'payment_amount' => (string) $paymentAmount,
+                'transaction_code' => sprintf('TOP-%s-%04d', now()->format('Ymd'), $transaction->id),
+                'points_credited' => $pointsCredited,
+                'previous_balance_points' => $previousBalancePoints,
+                'new_balance_points' => $newBalancePoints,
+                'point_rate_usd' => (string) $transaction->point_rate_usd,
+                'payment_amount' => $paymentAmount,
                 'payment_currency' => $paymentCurrency,
-                'exchange_rate' => $exchangeRate !== null ? (string) $exchangeRate : null,
+                'exchange_rate' => $exchangeRate,
                 'source' => $transaction->source->value,
                 'payment_method' => $transaction->payment_method->value,
                 'description' => $transaction->description,
@@ -154,27 +182,67 @@ class WalletTopUpController extends Controller
                 'owner_id' => $ownerId,
                 'recipient_name' => $ownerType === OwnerType::Company ? $owner?->legal_name : $owner?->name,
                 'recipient_phone' => $ownerType === OwnerType::Company ? $owner?->contract_ref : $owner?->phone,
-                'previous_balance' => (string) $previousBalance,
-                'new_balance' => (string) $newBalance,
+                // Retained for the dashboard's current receipt view. All three
+                // are the base-currency value of the points actually credited,
+                // so they agree with points_credited by construction — where
+                // the old `amount` echoed the untruncated payment and could
+                // overstate it by up to one point's worth.
+                'amount' => $points->pointsToUsd($pointsCredited),
+                'currency' => $baseCurrency,
+                'previous_balance' => $points->pointsToUsd($previousBalancePoints),
+                'new_balance' => $points->pointsToUsd($newBalancePoints),
                 'created_at' => $transaction->created_at?->toISOString() ?? now()->toISOString(),
             ],
         ], 201);
     }
 
-    private function calculateGeneralBalance(Wallet $wallet): string
-    {
-        $transactions = $wallet->transactions()
-            ->where('category', WalletTransactionCategory::General)
-            ->where(function ($query) {
-                $query->whereNull('expires_at')->orWhere('expires_at', '>', now());
-            })
-            ->get();
+    /**
+     * What a given cash amount would credit, without writing anything.
+     * Exists so the top-up dialog can show a live point preview without
+     * reimplementing the rounding rules in TypeScript (Invariant 4).
+     */
+    public function preview(
+        StoreWalletTopUpRequest $request,
+        PointConversionService $points,
+        CurrencyConversionService $conversion,
+    ): JsonResponse {
+        $baseCurrency = $conversion->baseCurrencyCode();
+        $paymentCurrency = $request->validated('currency') ?? $baseCurrency;
+        $paymentAmount = (string) $request->validated('amount');
 
-        $totalPoints = 0;
-        foreach ($transactions as $tx) {
-            $totalPoints += (int) $tx->amount;
+        [$usd, $exchangeRate] = $this->paymentInBaseCurrency($paymentAmount, $paymentCurrency, $baseCurrency);
+
+        return response()->json([
+            'data' => [
+                'points' => $points->usdToPoints($usd),
+                'usd' => $usd,
+                'payment_amount' => $paymentAmount,
+                'payment_currency' => $paymentCurrency,
+                'exchange_rate' => $exchangeRate,
+                'point_rate_usd' => $points->rate(),
+            ],
+        ]);
+    }
+
+    /**
+     * The base-currency value of a payment, plus the FX rate applied (null
+     * when the payment was already in base currency). Shared by store() and
+     * preview() so the preview can never disagree with what a real top-up
+     * would credit.
+     *
+     * @return array{0: string, 1: ?string}
+     */
+    private function paymentInBaseCurrency(string $paymentAmount, string $paymentCurrency, string $baseCurrency): array
+    {
+        if ($paymentCurrency === $baseCurrency) {
+            return [$paymentAmount, null];
         }
 
-        return app(PointConversionService::class)->pointsToUsd($totalPoints);
+        $exchangeRate = (string) ExchangeRate::current($paymentCurrency)->rate_to_base;
+
+        return [
+            number_format((float) $paymentAmount * (float) $exchangeRate, 2, '.', ''),
+            $exchangeRate,
+        ];
     }
 }

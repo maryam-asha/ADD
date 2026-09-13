@@ -23,6 +23,7 @@ class SessionClosureService
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
+        private readonly PointConversionService $points,
     ) {}
 
     /**
@@ -130,9 +131,12 @@ class SessionClosureService
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
-        // TODO(spec-C): drop conversion once ledger stores points
+        // `amount_owed`/`currency` are the session's money-denominated record
+        // of the charge and remain decimal USD — only the wallet ledger became
+        // point-denominated. Converting the point charge back to USD here is
+        // the intended direction, not leftover scaffolding.
         $points = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
-        $amount = app(PointConversionService::class)->pointsToUsd($points);
+        $amount = $this->points->pointsToUsd($points);
 
         $session->forceFill([
             // Normalize to UTC: Eloquent's datetime cast stores the Carbon value's
@@ -143,7 +147,6 @@ class SessionClosureService
             'checked_out_at' => $checkedOutAt->copy()->setTimezone('UTC'),
             'termination_source' => $source,
             'amount_owed' => $amount,
-            // TODO(spec-C): drop conversion once ledger stores points
             'currency' => 'USD',
         ])->save();
     }

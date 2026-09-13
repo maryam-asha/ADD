@@ -37,6 +37,7 @@ class BookingCreationService
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
+        private readonly PointConversionService $points,
     ) {}
 
     public function create(
@@ -71,11 +72,15 @@ class BookingCreationService
             $this->assertOccupancyLeavesRoom($locked);
             $this->assertBufferRespected($locked, $startAt, $endAt);
 
-            // TODO(spec-C): drop conversion once ledger stores points
             $points = $this->amounts->forRange($locked, $startAt, $endAt);
-            $amount = app(PointConversionService::class)->pointsToUsd($points);
 
-            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $points, $amount, $walletOwnerType, $walletOwnerId);
+            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $points, $walletOwnerType, $walletOwnerId);
+
+            // `amount_owed`/`currency` are the booking's money-denominated
+            // record of the charge and remain decimal USD — only the wallet
+            // ledger became point-denominated. Converting the point charge
+            // back here is the intended direction, not leftover scaffolding.
+            $amount = $this->points->pointsToUsd($points);
 
             $status = $locked->requires_approval ? BookingStatus::Pending : BookingStatus::Confirmed;
 
@@ -86,7 +91,6 @@ class BookingCreationService
                 'end_at' => $endAt,
                 'status' => $status,
                 'amount_owed' => $amount,
-                // TODO(spec-C): drop conversion once ledger stores points
                 'currency' => 'USD',
                 'payment_state' => $paymentState,
                 'payment_source' => $paymentSource,
@@ -122,7 +126,7 @@ class BookingCreationService
     /**
      * @return array{0: PaymentState, 1: ?PaymentSource}
      */
-    private function routePayment(Space $space, User $member, int $points, string $amount, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
+    private function routePayment(Space $space, User $member, int $points, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
     {
         if ($points <= 0) {
             return [PaymentState::Unpaid, null];

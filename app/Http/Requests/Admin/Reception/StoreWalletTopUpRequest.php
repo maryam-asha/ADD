@@ -5,6 +5,8 @@ namespace App\Http\Requests\Admin\Reception;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use Illuminate\Contracts\Validation\Validator;
@@ -48,6 +50,28 @@ class StoreWalletTopUpRequest extends FormRequest
                 $baseCode = Currency::query()->where('is_base', true)->value('code') ?? 'USD';
                 if ($currencyCode !== $baseCode && ExchangeRate::current($currencyCode) === null) {
                     $validator->errors()->add('currency', "No active exchange rate found for currency {$currencyCode}.");
+                }
+            }
+
+            // Credits floor (Invariant 2), so a payment worth less than one
+            // whole point would credit nothing at all while still writing a
+            // transaction row recording the full amount taken. Refuse it at
+            // the door rather than swallow the money.
+            $amount = $this->input('amount');
+
+            if ($amount !== null && ! $validator->errors()->has('amount') && ! $validator->errors()->has('currency')) {
+                $points = app(PointConversionService::class);
+                $conversion = app(CurrencyConversionService::class);
+
+                $base = $conversion->baseCurrencyCode();
+                $currency = $this->input('currency') ?? $base;
+
+                $usd = $currency === $base
+                    ? (string) $amount
+                    : (string) $conversion->convert((float) $amount, $currency, $base);
+
+                if ($points->usdToPoints($usd) < 1) {
+                    $validator->errors()->add('amount', __('api.wallet.amount_below_one_point'));
                 }
             }
         });

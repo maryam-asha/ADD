@@ -270,4 +270,60 @@ class WalletServiceTest extends TestCase
             $this->assertSame(0, $this->rawSum($wallet, WalletTransactionCategory::General));
         }
     }
+
+    /**
+     * generalBalance() is the unlocked read behind receipts and the
+     * reception balance endpoint. It must net debits against credits,
+     * count only the General category, and honour lazy expiry — the same
+     * rules lockedGeneralBalance() applies for debits, minus the locking.
+     */
+    public function test_general_balance_nets_debits_against_credits_in_whole_points(): void
+    {
+        $user = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $user->id]);
+
+        $this->assertSame(0, $this->service->generalBalance($wallet));
+
+        $this->service->creditGeneral($wallet, 340, WalletTransactionSource::TopUp);
+        $this->assertSame(340, $this->service->generalBalance($wallet));
+
+        $this->service->creditGeneral($wallet, 60, WalletTransactionSource::TopUp);
+        $this->assertSame(400, $this->service->generalBalance($wallet));
+
+        $this->service->debitGeneral($wallet, 150);
+        $this->assertSame(250, $this->service->generalBalance($wallet));
+    }
+
+    public function test_general_balance_ignores_other_categories_and_expired_credits(): void
+    {
+        $user = User::factory()->create();
+        $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $user->id]);
+
+        $this->service->creditGeneral($wallet, 100, WalletTransactionSource::TopUp);
+
+        // A categorized credit is a separate pool — it must not leak in.
+        $this->service->creditCategorized(
+            $wallet,
+            WalletTransactionCategory::SpaceSpecific,
+            500,
+            WalletTransactionSource::SubscriptionGrant,
+            now()->addMonth()
+        );
+
+        $this->assertSame(100, $this->service->generalBalance($wallet));
+
+        // General never expires in practice, but the read applies lazy
+        // expiry uniformly: an already-expired General row stops counting.
+        WalletTransaction::create([
+            'wallet_id' => $wallet->id,
+            'amount' => '70',
+            'category' => WalletTransactionCategory::General,
+            'restricted_space_id' => null,
+            'source' => WalletTransactionSource::TopUp,
+            'expires_at' => now()->subDay(),
+            'description' => null,
+        ]);
+
+        $this->assertSame(100, $this->service->generalBalance($wallet));
+    }
 }
