@@ -10,12 +10,18 @@ use Carbon\CarbonInterface;
  * a partial point always costs a full one, so a booking never charges
  * less than it consumed.
  *
- * Computed with bcmath at scale 4 and ceiled once at the very end —
- * rounding per step would compound. Returns a bare int because points
- * carry no currency; the old [amount, currency] tuple is gone.
+ * Computed entirely in integers — seconds * rate is divided by 3600 once,
+ * and the remainder of that single division is what decides the ceil. No
+ * intermediate value is ever rounded or truncated, so the ceil always sees
+ * the exact amount; rounding per step would compound and, because every
+ * such loss is invisible to the final comparison, silently under-charge.
+ * Returns a bare int because points carry no currency; the old
+ * [amount, currency] tuple is gone.
  */
 class AmountCalculator
 {
+    private const SECONDS_PER_HOUR = 3600;
+
     public function forRange(Space $space, CarbonInterface $start, CarbonInterface $end): int
     {
         $rate = $space->hourly_rate_points;
@@ -24,12 +30,17 @@ class AmountCalculator
             return 0;
         }
 
-        $seconds = $start->diffInSeconds($end);
-        $hours = bcdiv((string) $seconds, '3600', 6);
-        $exact = bcmul($hours, (string) $rate, 4);
+        $seconds = (int) $start->diffInSeconds($end);
 
-        $floor = bcdiv($exact, '1', 0);
+        if ($seconds <= 0) {
+            return 0;
+        }
 
-        return (int) (bccomp($exact, $floor, 4) > 0 ? bcadd($floor, '1', 0) : $floor);
+        $points = bcmul((string) $seconds, (string) $rate);
+
+        $whole = bcdiv($points, (string) self::SECONDS_PER_HOUR, 0);
+        $remainder = bcmod($points, (string) self::SECONDS_PER_HOUR);
+
+        return (int) (bccomp($remainder, '0') > 0 ? bcadd($whole, '1') : $whole);
     }
 }
