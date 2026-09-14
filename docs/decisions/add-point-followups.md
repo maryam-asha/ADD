@@ -12,21 +12,27 @@ left undone, so none of it decays into folklore.
 Nothing here blocked the merge. Each item names why it was deferred and
 what it costs to leave alone.
 
-## 1. Events are still priced in currency
+## 1. Events are priced in points — ✅ DONE 2026-09-14
 
-`events.price` (`decimal(10,2)`) and `events.currency` were never
-converted — they were added on 2026-09-08, after the study that
-enumerated the pricing columns, and so appear in no spec or task.
+Closed. `events.price` and `events.currency` were dropped; `price_points`
+is the only stored price, and `EventResource` / `EventBrowseService`
+derive `price_usd` / `price_display` / `currency` per request through
+`PointConversionService`, the same shape `PlanResource` uses.
 
-**Why it is not urgent:** events never touch the wallet. There is no
-`WalletService` anywhere under `app/Domain/Experience/` or the event
-controllers; the price is display-only, so no payment path is
-inconsistent — only the display is.
+⚠️ **The urgency was higher than this document originally recorded.** By
+the time the conversion ran, events had stopped being display-only:
+`EventRegistrationService` debits the member wallet via `debitGeneral()`
+on registration. `price_points` had been added alongside `price` and
+`currency` without removing them, so an event carried **two unlinked
+prices** — the registration charged `price_points` while every API
+response displayed `price`. Nothing kept them in step, so an event could
+show "$5.00" and charge 200 points (\$20.00).
 
-**What converting looks like:** `EventResource` already emits the
-`price_usd` / `price_display` / `currency` trio, so it follows the same
-shape as `PlanResource` did. The work is a migration to
-`price_points`, the Form Requests, and the resource.
+The dashboard followed: the events table and form now read and write
+`price_points`, and the currency selector is gone.
+
+Every pricing table in the product now stores points:
+`events`, `plans`, `spaces`, `plan_balances`, `wallet_transactions`.
 
 ## 2. `included_hours` is credited 1:1 as points
 
