@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
+use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
+use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
@@ -135,6 +137,8 @@ Route::apiResource('contact-links', ContactLinkController::class)
 Route::apiResource('announcements', AnnouncementController::class);
 Route::apiResource('event-categories', EventCategoryController::class)
     ->parameters(['event-categories' => 'eventCategory']);
+Route::get('events/rooms', [EventController::class, 'rooms']);
+Route::get('events/statuses', [EventController::class, 'statuses']);
 Route::apiResource('events', EventController::class);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
@@ -277,4 +281,20 @@ Route::middleware('role:admin')->group(function () {
     // Notification broadcast — admin-only, sends push + in-app notifications
     // to targeted users (all, by role, or specific user IDs).
     Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
+
+    // ADD Service Types — CRUD for service catalog + form fields
+    Route::get('service-types', [AdminServiceTypeController::class, 'index']);
+    Route::post('service-types', [AdminServiceTypeController::class, 'store']);
+    Route::get('service-types/{serviceType}', [AdminServiceTypeController::class, 'show']);
+    Route::patch('service-types/{serviceType}', [AdminServiceTypeController::class, 'update']);
+    Route::delete('service-types/{serviceType}', [AdminServiceTypeController::class, 'destroy']);
+    Route::get('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'indexFields']);
+    Route::post('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'storeField']);
+    Route::patch('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'updateField']);
+    Route::delete('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'destroyField']);
+
+    // ADD Service Requests — staff view all, filter by branch/status/type
+    Route::get('service-requests', [AdminServiceRequestController::class, 'index']);
+    Route::get('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'show']);
+    Route::patch('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'update']);
 });

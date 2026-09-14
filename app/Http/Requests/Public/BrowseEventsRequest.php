@@ -18,8 +18,12 @@ class BrowseEventsRequest extends FormRequest
     {
         return [
             'search' => ['nullable', 'string', 'max:100'],
-            'free' => ['nullable', 'boolean'],
-            'is_free' => ['nullable', 'boolean'],
+            'q' => ['nullable', 'string', 'max:100'],
+            'status' => ['nullable', 'string', 'max:100'],
+            'free' => ['nullable'],
+            'is_free' => ['nullable'],
+            'price_type' => ['nullable', 'string', 'in:free,paid'],
+            'type' => ['nullable', 'string', 'in:free,paid'],
             'cancelled' => ['nullable', 'boolean'],
             'is_cancelled' => ['nullable', 'boolean'],
             'category_id' => ['nullable', 'integer', 'exists:event_categories,id'],

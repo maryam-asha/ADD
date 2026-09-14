@@ -23,6 +23,7 @@ Route::get('plans', [PlanController::class, 'index']);
 Route::get('event-categories', [EventCategoryController::class, 'index']);
 Route::get('events', [EventController::class, 'index']);
 Route::get('events/categories', [EventController::class, 'categories']);
+Route::get('events/statuses', [EventController::class, 'statuses']);
 Route::get('events/{event}', [EventController::class, 'show']);
 Route::get('contact-links', [ContactLinkController::class, 'index']);
 Route::get('currencies', [CurrencyController::class, 'index']);

@@ -24,5 +24,6 @@ class DatabaseSeeder extends Seeder
         $this->call(SpaceSeeder::class);
         $this->call(PlanModuleSeeder::class);
         $this->call(PlanSeeder::class);
+        $this->call(ServiceAxisSeeder::class);
     }
 }

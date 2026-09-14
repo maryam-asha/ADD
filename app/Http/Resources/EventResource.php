@@ -41,6 +41,7 @@ class EventResource extends JsonResource
         return [
             'id' => $this->id,
             'branch_id' => $this->branch_id,
+            'space_id' => $this->space_id,
             'category_id' => $this->category_id,
             'title' => $isAdmin ? $this->title : $this->translate('title', $locale),
             'description' => $isAdmin ? $this->description : $this->translate('description', $locale),

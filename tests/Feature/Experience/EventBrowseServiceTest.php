@@ -439,4 +439,349 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('مجاني', $memberRes->json('data.price_label'));
         $this->assertTrue($memberRes->json('data.is_registered'));
     }
+
+    public function test_can_fetch_event_statuses(): void
+    {
+        // 1. Public endpoint in English
+        $resEn = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/events/statuses');
+        $resEn->assertOk();
+        $resEn->assertJsonCount(4, 'data');
+        $resEn->assertJsonFragment([
+            'id' => 'open',
+            'slug' => 'open',
+            'name' => 'Open for Registration',
+            'color' => '#10B981',
+        ]);
+        $resEn->assertJsonFragment([
+            'id' => 'full',
+            'slug' => 'full',
+            'name' => 'Full',
+            'color' => '#F59E0B',
+        ]);
+        $resEn->assertJsonFragment([
+            'id' => 'closed',
+            'slug' => 'closed',
+            'name' => 'Closed / Past',
+            'color' => '#6B7280',
+        ]);
+        $resEn->assertJsonFragment([
+            'id' => 'cancelled',
+            'slug' => 'cancelled',
+            'name' => 'Cancelled',
+            'color' => '#EF4444',
+        ]);
+
+        // 2. Member endpoint in Arabic
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $resAr = $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/member/events/statuses');
+        $resAr->assertOk();
+        $resAr->assertJsonFragment([
+            'id' => 'open',
+            'slug' => 'open',
+            'name' => 'متاح للتسجيل',
+            'color' => '#10B981',
+        ]);
+        $resAr->assertJsonFragment([
+            'id' => 'full',
+            'slug' => 'full',
+            'name' => 'مكتمل العدد',
+            'color' => '#F59E0B',
+        ]);
+
+        // 3. Admin endpoint
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $resAdmin = $this->getJson('/api/v1/admin/events/statuses');
+        $resAdmin->assertOk();
+        $resAdmin->assertJsonCount(4, 'data');
+    }
+
+    public function test_can_search_by_description_and_use_q_parameter(): void
+    {
+        Event::create([
+            'title' => ['en' => 'Machine Learning', 'ar' => 'تعلم الآلة'],
+            'description' => [
+                'en' => 'Learn deep learning architectures and neural networks',
+                'ar' => 'تعلم بنى التعلم العميق والشبكات العصبية',
+            ],
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHours(2),
+            'status' => 'published',
+        ]);
+
+        Event::create([
+            'title' => ['en' => 'Graphic Design', 'ar' => 'تصميم جرافيك'],
+            'description' => [
+                'en' => 'Principles of layout and color theory',
+                'ar' => 'مبادئ التخطيط ونظرية الألوان',
+            ],
+            'start_at' => now()->addDays(3),
+            'end_at' => now()->addDays(3)->addHours(2),
+            'status' => 'published',
+        ]);
+
+        // Search in description using search param
+        $resDesc = $this->getJson('/api/v1/events?search=neural');
+        $resDesc->assertOk();
+        $this->assertCount(1, $resDesc->json('data'));
+        $this->assertSame('Machine Learning', $resDesc->json('data.0.title'));
+
+        // Search in Arabic description using q alias param
+        $resQ = $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/events?q=العصبية');
+        $resQ->assertOk();
+        $this->assertCount(1, $resQ->json('data'));
+        $this->assertSame('تعلم الآلة', $resQ->json('data.0.title'));
+    }
+
+    public function test_can_filter_by_price_type(): void
+    {
+        Event::create([
+            'title' => ['en' => 'Free Meetup', 'ar' => 'لقاء مجاني'],
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHours(2),
+            'is_free' => true,
+            'price' => 0,
+            'status' => 'published',
+        ]);
+
+        Event::create([
+            'title' => ['en' => 'Paid Conference', 'ar' => 'مؤتمر مدفوع'],
+            'start_at' => now()->addDays(4),
+            'end_at' => now()->addDays(4)->addHours(4),
+            'is_free' => false,
+            'price' => 50,
+            'status' => 'published',
+        ]);
+
+        // Filter price_type=free
+        $resFree = $this->getJson('/api/v1/events?price_type=free');
+        $resFree->assertOk();
+        $this->assertCount(1, $resFree->json('data'));
+        $this->assertSame('Free Meetup', $resFree->json('data.0.title'));
+
+        // Filter price_type=paid
+        $resPaid = $this->getJson('/api/v1/events?price_type=paid');
+        $resPaid->assertOk();
+        $this->assertCount(1, $resPaid->json('data'));
+        $this->assertSame('Paid Conference', $resPaid->json('data.0.title'));
+
+        // Filter type=free
+        $resType = $this->getJson('/api/v1/events?type=free');
+        $resType->assertOk();
+        $this->assertCount(1, $resType->json('data'));
+        $this->assertSame('Free Meetup', $resType->json('data.0.title'));
+    }
+
+    public function test_can_filter_by_computed_statuses(): void
+    {
+        // 1. Open event (upcoming, capacity 20, 2 attendees)
+        $openEvent = Event::create([
+            'title' => ['en' => 'Open Event', 'ar' => 'فعالية متاحة'],
+            'start_at' => now()->addDays(2)->setTime(10, 0),
+            'end_at' => now()->addDays(2)->setTime(12, 0),
+            'capacity' => 20,
+            'status' => 'published',
+        ]);
+        EventAttendee::create(['event_id' => $openEvent->id, 'name' => 'User 1', 'email' => 'u1@ex.com']);
+        EventAttendee::create(['event_id' => $openEvent->id, 'name' => 'User 2', 'email' => 'u2@ex.com']);
+
+        // 2. Full event (upcoming, capacity 2, 2 attendees)
+        $fullEvent = Event::create([
+            'title' => ['en' => 'Full Event', 'ar' => 'فعالية ممتلئة'],
+            'start_at' => now()->addDays(3)->setTime(10, 0),
+            'end_at' => now()->addDays(3)->setTime(12, 0),
+            'capacity' => 2,
+            'status' => 'published',
+        ]);
+        EventAttendee::create(['event_id' => $fullEvent->id, 'name' => 'User 3', 'email' => 'u3@ex.com']);
+        EventAttendee::create(['event_id' => $fullEvent->id, 'name' => 'User 4', 'email' => 'u4@ex.com']);
+
+        // 3. Closed / Past event (yesterday)
+        $closedEvent = Event::create([
+            'title' => ['en' => 'Closed Event', 'ar' => 'فعالية منتهية'],
+            'start_at' => now()->subDays(2)->setTime(10, 0),
+            'end_at' => now()->subDays(2)->setTime(12, 0),
+            'capacity' => 20,
+            'status' => 'published',
+        ]);
+
+        // 4. Cancelled event
+        $cancelledEvent = Event::create([
+            'title' => ['en' => 'Cancelled Event', 'ar' => 'فعالية ملغاة'],
+            'start_at' => now()->addDays(5)->setTime(10, 0),
+            'end_at' => now()->addDays(5)->setTime(12, 0),
+            'capacity' => 20,
+            'status' => 'cancelled',
+        ]);
+
+        // Filter status=open
+        $resOpen = $this->getJson('/api/v1/events?status=open');
+        $resOpen->assertOk();
+        $this->assertCount(1, $resOpen->json('data'));
+        $this->assertSame($openEvent->id, $resOpen->json('data.0.id'));
+        $this->assertSame('open', $resOpen->json('data.0.computed_status'));
+
+        // Filter status=full
+        $resFull = $this->getJson('/api/v1/events?status=full');
+        $resFull->assertOk();
+        $this->assertCount(1, $resFull->json('data'));
+        $this->assertSame($fullEvent->id, $resFull->json('data.0.id'));
+        $this->assertSame('full', $resFull->json('data.0.computed_status'));
+
+        // Filter status=closed
+        $resClosed = $this->getJson('/api/v1/events?status=closed');
+        $resClosed->assertOk();
+        $this->assertCount(1, $resClosed->json('data'));
+        $this->assertSame($closedEvent->id, $resClosed->json('data.0.id'));
+        $this->assertSame('closed', $resClosed->json('data.0.computed_status'));
+
+        // Filter status=cancelled
+        $resCancelled = $this->getJson('/api/v1/events?status=cancelled');
+        $resCancelled->assertOk();
+        $this->assertCount(1, $resCancelled->json('data'));
+        $this->assertSame($cancelledEvent->id, $resCancelled->json('data.0.id'));
+        $this->assertSame('cancelled', $resCancelled->json('data.0.computed_status'));
+
+        // Filter multiple statuses: status=open,full
+        $resMulti = $this->getJson('/api/v1/events?status=open,full');
+        $resMulti->assertOk();
+        $this->assertCount(2, $resMulti->json('data'));
+    }
+
+    public function test_member_can_fetch_my_events_with_tabs_and_counts(): void
+    {
+        $memberA = User::factory()->create(['email' => 'member.a@example.com', 'phone' => '0911111111']);
+        $memberA->assignRole('member');
+
+        $memberB = User::factory()->create(['email' => 'member.b@example.com', 'phone' => '0922222222']);
+        $memberB->assignRole('member');
+
+        // 1. Upcoming event for Member A
+        $upcomingEvent1 = Event::create([
+            'title' => ['en' => 'Founder Networking Evening', 'ar' => 'أمسية تعارف رواد الأعمال'],
+            'description' => ['en' => 'Connect with entrepreneurs', 'ar' => 'تواصل مع رواد الأعمال'],
+            'start_at' => now()->addDays(2)->setTime(18, 0),
+            'end_at' => now()->addDays(2)->setTime(20, 0),
+            'location' => 'ADD Café, Aleppo',
+            'status' => 'published',
+        ]);
+        $attendee1 = EventAttendee::create([
+            'event_id' => $upcomingEvent1->id,
+            'name' => 'Member A',
+            'email' => 'member.a@example.com',
+            'phone' => '0911111111',
+            'attended' => null,
+        ]);
+
+        // 2. Another upcoming event for Member A
+        $upcomingEvent2 = Event::create([
+            'title' => ['en' => 'AI for Business Workshop', 'ar' => 'ورشة الذكاء الاصطناعي'],
+            'description' => ['en' => 'Practical tools and strategies', 'ar' => 'أدوات واستراتيجيات عملية'],
+            'start_at' => now()->addDays(5)->setTime(10, 0),
+            'end_at' => now()->addDays(5)->setTime(12, 0),
+            'location' => 'ADD Rooms',
+            'status' => 'published',
+        ]);
+        EventAttendee::create([
+            'event_id' => $upcomingEvent2->id,
+            'name' => 'Member A',
+            'email' => 'member.a@example.com',
+            'phone' => '0911111111',
+            'attended' => null,
+        ]);
+
+        // 3. Past event for Member A (attended)
+        $pastEventA = Event::create([
+            'title' => ['en' => 'Women in Tech Meetup', 'ar' => 'ملتقى المرأة في التكنولوجيا'],
+            'description' => ['en' => 'Stories, advice, and connections', 'ar' => 'قصص ونصائح وتواصل'],
+            'start_at' => now()->subDays(5)->setTime(18, 0),
+            'end_at' => now()->subDays(5)->setTime(20, 0),
+            'location' => 'ADD Café, Aleppo',
+            'status' => 'published',
+        ]);
+        EventAttendee::create([
+            'event_id' => $pastEventA->id,
+            'name' => 'Member A',
+            'email' => 'member.a@example.com',
+            'phone' => '0911111111',
+            'attended' => true,
+        ]);
+
+        // 4. Event for Member B only
+        $eventB = Event::create([
+            'title' => ['en' => 'Member B Exclusive Event', 'ar' => 'فعالية العضو ب'],
+            'start_at' => now()->addDays(3),
+            'end_at' => now()->addDays(3)->addHours(2),
+            'status' => 'published',
+        ]);
+        EventAttendee::create([
+            'event_id' => $eventB->id,
+            'name' => 'Member B',
+            'email' => 'member.b@example.com',
+            'phone' => '0922222222',
+        ]);
+
+        // Authenticate Member A
+        Sanctum::actingAs($memberA, ['*']);
+
+        // Test GET /api/v1/member/events/my-events with default tab (upcoming)
+        $res = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/member/events/my-events');
+        $res->assertOk();
+
+        // Check counts
+        $res->assertJsonPath('counts.upcoming', 2);
+        $res->assertJsonPath('counts.past', 1);
+        $res->assertJsonPath('counts.total', 3);
+
+        // Check data list
+        $data = $res->json('data');
+        $this->assertCount(2, $data);
+        $eventIds = collect($data)->pluck('id')->all();
+        $this->assertContains($upcomingEvent1->id, $eventIds);
+        $this->assertContains($upcomingEvent2->id, $eventIds);
+        $this->assertNotContains($pastEventA->id, $eventIds);
+        $this->assertNotContains($eventB->id, $eventIds);
+
+        // Check first card details
+        $item1 = collect($data)->firstWhere('id', $upcomingEvent1->id);
+        $this->assertSame($attendee1->id, $item1['ticket_id']);
+        $this->assertSame('Founder Networking Evening', $item1['title']);
+        $this->assertSame('Connect with entrepreneurs', $item1['description']);
+        $this->assertSame('ADD Café, Aleppo', $item1['location']);
+        $this->assertSame('registered', $item1['registration']['status']);
+        $this->assertSame('Registered', $item1['registration']['label']);
+        $this->assertSame('upcoming', $item1['time_status']['type']);
+        $this->assertSame('Upcoming', $item1['time_status']['label']);
+        $this->assertSame('view_ticket', $item1['action']['type']);
+        $this->assertSame($attendee1->id, $item1['action']['ticket_id']);
+        $this->assertIsArray($item1['my_badges']);
+
+        // Test GET with tab=past
+        $resPast = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/member/events/my-events?tab=past');
+        $resPast->assertOk();
+        $this->assertCount(1, $resPast->json('data'));
+        $pastItem = $resPast->json('data.0');
+        $this->assertSame($pastEventA->id, $pastItem['id']);
+        $this->assertSame('attended', $pastItem['registration']['status']);
+        $this->assertSame('Attended', $pastItem['registration']['label']);
+        $this->assertSame('past', $pastItem['time_status']['type']);
+        $this->assertSame('view_event', $pastItem['action']['type']);
+
+        // Test Arabic header translations
+        $resAr = $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/member/events/my-events?tab=past');
+        $resAr->assertOk();
+        $this->assertSame('حضر', $resAr->json('data.0.registration.label'));
+        $this->assertSame('سابق', $resAr->json('data.0.time_status.label'));
+        $this->assertSame('عرض الفعالية', $resAr->json('data.0.action.label'));
+
+        // Test alternate route /api/v1/member/my-events
+        $resAlt = $this->getJson('/api/v1/member/my-events');
+        $resAlt->assertOk();
+        $resAlt->assertJsonPath('counts.upcoming', 2);
+    }
 }

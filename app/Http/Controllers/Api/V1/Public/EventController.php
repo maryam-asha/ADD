@@ -28,6 +28,16 @@ class EventController extends Controller
         ]);
     }
 
+    /**
+     * Retrieve event statuses list for filtering in public app.
+     */
+    public function statuses(EventBrowseService $service): JsonResponse
+    {
+        return response()->json([
+            'data' => $service->statuses(),
+        ]);
+    }
+
     public function show(Request $request, int|string $id, EventBrowseService $service): JsonResponse
     {
         $user = $request->user('sanctum');

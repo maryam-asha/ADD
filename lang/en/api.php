@@ -265,4 +265,27 @@ return [
         ],
     ],
 
+    'services' => [
+        'not_found'               => 'Service not found or not available to your account.',
+        'request_not_found'       => 'Service request not found.',
+        'not_form_based'          => 'This service does not accept form submissions.',
+        'request_already_terminal'=> 'This request is already closed and cannot be updated.',
+        'type_updated'            => 'Service type updated.',
+        'type_deleted'            => 'Service type deleted.',
+        'field_updated'           => 'Field updated.',
+        'field_deleted'           => 'Field deleted.',
+        'request_updated'         => 'Request status updated.',
+    ],
+
+    'event' => [
+        'cancelled'                   => 'This event is cancelled and registration is closed.',
+        'not_available'               => 'This event is currently not available for registration.',
+        'closed'                      => 'Registration for this event has closed.',
+        'already_registered'          => 'You are already registered for this event.',
+        'full'                        => 'Sorry, this event is full. All seats are completely booked.',
+        'insufficient_points'         => 'Insufficient points. :required points required, you have :current points (short :shortage).',
+        'registration_success'        => 'Successfully registered for the event.',
+        'registration_success_points' => 'Successfully registered for the event. :points points deducted from your wallet.',
+    ],
+
 ];

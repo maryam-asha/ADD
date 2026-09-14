@@ -251,4 +251,71 @@ class EventTest extends TestCase
         $this->assertEquals('100000.00', $item['price_display']);
         $this->assertSame('SYP', $item['display_currency']);
     }
+
+    public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void
+    {
+        $this->actingAsAdmin();
+
+        $branch = \App\Domain\Foundation\Models\Branch::create([
+            'name' => ['en' => 'Aleppo Branch', 'ar' => 'فرع حلب'],
+            'city' => ['en' => 'Aleppo', 'ar' => 'حلب'],
+            'timezone' => 'Asia/Damascus',
+            'is_default' => true,
+        ]);
+
+        $building = \App\Domain\Foundation\Models\Building::create([
+            'branch_id' => $branch->id,
+            'name' => ['en' => 'Main Building', 'ar' => 'المبنى الرئيسي'],
+            'floor_count' => 3,
+        ]);
+
+        $space = \App\Domain\Foundation\Models\Space::factory()
+            ->eventHall()
+            ->create([
+                'building_id' => $building->id,
+                'capacity' => 100,
+            ]);
+
+        // 1. Fetch available rooms
+        $resRooms = $this->withHeaders(['lang' => 'ar'])->getJson('/api/v1/admin/events/rooms');
+        $resRooms->assertOk();
+        $this->assertCount(1, $resRooms->json('data'));
+        $this->assertSame($space->id, $resRooms->json('data.0.id'));
+        $this->assertSame('قاعة الفعاليات', $resRooms->json('data.0.name'));
+        $this->assertSame('فرع حلب', $resRooms->json('data.0.branch_name'));
+
+        // 2. Create event without typing location directly; location is automatically Branch + Room
+        $response = $this->withHeaders(['lang' => 'ar'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Tech Gathering', 'ar' => 'ملتقى تقني'],
+            'space_id' => $space->id,
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame($space->id, $response->json('data.space_id'));
+        $this->assertSame('فرع حلب – قاعة الفعاليات', $response->json('data.location'));
+        $this->assertSame($branch->id, $response->json('data.branch_id'));
+        $this->assertSame(100, $response->json('data.capacity'));
+
+        $this->assertDatabaseHas('events', [
+            'id' => $response->json('data.id'),
+            'space_id' => $space->id,
+            'branch_id' => $branch->id,
+            'location' => 'فرع حلب – قاعة الفعاليات',
+            'capacity' => 100,
+        ]);
+
+        // 3. Create event with room name in English
+        $resEn = $this->withHeaders(['lang' => 'en'])->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Workshop', 'ar' => 'ورشة'],
+            'branch_id' => $branch->id,
+            'room' => 'meeting_room',
+            'start_at' => now()->addDays(3)->toDateTimeString(),
+            'end_at' => now()->addDays(3)->addHours(2)->toDateTimeString(),
+        ]);
+
+        $resEn->assertCreated();
+        $this->assertSame('Aleppo Branch – Meeting Room', $resEn->json('data.location'));
+    }
 }

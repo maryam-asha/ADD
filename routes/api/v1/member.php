@@ -8,6 +8,8 @@ use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
+use App\Http\Controllers\Api\V1\Member\MemberServiceController;
+use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
@@ -108,5 +110,18 @@ Route::delete('device-token', [MemberDeviceTokenController::class, 'destroy']);
 // Mobile events calendar, categories, and details for members
 Route::get('events', [EventController::class, 'index']);
 Route::get('events/categories', [EventController::class, 'categories']);
+Route::get('events/statuses', [EventController::class, 'statuses']);
+Route::get('events/my-events', [EventController::class, 'myEvents']);
+Route::get('my-events', [EventController::class, 'myEvents']);
 Route::get('event-categories', [EventController::class, 'categories']);
 Route::get('events/{event}', [EventController::class, 'show']);
+Route::post('events/{event}/register', [EventController::class, 'register']);
+
+// ADD Services — catalog and request submission
+Route::get('services', [MemberServiceController::class, 'index']);
+Route::get('services/{slug}', [MemberServiceController::class, 'show']);
+Route::post('services/{slug}/requests', [MemberServiceController::class, 'submitRequest']);
+
+// Member's own service request history
+Route::get('service-requests', [MemberServiceRequestController::class, 'index']);
+Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController::class, 'show']);

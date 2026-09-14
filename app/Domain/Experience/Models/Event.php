@@ -6,6 +6,7 @@ use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,6 +18,7 @@ class Event extends Model
 
     protected $fillable = [
         'branch_id',
+        'space_id',
         'category_id',
         'title',
         'description',
@@ -25,6 +27,7 @@ class Event extends Model
         'location',
         'capacity',
         'is_free',
+        'price_points',
         'price',
         'currency',
         'image_url',
@@ -35,12 +38,15 @@ class Event extends Model
     protected function casts(): array
     {
         return [
+            'branch_id' => 'integer',
+            'space_id' => 'integer',
             'category_id' => 'integer',
             'title' => 'array',
             'description' => 'array',
             'start_at' => 'datetime',
             'end_at' => 'datetime',
             'is_free' => 'boolean',
+            'price_points' => 'integer',
             'price' => 'decimal:2',
             'image_url' => AsMediaUrl::class,
         ];
@@ -49,6 +55,11 @@ class Event extends Model
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);
+    }
+
+    public function space(): BelongsTo
+    {
+        return $this->belongsTo(Space::class);
     }
 
     public function category(): BelongsTo

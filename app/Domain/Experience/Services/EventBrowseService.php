@@ -49,28 +49,17 @@ class EventBrowseService
             ->withCount('attendees');
 
         // 1. Cancelled / Status filter
-        $isCancelled = null;
-        if (array_key_exists('cancelled', $filters)) {
-            $isCancelled = filter_var($filters['cancelled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        } elseif (array_key_exists('is_cancelled', $filters)) {
-            $isCancelled = filter_var($filters['is_cancelled'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
-        }
+        $this->applyStatusFilter($query, $filters);
 
-        if ($isCancelled === true) {
-            $query->where('status', 'cancelled');
-        } elseif ($isCancelled === false) {
-            $query->where('status', 'published');
-        } else {
-            // Default for user: published events
-            $query->where('status', 'published');
-        }
-
-        // 2. Search by event name/title in text
-        if (! empty($filters['search'])) {
-            $search = '%' . trim((string) $filters['search']) . '%';
+        // 2. Search by event title/description in text (supports 'search' and 'q')
+        $searchTerm = $filters['search'] ?? $filters['q'] ?? null;
+        if (! empty($searchTerm)) {
+            $search = '%' . trim((string) $searchTerm) . '%';
             $query->where(function (Builder $q) use ($search) {
                 $q->where('title->ar', 'like', $search)
-                    ->orWhere('title->en', 'like', $search);
+                    ->orWhere('title->en', 'like', $search)
+                    ->orWhere('description->ar', 'like', $search)
+                    ->orWhere('description->en', 'like', $search);
             });
         }
 
@@ -101,6 +90,10 @@ class EventBrowseService
             $isFree = filter_var($filters['free'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
         } elseif (array_key_exists('is_free', $filters)) {
             $isFree = filter_var($filters['is_free'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+        } elseif (! empty($filters['price_type'])) {
+            $isFree = $filters['price_type'] === 'free';
+        } elseif (! empty($filters['type'])) {
+            $isFree = $filters['type'] === 'free';
         }
 
         if ($isFree !== null) {
@@ -163,6 +156,113 @@ class EventBrowseService
     }
 
     /**
+     * Retrieve events that the authenticated user is registered for ("My Events").
+     * Supports tab filter: 'upcoming' (default) or 'past'.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    public function myEvents(User $user, array $filters = []): array
+    {
+        $now = Carbon::now();
+        $nowStr = $now->toDateTimeString();
+
+        // Base query condition for user's registration
+        $userAttendeeCondition = function ($q) use ($user) {
+            $q->where(function ($sub) use ($user) {
+                $sub->where('user_id', $user->id)
+                    ->orWhere('email', $user->email);
+                if ($user->phone) {
+                    $sub->orWhere('phone', $user->phone);
+                }
+            });
+        };
+
+        // Query for events registered by this user (exclude draft events)
+        $baseQuery = Event::query()
+            ->whereHas('attendees', $userAttendeeCondition)
+            ->where('status', '!=', 'draft');
+
+        // Calculate summary counts across all registered events for the user
+        $upcomingCount = (clone $baseQuery)->where(function (Builder $q) use ($nowStr) {
+            $q->where(function ($sub) use ($nowStr) {
+                $sub->whereNotNull('end_at')->where('end_at', '>=', $nowStr);
+            })->orWhere(function ($sub) use ($nowStr) {
+                $sub->whereNull('end_at')->where('start_at', '>=', $nowStr);
+            });
+        })->count();
+
+        $pastCount = (clone $baseQuery)->where(function (Builder $q) use ($nowStr) {
+            $q->where(function ($sub) use ($nowStr) {
+                $sub->whereNotNull('end_at')->where('end_at', '<', $nowStr);
+            })->orWhere(function ($sub) use ($nowStr) {
+                $sub->whereNull('end_at')->where('start_at', '<', $nowStr);
+            });
+        })->count();
+
+        $totalCount = $upcomingCount + $pastCount;
+
+        // Apply tab filter: 'upcoming' (default), 'past', or 'all'
+        $tab = strtolower(trim((string) ($filters['tab'] ?? $filters['type'] ?? 'upcoming')));
+
+        $query = (clone $baseQuery)
+            ->with([
+                'branch',
+                'category',
+                'attendees' => $userAttendeeCondition,
+            ])
+            ->withCount('attendees');
+
+        if ($tab === 'past') {
+            $query->where(function (Builder $q) use ($nowStr) {
+                $q->where(function ($sub) use ($nowStr) {
+                    $sub->whereNotNull('end_at')->where('end_at', '<', $nowStr);
+                })->orWhere(function ($sub) use ($nowStr) {
+                    $sub->whereNull('end_at')->where('start_at', '<', $nowStr);
+                });
+            })->orderBy('start_at', 'desc');
+        } elseif ($tab === 'all') {
+            $query->orderBy('start_at', 'desc');
+        } else {
+            // Default: upcoming
+            $tab = 'upcoming';
+            $query->where(function (Builder $q) use ($nowStr) {
+                $q->where(function ($sub) use ($nowStr) {
+                    $sub->whereNotNull('end_at')->where('end_at', '>=', $nowStr);
+                })->orWhere(function ($sub) use ($nowStr) {
+                    $sub->whereNull('end_at')->where('start_at', '>=', $nowStr);
+                });
+            })->orderBy('start_at', 'asc');
+        }
+
+        $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 20;
+        $paginator = $query->paginate($perPage);
+
+        $events = collect($paginator->items())->map(fn (Event $event) => $this->formatMyEventCard($event, $user));
+
+        return [
+            'counts' => [
+                'upcoming' => $upcomingCount,
+                'past' => $pastCount,
+                'total' => $totalCount,
+            ],
+            'data' => $events,
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+            'links' => [
+                'first' => $paginator->url(1),
+                'last' => $paginator->url($paginator->lastPage()),
+                'prev' => $paginator->previousPageUrl(),
+                'next' => $paginator->nextPageUrl(),
+            ],
+        ];
+    }
+
+    /**
      * Retrieve active event categories for display in the app separately.
      * Returns id, name (translated by header language), icon, and color (no slug).
      *
@@ -186,6 +286,118 @@ class EventBrowseService
     }
 
     /**
+     * Filter events by dynamic status (open, full, closed, cancelled, all).
+     */
+    protected function applyStatusFilter(Builder $query, array $filters): void
+    {
+        $status = $filters['status'] ?? null;
+        $cancelled = $filters['cancelled'] ?? $filters['is_cancelled'] ?? null;
+
+        if ($cancelled !== null) {
+            $isCancelled = filter_var($cancelled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($isCancelled === true) {
+                $query->where('status', 'cancelled');
+                return;
+            } elseif ($isCancelled === false) {
+                $query->where('status', 'published');
+                return;
+            }
+        }
+
+        if (empty($status) || $status === 'all') {
+            if ($status !== 'all') {
+                $query->where('status', 'published');
+            }
+            return;
+        }
+
+        $statuses = is_array($status) ? $status : explode(',', (string) $status);
+        $statuses = array_map('trim', array_map('strtolower', $statuses));
+
+        $now = Carbon::now()->toDateTimeString();
+
+        $query->where(function (Builder $q) use ($statuses, $now) {
+            foreach ($statuses as $st) {
+                $q->orWhere(function (Builder $sub) use ($st, $now) {
+                    if ($st === 'cancelled') {
+                        $sub->where('status', 'cancelled');
+                    } elseif ($st === 'closed') {
+                        $sub->where('status', 'published')
+                            ->where(function (Builder $dateQ) use ($now) {
+                                $dateQ->where(function ($d) use ($now) {
+                                    $d->whereNotNull('end_at')->where('end_at', '<', $now);
+                                })->orWhere(function ($d) use ($now) {
+                                    $d->whereNull('end_at')->where('start_at', '<', $now);
+                                });
+                            });
+                    } elseif ($st === 'full') {
+                        $sub->where('status', 'published')
+                            ->where(function (Builder $dateQ) use ($now) {
+                                $dateQ->where(function ($d) use ($now) {
+                                    $d->whereNotNull('end_at')->where('end_at', '>=', $now);
+                                })->orWhere(function ($d) use ($now) {
+                                    $d->whereNull('end_at')->where('start_at', '>=', $now);
+                                });
+                            })
+                            ->whereNotNull('capacity')
+                            ->whereRaw('(SELECT COUNT(*) FROM event_attendees WHERE event_attendees.event_id = events.id) >= events.capacity');
+                    } elseif ($st === 'open') {
+                        $sub->where('status', 'published')
+                            ->where(function (Builder $dateQ) use ($now) {
+                                $dateQ->where(function ($d) use ($now) {
+                                    $d->whereNotNull('end_at')->where('end_at', '>=', $now);
+                                })->orWhere(function ($d) use ($now) {
+                                    $d->whereNull('end_at')->where('start_at', '>=', $now);
+                                });
+                            })
+                            ->where(function (Builder $capQ) {
+                                $capQ->whereNull('capacity')
+                                    ->orWhereRaw('(SELECT COUNT(*) FROM event_attendees WHERE event_attendees.event_id = events.id) < events.capacity');
+                            });
+                    }
+                });
+            }
+        });
+    }
+
+    /**
+     * Retrieve all possible event statuses with localized titles.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function statuses(): array
+    {
+        $locale = $this->resolveLocale();
+
+        return [
+            [
+                'id' => 'open',
+                'slug' => 'open',
+                'name' => $locale === 'en' ? 'Open for Registration' : 'متاح للتسجيل',
+                'color' => '#10B981',
+            ],
+            [
+                'id' => 'full',
+                'slug' => 'full',
+                'name' => $locale === 'en' ? 'Full' : 'مكتمل العدد',
+                'color' => '#F59E0B',
+            ],
+            [
+                'id' => 'closed',
+                'slug' => 'closed',
+                'name' => $locale === 'en' ? 'Closed / Past' : 'منتهي',
+                'color' => '#6B7280',
+            ],
+            [
+                'id' => 'cancelled',
+                'slug' => 'cancelled',
+                'name' => $locale === 'en' ? 'Cancelled' : 'ملغى',
+                'color' => '#EF4444',
+            ],
+        ];
+    }
+
+    /**
      * Formats an event for the list cards with translated fields resolved by header language.
      *
      * @return array<string, mixed>
@@ -201,7 +413,17 @@ class EventBrowseService
         $seatsLeft = $capacity !== null ? max(0, $capacity - $attendeesCount) : null;
         $isFull = $capacity !== null && $seatsLeft === 0;
         $isCancelled = $event->status === 'cancelled';
-        $isPast = $end ? $end->isPast() : false;
+        $now = Carbon::now();
+        $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
+
+        $computedStatus = 'open';
+        if ($isCancelled) {
+            $computedStatus = 'cancelled';
+        } elseif ($isPast) {
+            $computedStatus = 'closed';
+        } elseif ($isFull) {
+            $computedStatus = 'full';
+        }
 
         $badge = $this->resolveBadge($event, $isCancelled, $isFull, $locale);
         $seatsLeftText = $this->resolveSeatsLeftText($capacity, $attendeesCount, $seatsLeft, $isCancelled, $isFull, $locale);
@@ -237,6 +459,7 @@ class EventBrowseService
         return [
             'id' => $event->id,
             'title' => $event->translate('title', $locale),
+            'description' => $event->translate('description', $locale),
             'category' => $event->category ? [
                 'id' => $event->category->id,
                 'name' => $event->category->translate('name', $locale),
@@ -255,6 +478,7 @@ class EventBrowseService
                 'range' => $start && $end ? ($start->format('h:i A') . ' – ' . $end->format('h:i A')) : null,
             ],
             'location' => $event->location,
+            'space_id' => $event->space_id,
             'branch' => $event->branch ? [
                 'id' => $event->branch->id,
                 'name' => $event->branch->translate('name', $locale),
@@ -265,12 +489,14 @@ class EventBrowseService
             'seats_left' => $seatsLeft,
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
+            'price_points' => (int) ($event->price_points ?? 0),
             'price' => $priceUsd,
             'currency' => $baseCurrency,
             'price_usd' => $priceUsd,
             'price_display' => $priceDisplay,
             'display_currency' => $targetCurrency,
             'status' => $event->status,
+            'computed_status' => $computedStatus,
             'badge' => $badge,
             'is_registered' => $isRegistered,
             'can_register' => ! $isCancelled && ! $isFull && ! $isPast && $event->status === 'published',
@@ -288,12 +514,106 @@ class EventBrowseService
         $locale = $this->resolveLocale();
         $start = $event->start_at ? Carbon::parse($event->start_at) : null;
 
+        $priceLabel = $locale === 'ar' ? 'مجاني' : 'Free';
+        if (! $event->is_free) {
+            if (($event->price_points ?? 0) > 0) {
+                $priceLabel = $locale === 'ar' ? ($event->price_points . ' نقطة') : ($event->price_points . ' pts');
+            } else {
+                $priceLabel = ($event->currency ?? 'USD') . ' ' . (float) $event->price;
+            }
+        }
+
         return array_merge($card, [
             'description' => $event->translate('description', $locale),
             'date_full' => $start ? $start->format('l, F j, Y') : null,
-            'price_label' => $event->is_free
-                ? ($locale === 'ar' ? 'مجاني' : 'Free')
-                : (($event->currency ?? 'USD') . ' ' . (float) $event->price),
+            'price_label' => $priceLabel,
+        ]);
+    }
+
+    /**
+     * Formats an event card specifically for the "My Events" screen.
+     * Matches the mobile design with dual badges, formatted date, ticket id, and action buttons.
+     *
+     * @return array<string, mixed>
+     */
+    public function formatMyEventCard(Event $event, User $user): array
+    {
+        $locale = $this->resolveLocale();
+        $card = $this->formatEventCard($event, $user);
+
+        $attendee = $event->attendees ? $event->attendees->first() : null;
+        $now = Carbon::now();
+        $start = $event->start_at ? Carbon::parse($event->start_at) : null;
+        $end = $event->end_at ? Carbon::parse($event->end_at) : null;
+        $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
+
+        // Registration badge and status
+        $regStatus = 'registered';
+        $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
+        if ($attendee?->attended === true) {
+            $regStatus = 'attended';
+            $regLabel = $locale === 'ar' ? 'حضر' : 'Attended';
+        } elseif ($isPast && $attendee?->attended === false) {
+            $regStatus = 'missed';
+            $regLabel = $locale === 'ar' ? 'لم يحضر' : 'Missed';
+        }
+
+        // Time status badge
+        $timeStatusType = $isPast ? 'past' : 'upcoming';
+        $timeStatusLabel = $isPast
+            ? ($locale === 'ar' ? 'سابق' : 'Past')
+            : ($locale === 'ar' ? 'قادم' : 'Upcoming');
+
+        // Formatted date (e.g. "Thu, Nov 21, 2026 · 6:00 PM")
+        $dateFormatted = null;
+        if ($start) {
+            $hasTime = $start->format('H:i') !== '00:00';
+            $dateFormatted = $start->format('D, M d, Y') . ($hasTime ? ' · ' . $start->format('h:i A') : '');
+        }
+
+        // Badges list for UI
+        $myBadges = [
+            [
+                'type' => $regStatus,
+                'label' => $regLabel,
+                'category' => 'registration',
+            ],
+            [
+                'type' => $timeStatusType,
+                'label' => $timeStatusLabel,
+                'category' => 'time',
+            ],
+        ];
+
+        // Action button
+        $ticketId = $attendee?->id;
+        $action = (! $isPast && $ticketId)
+            ? [
+                'type' => 'view_ticket',
+                'label' => $locale === 'ar' ? 'عرض التذكرة' : 'View Ticket',
+                'ticket_id' => $ticketId,
+            ]
+            : [
+                'type' => 'view_event',
+                'label' => $locale === 'ar' ? 'عرض الفعالية' : 'View Event',
+                'event_id' => $event->id,
+            ];
+
+        return array_merge($card, [
+            'ticket_id' => $ticketId,
+            'date_formatted' => $dateFormatted,
+            'registration' => [
+                'status' => $regStatus,
+                'label' => $regLabel,
+                'attended' => $attendee?->attended,
+                'registered_at' => $attendee?->created_at?->toISOString(),
+            ],
+            'time_status' => [
+                'type' => $timeStatusType,
+                'label' => $timeStatusLabel,
+            ],
+            'my_badges' => $myBadges,
+            'action' => $action,
         ]);
     }
 
@@ -313,6 +633,13 @@ class EventBrowseService
             return [
                 'type' => 'full',
                 'label' => $locale === 'ar' ? 'ممتلئ' : 'Full',
+            ];
+        }
+
+        if (! $event->is_free && (int) ($event->price_points ?? 0) > 0) {
+            return [
+                'type' => 'paid',
+                'label' => $locale === 'ar' ? ($event->price_points . ' نقطة') : ($event->price_points . ' pts'),
             ];
         }
 
