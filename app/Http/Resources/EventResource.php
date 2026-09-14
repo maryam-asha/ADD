@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Finance\Services\CurrencyResolver;
+use App\Domain\Finance\Services\PointConversionService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,21 +24,16 @@ class EventResource extends JsonResource
         } catch (\Throwable) {
         }
 
-        $baseCurrency = $this->currency ?? 'USD';
-        $targetCurrency = app(\App\Domain\Finance\Services\CurrencyResolver::class)->resolve($request, $user);
-        $priceUsd = $this->price !== null ? (float) $this->price : 0.0;
-        $priceDisplay = number_format($priceUsd, 2, '.', '');
+        // Points are the stored price; every currency figure below is
+        // derived at read time (docs/superpowers/specs/
+        // 2026-09-12-add-point-system-design.md, Invariant 1). This is the
+        // same shape PlanResource and SpaceResource emit.
+        $points = app(PointConversionService::class);
+        $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
 
-        if (! $this->is_free && $priceUsd > 0 && $targetCurrency !== $baseCurrency) {
-            $converted = app(\App\Domain\Finance\Services\CurrencyConversionService::class)->convert(
-                $priceUsd,
-                $baseCurrency,
-                $targetCurrency
-            );
-            if ($converted !== null) {
-                $priceDisplay = number_format($converted, 2, '.', '');
-            }
-        }
+        $pricePoints = (int) ($this->price_points ?? 0);
+        $priceUsd = $points->pointsToUsd($pricePoints);
+        $priceDisplay = $points->pointsToCurrency($pricePoints, $targetCurrency) ?? $priceUsd;
 
         return [
             'id' => $this->id,
@@ -54,10 +51,10 @@ class EventResource extends JsonResource
             'location' => $this->location,
             'capacity' => $this->capacity,
             'is_free' => (bool) ($this->is_free ?? true),
-            'price' => $priceUsd,
-            'currency' => $baseCurrency,
+            'price_points' => $pricePoints,
             'price_usd' => $priceUsd,
             'price_display' => $priceDisplay,
+            'currency' => $targetCurrency,
             'display_currency' => $targetCurrency,
             'image_url' => $this->image_url,
             'status' => $this->status,

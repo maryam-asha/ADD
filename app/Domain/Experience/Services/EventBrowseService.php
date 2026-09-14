@@ -3,9 +3,13 @@
 namespace App\Domain\Experience\Services;
 
 use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Finance\Services\CurrencyResolver;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class EventBrowseService
@@ -39,7 +43,7 @@ class EventBrowseService
      * - search: search event title/name
      * - category: filter by category id or slug
      *
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     public function browse(array $filters = [], ?User $user = null): array
@@ -54,7 +58,7 @@ class EventBrowseService
         // 2. Search by event title/description in text (supports 'search' and 'q')
         $searchTerm = $filters['search'] ?? $filters['q'] ?? null;
         if (! empty($searchTerm)) {
-            $search = '%' . trim((string) $searchTerm) . '%';
+            $search = '%'.trim((string) $searchTerm).'%';
             $query->where(function (Builder $q) use ($search) {
                 $q->where('title->ar', 'like', $search)
                     ->orWhere('title->en', 'like', $search)
@@ -159,7 +163,7 @@ class EventBrowseService
      * Retrieve events that the authenticated user is registered for ("My Events").
      * Supports tab filter: 'upcoming' (default) or 'past'.
      *
-     * @param array<string, mixed> $filters
+     * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
      */
     public function myEvents(User $user, array $filters = []): array
@@ -272,12 +276,12 @@ class EventBrowseService
     {
         $locale = $this->resolveLocale();
 
-        return \App\Domain\Experience\Models\EventCategory::query()
+        return EventCategory::query()
             ->where('is_active', true)
             ->orderBy('order')
             ->orderBy('id')
             ->get()
-            ->map(fn (\App\Domain\Experience\Models\EventCategory $category) => [
+            ->map(fn (EventCategory $category) => [
                 'id' => $category->id,
                 'name' => $category->translate('name', $locale),
             ])
@@ -297,9 +301,11 @@ class EventBrowseService
             $isCancelled = filter_var($cancelled, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
             if ($isCancelled === true) {
                 $query->where('status', 'cancelled');
+
                 return;
             } elseif ($isCancelled === false) {
                 $query->where('status', 'published');
+
                 return;
             }
         }
@@ -308,6 +314,7 @@ class EventBrowseService
             if ($status !== 'all') {
                 $query->where('status', 'published');
             }
+
             return;
         }
 
@@ -440,21 +447,14 @@ class EventBrowseService
                 ->exists();
         }
 
-        $baseCurrency = $event->currency ?? 'USD';
-        $targetCurrency = app(\App\Domain\Finance\Services\CurrencyResolver::class)->resolve(request() ?? new \Illuminate\Http\Request(), $user);
-        $priceUsd = $event->price !== null ? (float) $event->price : 0.0;
-        $priceDisplay = number_format($priceUsd, 2, '.', '');
+        // Points are the stored price; the currency figures are derived at
+        // read time, never stored (point system Invariant 1).
+        $points = app(PointConversionService::class);
+        $targetCurrency = app(CurrencyResolver::class)->resolve(request() ?? new Request, $user);
 
-        if (! $event->is_free && $priceUsd > 0 && $targetCurrency !== $baseCurrency) {
-            $converted = app(\App\Domain\Finance\Services\CurrencyConversionService::class)->convert(
-                $priceUsd,
-                $baseCurrency,
-                $targetCurrency
-            );
-            if ($converted !== null) {
-                $priceDisplay = number_format($converted, 2, '.', '');
-            }
-        }
+        $pricePoints = (int) ($event->price_points ?? 0);
+        $priceUsd = $points->pointsToUsd($pricePoints);
+        $priceDisplay = $points->pointsToCurrency($pricePoints, $targetCurrency) ?? $priceUsd;
 
         return [
             'id' => $event->id,
@@ -475,7 +475,7 @@ class EventBrowseService
             'time' => [
                 'start' => $start ? $start->format('h:i A') : null,
                 'end' => $end ? $end->format('h:i A') : null,
-                'range' => $start && $end ? ($start->format('h:i A') . ' – ' . $end->format('h:i A')) : null,
+                'range' => $start && $end ? ($start->format('h:i A').' – '.$end->format('h:i A')) : null,
             ],
             'location' => $event->location,
             'space_id' => $event->space_id,
@@ -489,11 +489,10 @@ class EventBrowseService
             'seats_left' => $seatsLeft,
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
-            'price_points' => (int) ($event->price_points ?? 0),
-            'price' => $priceUsd,
-            'currency' => $baseCurrency,
+            'price_points' => $pricePoints,
             'price_usd' => $priceUsd,
             'price_display' => $priceDisplay,
+            'currency' => $targetCurrency,
             'display_currency' => $targetCurrency,
             'status' => $event->status,
             'computed_status' => $computedStatus,
@@ -515,12 +514,8 @@ class EventBrowseService
         $start = $event->start_at ? Carbon::parse($event->start_at) : null;
 
         $priceLabel = $locale === 'ar' ? 'مجاني' : 'Free';
-        if (! $event->is_free) {
-            if (($event->price_points ?? 0) > 0) {
-                $priceLabel = $locale === 'ar' ? ($event->price_points . ' نقطة') : ($event->price_points . ' pts');
-            } else {
-                $priceLabel = ($event->currency ?? 'USD') . ' ' . (float) $event->price;
-            }
+        if (! $event->is_free && ($event->price_points ?? 0) > 0) {
+            $priceLabel = $locale === 'ar' ? ($event->price_points.' نقطة') : ($event->price_points.' pts');
         }
 
         return array_merge($card, [
@@ -568,7 +563,7 @@ class EventBrowseService
         $dateFormatted = null;
         if ($start) {
             $hasTime = $start->format('H:i') !== '00:00';
-            $dateFormatted = $start->format('D, M d, Y') . ($hasTime ? ' · ' . $start->format('h:i A') : '');
+            $dateFormatted = $start->format('D, M d, Y').($hasTime ? ' · '.$start->format('h:i A') : '');
         }
 
         // Badges list for UI
@@ -639,15 +634,7 @@ class EventBrowseService
         if (! $event->is_free && (int) ($event->price_points ?? 0) > 0) {
             return [
                 'type' => 'paid',
-                'label' => $locale === 'ar' ? ($event->price_points . ' نقطة') : ($event->price_points . ' pts'),
-            ];
-        }
-
-        if (! $event->is_free && (float) $event->price > 0) {
-            $symbol = $event->currency === 'USD' ? '$' : ($event->currency . ' ');
-            return [
-                'type' => 'paid',
-                'label' => $symbol . (float) $event->price,
+                'label' => $locale === 'ar' ? ($event->price_points.' نقطة') : ($event->price_points.' pts'),
             ];
         }
 
@@ -669,12 +656,12 @@ class EventBrowseService
 
         if ($isFull) {
             return $locale === 'ar'
-                ? ('ممتلئ • ' . $capacity . '/' . $capacity . ' مقعد')
-                : ('Full • ' . $capacity . '/' . $capacity . ' seats');
+                ? ('ممتلئ • '.$capacity.'/'.$capacity.' مقعد')
+                : ('Full • '.$capacity.'/'.$capacity.' seats');
         }
 
         return $locale === 'ar'
-            ? ($seatsLeft . ' / ' . $capacity . ' مقاعد متبقية')
-            : ($seatsLeft . ' / ' . $capacity . ' seats left');
+            ? ($seatsLeft.' / '.$capacity.' مقاعد متبقية')
+            : ($seatsLeft.' / '.$capacity.' seats left');
     }
 }

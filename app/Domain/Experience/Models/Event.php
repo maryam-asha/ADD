@@ -28,8 +28,6 @@ class Event extends Model
         'capacity',
         'is_free',
         'price_points',
-        'price',
-        'currency',
         'image_url',
         'status',
         'order',
@@ -47,7 +45,6 @@ class Event extends Model
             'end_at' => 'datetime',
             'is_free' => 'boolean',
             'price_points' => 'integer',
-            'price' => 'decimal:2',
             'image_url' => AsMediaUrl::class,
         ];
     }

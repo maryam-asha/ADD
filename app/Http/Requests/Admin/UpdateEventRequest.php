@@ -44,8 +44,7 @@ class UpdateEventRequest extends FormRequest
                 'capacity' => ['nullable', 'integer', 'min:1'],
                 'is_free' => ['nullable', 'boolean'],
                 'price_points' => ['nullable', 'integer', 'min:0'],
-                'price' => ['nullable', 'numeric', 'min:0'],
-                'currency' => ['nullable', 'string', 'in:USD,SYP'],
+
                 'image_url' => ['nullable', 'string', 'max:1000'],
                 'status' => ['nullable', 'string', 'in:draft,published,cancelled'],
                 'order' => ['nullable', 'integer', 'min:0'],

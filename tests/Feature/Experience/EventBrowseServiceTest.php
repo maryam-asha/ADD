@@ -37,8 +37,7 @@ class EventBrowseServiceTest extends TestCase
             'location' => 'Main Branch – Event Hall',
             'capacity' => 50,
             'is_free' => true,
-            'price' => 0,
-            'currency' => 'USD',
+            'price_points' => 0,
             'status' => 'published',
             'order' => 1,
         ]);
@@ -61,8 +60,7 @@ class EventBrowseServiceTest extends TestCase
             'location' => 'Main Branch – Meeting Room',
             'capacity' => 30,
             'is_free' => false,
-            'price' => 15.00,
-            'currency' => 'USD',
+            'price_points' => 150,
             'status' => 'published',
             'order' => 2,
         ]);
@@ -75,8 +73,7 @@ class EventBrowseServiceTest extends TestCase
             'location' => 'ADD Café',
             'capacity' => 40,
             'is_free' => true,
-            'price' => 0,
-            'currency' => 'USD',
+            'price_points' => 0,
             'status' => 'published',
             'order' => 3,
         ]);
@@ -109,8 +106,7 @@ class EventBrowseServiceTest extends TestCase
                     'seats_left',
                     'seats_left_text',
                     'is_free',
-                    'price',
-                    'currency',
+                    'price_points',
                     'badge' => ['type', 'label'],
                     'is_registered',
                     'can_register',
@@ -137,7 +133,7 @@ class EventBrowseServiceTest extends TestCase
         $paidItem = $data->firstWhere('id', $paidEvent->id);
         $this->assertSame('Brand Building Masterclass', $paidItem['title']);
         $this->assertEquals('paid', $paidItem['badge']['type']);
-        $this->assertEquals('$15', $paidItem['badge']['label']);
+        $this->assertEquals('150 pts', $paidItem['badge']['label']);
 
         // Check Full Event
         $fullItem = $data->firstWhere('id', $fullEvent->id);
@@ -256,8 +252,7 @@ class EventBrowseServiceTest extends TestCase
             'start_at' => now()->addDays(2),
             'end_at' => now()->addDays(2)->addHours(2),
             'is_free' => true,
-            'price' => 0,
-            'currency' => 'USD',
+            'price_points' => 0,
             'status' => 'published',
         ]);
 
@@ -266,8 +261,7 @@ class EventBrowseServiceTest extends TestCase
             'start_at' => now()->addDays(3),
             'end_at' => now()->addDays(3)->addHours(4),
             'is_free' => false,
-            'price' => 50,
-            'currency' => 'USD',
+            'price_points' => 500,
             'status' => 'published',
         ]);
 
@@ -545,7 +539,7 @@ class EventBrowseServiceTest extends TestCase
             'start_at' => now()->addDays(2),
             'end_at' => now()->addDays(2)->addHours(2),
             'is_free' => true,
-            'price' => 0,
+            'price_points' => 0,
             'status' => 'published',
         ]);
 
@@ -554,7 +548,7 @@ class EventBrowseServiceTest extends TestCase
             'start_at' => now()->addDays(4),
             'end_at' => now()->addDays(4)->addHours(4),
             'is_free' => false,
-            'price' => 50,
+            'price_points' => 500,
             'status' => 'published',
         ]);
 

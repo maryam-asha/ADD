@@ -174,20 +174,18 @@ class EventTest extends TestCase
             'start_at' => now()->addDays(3)->toDateTimeString(),
             'end_at' => now()->addDays(3)->addHours(2)->toDateTimeString(),
             'is_free' => false,
-            'price' => 15.00,
-            'currency' => 'USD',
+            'price_points' => 150,
             'status' => 'published',
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.is_free', false);
-        $response->assertJsonPath('data.price', 15);
-        $response->assertJsonPath('data.currency', 'USD');
+        $response->assertJsonPath('data.price_points', 150);
+        $response->assertJsonPath('data.price_usd', '15.00');
 
         $this->assertDatabaseHas('events', [
             'is_free' => false,
-            'price' => 15.00,
-            'currency' => 'USD',
+            'price_points' => 150,
         ]);
     }
 
@@ -200,20 +198,18 @@ class EventTest extends TestCase
             'start_at' => now()->addDays(4)->toDateTimeString(),
             'end_at' => now()->addDays(4)->addHours(2)->toDateTimeString(),
             'is_free' => true,
-            'price' => 0.00,
-            'currency' => 'USD',
+            'price_points' => 0,
             'status' => 'published',
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.is_free', true);
-        $response->assertJsonPath('data.price', 0);
-        $response->assertJsonPath('data.currency', 'USD');
+        $response->assertJsonPath('data.price_points', 0);
+        $response->assertJsonPath('data.price_usd', '0.00');
 
         $this->assertDatabaseHas('events', [
             'is_free' => true,
-            'price' => 0.00,
-            'currency' => 'USD',
+            'price_points' => 0,
         ]);
     }
 
@@ -232,8 +228,7 @@ class EventTest extends TestCase
             'start_at' => now()->addDays(5),
             'end_at' => now()->addDays(5)->addHours(3),
             'is_free' => false,
-            'price' => 10.00, // 10 USD
-            'currency' => 'USD',
+            'price_points' => 100, // 100 pts = 10.00 USD at rate 0.10
             'status' => 'published',
         ]);
 
@@ -246,7 +241,7 @@ class EventTest extends TestCase
         $response->assertOk();
         $item = collect($response->json('data'))->firstWhere('id', $event->id);
         $this->assertNotNull($item);
-        $this->assertEquals(10.0, $item['price_usd']);
+        $this->assertSame('10.00', $item['price_usd']);
         // 10 USD / 0.0001 = 100000 SYP
         $this->assertEquals('100000.00', $item['price_display']);
         $this->assertSame('SYP', $item['display_currency']);
