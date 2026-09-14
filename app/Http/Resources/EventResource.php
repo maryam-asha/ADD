@@ -3,7 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Finance\Services\CurrencyResolver;
-use App\Domain\Finance\Services\PointConversionService;
+use App\Support\Presenters\EventPricePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -24,16 +24,11 @@ class EventResource extends JsonResource
         } catch (\Throwable) {
         }
 
-        // Points are the stored price; every currency figure below is
-        // derived at read time (docs/superpowers/specs/
-        // 2026-09-12-add-point-system-design.md, Invariant 1). This is the
-        // same shape PlanResource and SpaceResource emit.
-        $points = app(PointConversionService::class);
+        // Points are the stored price; every currency figure is derived at
+        // read time (point system Invariant 1). The presenter also returns
+        // display-ready labels so clients need not re-format them.
         $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
-
-        $pricePoints = (int) ($this->price_points ?? 0);
-        $priceUsd = $points->pointsToUsd($pricePoints);
-        $priceDisplay = $points->pointsToCurrency($pricePoints, $targetCurrency) ?? $priceUsd;
+        $price = app(EventPricePresenter::class)->present($this->resource, $targetCurrency, $locale);
 
         return [
             'id' => $this->id,
@@ -51,10 +46,7 @@ class EventResource extends JsonResource
             'location' => $this->location,
             'capacity' => $this->capacity,
             'is_free' => (bool) ($this->is_free ?? true),
-            'price_points' => $pricePoints,
-            'price_usd' => $priceUsd,
-            'price_display' => $priceDisplay,
-            'currency' => $targetCurrency,
+            ...$price,
             'display_currency' => $targetCurrency,
             'image_url' => $this->image_url,
             'status' => $this->status,

@@ -4,9 +4,8 @@ namespace App\Domain\Experience\Services;
 
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
-use App\Domain\Finance\Services\CurrencyResolver;
-use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
+use App\Support\Presenters\EventPricePresenter;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -447,14 +446,10 @@ class EventBrowseService
                 ->exists();
         }
 
-        // Points are the stored price; the currency figures are derived at
-        // read time, never stored (point system Invariant 1).
-        $points = app(PointConversionService::class);
-        $targetCurrency = app(CurrencyResolver::class)->resolve(request() ?? new Request, $user);
-
-        $pricePoints = (int) ($event->price_points ?? 0);
-        $priceUsd = $points->pointsToUsd($pricePoints);
-        $priceDisplay = $points->pointsToCurrency($pricePoints, $targetCurrency) ?? $priceUsd;
+        // Points are the stored price; the currency figures and the
+        // display-ready labels are derived at read time (Invariant 1).
+        $price = app(EventPricePresenter::class)->presentFor($event, $user, $locale);
+        $targetCurrency = $price['currency'];
 
         return [
             'id' => $event->id,
@@ -489,10 +484,7 @@ class EventBrowseService
             'seats_left' => $seatsLeft,
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
-            'price_points' => $pricePoints,
-            'price_usd' => $priceUsd,
-            'price_display' => $priceDisplay,
-            'currency' => $targetCurrency,
+            ...$price,
             'display_currency' => $targetCurrency,
             'status' => $event->status,
             'computed_status' => $computedStatus,
@@ -513,15 +505,11 @@ class EventBrowseService
         $locale = $this->resolveLocale();
         $start = $event->start_at ? Carbon::parse($event->start_at) : null;
 
-        $priceLabel = $locale === 'ar' ? 'مجاني' : 'Free';
-        if (! $event->is_free && ($event->price_points ?? 0) > 0) {
-            $priceLabel = $locale === 'ar' ? ($event->price_points.' نقطة') : ($event->price_points.' pts');
-        }
-
+        // price_label already comes from formatEventCard() via the
+        // presenter — no second copy of the formatting here.
         return array_merge($card, [
             'description' => $event->translate('description', $locale),
             'date_full' => $start ? $start->format('l, F j, Y') : null,
-            'price_label' => $priceLabel,
         ]);
     }
 
@@ -634,7 +622,7 @@ class EventBrowseService
         if (! $event->is_free && (int) ($event->price_points ?? 0) > 0) {
             return [
                 'type' => 'paid',
-                'label' => $locale === 'ar' ? ($event->price_points.' نقطة') : ($event->price_points.' pts'),
+                'label' => __('api.event.price_points', ['points' => (int) $event->price_points], $locale),
             ];
         }
 

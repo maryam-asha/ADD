@@ -4,6 +4,11 @@ namespace Tests\Feature\Experience;
 
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Finance\Enums\ExchangeRateSource;
+use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Building;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -216,10 +221,10 @@ class EventTest extends TestCase
     public function test_event_prices_are_returned_in_both_usd_and_preferred_display_currency(): void
     {
         // Set up exchange rate: 1 USD = 10,000 SYP (rate_to_base = 0.0001)
-        \App\Domain\Finance\Models\ExchangeRate::create([
+        ExchangeRate::create([
             'currency_code' => 'SYP',
             'rate_to_base' => '0.0001000000',
-            'source' => \App\Domain\Finance\Enums\ExchangeRateSource::Manual,
+            'source' => ExchangeRateSource::Manual,
             'effective_from' => now(),
         ]);
 
@@ -245,26 +250,32 @@ class EventTest extends TestCase
         // 10 USD / 0.0001 = 100000 SYP
         $this->assertEquals('100000.00', $item['price_display']);
         $this->assertSame('SYP', $item['display_currency']);
+
+        // Display-ready labels ride alongside the raw numbers, so a client
+        // prints them without re-implementing formatting or pluralisation.
+        $this->assertSame(100, $item['price_points']);
+        $this->assertSame('100 pts', $item['price_label']);
+        $this->assertSame('100,000.00 ل.س', $item['price_display_label']);
     }
 
     public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void
     {
         $this->actingAsAdmin();
 
-        $branch = \App\Domain\Foundation\Models\Branch::create([
+        $branch = Branch::create([
             'name' => ['en' => 'Aleppo Branch', 'ar' => 'فرع حلب'],
             'city' => ['en' => 'Aleppo', 'ar' => 'حلب'],
             'timezone' => 'Asia/Damascus',
             'is_default' => true,
         ]);
 
-        $building = \App\Domain\Foundation\Models\Building::create([
+        $building = Building::create([
             'branch_id' => $branch->id,
             'name' => ['en' => 'Main Building', 'ar' => 'المبنى الرئيسي'],
             'floor_count' => 3,
         ]);
 
-        $space = \App\Domain\Foundation\Models\Space::factory()
+        $space = Space::factory()
             ->eventHall()
             ->create([
                 'building_id' => $building->id,
