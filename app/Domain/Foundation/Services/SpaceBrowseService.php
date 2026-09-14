@@ -44,12 +44,6 @@ class SpaceBrowseService
             return [
                 'working_hours_banner' => null,
                 'spaces' => [],
-                'links' => [
-                    'first' => null,
-                    'last' => null,
-                    'prev' => null,
-                    'next' => null,
-                ],
                 'meta' => [
                     'current_page' => 1,
                     'from' => null,
@@ -107,12 +101,6 @@ class SpaceBrowseService
         return [
             'working_hours_banner' => $banner,
             'spaces' => $items->all(),
-            'links' => [
-                'first' => $paginator->url(1),
-                'last' => $paginator->url($paginator->lastPage()),
-                'prev' => $paginator->previousPageUrl(),
-                'next' => $paginator->nextPageUrl(),
-            ],
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'from' => $paginator->firstItem(),

@@ -17,7 +17,6 @@ class SpaceController extends Controller
         return response()->json([
             'working_hours_banner' => $result['working_hours_banner'],
             'data' => $result['spaces'],
-            'links' => $result['links'],
             'meta' => $result['meta'],
         ]);
     }

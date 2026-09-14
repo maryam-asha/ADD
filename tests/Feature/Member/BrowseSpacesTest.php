@@ -87,12 +87,6 @@ class BrowseSpacesTest extends TestCase
                     'main_image',
                 ],
             ],
-            'links' => [
-                'first',
-                'last',
-                'prev',
-                'next',
-            ],
             'meta' => [
                 'current_page',
                 'from',
@@ -175,14 +169,18 @@ class BrowseSpacesTest extends TestCase
         $response->assertJsonPath('meta.total', 4);
         $response->assertJsonPath('meta.last_page', 2);
         $response->assertJsonPath('meta.current_page', 1);
-        $this->assertNotNull($response->json('links.next'));
+        // A next page exists — asserted through meta, since member
+        // responses no longer carry a links block.
+        $this->assertLessThan($response->json('meta.last_page'), $response->json('meta.current_page'));
+        $this->assertNull($response->json('links'));
 
         // Request second page
         $responsePage2 = $this->getJson('/api/v1/member/spaces?per_page=2&page=2');
         $responsePage2->assertOk();
         $responsePage2->assertJsonCount(2, 'data');
         $responsePage2->assertJsonPath('meta.current_page', 2);
-        $this->assertNotNull($responsePage2->json('links.prev'));
+        $this->assertGreaterThan(1, $responsePage2->json('meta.current_page'));
+        $this->assertNull($responsePage2->json('links'));
     }
 
     public function test_member_can_view_space_details_matching_design(): void
