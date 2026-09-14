@@ -8,7 +8,6 @@ use App\Domain\Identity\Models\User;
 use App\Support\Presenters\EventPricePresenter;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class EventBrowseService
@@ -446,10 +445,11 @@ class EventBrowseService
                 ->exists();
         }
 
-        // Points are the stored price; the currency figures and the
-        // display-ready labels are derived at read time (Invariant 1).
-        $price = app(EventPricePresenter::class)->presentFor($event, $user, $locale);
-        $targetCurrency = $price['currency'];
+        // Member-facing: the two display labels only. The raw point count
+        // and the unformatted currency figures stay server-side —
+        // registration debits the wallet and checks the balance there, so
+        // a client has nothing to compute.
+        $price = app(EventPricePresenter::class)->presentForDisplay($event, $user, $locale);
 
         return [
             'id' => $event->id,
@@ -485,7 +485,6 @@ class EventBrowseService
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
             ...$price,
-            'display_currency' => $targetCurrency,
             'status' => $event->status,
             'computed_status' => $computedStatus,
             'badge' => $badge,

@@ -246,16 +246,19 @@ class EventTest extends TestCase
         $response->assertOk();
         $item = collect($response->json('data'))->firstWhere('id', $event->id);
         $this->assertNotNull($item);
-        $this->assertSame('10.00', $item['price_usd']);
-        // 10 USD / 0.0001 = 100000 SYP
-        $this->assertEquals('100000.00', $item['price_display']);
-        $this->assertSame('SYP', $item['display_currency']);
-
-        // Display-ready labels ride alongside the raw numbers, so a client
-        // prints them without re-implementing formatting or pluralisation.
-        $this->assertSame(100, $item['price_points']);
+        // The member surface returns display labels only: the points as
+        // the member spends them, and the same price in their chosen
+        // currency. 100 pts =  .00 = 100,000 SYP at the seeded rate.
         $this->assertSame('100 pts', $item['price_label']);
         $this->assertSame('100,000.00 ل.س', $item['price_display_label']);
+
+        // The raw figures stay server-side — registration debits the
+        // wallet and validates the balance there, so a member client has
+        // nothing to compute and no way to re-derive the price.
+        $this->assertArrayNotHasKey('price_points', $item);
+        $this->assertArrayNotHasKey('price_usd', $item);
+        $this->assertArrayNotHasKey('price_display', $item);
+        $this->assertArrayNotHasKey('display_currency', $item);
     }
 
     public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void

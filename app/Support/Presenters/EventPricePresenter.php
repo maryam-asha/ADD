@@ -49,6 +49,27 @@ class EventPricePresenter
     }
 
     /**
+     * The member-facing view: the two labels a client prints, and nothing
+     * else. A member never needs the raw point count — registration
+     * charges the wallet server-side and validates the balance there, so
+     * shipping the number would only invite a client to re-derive a price
+     * the server already decided.
+     *
+     * Admin surfaces keep the full block (they edit the stored value).
+     *
+     * @return array{price_label: string, price_display_label: string}
+     */
+    public function presentForDisplay(Event $event, ?User $user, string $locale): array
+    {
+        $price = $this->presentFor($event, $user, $locale);
+
+        return [
+            'price_label' => $price['price_label'],
+            'price_display_label' => $price['price_display_label'],
+        ];
+    }
+
+    /**
      * @return array{
      *     price_points: int,
      *     price_label: string,
