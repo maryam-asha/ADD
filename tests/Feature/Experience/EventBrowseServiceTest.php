@@ -5,6 +5,7 @@ namespace Tests\Feature\Experience;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Experience\Services\EventBrowseService;
 use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,6 +20,41 @@ class EventBrowseServiceTest extends TestCase
     {
         parent::setUp();
         $this->seed(RoleSeeder::class);
+    }
+
+    public function test_browse_lists_soonest_upcoming_first_then_past_most_recent_first(): void
+    {
+        $category = EventCategory::create([
+            'name' => ['en' => 'Talks', 'ar' => 'محاضرات'],
+            'slug' => 'talks-ordering',
+        ]);
+
+        // Deliberately created out of order, so a passing assertion cannot
+        // be an accident of insertion order.
+        $ids = [];
+        foreach ([-30, 20, -3, 2, 9] as $offset) {
+            $ids[$offset] = Event::create([
+                'title' => ['en' => "Offset {$offset}", 'ar' => "إزاحة {$offset}"],
+                'category_id' => $category->id,
+                'start_at' => now()->addDays($offset)->setTime(10, 0),
+                'end_at' => now()->addDays($offset)->setTime(12, 0),
+                'capacity' => 10,
+                'is_free' => true,
+                'price_points' => 0,
+                'status' => 'published',
+                'order' => 1,
+            ])->id;
+        }
+
+        $result = app(EventBrowseService::class)->browse(['per_page' => 10]);
+        $returned = collect($result['data'])->pluck('id')->all();
+
+        // Upcoming ascending (soonest first), then past descending (most
+        // recent first) — the list reads outward from today.
+        $this->assertSame(
+            [$ids[2], $ids[9], $ids[20], $ids[-3], $ids[-30]],
+            $returned
+        );
     }
 
     public function test_can_browse_events_calendar_with_badges_and_seat_calculations(): void

@@ -107,8 +107,15 @@ class EventBrowseService
             $query->where('branch_id', (int) $filters['branch_id']);
         }
 
-        // Chronological ordering
-        $query->orderBy('start_at', 'asc')->orderBy('order', 'asc');
+        // Soonest first, with anything already finished pushed below it.
+        // A plain `order by start_at` would surface a month-old event above
+        // one happening tomorrow, which is never what a calendar wants.
+        // Within the past block the most recent comes first, so the list
+        // reads outward from today in both directions.
+        $query->orderByRaw('CASE WHEN COALESCE(end_at, start_at) >= ? THEN 0 ELSE 1 END asc', [Carbon::now()->toDateTimeString()])
+            ->orderByRaw('CASE WHEN COALESCE(end_at, start_at) >= ? THEN start_at END asc', [Carbon::now()->toDateTimeString()])
+            ->orderBy('start_at', 'desc')
+            ->orderBy('order', 'asc');
 
         $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 20;
         $paginator = $query->paginate($perPage);
