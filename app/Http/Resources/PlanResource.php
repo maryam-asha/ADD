@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use Illuminate\Http\Request;
@@ -70,15 +71,32 @@ class PlanResource extends JsonResource
         // resolved target currency (docs/superpowers/specs/2026-09-12-add-point-system-design.md).
         $points = app(PointConversionService::class);
         $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
+        $baseCurrency = app(CurrencyConversionService::class)->baseCurrencyCode();
+
+        $convertedDisplay = $points->pointsToCurrency((int) $this->price_points, $targetCurrency);
 
         $data['price_points'] = (int) $this->price_points;
         $data['price_usd'] = $points->pointsToUsd((int) $this->price_points);
-        $data['price_display'] = $points->pointsToCurrency((int) $this->price_points, $targetCurrency)
-            ?? $data['price_usd'];
+        $data['price_display'] = $convertedDisplay ?? $data['price_usd'];
         $data['currency'] = $targetCurrency;
         $data['overage_rate_points'] = $this->overage_rate_points !== null
             ? (int) $this->overage_rate_points
             : null;
+
+        // Deprecated: superseded by price_display/currency above, which
+        // this pair simply mirrors — kept for one release only because the
+        // member app may still read the old names (docs/superpowers/specs/
+        // 2026-09-12-add-point-b-pricing-design.md §3). Emitted only when
+        // the resolved currency differs from base AND actually converted
+        // (i.e. an exchange rate exists), matching the original
+        // pre-points behaviour. Deliberately NOT computed on a separate
+        // conversion path: both fields are read straight off the
+        // price_display/currency values already derived above, so they
+        // cannot drift from them. Remove after one release.
+        if ($targetCurrency !== $baseCurrency && $convertedDisplay !== null) {
+            $data['converted_amount'] = $data['price_display'];
+            $data['converted_currency'] = $data['currency'];
+        }
 
         return $data;
     }

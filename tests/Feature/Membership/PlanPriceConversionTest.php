@@ -17,7 +17,10 @@ use Tests\TestCase;
  * than in a per-plan currency. `price_display`/`currency` supersede the
  * `converted_amount`/`converted_currency` pair these tests used to read;
  * the behaviour each one pins — which currency is resolved, and that the
- * display follows it — is unchanged.
+ * display follows it — is unchanged. The deprecated pair itself is still
+ * emitted for one release (docs/superpowers/specs/2026-09-12-add-point-b-
+ * pricing-design.md §3) — see
+ * test_the_deprecated_converted_pair_still_agrees_with_price_display below.
  */
 class PlanPriceConversionTest extends TestCase
 {
@@ -67,6 +70,42 @@ class PlanPriceConversionTest extends TestCase
         // could not tell a correct price from a 10x-inflated one.
         $response->assertJsonPath('data.price_usd', '10.00');
         $response->assertJsonPath('data.price_display', '10.00');
+        $response->assertJsonMissingPath('data.converted_amount');
+        $response->assertJsonMissingPath('data.converted_currency');
+    }
+
+    /**
+     * Finding 2 (final whole-branch review): PlanResource dropped
+     * `converted_amount`/`converted_currency` entirely instead of keeping
+     * them deprecated for one release, breaking a member-app build still
+     * reading the old names. Restored, and pinned here to agree with
+     * price_display/currency exactly — both must be read off the same
+     * already-computed point-based values, never a second conversion path
+     * that could drift from them.
+     */
+    public function test_the_deprecated_converted_pair_still_agrees_with_price_display(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272', 'effective_from' => now()->subDay()]);
+        $plan = Plan::factory()->create(['price_points' => 100]);
+        $admin = User::factory()->create(['preferred_currency' => 'SYP']);
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $response = $this->getJson("/api/v1/admin/plans/{$plan->id}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.price_display', '147000.02');
+        $response->assertJsonPath('data.currency', 'SYP');
+        $response->assertJsonPath('data.converted_amount', '147000.02');
+        $response->assertJsonPath('data.converted_currency', 'SYP');
+        $this->assertSame(
+            $response->json('data.price_display'),
+            $response->json('data.converted_amount')
+        );
+        $this->assertSame(
+            $response->json('data.currency'),
+            $response->json('data.converted_currency')
+        );
     }
 
     public function test_no_converted_amount_when_no_exchange_rate_exists(): void
