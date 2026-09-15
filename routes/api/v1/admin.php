@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
+use App\Http\Controllers\Api\V1\Admin\AdminEventRegistrationFieldController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
@@ -140,6 +142,19 @@ Route::apiResource('event-categories', EventCategoryController::class)
 Route::get('events/rooms', [EventController::class, 'rooms']);
 Route::get('events/statuses', [EventController::class, 'statuses']);
 Route::apiResource('events', EventController::class);
+
+// Per-event registration form definition, and the attendee roster with its
+// approve/reject decisions. All nested under an already-bound event, so
+// they never collide with the apiResource above.
+Route::get('events/{event}/registration-fields', [AdminEventRegistrationFieldController::class, 'index']);
+Route::post('events/{event}/registration-fields', [AdminEventRegistrationFieldController::class, 'store']);
+Route::patch('events/{event}/registration-fields/{field}', [AdminEventRegistrationFieldController::class, 'update']);
+Route::delete('events/{event}/registration-fields/{field}', [AdminEventRegistrationFieldController::class, 'destroy']);
+
+Route::get('events/{event}/attendees', [AdminEventAttendeeController::class, 'index']);
+Route::get('events/{event}/attendees/pending', [AdminEventAttendeeController::class, 'pending']);
+Route::post('events/{event}/attendees/{attendee}/approve', [AdminEventAttendeeController::class, 'approve']);
+Route::post('events/{event}/attendees/{attendee}/reject', [AdminEventAttendeeController::class, 'reject']);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);

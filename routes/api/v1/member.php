@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
+use App\Http\Controllers\Api\V1\Member\EventController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
 use App\Http\Controllers\Api\V1\Member\MemberServiceController;
@@ -14,7 +15,6 @@ use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
-use App\Http\Controllers\Api\V1\Member\EventController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\SpaceController;
@@ -106,7 +106,6 @@ Route::get('notifications/unread-count', [MemberNotificationController::class, '
 Route::put('device-token', [MemberDeviceTokenController::class, 'update']);
 Route::delete('device-token', [MemberDeviceTokenController::class, 'destroy']);
 
-
 // Mobile events calendar, categories, and details for members
 Route::get('events', [EventController::class, 'index']);
 Route::get('events/categories', [EventController::class, 'categories']);
@@ -115,6 +114,7 @@ Route::get('events/my-events', [EventController::class, 'myEvents']);
 Route::get('my-events', [EventController::class, 'myEvents']);
 Route::get('event-categories', [EventController::class, 'categories']);
 Route::get('events/{event}', [EventController::class, 'show']);
+Route::get('events/{event}/registration-form', [EventController::class, 'registrationForm']);
 Route::post('events/{event}/register', [EventController::class, 'register']);
 
 // ADD Services — catalog and request submission

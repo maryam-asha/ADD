@@ -5,6 +5,7 @@ namespace App\Domain\Experience\Services;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
 use App\Domain\Identity\Models\User;
+use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventPricePresenter;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,7 @@ class EventBrowseService
     {
         $query = Event::query()
             ->with(['branch', 'category', 'space.building.branch'])
-            ->withCount('attendees');
+            ->withCount('seatHoldingAttendees as attendees_count');
 
         // 1. Cancelled / Status filter
         $this->applyStatusFilter($query, $filters);
@@ -142,7 +143,7 @@ class EventBrowseService
     {
         if (! $event instanceof Event) {
             $event = Event::with(['branch', 'category'])
-                ->withCount('attendees')
+                ->withCount('seatHoldingAttendees as attendees_count')
                 ->find($event);
 
             if (! $event) {
@@ -151,7 +152,7 @@ class EventBrowseService
         } else {
             $event->loadMissing(['branch', 'category']);
             if (! isset($event->attendees_count)) {
-                $event->loadCount('attendees');
+                $event->loadCount('seatHoldingAttendees as attendees_count');
             }
         }
 
@@ -215,7 +216,7 @@ class EventBrowseService
                 'space.building.branch',
                 'attendees' => $userAttendeeCondition,
             ])
-            ->withCount('attendees');
+            ->withCount('seatHoldingAttendees as attendees_count');
 
         if ($tab === 'past') {
             $query->where(function (Builder $q) use ($nowStr) {
@@ -286,6 +287,24 @@ class EventBrowseService
     /**
      * Filter events by dynamic status (open, full, closed, cancelled, all).
      */
+    /**
+     * Correlated count of the seats an event has taken. Placeholders are
+     * bound by the caller from EventRegistrationStatus, so the status list
+     * here can never drift from the enum.
+     */
+    protected function seatCountSubquery(): string
+    {
+        $placeholders = implode(',', array_fill(
+            0,
+            count(EventRegistrationStatus::seatHoldingValues()),
+            '?'
+        ));
+
+        return '(SELECT COUNT(*) FROM event_attendees'
+            .' WHERE event_attendees.event_id = events.id'
+            ." AND event_attendees.status IN ({$placeholders}))";
+    }
+
     protected function applyStatusFilter(Builder $query, array $filters): void
     {
         $status = $filters['status'] ?? null;
@@ -341,7 +360,7 @@ class EventBrowseService
                                 });
                             })
                             ->whereNotNull('capacity')
-                            ->whereRaw('(SELECT COUNT(*) FROM event_attendees WHERE event_attendees.event_id = events.id) >= events.capacity');
+                            ->whereRaw($this->seatCountSubquery().' >= events.capacity', EventRegistrationStatus::seatHoldingValues());
                     } elseif ($st === 'open') {
                         $sub->where('status', 'published')
                             ->where(function (Builder $dateQ) use ($now) {
@@ -353,7 +372,7 @@ class EventBrowseService
                             })
                             ->where(function (Builder $capQ) {
                                 $capQ->whereNull('capacity')
-                                    ->orWhereRaw('(SELECT COUNT(*) FROM event_attendees WHERE event_attendees.event_id = events.id) < events.capacity');
+                                    ->orWhereRaw($this->seatCountSubquery().' < events.capacity', EventRegistrationStatus::seatHoldingValues());
                             });
                     }
                 });
@@ -429,17 +448,24 @@ class EventBrowseService
         $badge = $this->resolveBadge($event, $isCancelled, $isFull, $locale);
         $seatsLeftText = $this->resolveSeatsLeftText($capacity, $attendeesCount, $seatsLeft, $isCancelled, $isFull, $locale);
 
-        $isRegistered = false;
-        if ($user) {
-            $isRegistered = $event->attendees()
+        // One lookup, not two: the row itself answers both "is this member
+        // in" and "where does their registration stand". Rejected rows are
+        // excluded, so a rejected member may register again.
+        $myRegistration = $user
+            ? $event->attendees()
+                ->seatHolding()
                 ->where(function ($q) use ($user) {
-                    $q->where('email', $user->email);
+                    $q->where('user_id', $user->id)
+                        ->orWhere('email', $user->email);
                     if ($user->phone) {
                         $q->orWhere('phone', $user->phone);
                     }
                 })
-                ->exists();
-        }
+                ->first()
+            : null;
+
+        $isRegistered = $myRegistration !== null;
+        $registrationStatus = $myRegistration?->status?->value;
 
         // Member-facing: the two display labels only. The raw point count
         // and the unformatted currency figures stay server-side —
@@ -485,7 +511,16 @@ class EventBrowseService
             'computed_status' => $computedStatus,
             'badge' => $badge,
             'is_registered' => $isRegistered,
-            'can_register' => ! $isCancelled && ! $isFull && ! $isPast && $event->status === 'published',
+            'registration_status' => $registrationStatus,
+            'requires_approval' => (bool) $event->requires_approval,
+            'has_registration_form' => (bool) $event->has_registration_form,
+            // A member already holding a seat cannot take a second one —
+            // this used to say true and then 422 on the attempt. A
+            // rejected registration is not seat-holding, so they may
+            // register again.
+            'can_register' => ! $isCancelled && ! $isFull && ! $isPast
+                && $event->status === 'published'
+                && ! $isRegistered,
         ];
     }
 
@@ -525,15 +560,27 @@ class EventBrowseService
         $end = $event->end_at ? Carbon::parse($event->end_at) : null;
         $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
 
-        // Registration badge and status
-        $regStatus = 'registered';
-        $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
-        if ($attendee?->attended === true) {
-            $regStatus = 'attended';
-            $regLabel = $locale === 'ar' ? 'حضر' : 'Attended';
-        } elseif ($isPast && $attendee?->attended === false) {
-            $regStatus = 'missed';
-            $regLabel = $locale === 'ar' ? 'لم يحضر' : 'Missed';
+        // Where the registration stands. A decision outranks attendance:
+        // only an approved registration can go on to be attended or missed.
+        $isApproved = $attendee?->status === EventRegistrationStatus::Approved;
+
+        if ($attendee?->status === EventRegistrationStatus::Pending) {
+            $regStatus = 'pending';
+            $regLabel = $locale === 'ar' ? 'قيد المراجعة' : 'Pending review';
+        } elseif ($attendee?->status === EventRegistrationStatus::Rejected) {
+            $regStatus = 'rejected';
+            $regLabel = $locale === 'ar' ? 'مرفوض' : 'Rejected';
+        } else {
+            $regStatus = 'registered';
+            $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
+
+            if ($isApproved && $attendee?->attended === true) {
+                $regStatus = 'attended';
+                $regLabel = $locale === 'ar' ? 'حضر' : 'Attended';
+            } elseif ($isApproved && $isPast && $attendee?->attended === false) {
+                $regStatus = 'missed';
+                $regLabel = $locale === 'ar' ? 'لم يحضر' : 'Missed';
+            }
         }
 
         // Time status badge
@@ -565,7 +612,7 @@ class EventBrowseService
 
         // Action button
         $ticketId = $attendee?->id;
-        $action = (! $isPast && $ticketId)
+        $action = (! $isPast && $ticketId && $isApproved)
             ? [
                 'type' => 'view_ticket',
                 'label' => $locale === 'ar' ? 'عرض التذكرة' : 'View Ticket',
@@ -584,6 +631,7 @@ class EventBrowseService
                 'status' => $regStatus,
                 'label' => $regLabel,
                 'attended' => $attendee?->attended,
+                'rejection_reason' => $attendee?->rejection_reason,
                 'registered_at' => $attendee?->created_at?->toISOString(),
             ],
             'time_status' => [

@@ -4,12 +4,16 @@ namespace App\Services\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Models\EventRegistrationFieldValue;
 use App\Domain\Experience\Services\EventLocationService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\InsufficientBalanceException;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Support\Enums\EventRegistrationStatus;
 use Carbon\Carbon;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -28,9 +32,12 @@ class EventRegistrationService
      *
      * @throws ValidationException
      */
-    public function register(Event $event, User $user): array
+    /**
+     * @param  array<string, mixed>  $fieldValues  answers to the event form, if any
+     */
+    public function register(Event $event, User $user, array $fieldValues = []): array
     {
-        return DB::transaction(function () use ($event, $user) {
+        return DB::transaction(function () use ($event, $user, $fieldValues) {
             // 1. Lock event for update to prevent race conditions on capacity
             $lockedEvent = Event::query()
                 ->where('id', $event->id)
@@ -65,6 +72,7 @@ class EventRegistrationService
             // 4. Validate user is not already registered
             $alreadyRegistered = EventAttendee::query()
                 ->where('event_id', $lockedEvent->id)
+                ->seatHolding()
                 ->where(function ($query) use ($user) {
                     $query->where('user_id', $user->id)
                         ->orWhere('email', $user->email);
@@ -84,6 +92,7 @@ class EventRegistrationService
             if ($lockedEvent->capacity !== null) {
                 $currentAttendeeCount = EventAttendee::query()
                     ->where('event_id', $lockedEvent->id)
+                    ->seatHolding()
                     ->lockForUpdate()
                     ->count();
 
@@ -94,58 +103,83 @@ class EventRegistrationService
                 }
             }
 
-            // 6. Handle Payment (Free vs Points)
+            // 5b. An event that needs review parks the registration; one
+            // that does not admits it here and now.
+            $status = $lockedEvent->requires_approval
+                ? EventRegistrationStatus::Pending
+                : EventRegistrationStatus::Approved;
+
+            // 6. Payment. Points are only ever taken from an approved
+            // registration, so a pending one costs nothing and a rejection
+            // needs no refund. A member short of points may still apply and
+            // top up before the decision.
             $isFree = (bool) ($lockedEvent->is_free ?? true);
             $pricePoints = (int) ($lockedEvent->price_points ?? 0);
             $pointsDeducted = 0;
 
-            if (! $isFree && $pricePoints > 0) {
+            if ($status === EventRegistrationStatus::Approved && ! $isFree && $pricePoints > 0) {
                 $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
-                $currentBalance = $this->wallets->generalBalance($wallet);
-
-                if ($currentBalance < $pricePoints) {
-                    $shortage = $pricePoints - $currentBalance;
-
-                    throw ValidationException::withMessages([
-                        'points' => [__('api.event.insufficient_points', [
-                            'current' => $currentBalance,
-                            'required' => $pricePoints,
-                            'shortage' => $shortage,
-                        ])],
-                    ]);
-                }
 
                 $eventTitle = is_array($lockedEvent->title)
                     ? ($lockedEvent->title['en'] ?? $lockedEvent->title['ar'] ?? "Event #{$lockedEvent->id}")
                     : (string) $lockedEvent->title;
 
-                $this->wallets->debitGeneral(
-                    $wallet,
-                    $pricePoints,
-                    "Event registration: {$eventTitle}"
-                );
+                try {
+                    // debitGeneral locks the balance and checks it itself;
+                    // reading it first and comparing would race.
+                    $this->wallets->debitGeneral(
+                        $wallet,
+                        $pricePoints,
+                        "Event registration: {$eventTitle}"
+                    );
+                } catch (InsufficientBalanceException) {
+                    $currentBalance = $this->wallets->generalBalance($wallet);
+
+                    throw ValidationException::withMessages([
+                        'points' => [__('api.event.insufficient_points', [
+                            'current' => $currentBalance,
+                            'required' => $pricePoints,
+                            'shortage' => max(0, $pricePoints - $currentBalance),
+                        ])],
+                    ]);
+                }
 
                 $pointsDeducted = $pricePoints;
             }
 
-            // 7. Create Attendee record populated from user profile
+            // 7. Create the attendee from the member's own profile. Name,
+            // phone and email are never asked for on the form — they are
+            // already known, and a form field could contradict them.
             $attendee = EventAttendee::create([
                 'event_id' => $lockedEvent->id,
                 'user_id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
                 'phone' => $user->phone,
+                'status' => $status,
                 'attended' => null,
             ]);
 
+            // 8. Answers to the event's own questions, if it asks any.
+            if ($lockedEvent->has_registration_form) {
+                $this->persistFieldValues($lockedEvent, $attendee, $fieldValues);
+            }
+
             $locale = app()->getLocale() ?: 'ar';
-            $successMessage = $pointsDeducted > 0
-                ? __('api.event.registration_success_points', ['points' => $pointsDeducted])
-                : __('api.event.registration_success');
+
+            if ($status === EventRegistrationStatus::Pending) {
+                $successMessage = __('api.event.registration_pending');
+            } else {
+                $successMessage = $pointsDeducted > 0
+                    ? __('api.event.registration_success_points', ['points' => $pointsDeducted])
+                    : __('api.event.registration_success');
+            }
 
             return [
                 'message' => $successMessage,
                 'ticket_id' => $attendee->id,
+                'status' => $status->value,
+                'requires_approval' => (bool) $lockedEvent->requires_approval,
                 'event' => [
                     'id' => $lockedEvent->id,
                     'title' => $lockedEvent->translate('title', $locale),
@@ -155,5 +189,31 @@ class EventRegistrationService
                 ],
             ];
         });
+    }
+
+    /**
+     * Store the member's answers, one row per answered field.
+     *
+     * Iterates the event's own active fields rather than the submitted
+     * keys, so an unknown or reserved key in the payload cannot create a
+     * row. Validation has already run in the Form Request.
+     *
+     * @param  array<string, mixed>  $fieldValues
+     */
+    private function persistFieldValues(Event $event, EventAttendee $attendee, array $fieldValues): void
+    {
+        foreach ($event->activeRegistrationFields as $field) {
+            $value = $fieldValues[$field->key] ?? null;
+
+            if ($value === null || $value === '') {
+                continue;
+            }
+
+            if ($field->fieldType()->storesFile() && $value instanceof UploadedFile) {
+                $value = $value->store("event-registrations/{$attendee->id}", 'public');
+            }
+
+            EventRegistrationFieldValue::fromFieldValue($attendee->id, $field, $value)->save();
+        }
     }
 }

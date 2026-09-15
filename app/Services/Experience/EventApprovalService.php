@@ -1,0 +1,179 @@
+<?php
+
+namespace App\Services\Experience;
+
+use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Domain\Experience\Models\Event;
+use App\Domain\Identity\Models\NotificationLog;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\InsufficientBalanceException;
+use App\Domain\Membership\Services\WalletService;
+use App\Services\Experience\Exceptions\EventActionException;
+use App\Support\Enums\EventRegistrationStatus;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * Approving and rejecting registrations for events that ask for review.
+ *
+ * Lives outside app/Domain/ because it needs WalletService, and
+ * DomainLayerBoundaryTest bans Domain\Experience from importing
+ * Domain\Membership — the same reason EventRegistrationService sits here.
+ *
+ * Points are taken at approval, never at submission, so a pending
+ * registration costs the member nothing and a rejection has nothing to
+ * refund.
+ */
+class EventApprovalService
+{
+    public function __construct(
+        private readonly WalletService $wallets,
+    ) {}
+
+    /**
+     * Admit a pending registration, taking payment if the event is paid.
+     *
+     * A failure anywhere here — the event filled up, the member spent
+     * their points in the meantime — aborts the transaction, so the
+     * registration is left pending and the wallet untouched rather than
+     * half-approved.
+     */
+    public function approve(EventAttendee $attendee, User $operator): void
+    {
+        DB::transaction(function () use ($attendee, $operator) {
+            $locked = $this->lockPending($attendee);
+
+            $event = Event::query()
+                ->whereKey($locked->event_id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            $this->assertSeatAvailable($event, $locked);
+            $this->chargeIfPaid($event, $locked);
+
+            $locked->forceFill([
+                'status' => EventRegistrationStatus::Approved,
+                'approved_by' => $operator->id,
+                'approved_at' => now(),
+            ])->save();
+
+            $this->notify($locked->user_id, 'event.registration_approved');
+        });
+    }
+
+    /**
+     * Turn a pending registration down. Nothing was charged, so nothing is
+     * refunded; the seat is freed by the status alone.
+     */
+    public function reject(EventAttendee $attendee, User $operator, string $reason): void
+    {
+        if (trim($reason) === '') {
+            throw new EventActionException('api.event.rejection_reason_required');
+        }
+
+        DB::transaction(function () use ($attendee, $operator, $reason) {
+            $locked = $this->lockPending($attendee);
+
+            $locked->forceFill([
+                'status' => EventRegistrationStatus::Rejected,
+                'rejection_reason' => trim($reason),
+                // Written on rejection too: the same audit trail either way.
+                'approved_by' => $operator->id,
+                'approved_at' => now(),
+            ])->save();
+
+            $this->notify($locked->user_id, 'event.registration_rejected');
+        });
+    }
+
+    /**
+     * Re-read the row under a lock. The instance the caller holds may have
+     * been decided by someone else since it was fetched.
+     */
+    private function lockPending(EventAttendee $attendee): EventAttendee
+    {
+        $locked = EventAttendee::query()
+            ->whereKey($attendee->getKey())
+            ->lockForUpdate()
+            ->firstOrFail();
+
+        if ($locked->status !== EventRegistrationStatus::Pending) {
+            throw new EventActionException('api.event.not_pending', 409);
+        }
+
+        return $locked;
+    }
+
+    /**
+     * Other pending registrations may have been approved since this one was
+     * submitted, so capacity is re-checked here rather than trusted from
+     * submission time.
+     *
+     * Counts approved rows only: this registration is itself seat-holding
+     * while pending, so counting seat-holders would always be one over.
+     */
+    private function assertSeatAvailable(Event $event, EventAttendee $attendee): void
+    {
+        if ($event->capacity === null) {
+            return;
+        }
+
+        $taken = EventAttendee::query()
+            ->where('event_id', $event->id)
+            ->where('status', EventRegistrationStatus::Approved)
+            ->whereKeyNot($attendee->getKey())
+            ->count();
+
+        if ($taken >= (int) $event->capacity) {
+            throw new EventActionException('api.event.approval_would_exceed_capacity', 409);
+        }
+    }
+
+    private function chargeIfPaid(Event $event, EventAttendee $attendee): void
+    {
+        $pricePoints = (int) ($event->price_points ?? 0);
+
+        if ((bool) ($event->is_free ?? true) || $pricePoints <= 0) {
+            return;
+        }
+
+        // A walk-in RSVP has no account to charge.
+        if ($attendee->user_id === null) {
+            throw new EventActionException('api.event.approve_requires_member');
+        }
+
+        try {
+            $wallet = $this->wallets->walletFor(OwnerType::User, $attendee->user_id);
+        } catch (ModelNotFoundException) {
+            throw new EventActionException('api.event.wallet_missing');
+        }
+
+        $title = is_array($event->title)
+            ? ($event->title['en'] ?? $event->title['ar'] ?? "Event #{$event->id}")
+            : (string) $event->title;
+
+        try {
+            $this->wallets->debitGeneral($wallet, $pricePoints, "Event registration: {$title}");
+        } catch (InsufficientBalanceException) {
+            throw new EventActionException('api.event.approve_insufficient_points', 422, [
+                'current' => $this->wallets->generalBalance($wallet),
+                'required' => $pricePoints,
+            ]);
+        }
+    }
+
+    private function notify(?int $userId, string $templateKey): void
+    {
+        if ($userId === null) {
+            return;
+        }
+
+        NotificationLog::create([
+            'user_id' => $userId,
+            'channel' => 'push',
+            'template_key' => $templateKey,
+            'status' => 'sent',
+        ]);
+    }
+}

@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1\Public;
 
+use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventBrowseService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\BrowseEventsRequest;
+use App\Http\Resources\Experience\EventRegistrationFieldResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -45,6 +47,27 @@ class EventController extends Controller
 
         return response()->json([
             'data' => $details,
+        ]);
+    }
+
+    /**
+     * The questions an event asks, for the marketing site.
+     *
+     * No identity block here: a visitor has no account to prefill from.
+     */
+    public function registrationForm(int|string $id): JsonResponse
+    {
+        $event = Event::with('activeRegistrationFields')
+            ->where('status', 'published')
+            ->findOrFail($id);
+
+        return response()->json([
+            'data' => [
+                'event_id' => $event->id,
+                'requires_approval' => (bool) $event->requires_approval,
+                'has_registration_form' => (bool) $event->has_registration_form,
+                'fields' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
+            ],
         ]);
     }
 }
