@@ -66,6 +66,7 @@ class EventController extends Controller
                 'event_id' => $event->id,
                 'requires_approval' => (bool) $event->requires_approval,
                 'has_registration_form' => (bool) $event->has_registration_form,
+                'external_form_url' => $event->external_form_url,
                 'fields' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
             ],
         ]);

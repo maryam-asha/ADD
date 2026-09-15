@@ -51,6 +51,10 @@ class UpdateEventRequest extends FormRequest
                 // would shadow the derived one.
                 'location' => ['nullable', 'string', 'max:255', 'prohibits:space_id,room_id'],
                 'capacity' => ['nullable', 'integer', 'min:1'],
+                'requires_approval' => ['nullable', 'boolean'],
+                // Registration happens here or there, never both: an
+                // external form knows nothing about our seats or approvals.
+                'external_form_url' => ['nullable', 'string', 'url', 'max:2048'],
                 'is_free' => ['nullable', 'boolean'],
                 'price_points' => ['nullable', 'integer', 'min:0'],
 

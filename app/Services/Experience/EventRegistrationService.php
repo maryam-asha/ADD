@@ -51,6 +51,15 @@ class EventRegistrationService
                 ]);
             }
 
+            // Registration lives elsewhere for this event, so there is nothing
+            // to record here — and recording it would invent a seat and an
+            // approval the external form knows nothing about.
+            if ($lockedEvent->registersExternally()) {
+                throw ValidationException::withMessages([
+                    'event' => [__('api.event.registers_externally')],
+                ]);
+            }
+
             if ($lockedEvent->status === 'draft') {
                 throw ValidationException::withMessages([
                     'event' => [__('api.event.not_available')],

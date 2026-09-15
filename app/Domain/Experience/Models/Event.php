@@ -29,6 +29,7 @@ class Event extends Model
         'capacity',
         'requires_approval',
         'has_registration_form',
+        'external_form_url',
         'is_free',
         'price_points',
         'image_url',
@@ -79,6 +80,16 @@ class Event extends Model
      * through this rather than `attendees()` — a rejected registration
      * must not keep holding a place.
      */
+    /**
+     * Whether registration happens somewhere other than here. Nothing about
+     * seats, approval or points applies to such an event — the member never
+     * reaches our registration endpoint at all.
+     */
+    public function registersExternally(): bool
+    {
+        return filled($this->external_form_url);
+    }
+
     public function seatHoldingAttendees(): HasMany
     {
         return $this->attendees()

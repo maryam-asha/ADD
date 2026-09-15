@@ -515,11 +515,13 @@ class EventBrowseService
             'registration_status' => $registrationStatus,
             'requires_approval' => (bool) $event->requires_approval,
             'has_registration_form' => (bool) $event->has_registration_form,
+            'external_form_url' => $event->external_form_url,
             // A member already holding a seat cannot take a second one —
             // this used to say true and then 422 on the attempt. A
             // rejected registration is not seat-holding, so they may
             // register again.
-            'can_register' => ! $isCancelled && ! $isFull && ! $isPast
+            'can_register' => ! $event->registersExternally()
+                && ! $isCancelled && ! $isFull && ! $isPast
                 && $event->status === 'published'
                 && ! $isRegistered,
         ];

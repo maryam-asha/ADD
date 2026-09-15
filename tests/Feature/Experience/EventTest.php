@@ -460,4 +460,49 @@ class EventTest extends TestCase
             $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/admin/events/'.$id)->json('data.location')
         );
     }
+
+    public function test_an_event_with_an_external_form_refuses_in_app_registration(): void
+    {
+        $this->seed(RoleSeeder::class);
+
+        $event = Event::factory()->create([
+            'external_form_url' => 'https://forms.example.com/signup',
+        ]);
+
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('event');
+
+        // Nothing recorded: no seat taken, no approval pending.
+        $this->assertDatabaseCount('event_attendees', 0);
+    }
+
+    public function test_the_card_sends_members_to_the_external_form_instead_of_registering(): void
+    {
+        $event = Event::factory()->create([
+            'external_form_url' => 'https://forms.example.com/signup',
+        ]);
+
+        $card = collect($this->getJson('/api/v1/events')->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertSame('https://forms.example.com/signup', $card['external_form_url']);
+        $this->assertFalse($card['can_register']);
+    }
+
+    public function test_an_external_url_must_be_a_url(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'X', 'ar' => 'س'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(2)->addHours(2)->toDateTimeString(),
+            'external_form_url' => 'not-a-url',
+        ])->assertStatus(422)->assertJsonValidationErrors('external_form_url');
+    }
 }

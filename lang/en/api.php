@@ -284,6 +284,7 @@ return [
     ],
 
     'event' => [
+        'registers_externally' => 'Registration for this event is handled on an external form.',
         'pending_rejected' => 'Closed out :count pending registration(s).',
         'pending_expired' => 'Closed automatically: not reviewed before the event.',
         'cancelled' => 'This event is cancelled and registration is closed.',
