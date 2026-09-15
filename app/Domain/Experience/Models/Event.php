@@ -7,6 +7,7 @@ use App\Concerns\HasTranslations;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
+use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,8 @@ class Event extends Model
         'end_at',
         'location',
         'capacity',
+        'requires_approval',
+        'has_registration_form',
         'is_free',
         'price_points',
         'image_url',
@@ -43,6 +46,8 @@ class Event extends Model
             'description' => 'array',
             'start_at' => 'datetime',
             'end_at' => 'datetime',
+            'requires_approval' => 'boolean',
+            'has_registration_form' => 'boolean',
             'is_free' => 'boolean',
             'price_points' => 'integer',
             'image_url' => AsMediaUrl::class,
@@ -67,5 +72,27 @@ class Event extends Model
     public function attendees(): HasMany
     {
         return $this->hasMany(EventAttendee::class);
+    }
+
+    /**
+     * Attendees that occupy a seat. Every capacity calculation goes
+     * through this rather than `attendees()` — a rejected registration
+     * must not keep holding a place.
+     */
+    public function seatHoldingAttendees(): HasMany
+    {
+        return $this->attendees()
+            ->whereIn('status', EventRegistrationStatus::seatHoldingValues());
+    }
+
+    public function registrationFields(): HasMany
+    {
+        return $this->hasMany(EventRegistrationField::class)->orderBy('order');
+    }
+
+    /** What a member is actually shown, and what a submission is validated against. */
+    public function activeRegistrationFields(): HasMany
+    {
+        return $this->registrationFields()->where('is_active', true);
     }
 }

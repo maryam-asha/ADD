@@ -8,7 +8,9 @@ use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Access\Models\AccessEvent;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Access\Models\AccessGrant;
+use App\Support\Enums\EventRegistrationStatus;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
@@ -72,6 +74,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        EventAttendee::class => [
+            'status' => EventRegistrationStatus::class,
+        ],
         AccessGrant::class => [
             'grantee_type' => OwnerType::class,
             'source_type' => AccessSourceType::class,
