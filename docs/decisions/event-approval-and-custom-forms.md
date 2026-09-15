@@ -48,6 +48,21 @@ Separately, `ServiceType::fields()` was not filtered to active, so inactive fiel
 
 **Shipping note, since resolved:** turning on validation that has never run could in principle reject payloads the app sends successfully today. The production configuration was inspected before shipping: four field rows in total, one of them required (`technical.issue_type`, a select with options), and zero rows in `service_requests`. There were no live submissions to break.
 
+## Time is stored as an instant, displayed as a wall clock
+
+Events stored whatever the admin typed, and rendered it back without conversion. That looked right only because both halves were wrong in the same direction: `config('app.timezone')` is `UTC` while the district runs on the `app.timezone` Setting, `Asia/Damascus` — three hours apart. The moment anything interpreted a stored value as a real instant, it moved.
+
+The damage is a wrong **day**, not a wrong hour. An event entered as 23:30 on 1 October is 20:30 UTC; read back naively it becomes 02:30 on **2 October**, taking the weekday label, the upcoming/past ordering, the `open`/`closed` filters and `pending_expires_at` with it. An 01:30 event moves the other way, to the day before.
+
+- **`App\Support\Time\LocalTime` is the only thing that knows what "local" means.** It reads the same global `app.timezone` Setting that `BusinessHoursService` and the Booking services already use, and deliberately not `branches.timezone` — a pre-existing column nothing reads (`docs/decisions/business-hours.md`). Events were the one area ignoring that convention.
+- **Input is interpreted, not trusted.** `StoreEventRequest`/`UpdateEventRequest` convert `start_at`/`end_at` in `prepareForValidation()`, so a bare `2026-10-01 19:00` means 19:00 *here*. A value that states its own offset (`+03:00`, `Z`) is taken at its word, because that client has already been explicit and re-interpreting it would shift the event again.
+- **Output is converted back.** Every `format()` in `EventBrowseService` now works from a converted instance, so the five parse sites fix every downstream label at once. `EventResource` gives the admin a true ISO instant — so a round-trip through the editor is lossless — plus `start_time`/`end_time`/`timezone` for the wall clock they actually typed.
+- **Comparisons were already right and stay untouched.** "Is this event past", capacity and the pending deadline compare instants to instants; they never needed a timezone and would have been broken by adding one.
+
+**The trap worth knowing:** Eloquent's `datetime` cast *relabels* rather than converts. Handing it a `19:00 +03:00` Carbon stores `19:00 UTC` and silently moves the event three hours. Anything writing an event time outside the Form Requests — `EventSeeder` did — has to convert through `LocalTime::toUtc()` first, not merely build the Carbon in the right zone.
+
+The twenty existing rows were disposable test data and were dropped rather than back-filled, so no correction migration exists. Any real data written before this change would need one.
+
 ## Schema note: the 64-character trap
 
 `event_registration_field_values` is 31 characters, so Laravel's generated FK name `event_registration_field_values_event_registration_field_id_foreign` is **67** — past MySQL's 64-character identifier limit. The test suite runs on in-memory SQLite (`phpunit.xml`), which accepts long names silently, while production is MySQL: an auto-named constraint would have passed CI and failed on deploy. Every index and FK on that table is named explicitly, and the DDL was verified by creating both tables against the real MySQL database before committing.

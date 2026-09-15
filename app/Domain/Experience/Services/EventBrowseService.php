@@ -7,6 +7,7 @@ use App\Domain\Experience\Models\EventCategory;
 use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventPricePresenter;
+use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
@@ -425,8 +426,8 @@ class EventBrowseService
     public function formatEventCard(Event $event, ?User $user = null): array
     {
         $locale = $this->resolveLocale();
-        $start = $event->start_at ? Carbon::parse($event->start_at) : null;
-        $end = $event->end_at ? Carbon::parse($event->end_at) : null;
+        $start = app(LocalTime::class)->toLocal($event->start_at);
+        $end = app(LocalTime::class)->toLocal($event->end_at);
         $capacity = $event->capacity !== null ? (int) $event->capacity : null;
         $attendeesCount = (int) ($event->attendees_count ?? 0);
 
@@ -533,7 +534,7 @@ class EventBrowseService
     {
         $card = $this->formatEventCard($event, $user);
         $locale = $this->resolveLocale();
-        $start = $event->start_at ? Carbon::parse($event->start_at) : null;
+        $start = app(LocalTime::class)->toLocal($event->start_at);
 
         // price_label already comes from formatEventCard() via the
         // presenter — no second copy of the formatting here.
@@ -556,8 +557,8 @@ class EventBrowseService
 
         $attendee = $event->attendees ? $event->attendees->first() : null;
         $now = Carbon::now();
-        $start = $event->start_at ? Carbon::parse($event->start_at) : null;
-        $end = $event->end_at ? Carbon::parse($event->end_at) : null;
+        $start = app(LocalTime::class)->toLocal($event->start_at);
+        $end = app(LocalTime::class)->toLocal($event->end_at);
         $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
 
         // Where the registration stands. A decision outranks attendance:

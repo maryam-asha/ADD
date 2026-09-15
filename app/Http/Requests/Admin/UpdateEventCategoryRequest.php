@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Experience\Models\EventCategory;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -19,7 +20,7 @@ class UpdateEventCategoryRequest extends FormRequest
     public function rules(): array
     {
         $category = $this->route('eventCategory') ?? $this->route('event_category');
-        $categoryId = $category instanceof \App\Domain\Experience\Models\EventCategory ? $category->id : $category;
+        $categoryId = $category instanceof EventCategory ? $category->id : $category;
 
         return array_merge(
             TranslatableField::rules('name'),
