@@ -88,6 +88,33 @@ class AdminEventAttendeeController extends Controller
     }
 
     /**
+     * Turn down everything still awaiting a decision on this event.
+     */
+    public function rejectPending(Request $request, Event $event): JsonResponse
+    {
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:500'],
+        ]);
+
+        try {
+            $count = $this->approvals->rejectAllPending(
+                $event,
+                $request->user(),
+                $validated['rejection_reason'],
+            );
+        } catch (EventActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $this->logSensitiveAction('event_registrations_bulk_rejected', $event, ['count' => $count]);
+
+        return response()->json([
+            'message' => __('api.event.pending_rejected', ['count' => $count]),
+            'rejected_count' => $count,
+        ]);
+    }
+
+    /**
      * Both models are bound independently, so nothing otherwise stops an
      * attendee id from one event being acted on through another's URL.
      */

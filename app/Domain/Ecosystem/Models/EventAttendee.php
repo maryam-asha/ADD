@@ -26,6 +26,7 @@ class EventAttendee extends Model
         'rejection_reason',
         'approved_by',
         'approved_at',
+        'pending_expires_at',
         'attended',
     ];
 
@@ -36,6 +37,7 @@ class EventAttendee extends Model
             'attended' => 'boolean',
             'status' => EventRegistrationStatus::class,
             'approved_at' => 'datetime',
+            'pending_expires_at' => 'datetime',
         ];
     }
 

@@ -153,6 +153,7 @@ Route::delete('events/{event}/registration-fields/{field}', [AdminEventRegistrat
 
 Route::get('events/{event}/attendees', [AdminEventAttendeeController::class, 'index']);
 Route::get('events/{event}/attendees/pending', [AdminEventAttendeeController::class, 'pending']);
+Route::post('events/{event}/attendees/reject-pending', [AdminEventAttendeeController::class, 'rejectPending']);
 Route::post('events/{event}/attendees/{attendee}/approve', [AdminEventAttendeeController::class, 'approve']);
 Route::post('events/{event}/attendees/{attendee}/reject', [AdminEventAttendeeController::class, 'reject']);
 

@@ -65,7 +65,7 @@ class UpdateEventRegistrationFieldRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'key.not_in' => __('api.event.reserved_field_key', ['key' => $this->input('key')]),
+            'key.not_in' => __('api.validation.reserved_field_key', ['key' => $this->input('key')]),
         ];
     }
 }

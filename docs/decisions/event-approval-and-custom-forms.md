@@ -46,7 +46,7 @@ Wiring it up required resolving the `ServiceType` from the route slug inside the
 
 Separately, `ServiceType::fields()` was not filtered to active, so inactive fields were rendered to members and then silently dropped by `persistValues()`. `activeFields()` is now the single source for what a member is shown and what is persisted; `fields()` still returns everything for the admin editor.
 
-**Shipping note:** turning on validation that has never run can reject payloads the mobile app currently sends successfully. Audit production for active `service_type_fields` with `is_required = true` before deploying, and confirm the client sends them.
+**Shipping note, since resolved:** turning on validation that has never run could in principle reject payloads the app sends successfully today. The production configuration was inspected before shipping: four field rows in total, one of them required (`technical.issue_type`, a select with options), and zero rows in `service_requests`. There were no live submissions to break.
 
 ## Schema note: the 64-character trap
 
@@ -56,10 +56,19 @@ Separately, `ServiceType::fields()` was not filtered to active, so inactive fiel
 
 One deliberate divergence from that table: `event_registration_field_values.event_registration_field_id` **cascades** on delete where `service_request_values` restricts. A service field outlives its requests; an event's fields are owned by the event, and restricting would make deleting an event fail.
 
+## Closing the seat-holding gap
+
+A pending registration is free and holds a seat, so abandoned applications can fill a paid event — and several of them, cheaply, are a way to fill one without paying at all. That is closer to an abuse surface than a missing feature, and it is addressed two ways rather than left open.
+
+- **A deadline, counted back from the event's start.** `event_attendees.pending_expires_at` is set at registration to `start_at` minus `config('events.pending_expiry_hours_before_start')`, default 24. Measuring back from the event rather than forward from the submission means an application for a distant event stays alive as long as it is useful, while one for tomorrow resolves quickly — a fixed "7 days from submission" would kill legitimate early applications for no reason. An event already inside the window mints no deadline rather than one born expired. `events:expire-pending-registrations` runs hourly and closes out anything past its time, writing `approved_at` but deliberately **no `approved_by`**: nobody decided it, the deadline did.
+- **A bulk reject.** `POST admin/events/{event}/attendees/reject-pending` turns down every still-undecided registration on one event under one reason. Deciding a queue one row at a time is the reason queues get abandoned in the first place, so the way out has to be one action. Rows are locked while being decided, so a concurrent single approval either lands first or finds its row no longer pending.
+
+Together these also resolve what was previously a second gap: an approval that fails because the member's balance dropped no longer strands the registration forever — the deadline or a bulk reject will close it out.
+
+Reserved identity keys are now enforced on **both** domains. The Services field API was left alone initially because its production configuration was unknown and might already have contained a field keyed `name`; inspection showed four fields, none reserved, so the same rule and the same key-format guard now apply there. The message moved from `api.event.reserved_field_key` to `api.validation.reserved_field_key`, since it is no longer specific to events.
+
 ## Known gaps, deliberately not addressed
 
-- **A pending registration holds a seat indefinitely, for free.** There is no TTL and no bulk-reject, so abandoned pendings can silently block a paid event. An admin bulk-reject is the natural follow-up; a pending expiry needs a product decision about how long is too long.
-- **An approval that fails on a dropped balance leaves the registration pending forever** unless staff retry or reject it. Auto-rejecting was considered and rejected: it makes a decision on the admin's behalf and would surprise a member who was about to top up.
-- **Reserved keys are enforced on Events only.** The Services field API is unchanged, because its production configuration is unknown and may already contain a field keyed `name` — a hard 422 there could break a live form. Tighten it once that configuration is confirmed clean.
-- **Events still run on `role:` middleware, not the `permission:` pilot.** Consistent with every other resource except Branches; converting them belongs with the rest of that rollout.
-- **Notifications are `NotificationLog` rows, not real delivery** — inherited unchanged from `BookingApprovalService`, and `docs/decisions/booking-creation-approval-extension.md` covers why.
+- **Events still run on `role:` middleware, not the `permission:` pilot.** Consistent with every other resource except Branches; converting them belongs with the rest of that rollout, not here.
+- **Notifications are `NotificationLog` rows, not real delivery** — inherited unchanged from `BookingApprovalService`, and `docs/decisions/booking-creation-approval-extension.md` covers why. A member whose registration expires or is bulk-rejected therefore learns of it by opening the app, not by being told.
+- **The expiry sweep does not notify differently from a manual rejection.** Both write `event.registration_rejected`, so a member cannot tell from the notification alone whether a person decided or a deadline passed. The `rejection_reason` text does distinguish them.

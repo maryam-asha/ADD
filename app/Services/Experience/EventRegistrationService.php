@@ -157,6 +157,9 @@ class EventRegistrationService
                 'email' => $user->email,
                 'phone' => $user->phone,
                 'status' => $status,
+                'pending_expires_at' => $status === EventRegistrationStatus::Pending
+                    ? $this->pendingDeadlineFor($lockedEvent)
+                    : null,
                 'attended' => null,
             ]);
 
@@ -215,5 +218,26 @@ class EventRegistrationService
 
             EventRegistrationFieldValue::fromFieldValue($attendee->id, $field, $value)->save();
         }
+    }
+
+    /**
+     * When an undecided registration for this event stops holding its seat.
+     *
+     * Derived from the event's start so a distant event keeps its
+     * applications alive; null when the event has no start to count back
+     * from, in which case only an admin closes it out.
+     */
+    private function pendingDeadlineFor(Event $event): ?Carbon
+    {
+        if ($event->start_at === null) {
+            return null;
+        }
+
+        $deadline = Carbon::parse($event->start_at)
+            ->subHours((int) config('events.pending_expiry_hours_before_start', 24));
+
+        // An event starting within the window would otherwise mint a
+        // deadline already in the past.
+        return $deadline->isFuture() ? $deadline : null;
     }
 }

@@ -54,3 +54,11 @@ Schedule::command('access:expire-unactivated-grants')->everyFiveMinutes()->witho
 // instead, so a same-day booking's grant doesn't survive its own
 // cancellation.
 Schedule::command('access:revoke-grants-on-booking-cancellation')->everyFiveMinutes()->withoutOverlapping();
+
+/*
+ * Events (docs/decisions/event-approval-and-custom-forms.md) — a pending
+ * registration holds a seat but is free, since points are only taken on
+ * approval. Anything still undecided by its deadline is closed out so the
+ * seats reopen while there is still time to fill them.
+ */
+Schedule::command('events:expire-pending-registrations')->hourly()->withoutOverlapping();

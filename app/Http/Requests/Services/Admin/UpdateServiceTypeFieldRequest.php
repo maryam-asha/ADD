@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Services\Admin;
 
 use App\Support\Forms\FieldType;
+use App\Support\Forms\ReservedFieldKeys;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,7 +19,9 @@ class UpdateServiceTypeFieldRequest extends FormRequest
         $types = collect(FieldType::cases())->map->value->all();
 
         return [
-            'key' => ['sometimes', 'string', 'max:80'],
+            'key' => ['sometimes', 'string', 'max:80',
+                'regex:/^[a-z][a-z0-9_]*$/',
+                ReservedFieldKeys::rule()],
             'label' => ['sometimes', 'array'],
             'label.en' => ['required_with:label', 'string', 'max:150'],
             'label.ar' => ['required_with:label', 'string', 'max:150'],
@@ -33,6 +36,16 @@ class UpdateServiceTypeFieldRequest extends FormRequest
             'is_required' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'order' => ['sometimes', 'integer', 'min:0'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'key.not_in' => __('api.validation.reserved_field_key', ['key' => $this->input('key')]),
         ];
     }
 }

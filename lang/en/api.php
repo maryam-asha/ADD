@@ -46,6 +46,7 @@ return [
     ],
 
     'validation' => [
+        'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
         'failed' => 'The given data is invalid.',
     ],
 
@@ -283,6 +284,8 @@ return [
     ],
 
     'event' => [
+        'pending_rejected' => 'Closed out :count pending registration(s).',
+        'pending_expired' => 'Closed automatically: not reviewed before the event.',
         'cancelled' => 'This event is cancelled and registration is closed.',
         'not_available' => 'This event is currently not available for registration.',
         'closed' => 'Registration for this event has closed.',
@@ -302,7 +305,6 @@ return [
         'approval_would_exceed_capacity' => 'Cannot approve: the event is already full.',
         'wallet_missing' => 'This member has no wallet.',
         'approve_requires_member' => 'A paid registration can only be approved for a registered member.',
-        'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
         'form_field_created' => 'Field created.',
         'form_field_updated' => 'Field updated.',
         'form_field_deleted' => 'Field deleted.',

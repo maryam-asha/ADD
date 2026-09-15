@@ -46,7 +46,7 @@ class RegisterForEventRequest extends FormRequest
             foreach (ReservedFieldKeys::present((array) $this->input('fields', [])) as $key) {
                 $validator->errors()->add(
                     "fields.{$key}",
-                    __('api.event.reserved_field_key', ['key' => $key])
+                    __('api.validation.reserved_field_key', ['key' => $key])
                 );
             }
         });

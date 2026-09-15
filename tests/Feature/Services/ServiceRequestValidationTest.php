@@ -141,4 +141,38 @@ class ServiceRequestValidationTest extends TestCase
         $this->postJson("/api/v1/member/services/{$type->slug}/requests", ['fields' => []])
             ->assertCreated();
     }
+
+    public function test_identity_keys_cannot_be_defined_as_service_fields_either(): void
+    {
+        $type = $this->serviceType();
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        foreach (['name', 'phone', 'email', 'Email'] as $key) {
+            $this->postJson("/api/v1/admin/service-types/{$type->id}/fields", [
+                'key' => $key,
+                'label' => ['en' => 'Your name', 'ar' => 'اسمك'],
+                'type' => 'text',
+            ])->assertStatus(422)->assertJsonValidationErrors('key');
+        }
+
+        $this->assertSame(0, ServiceTypeField::where('service_type_id', $type->id)->count());
+    }
+
+    public function test_a_service_field_key_that_would_break_rule_paths_is_refused(): void
+    {
+        $type = $this->serviceType();
+
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->postJson("/api/v1/admin/service-types/{$type->id}/fields", [
+            'key' => 'a.b',
+            'label' => ['en' => 'Q', 'ar' => 'س'],
+            'type' => 'text',
+        ])->assertStatus(422)->assertJsonValidationErrors('key');
+    }
 }

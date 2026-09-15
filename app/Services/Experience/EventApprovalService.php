@@ -88,6 +88,50 @@ class EventApprovalService
     }
 
     /**
+     * Turn down every registration still awaiting a decision on an event.
+     *
+     * The way out of a queue nobody is going to work through: applications
+     * pile up holding seats, and deciding them one at a time is the reason
+     * they were abandoned. Nothing was charged, so nothing is refunded.
+     *
+     * @return int how many were closed out
+     */
+    public function rejectAllPending(Event $event, User $operator, string $reason): int
+    {
+        if (trim($reason) === '') {
+            throw new EventActionException('api.event.rejection_reason_required');
+        }
+
+        return DB::transaction(function () use ($event, $operator, $reason) {
+            // Lock the rows being decided, so a concurrent approve either
+            // lands first or finds its row no longer pending.
+            $ids = EventAttendee::query()
+                ->where('event_id', $event->id)
+                ->where('status', EventRegistrationStatus::Pending)
+                ->lockForUpdate()
+                ->pluck('id');
+
+            if ($ids->isEmpty()) {
+                return 0;
+            }
+
+            EventAttendee::query()->whereIn('id', $ids)->update([
+                'status' => EventRegistrationStatus::Rejected->value,
+                'rejection_reason' => trim($reason),
+                'approved_by' => $operator->id,
+                'approved_at' => now(),
+            ]);
+
+            EventAttendee::query()->whereIn('id', $ids)
+                ->whereNotNull('user_id')
+                ->pluck('user_id')
+                ->each(fn ($userId) => $this->notify($userId, 'event.registration_rejected'));
+
+            return $ids->count();
+        });
+    }
+
+    /**
      * Re-read the row under a lock. The instance the caller holds may have
      * been decided by someone else since it was fetched.
      */
