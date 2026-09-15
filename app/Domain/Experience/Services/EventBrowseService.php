@@ -47,7 +47,7 @@ class EventBrowseService
     public function browse(array $filters = [], ?User $user = null): array
     {
         $query = Event::query()
-            ->with(['branch', 'category'])
+            ->with(['branch', 'category', 'space.building.branch'])
             ->withCount('attendees');
 
         // 1. Cancelled / Status filter
@@ -212,6 +212,7 @@ class EventBrowseService
             ->with([
                 'branch',
                 'category',
+                'space.building.branch',
                 'attendees' => $userAttendeeCondition,
             ])
             ->withCount('attendees');
@@ -467,7 +468,7 @@ class EventBrowseService
                 'end' => $end ? $end->format('h:i A') : null,
                 'range' => $start && $end ? ($start->format('h:i A').' – '.$end->format('h:i A')) : null,
             ],
-            'location' => $event->location,
+            'location' => app(EventLocationService::class)->displayLocation($event, $locale),
             'space_id' => $event->space_id,
             'branch' => $event->branch ? [
                 'id' => $event->branch->id,

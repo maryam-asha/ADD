@@ -203,6 +203,11 @@ return [
             'maintenance' => 'تحت الصيانة',
             'retired' => 'خارج الخدمة',
         ],
+        'types' => [
+            'event_hall' => 'قاعة الفعاليات',
+            'room' => 'غرفة الاجتماعات',
+            'space' => 'مساحة',
+        ],
         'starting_from' => 'يبدأ من',
         'per_hour' => 'ساعة',
         'per_day' => 'يوم',

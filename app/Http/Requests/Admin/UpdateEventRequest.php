@@ -40,7 +40,11 @@ class UpdateEventRequest extends FormRequest
                 'category_id' => ['nullable', 'integer', 'exists:event_categories,id'],
                 'start_at' => ['sometimes', 'required', 'date'],
                 'end_at' => ['sometimes', 'required', 'date', 'after:start_at'],
-                'location' => ['nullable', 'string', 'max:255'],
+                // An event is on-site (space_id, label derived at read
+                // time from live branch/space names) or off-site (this
+                // free-text address). Never both — a stored location
+                // would shadow the derived one.
+                'location' => ['nullable', 'string', 'max:255', 'prohibits:space_id,room_id'],
                 'capacity' => ['nullable', 'integer', 'min:1'],
                 'is_free' => ['nullable', 'boolean'],
                 'price_points' => ['nullable', 'integer', 'min:0'],

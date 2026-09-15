@@ -3,6 +3,7 @@
 namespace App\Domain\Foundation\Models;
 
 use App\Casts\AsMediaUrlArray;
+use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -14,11 +15,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Space extends Model
 {
-    use HasFactory;
+    use HasFactory, HasTranslations;
 
     protected $fillable = [
         'building_id',
         'zone_id',
+        'name',
         'space_type',
         'allocation_model',
         'is_lockable',
@@ -38,6 +40,7 @@ class Space extends Model
     protected function casts(): array
     {
         return [
+            'name' => 'array',
             'space_type' => SpaceType::class,
             'allocation_model' => AllocationModel::class,
             'is_lockable' => 'boolean',

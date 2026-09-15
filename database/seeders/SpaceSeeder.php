@@ -90,6 +90,7 @@ class SpaceSeeder extends Seeder
                 'space_type' => SpaceType::CoSpace,
             ],
             [
+                'name' => ['en' => 'Hot Desk', 'ar' => 'مكتب مرن'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::Open,
                 'is_lockable' => false,
@@ -124,6 +125,7 @@ class SpaceSeeder extends Seeder
                 'capacity' => 6,
             ],
             [
+                'name' => ['en' => 'Meeting Room A', 'ar' => 'غرفة الاجتماعات أ'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
@@ -150,6 +152,7 @@ class SpaceSeeder extends Seeder
                 'capacity' => 2,
             ],
             [
+                'name' => ['en' => 'Private Office 3', 'ar' => 'مكتب خاص ٣'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
@@ -174,6 +177,7 @@ class SpaceSeeder extends Seeder
                 'space_type' => SpaceType::EventHall,
             ],
             [
+                'name' => ['en' => 'Event Hall', 'ar' => 'قاعة الفعاليات'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingDaily,
                 'is_lockable' => true,

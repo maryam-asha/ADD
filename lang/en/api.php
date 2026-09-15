@@ -203,6 +203,11 @@ return [
             'maintenance' => 'Under Maintenance',
             'retired' => 'Retired',
         ],
+        'types' => [
+            'event_hall' => 'Event Hall',
+            'room' => 'Meeting Room',
+            'space' => 'Space',
+        ],
         'starting_from' => 'Starting from',
         'per_hour' => 'hour',
         'per_day' => 'day',

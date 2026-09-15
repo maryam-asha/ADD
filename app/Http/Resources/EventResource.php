@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Experience\Services\EventLocationService;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Support\Presenters\EventPricePresenter;
 use Illuminate\Http\Request;
@@ -43,7 +44,7 @@ class EventResource extends JsonResource
             ]) : null,
             'start_at' => $isAdmin ? $this->start_at?->toISOString() : $this->start_at?->format('Y-m-d'),
             'end_at' => $isAdmin ? $this->end_at?->toISOString() : $this->end_at?->format('Y-m-d'),
-            'location' => $this->location,
+            'location' => app(EventLocationService::class)->displayLocation($this->resource, $locale),
             'capacity' => $this->capacity,
             'is_free' => (bool) ($this->is_free ?? true),
             ...$price,

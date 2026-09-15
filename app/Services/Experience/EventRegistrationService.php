@@ -4,6 +4,7 @@ namespace App\Services\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Experience\Services\EventLocationService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
@@ -24,6 +25,7 @@ class EventRegistrationService
      * Deducts points from member's wallet if paid; free events register immediately.
      *
      * @return array<string, mixed>
+     *
      * @throws ValidationException
      */
     public function register(Event $event, User $user): array
@@ -97,7 +99,7 @@ class EventRegistrationService
             $pricePoints = (int) ($lockedEvent->price_points ?? 0);
             $pointsDeducted = 0;
 
-            if (!$isFree && $pricePoints > 0) {
+            if (! $isFree && $pricePoints > 0) {
                 $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
                 $currentBalance = $this->wallets->generalBalance($wallet);
 
@@ -148,7 +150,7 @@ class EventRegistrationService
                     'id' => $lockedEvent->id,
                     'title' => $lockedEvent->translate('title', $locale),
                     'start_at' => $lockedEvent->start_at?->format('Y-m-d'),
-                    'location' => $lockedEvent->location,
+                    'location' => app(EventLocationService::class)->displayLocation($lockedEvent, $locale),
                     'price_points' => $pricePoints,
                 ],
             ];
