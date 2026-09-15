@@ -31,9 +31,11 @@ class ProfileCompletionTest extends TestCase
         $response = $this->getJson('/api/v1/member/profile');
 
         $response->assertOk();
-        $response->assertJsonPath('completion.score', 25);
-        $response->assertJsonPath('completion.threshold', 80);
-        $this->assertContains('avatar_url', $response->json('completion.missing_fields'));
+        $response->assertJsonPath('data.completion.score', 25);
+        $response->assertJsonPath('data.completion.threshold', 80);
+        $response->assertJsonMissingPath('data.completion.missing_fields');
+        $response->assertJsonMissingPath('completion');
+        $this->assertNotNull($response->json('data.user'));
     }
 
     public function test_get_profile_score_rises_after_the_member_fills_in_fields(): void
@@ -50,9 +52,8 @@ class ProfileCompletionTest extends TestCase
         $response = $this->getJson('/api/v1/member/profile');
 
         $response->assertOk();
-        $response->assertJsonPath('completion.score', 25 + 10 + 15);
-        $this->assertNotContains('bio', $response->json('completion.missing_fields'));
-        $this->assertNotContains('avatar_url', $response->json('completion.missing_fields'));
+        $response->assertJsonPath('data.completion.score', 25 + 10 + 15);
+        $response->assertJsonMissingPath('data.completion.missing_fields');
     }
 
     public function test_changing_the_threshold_setting_changes_the_reported_threshold_without_a_code_change(): void
@@ -66,6 +67,6 @@ class ProfileCompletionTest extends TestCase
         $response = $this->getJson('/api/v1/member/profile');
 
         $response->assertOk();
-        $response->assertJsonPath('completion.threshold', 50);
+        $response->assertJsonPath('data.completion.threshold', 50);
     }
 }

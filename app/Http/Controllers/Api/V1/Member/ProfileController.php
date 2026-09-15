@@ -15,15 +15,17 @@ use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings): MemberProfileResource
+    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings): JsonResponse
     {
         $user = $request->user();
 
-        return (new MemberProfileResource($user))->additional([
-            'completion' => [
-                'score' => $completion->score($user),
-                'threshold' => $settings->get('profile.completion_threshold', 80),
-                'missing_fields' => $completion->missingFields($user),
+        return response()->json([
+            'data' => [
+                'user' => new MemberProfileResource($user),
+                'completion' => [
+                    'score' => $completion->score($user),
+                    'threshold' => $settings->get('profile.completion_threshold', 80),
+                ],
             ],
         ]);
     }

@@ -1780,7 +1780,7 @@
                                         "profile"
                                     ]
                                 },
-                                "description": "Returns the authenticated member in one payload: account fields (id, name, phone, email, preferred_language, preferred_currency, status) plus `personal` (`bio`, `city`, `avatar_url`, `gender`), `professional` (`job_title`, `company_name`, `industry`), and `links` (`linkedin_url`, `instagram_url`, `behance_url`, `website_url`). Profile fields are null until the member has ever saved one. Also returns a top-level `completion` object (sibling of `data`): `score` (0-100), `threshold` (from the `profile.completion_threshold` setting), and `missing_fields`."
+                                "description": "Returns the authenticated member wrapped inside `data.user`: account fields (id, name, phone, email, preferred_language, preferred_currency, status) plus `personal` (`bio`, `city`, `avatar_url`, `gender`), `professional` (`job_title`, `company_name`, `industry`), and `links` (`linkedin_url`, `instagram_url`, `behance_url`, `website_url`). Profile fields are null until the member has ever saved one. Also returns `completion` inside `data`: `score` (0-100) and `threshold` (from the `profile.completion_threshold` setting)."
                             }
                         },
                         {
