@@ -47,7 +47,7 @@ class WalkInSessionController extends Controller
     public function checkOut(CheckOutSessionRequest $request, WalkinSession $walkinSession, SessionClosureService $closures): JsonResponse
     {
         try {
-            $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at')));
+            $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at'), 'UTC'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

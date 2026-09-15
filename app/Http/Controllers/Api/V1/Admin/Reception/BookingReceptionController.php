@@ -72,7 +72,7 @@ class BookingReceptionController extends Controller
     public function checkOut(CheckOutSessionRequest $request, Booking $booking, SessionClosureService $closures): JsonResponse
     {
         try {
-            $closures->closeOut($booking, Carbon::parse($request->validated('checked_out_at')));
+            $closures->closeOut($booking, Carbon::parse($request->validated('checked_out_at'), 'UTC'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

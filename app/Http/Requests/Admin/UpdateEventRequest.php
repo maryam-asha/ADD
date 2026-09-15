@@ -2,12 +2,14 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Support\Time\LocalTime;
+use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateEventRequest extends FormRequest
 {
+    use InterpretsLocalTimes;
+
     public function authorize(): bool
     {
         return true;
@@ -18,16 +20,7 @@ class UpdateEventRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        // A bare "2026-10-01 19:00" means 19:00 in the district, not UTC.
-        // Interpreting it here — before validation and before the cast —
-        // is what keeps a late-evening event from landing on the next day.
-        $local = app(LocalTime::class);
-
-        foreach (['start_at', 'end_at'] as $field) {
-            if (is_string($this->input($field)) && $this->input($field) !== '') {
-                $this->merge([$field => $local->toUtc($this->input($field))->toDateTimeString()]);
-            }
-        }
+        $this->interpretLocalTimes(['start_at', 'end_at']);
 
         if ($this->has('room_id') && ! $this->has('space_id')) {
             $this->merge([

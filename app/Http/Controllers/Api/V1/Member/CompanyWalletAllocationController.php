@@ -46,7 +46,7 @@ class CompanyWalletAllocationController extends Controller
                     WalletTransactionCategory::from($request->validated('category')),
                     $points,
                     WalletTransactionSource::CompanyAdminAllocation,
-                    Carbon::parse($request->validated('expires_at')),
+                    Carbon::parse($request->validated('expires_at'), 'UTC'),
                     $request->validated('restricted_space_id'),
                     $request->validated('user_ids'),
                     $request->validated('description')

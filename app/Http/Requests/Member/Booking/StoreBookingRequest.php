@@ -2,14 +2,22 @@
 
 namespace App\Http\Requests\Member\Booking;
 
+use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class StoreBookingRequest extends FormRequest
 {
+    use InterpretsLocalTimes;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->interpretLocalTimes(['start_at', 'end_at']);
     }
 
     /**

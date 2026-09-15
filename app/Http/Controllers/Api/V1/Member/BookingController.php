@@ -33,8 +33,8 @@ class BookingController extends Controller
             $booking = $creations->create(
                 $space,
                 $request->user(),
-                Carbon::parse($request->validated('start_at')),
-                Carbon::parse($request->validated('end_at')),
+                Carbon::parse($request->validated('start_at'), 'UTC'),
+                Carbon::parse($request->validated('end_at'), 'UTC'),
                 $walletOwnerType,
                 $request->validated('wallet_owner_id'),
             );

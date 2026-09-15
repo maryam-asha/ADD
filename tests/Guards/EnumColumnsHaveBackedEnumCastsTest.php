@@ -8,9 +8,7 @@ use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Access\Models\AccessEvent;
-use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Access\Models\AccessGrant;
-use App\Support\Enums\EventRegistrationStatus;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
@@ -19,6 +17,7 @@ use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
@@ -57,6 +56,7 @@ use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
+use App\Support\Enums\EventRegistrationStatus;
 use Tests\TestCase;
 
 /**
