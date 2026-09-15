@@ -63,6 +63,20 @@ The damage is a wrong **day**, not a wrong hour. An event entered as 23:30 on 1 
 
 The twenty existing rows were disposable test data and were dropped rather than back-filled, so no correction migration exists. Any real data written before this change would need one.
 
+### The same pattern elsewhere
+
+A scan of every datetime column, Form Request accepting a date, and `Carbon::parse` on request input found the bug was not confined to events.
+
+**Bookings had it, and worse — it refused legitimate work.** `BookingController` parsed `start_at` with no timezone, and `BookingCreationService` then converted it to local to compare against business hours, so a 19:00 booking in a space open until 20:00 was read as 22:00 and rejected as outside business hours. The existing booking tests never caught it because every one of them sends an explicit `+03:00`, which `Carbon::parse` handles correctly; the gap only opened for a client sending a bare time. Session check-out (`BookingReceptionController`, `WalkInSessionController`) had the same shape, comparing a wall clock against closing time.
+
+Interpretation now happens once at the edge through `App\Http\Requests\Concerns\InterpretsLocalTimes`, which the event requests also moved onto, so one rule lives in one place. The remaining parses state `'UTC'` explicitly rather than inheriting whatever `config('app.timezone')` happens to be.
+
+Announcements were given the same treatment pre-emptively — not broken today, because nothing compares those times, but the same fragile shape.
+
+Most datetime columns needed nothing: `expires_at`, `paid_at`, `checked_in_at`, `approved_at` and the rest are machine timestamps written from `now()`, already instants. The risk is only where a person types a wall clock that is later compared as one.
+
+`tests/Guards/UserSuppliedTimesAreInterpretedLocallyTest` now fails if a controller parses a request time without a timezone, or a Form Request takes a typed date without interpreting it. Both assertions were checked by reintroducing the bug and confirming they fail — a guard that has only ever passed proves nothing. Fields that are genuinely not wall clocks (business hours, stored as `H:i` against a weekday; an exchange-rate filter bound; unread maintenance windows) are listed with reasons rather than silently skipped.
+
 ## Schema note: the 64-character trap
 
 `event_registration_field_values` is 31 characters, so Laravel's generated FK name `event_registration_field_values_event_registration_field_id_foreign` is **67** — past MySQL's 64-character identifier limit. The test suite runs on in-memory SQLite (`phpunit.xml`), which accepts long names silently, while production is MySQL: an auto-named constraint would have passed CI and failed on deploy. Every index and FK on that table is named explicitly, and the DDL was verified by creating both tables against the real MySQL database before committing.
