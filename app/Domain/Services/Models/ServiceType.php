@@ -33,16 +33,16 @@ class ServiceType extends Model
     protected function casts(): array
     {
         return [
-            'name'                    => 'array',
-            'description'             => 'array',
-            'is_active'               => 'boolean',
-            'is_coming_soon'          => 'boolean',
-            'requires_location'       => 'boolean',
-            'requires_review'         => 'boolean',
-            'request_method'          => RequestMethod::class,
-            'request_config'          => 'array',
+            'name' => 'array',
+            'description' => 'array',
+            'is_active' => 'boolean',
+            'is_coming_soon' => 'boolean',
+            'requires_location' => 'boolean',
+            'requires_review' => 'boolean',
+            'request_method' => RequestMethod::class,
+            'request_config' => 'array',
             'allowed_plan_module_ids' => 'array',
-            'order'                   => 'integer',
+            'order' => 'integer',
         ];
     }
 
@@ -56,6 +56,17 @@ class ServiceType extends Model
     public function fields(): HasMany
     {
         return $this->hasMany(ServiceTypeField::class)->orderBy('order');
+    }
+
+    /**
+     * The fields a member should actually be shown. `fields()` keeps
+     * returning every row for the admin editor, but rendering an inactive
+     * field to a member invites an answer that persistValues() then drops
+     * on the floor.
+     */
+    public function activeFields(): HasMany
+    {
+        return $this->fields()->where('is_active', true);
     }
 
     public function requests(): HasMany

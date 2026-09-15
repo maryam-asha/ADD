@@ -29,9 +29,9 @@ class ServiceRequest extends Model
     {
         return [
             'location_source' => LocationSource::class,
-            'status'          => RequestStatus::class,
+            'status' => RequestStatus::class,
             'resolution_note' => 'array',
-            'submitted_at'    => 'datetime',
+            'submitted_at' => 'datetime',
         ];
     }
 

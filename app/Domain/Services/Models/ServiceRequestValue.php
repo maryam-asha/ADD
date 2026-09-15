@@ -2,7 +2,7 @@
 
 namespace App\Domain\Services\Models;
 
-use App\Domain\Services\Enums\FieldType;
+use App\Support\Forms\FieldValueRouter;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -43,11 +43,8 @@ class ServiceRequestValue extends Model
      */
     public function resolvedValue(): mixed
     {
-        return match (true) {
-            $this->value_file !== null => $this->value_file,
-            $this->value_json !== null => $this->value_json,
-            default                    => $this->value_text,
-        };
+        return app(FieldValueRouter::class)
+            ->resolve($this->value_text, $this->value_json, $this->value_file);
     }
 
     /**
@@ -59,17 +56,13 @@ class ServiceRequestValue extends Model
         mixed $value,
     ): self {
         $instance = new self([
-            'service_request_id'    => $requestId,
+            'service_request_id' => $requestId,
             'service_type_field_id' => $field->id,
         ]);
 
-        if ($field->type->storesFile()) {
-            $instance->value_file = $value; // already stored path
-        } elseif ($field->type->storesJson()) {
-            $instance->value_json = $value;
-        } else {
-            $instance->value_text = (string) $value;
-        }
+        $instance->forceFill(
+            app(FieldValueRouter::class)->route($field->fieldType(), $value)
+        );
 
         return $instance;
     }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Services;
 
 use App\Domain\Services\Enums\LocationSource;
+use App\Domain\Services\Models\ServiceType;
 use App\Domain\Services\Services\ServiceRequestService;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -23,16 +24,26 @@ class StoreServiceRequestRequest extends FormRequest
     public function rules(): array
     {
         $baseRules = [
-            'branch_id'       => ['nullable', 'integer', 'exists:branches,id'],
-            'space_id'        => ['nullable', 'integer', 'exists:spaces,id'],
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            'space_id' => ['nullable', 'integer', 'exists:spaces,id'],
             'location_source' => ['nullable', 'string', 'in:qr,manual,none'],
-            'fields'          => ['nullable', 'array'],
+            'fields' => ['nullable', 'array'],
         ];
 
-        // Dynamic field rules — resolved from the service type if we can resolve it here.
-        // The controller re-validates via ServiceRequestService::buildValidationRules()
-        // after resolving the service type, so these are the structural wrappers only.
-        return $baseRules;
+        // Field rules come from the service type's stored definitions. The
+        // slug is on the route, so resolve it here rather than leaving the
+        // payload unvalidated: if it doesn't resolve, fall through with the
+        // structural rules only and let the controller return its 404.
+        $type = ServiceType::query()
+            ->where('slug', $this->route('slug'))
+            ->with('activeFields')
+            ->first();
+
+        if ($type === null) {
+            return $baseRules;
+        }
+
+        return $baseRules + app(ServiceRequestService::class)->buildValidationRules($type);
     }
 
     /**

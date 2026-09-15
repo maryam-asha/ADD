@@ -28,7 +28,7 @@ class ServiceCatalogService
      * Return all axes with their accessible service types for the given member.
      * Types are already filtered; axes with zero accessible types are omitted.
      *
-     * @return Collection<int, ServiceAxis>  (with 'serviceTypes' already loaded)
+     * @return Collection<int, ServiceAxis> (with 'serviceTypes' already loaded)
      */
     public function forMember(User $user): Collection
     {
@@ -39,17 +39,17 @@ class ServiceCatalogService
                 $query->active()
                     ->where(function ($q) {
                         $q->where('visibility', 'member')
-                          ->orWhere('visibility', 'both');
+                            ->orWhere('visibility', 'both');
                     })
                     ->accessibleByModules($moduleIds)
-                    ->with('fields')
+                    ->with('activeFields')
                     ->ordered();
             },
         ])
-        ->ordered()
-        ->get()
-        ->filter(fn (ServiceAxis $axis) => $axis->serviceTypes->isNotEmpty())
-        ->values();
+            ->ordered()
+            ->get()
+            ->filter(fn (ServiceAxis $axis) => $axis->serviceTypes->isNotEmpty())
+            ->values();
     }
 
     /**
@@ -64,10 +64,10 @@ class ServiceCatalogService
             ->where('slug', $slug)
             ->where(function ($q) {
                 $q->where('visibility', 'member')
-                  ->orWhere('visibility', 'both');
+                    ->orWhere('visibility', 'both');
             })
             ->accessibleByModules($moduleIds)
-            ->with('fields')
+            ->with('activeFields')
             ->first();
     }
 
