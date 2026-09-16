@@ -47,6 +47,17 @@ return [
 
     'validation' => [
         'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
+        'vocabulary_not_an_object' => 'Validation settings must be an object.',
+        'constraint_not_allowed_for_type' => '":key" is not a setting a :type field accepts.',
+        'constraint_must_be_boolean' => '":key" must be true or false.',
+        'constraint_must_be_whole' => '":key" must be a whole number.',
+        'constraint_below_minimum' => '":key" must be at least :min.',
+        'constraint_must_be_numeric' => '":key" must be a number.',
+        'constraint_must_be_a_date' => '":key" must be a date in YYYY-MM-DD form.',
+        'constraint_not_a_real_date' => '":date" is not a real calendar date.',
+        'constraint_unknown_pattern' => '":key" must be one of: :patterns.',
+        'constraint_must_be_text' => '":key" must be text.',
+        'constraint_range_inverted' => '":min" must not be greater than ":max".',
         'failed' => 'The given data is invalid.',
     ],
 

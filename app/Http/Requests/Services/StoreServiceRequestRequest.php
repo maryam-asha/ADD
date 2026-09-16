@@ -5,6 +5,7 @@ namespace App\Http\Requests\Services;
 use App\Domain\Services\Enums\LocationSource;
 use App\Domain\Services\Models\ServiceType;
 use App\Domain\Services\Services\ServiceRequestService;
+use App\Support\Forms\FieldRuleBuilder;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -44,6 +45,24 @@ class StoreServiceRequestRequest extends FormRequest
         }
 
         return $baseRules + app(ServiceRequestService::class)->buildValidationRules($type);
+    }
+
+    /**
+     * Name each generated rule path after the field the admin defined — see
+     * FieldRuleBuilder::attributesFor().
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        $type = ServiceType::query()
+            ->where('slug', $this->route('slug'))
+            ->with('activeFields')
+            ->first();
+
+        return $type === null
+            ? []
+            : app(FieldRuleBuilder::class)->attributesFor($type->activeFields);
     }
 
     /**

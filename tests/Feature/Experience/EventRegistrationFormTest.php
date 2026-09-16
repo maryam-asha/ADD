@@ -350,4 +350,104 @@ class EventRegistrationFormTest extends TestCase
 
         EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'email']);
     }
+
+    // ── Constraints reach the member, and name themselves ─────────────────
+
+    public function test_a_text_answer_over_its_character_limit_is_refused(): void
+    {
+        $event = Event::factory()->create(['has_registration_form' => true]);
+        EventRegistrationField::factory()->for($event)->create([
+            'key' => 'bio', 'type' => FieldType::Text, 'validation' => ['max' => 10],
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register", [
+            'fields' => ['bio' => str_repeat('a', 50)],
+        ])->assertStatus(422)->assertJsonValidationErrors('fields.bio');
+    }
+
+    public function test_a_date_answer_outside_the_allowed_range_is_refused(): void
+    {
+        $event = Event::factory()->create(['has_registration_form' => true]);
+        EventRegistrationField::factory()->for($event)->create([
+            'key' => 'arrival',
+            'type' => FieldType::Date,
+            'validation' => ['min_date' => '2026-06-01', 'max_date' => '2026-06-30'],
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+        $url = "/api/v1/member/events/{$event->id}/register";
+
+        $this->postJson($url, ['fields' => ['arrival' => '2026-05-31']])
+            ->assertStatus(422)->assertJsonValidationErrors('fields.arrival');
+
+        $this->postJson($url, ['fields' => ['arrival' => '2026-07-01']])
+            ->assertStatus(422)->assertJsonValidationErrors('fields.arrival');
+    }
+
+    public function test_a_date_answer_inside_the_range_is_accepted(): void
+    {
+        $event = Event::factory()->create(['has_registration_form' => true]);
+        EventRegistrationField::factory()->for($event)->create([
+            'key' => 'arrival',
+            'type' => FieldType::Date,
+            'validation' => ['min_date' => '2026-06-01', 'max_date' => '2026-06-30'],
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register", [
+            'fields' => ['arrival' => '2026-06-15'],
+        ])->assertStatus(201);
+    }
+
+    public function test_a_checkbox_under_its_minimum_selection_count_is_refused(): void
+    {
+        $event = Event::factory()->create(['has_registration_form' => true]);
+        EventRegistrationField::factory()->for($event)->create([
+            'key' => 'topics',
+            'type' => FieldType::Checkbox,
+            'options' => [
+                ['value' => 'ai', 'label' => ['en' => 'AI', 'ar' => 'ذكاء']],
+                ['value' => 'iot', 'label' => ['en' => 'IoT', 'ar' => 'إنترنت']],
+            ],
+            'validation' => ['min' => 2],
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register", [
+            'fields' => ['topics' => ['ai']],
+        ])->assertStatus(422)->assertJsonValidationErrors('fields.topics');
+    }
+
+    /**
+     * The point of the whole feature: a constraint that fires has to say
+     * which question it is about, in the member's own language. This used to
+     * read "fields.dietary_needs", a key the member has never seen.
+     */
+    public function test_a_failure_names_the_question_in_the_members_language(): void
+    {
+        $event = Event::factory()->create(['has_registration_form' => true]);
+        EventRegistrationField::factory()->for($event)->create([
+            'key' => 'dietary_needs',
+            'label' => ['en' => 'Dietary needs', 'ar' => 'الاحتياجات الغذائية'],
+            'type' => FieldType::Text,
+            'validation' => ['max' => 10],
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+
+        $response = $this->withHeader('lang', 'ar')->postJson(
+            "/api/v1/member/events/{$event->id}/register",
+            ['fields' => ['dietary_needs' => str_repeat('ا', 50)]],
+        )->assertStatus(422);
+
+        $message = $response->json('errors.fields\.dietary_needs.0')
+            ?? $response->json('errors')['fields.dietary_needs'][0];
+
+        $this->assertStringContainsString('الاحتياجات الغذائية', $message);
+        $this->assertStringNotContainsString('dietary_needs', $message);
+    }
 }

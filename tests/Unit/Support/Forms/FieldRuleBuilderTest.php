@@ -15,8 +15,9 @@ class FieldRuleBuilderTest extends TestCase
         array $validation = [],
         ?array $options = null,
         bool $required = false,
+        ?string $label = null,
     ): FormFieldContract {
-        return new class($key, $type, $validation, $options, $required) implements FormFieldContract
+        return new class($key, $type, $validation, $options, $required, $label) implements FormFieldContract
         {
             public function __construct(
                 private string $key,
@@ -24,6 +25,7 @@ class FieldRuleBuilderTest extends TestCase
                 private array $validation,
                 private ?array $options,
                 private bool $required,
+                private ?string $label = null,
             ) {}
 
             public function fieldKey(): string
@@ -49,6 +51,11 @@ class FieldRuleBuilderTest extends TestCase
             public function isFieldRequired(): bool
             {
                 return $this->required;
+            }
+
+            public function fieldLabel(?string $locale = null): string
+            {
+                return $this->label ?? $this->key;
             }
         };
     }
@@ -157,5 +164,192 @@ class FieldRuleBuilderTest extends TestCase
         $rules = (new FieldRuleBuilder)->rulesFor([$this->field('x', FieldType::Date)], 'answers');
 
         $this->assertSame(['nullable', 'date'], $rules['answers.x']);
+    }
+
+    // ── Date bounds ──────────────────────────────────────────────────────
+
+    public function test_a_date_field_carries_its_range(): void
+    {
+        $rules = $this->build($this->field('arrival', FieldType::Date, [
+            'min_date' => '2026-01-01',
+            'max_date' => '2026-12-31',
+        ]));
+
+        $this->assertSame(
+            ['nullable', 'date', 'after_or_equal:2026-01-01', 'before_or_equal:2026-12-31'],
+            $rules['fields.arrival'],
+        );
+    }
+
+    public function test_a_date_bound_can_be_one_sided(): void
+    {
+        $from = $this->build($this->field('a', FieldType::Date, ['min_date' => '2026-06-01']));
+        $until = $this->build($this->field('b', FieldType::Date, ['max_date' => '2026-06-30']));
+
+        $this->assertSame(['nullable', 'date', 'after_or_equal:2026-06-01'], $from['fields.a']);
+        $this->assertSame(['nullable', 'date', 'before_or_equal:2026-06-30'], $until['fields.b']);
+    }
+
+    /**
+     * A relative bound would make the emitted rule depend on the day it was
+     * built. That is a deliberate follow-up, so it must not half-work now.
+     */
+    public function test_a_malformed_or_relative_date_bound_is_dropped(): void
+    {
+        foreach (['2026-13-45', 'tomorrow', '+30 days', '2026/01/01', '', 'today'] as $bad) {
+            $rules = $this->build($this->field('d', FieldType::Date, ['min_date' => $bad]));
+
+            $this->assertSame(['nullable', 'date'], $rules['fields.d'], "`{$bad}` should not produce a bound.");
+        }
+    }
+
+    public function test_an_impossible_calendar_date_is_rejected_by_checkdate(): void
+    {
+        // Well-formed but not a real day: 2026 is not a leap year.
+        $rules = $this->build($this->field('d', FieldType::Date, ['min_date' => '2026-02-30']));
+
+        $this->assertSame(['nullable', 'date'], $rules['fields.d']);
+    }
+
+    // ── Checkbox item counts ─────────────────────────────────────────────
+
+    public function test_a_checkbox_can_bound_how_many_are_ticked(): void
+    {
+        $rules = $this->build($this->field('topics', FieldType::Checkbox, ['min' => 1, 'max' => 3], [
+            ['value' => 'ai'], ['value' => 'iot'], ['value' => 'ml'],
+        ]));
+
+        $this->assertSame(['nullable', 'array', 'min:1', 'max:3'], $rules['fields.topics']);
+        $this->assertSame(['string', 'in:ai,iot,ml'], $rules['fields.topics.*']);
+    }
+
+    // ── Tightened guards ─────────────────────────────────────────────────
+
+    /** Regression: an unchecked bound reached the rule string verbatim. */
+    public function test_a_non_numeric_text_bound_is_dropped_rather_than_emitted(): void
+    {
+        $rules = $this->build($this->field('n', FieldType::Text, ['max' => 'abc', 'min' => 2]));
+
+        $this->assertSame(['nullable', 'string', 'min:2'], $rules['fields.n']);
+    }
+
+    /** Regression: (int) 'abc' is 0, so junk silently became min:0, not 1. */
+    public function test_a_non_numeric_rating_bound_falls_back_to_the_default(): void
+    {
+        $rules = $this->build($this->field('r', FieldType::Rating, ['min' => 'abc']));
+
+        $this->assertSame(['nullable', 'integer', 'min:1', 'max:5'], $rules['fields.r']);
+    }
+
+    // ── Named patterns ───────────────────────────────────────────────────
+
+    public function test_a_named_pattern_resolves_to_its_expression(): void
+    {
+        $rules = $this->build($this->field('code', FieldType::Text, ['regex' => 'digits']));
+
+        $this->assertSame(['nullable', 'string', 'regex:/^[0-9]+$/'], $rules['fields.code']);
+    }
+
+    /** email/url have better-worded native rules, already translated. */
+    public function test_a_pattern_without_an_expression_emits_laravels_own_rule(): void
+    {
+        $rules = $this->build($this->field('site', FieldType::Text, ['regex' => 'url']));
+
+        $this->assertSame(['nullable', 'string', 'url'], $rules['fields.site']);
+    }
+
+    /**
+     * The security-relevant one. A free-form expression could inject rules
+     * past Laravel's `|` split, or hang a worker. Legacy rows carrying one
+     * are dropped, not honoured — and not rejected either, so a live form
+     * keeps working.
+     */
+    public function test_a_free_form_regex_is_dropped_rather_than_honoured(): void
+    {
+        foreach (['/^(a+)+$/', '/^a/|exists:users,email', '.*'] as $raw) {
+            $rules = $this->build($this->field('t', FieldType::Text, ['regex' => $raw]));
+
+            $this->assertSame(['nullable', 'string'], $rules['fields.t'], "`{$raw}` must not reach the rules.");
+        }
+    }
+
+    // ── Backward compatibility ───────────────────────────────────────────
+
+    /**
+     * The contract: a field with no constraints produces exactly what it
+     * produced before this vocabulary existed. Rating keeps its 1..5
+     * defaults; nothing else gains a bound it did not have.
+     */
+    public function test_an_unconstrained_field_of_every_type_is_unchanged(): void
+    {
+        $expected = [
+            'text' => ['nullable', 'string'],
+            'textarea' => ['nullable', 'string'],
+            'select' => ['nullable', 'string'],
+            'file' => ['nullable', 'file'],
+            'checkbox' => ['nullable', 'array'],
+            'date' => ['nullable', 'date'],
+            'number' => ['nullable', 'numeric'],
+            'rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+        ];
+
+        foreach (FieldType::cases() as $type) {
+            $rules = $this->build($this->field('f', $type));
+
+            $this->assertSame($expected[$type->value], $rules['fields.f'], "{$type->value} changed shape.");
+        }
+    }
+
+    /** The four rows actually in the database today still build. */
+    public function test_the_shapes_already_stored_in_production_still_build(): void
+    {
+        $textarea = $this->build($this->field('t', FieldType::Textarea, ['max' => 500]));
+        $file = $this->build($this->field('f', FieldType::File, ['accept' => 'image/*', 'max_kb' => 5120]));
+        $select = $this->build($this->field('s', FieldType::Select, ['required' => true], [['value' => 'a']]));
+
+        $this->assertSame(['nullable', 'string', 'max:500'], $textarea['fields.t']);
+        $this->assertSame(['nullable', 'file', 'mimes:jpg,jpeg,png,gif,webp,svg', 'max:5120'], $file['fields.f']);
+        $this->assertSame(['required', 'string', 'in:a'], $select['fields.s']);
+    }
+
+    // ── Attribute names ──────────────────────────────────────────────────
+
+    public function test_each_rule_path_is_named_after_its_label(): void
+    {
+        $attributes = (new FieldRuleBuilder)->attributesFor([
+            $this->field('dietary_needs', FieldType::Text, label: 'الاحتياجات الغذائية'),
+        ]);
+
+        $this->assertSame(['fields.dietary_needs' => 'الاحتياجات الغذائية'], $attributes);
+    }
+
+    /** An element error is keyed fields.topics.0 and needs the same name. */
+    public function test_a_checkbox_names_its_elements_too(): void
+    {
+        $attributes = (new FieldRuleBuilder)->attributesFor([
+            $this->field('topics', FieldType::Checkbox, label: 'المواضيع'),
+        ]);
+
+        $this->assertSame([
+            'fields.topics' => 'المواضيع',
+            'fields.topics.*' => 'المواضيع',
+        ], $attributes);
+    }
+
+    public function test_a_field_without_a_label_falls_back_to_its_key(): void
+    {
+        $attributes = (new FieldRuleBuilder)->attributesFor([$this->field('notes', FieldType::Text)]);
+
+        $this->assertSame(['fields.notes' => 'notes'], $attributes);
+    }
+
+    public function test_attribute_names_follow_the_same_prefix_as_the_rules(): void
+    {
+        $attributes = (new FieldRuleBuilder)->attributesFor(
+            [$this->field('x', FieldType::Text, label: 'X')],
+            'answers',
+        );
+
+        $this->assertSame(['answers.x' => 'X'], $attributes);
     }
 }

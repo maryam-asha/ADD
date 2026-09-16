@@ -4,6 +4,7 @@ namespace App\Http\Requests\Experience\Admin;
 
 use App\Support\Forms\FieldType;
 use App\Support\Forms\ReservedFieldKeys;
+use App\Support\Forms\Rules\ValidationVocabularyRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -49,10 +50,9 @@ class UpdateEventRegistrationFieldRequest extends FormRequest
             ],
             'options.*.value' => ['required', 'string', 'max:100'],
             'options.*.label' => ['required', 'array'],
-            'validation' => ['nullable', 'array'],
-            'validation.min' => ['nullable', 'numeric'],
-            'validation.max' => ['nullable', 'numeric'],
-            'validation.max_kb' => ['nullable', 'integer', 'min:1'],
+            // Which keys are legal depends on the field's type, which a
+            // declarative rule cannot express — see ValidationVocabularyRule.
+            'validation' => ['nullable', 'array', new ValidationVocabularyRule($this->constrainedType())],
             'is_required' => ['nullable', 'boolean'],
             'is_active' => ['nullable', 'boolean'],
             'order' => ['nullable', 'integer', 'min:0'],
@@ -67,5 +67,29 @@ class UpdateEventRegistrationFieldRequest extends FormRequest
         return [
             'key.not_in' => __('api.validation.reserved_field_key', ['key' => $this->input('key')]),
         ];
+    }
+
+    /**
+     * The type whose vocabulary applies, or null when it cannot be resolved.
+     *
+     * `type` is absent from a PATCH that only changes a label, so fall back
+     * to the stored field — the same input-or-model resolution this request
+     * already uses for `options`.
+     */
+    private function constrainedType(): ?FieldType
+    {
+        $given = $this->input('type');
+
+        if (is_string($given)) {
+            return FieldType::tryFrom($given);
+        }
+
+        $field = $this->route('field');
+
+        if (is_object($field) && $field->type instanceof FieldType) {
+            return $field->type;
+        }
+
+        return null;
     }
 }

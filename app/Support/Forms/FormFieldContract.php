@@ -22,12 +22,24 @@ interface FormFieldContract
     public function fieldOptions(): ?array;
 
     /**
-     * Compact validation fragments as stored — {required, min, max, regex,
-     * accept, max_kb} — not Laravel rule strings.
+     * Compact validation fragments as stored, not Laravel rule strings.
+     *
+     * FieldConstraints is the specification of which keys are legal for
+     * which type — this docblock used to list them and went stale the
+     * moment the vocabulary grew.
      *
      * @return array<string, mixed>
      */
     public function fieldValidation(): array;
 
     public function isFieldRequired(): bool;
+
+    /**
+     * The field's label in the current locale, for validation messages.
+     *
+     * Without it a failed rule renders `:attribute` as the dotted path, so
+     * an Arabic member reads "fields.dietary_needs" rather than the label
+     * the admin wrote.
+     */
+    public function fieldLabel(?string $locale = null): string;
 }

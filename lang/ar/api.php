@@ -47,6 +47,17 @@ return [
 
     'validation' => [
         'reserved_field_key' => 'الحقل ":key" يؤخذ من حساب العضو ولا يمكن تعريفه في الفورم.',
+        'vocabulary_not_an_object' => 'إعدادات التحقق يجب أن تكون كائناً.',
+        'constraint_not_allowed_for_type' => '":key" ليس إعداداً يقبله حقل من نوع :type.',
+        'constraint_must_be_boolean' => '":key" يجب أن يكون صحيحاً أو خطأً.',
+        'constraint_must_be_whole' => '":key" يجب أن يكون عدداً صحيحاً.',
+        'constraint_below_minimum' => '":key" يجب ألا يقل عن :min.',
+        'constraint_must_be_numeric' => '":key" يجب أن يكون رقماً.',
+        'constraint_must_be_a_date' => '":key" يجب أن يكون تاريخاً بصيغة YYYY-MM-DD.',
+        'constraint_not_a_real_date' => '":date" ليس تاريخاً حقيقياً في التقويم.',
+        'constraint_unknown_pattern' => '":key" يجب أن يكون أحد: :patterns.',
+        'constraint_must_be_text' => '":key" يجب أن يكون نصاً.',
+        'constraint_range_inverted' => '":min" يجب ألا يكون أكبر من ":max".',
         'failed' => 'البيانات المُرسلة غير صالحة.',
     ],
 

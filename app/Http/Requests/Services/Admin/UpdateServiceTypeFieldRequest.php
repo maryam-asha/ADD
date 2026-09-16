@@ -4,6 +4,7 @@ namespace App\Http\Requests\Services\Admin;
 
 use App\Support\Forms\FieldType;
 use App\Support\Forms\ReservedFieldKeys;
+use App\Support\Forms\Rules\ValidationVocabularyRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,7 +33,9 @@ class UpdateServiceTypeFieldRequest extends FormRequest
             'options.*.label' => ['required_with:options', 'array'],
             'options.*.label.en' => ['required_with:options', 'string'],
             'options.*.label.ar' => ['required_with:options', 'string'],
-            'validation' => ['nullable', 'array'],
+            // Which keys are legal depends on the field's type, which a
+            // declarative rule cannot express — see ValidationVocabularyRule.
+            'validation' => ['nullable', 'array', new ValidationVocabularyRule($this->constrainedType())],
             'is_required' => ['sometimes', 'boolean'],
             'is_active' => ['sometimes', 'boolean'],
             'order' => ['sometimes', 'integer', 'min:0'],
@@ -47,5 +50,29 @@ class UpdateServiceTypeFieldRequest extends FormRequest
         return [
             'key.not_in' => __('api.validation.reserved_field_key', ['key' => $this->input('key')]),
         ];
+    }
+
+    /**
+     * The type whose vocabulary applies, or null when it cannot be resolved.
+     *
+     * `type` is absent from a PATCH that only changes a label, so fall back
+     * to the stored field — the same input-or-model resolution this request
+     * already uses for `options`.
+     */
+    private function constrainedType(): ?FieldType
+    {
+        $given = $this->input('type');
+
+        if (is_string($given)) {
+            return FieldType::tryFrom($given);
+        }
+
+        $field = $this->route('field');
+
+        if (is_object($field) && $field->type instanceof FieldType) {
+            return $field->type;
+        }
+
+        return null;
     }
 }

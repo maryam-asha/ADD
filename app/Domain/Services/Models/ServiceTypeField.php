@@ -86,4 +86,9 @@ class ServiceTypeField extends Model implements FormFieldContract
     {
         return (bool) $this->is_required;
     }
+
+    public function fieldLabel(?string $locale = null): string
+    {
+        return $this->translate('label', $locale) ?: $this->key;
+    }
 }

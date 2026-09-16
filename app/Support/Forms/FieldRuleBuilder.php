@@ -42,6 +42,45 @@ class FieldRuleBuilder
     }
 
     /**
+     * Human names for the generated rule paths, for Form Request
+     * attributes().
+     *
+     * A failed dynamic rule otherwise renders `:attribute` as the dotted
+     * path it was keyed by, so the member is told that "fields.dietary_needs"
+     * is too long rather than being told which question is. The label is
+     * already stored bilingually and already shipped to clients; it was
+     * simply never reaching the validator.
+     *
+     * @param  iterable<FormFieldContract>  $fields
+     * @return array<string, string>
+     */
+    public function attributesFor(iterable $fields, string $prefix = 'fields'): array
+    {
+        $attributes = [];
+
+        foreach ($fields as $field) {
+            $key = $field->fieldKey();
+
+            if (str_contains($key, '.')) {
+                continue; // Skipped by rulesFor() too; no rule to name.
+            }
+
+            $label = $field->fieldLabel();
+            $path = "{$prefix}.{$key}";
+
+            $attributes[$path] = $label;
+
+            // A checkbox element error is keyed fields.topics.0, which would
+            // otherwise read as a bare index.
+            if ($field->fieldType() === FieldType::Checkbox) {
+                $attributes["{$path}.*"] = $label;
+            }
+        }
+
+        return $attributes;
+    }
+
+    /**
      * @return array<string, array<int, string>>
      */
     private function rulesForField(FormFieldContract $field, string $path): array
@@ -59,13 +98,15 @@ class FieldRuleBuilder
             case FieldType::Text:
             case FieldType::Textarea:
                 $rules[] = 'string';
+                // Character counts. Guarded and cast: an unchecked value used
+                // to reach the rule string verbatim.
                 foreach (['max', 'min'] as $bound) {
-                    if (isset($v[$bound])) {
-                        $rules[] = "{$bound}:{$v[$bound]}";
+                    if (isset($v[$bound]) && is_numeric($v[$bound])) {
+                        $rules[] = $bound.':'.(int) $v[$bound];
                     }
                 }
-                if (isset($v['regex'])) {
-                    $rules[] = "regex:{$v['regex']}";
+                if (isset($v['regex']) && $pattern = $this->patternRule((string) $v['regex'])) {
+                    $rules[] = $pattern;
                 }
                 break;
 
@@ -80,6 +121,17 @@ class FieldRuleBuilder
 
             case FieldType::Date:
                 $rules[] = 'date';
+                // Absolute calendar bounds. Deliberately NOT parsed with
+                // Carbon: these are dates, not instants, and comparing them
+                // needs no timezone. That also keeps this clear of
+                // tests/Guards/UserSuppliedTimesAreInterpretedLocallyTest,
+                // which bans Carbon::parse on user-supplied times.
+                if ($from = $this->dateBound($v, FieldConstraints::MIN_DATE)) {
+                    $rules[] = "after_or_equal:{$from}";
+                }
+                if ($until = $this->dateBound($v, FieldConstraints::MAX_DATE)) {
+                    $rules[] = "before_or_equal:{$until}";
+                }
                 break;
 
             case FieldType::Select:
@@ -95,6 +147,14 @@ class FieldRuleBuilder
                 // `in:` used to be applied to the array itself, which never
                 // validates the elements. The constraint belongs on `.*`.
                 $rules[] = 'array';
+                // How many boxes may be ticked: Laravel counts elements when
+                // min/max are applied to an array, so the item-count meaning
+                // falls out of the same keys.
+                foreach (['min', 'max'] as $bound) {
+                    if (isset($v[$bound]) && is_numeric($v[$bound])) {
+                        $rules[] = $bound.':'.(int) $v[$bound];
+                    }
+                }
                 if ($in = $this->inRule($field)) {
                     $extra["{$path}.*"] = ['string', $in];
                 }
@@ -102,8 +162,8 @@ class FieldRuleBuilder
 
             case FieldType::Rating:
                 $rules[] = 'integer';
-                $rules[] = 'min:'.(int) ($v['min'] ?? 1);
-                $rules[] = 'max:'.(int) ($v['max'] ?? 5);
+                $rules[] = 'min:'.$this->ratingBound($v, 'min', 1);
+                $rules[] = 'max:'.$this->ratingBound($v, 'max', 5);
                 break;
 
             case FieldType::File:
@@ -118,6 +178,63 @@ class FieldRuleBuilder
         }
 
         return [$path => $rules] + $extra;
+    }
+
+    /**
+     * A named pattern resolved to a rule, or null.
+     *
+     * `regex` used to be a free-form expression concatenated straight into
+     * the rule string. Laravel splits rules on `|`, so a stored
+     * `/^a/|exists:users,email` appended two rules to a member-facing
+     * validator; and a nested quantifier like `(a+)+$` hangs the worker on a
+     * long input. Only the names in FieldConstraints::PATTERNS are honoured
+     * now.
+     *
+     * An unrecognised value is dropped and logged rather than rejected, the
+     * same posture acceptToMimes() already takes: a live configuration must
+     * not start refusing every submission because of a legacy row.
+     */
+    private function patternRule(string $name): ?string
+    {
+        if (! FieldConstraints::isPatternName($name)) {
+            Log::warning('Unknown form field `regex` pattern; text left unconstrained.', [
+                'pattern' => Str::limit($name, 100),
+            ]);
+
+            return null;
+        }
+
+        $pattern = FieldConstraints::PATTERNS[$name];
+
+        // A null entry means Laravel has a better-worded rule of its own,
+        // already translated in lang/{en,ar}/validation.php.
+        return $pattern === null ? $name : "regex:{$pattern}";
+    }
+
+    /**
+     * A `YYYY-MM-DD` bound, or null when absent or malformed.
+     *
+     * checkdate() rather than strtotime(): the latter accepts "tomorrow" and
+     * "+1 week", which would make the emitted rule depend on when it was
+     * built. Relative bounds are a deliberate follow-up, not an accident.
+     */
+    private function dateBound(array $validation, string $key): ?string
+    {
+        $value = $validation[$key] ?? null;
+
+        if (! is_string($value) || ! preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m)) {
+            return null;
+        }
+
+        return checkdate((int) $m[2], (int) $m[3], (int) $m[1]) ? $value : null;
+    }
+
+    /** A rating bound, falling back to the documented default when unusable. */
+    private function ratingBound(array $validation, string $key, int $default): int
+    {
+        $value = $validation[$key] ?? null;
+
+        return is_numeric($value) ? (int) $value : $default;
     }
 
     /**

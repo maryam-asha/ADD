@@ -53,6 +53,23 @@ class RegisterForEventRequest extends FormRequest
     }
 
     /**
+     * Name each generated rule path after the question the admin wrote, so a
+     * failure reads "الاحتياجات الغذائية" rather than "fields.dietary_needs".
+     *
+     * @return array<string, string>
+     */
+    public function attributes(): array
+    {
+        $event = $this->targetEvent();
+
+        if ($event === null || ! $event->has_registration_form) {
+            return [];
+        }
+
+        return app(FieldRuleBuilder::class)->attributesFor($event->activeRegistrationFields);
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function fieldValues(): array
