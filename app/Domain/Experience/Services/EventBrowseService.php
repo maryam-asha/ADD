@@ -143,7 +143,7 @@ class EventBrowseService
     public function details(Event|int|string $event, ?User $user = null): array
     {
         if (! $event instanceof Event) {
-            $event = Event::with(['branch', 'category'])
+            $event = Event::with(['branch', 'category', 'sessions'])
                 ->withCount('seatHoldingAttendees as attendees_count')
                 ->find($event);
 
@@ -151,7 +151,7 @@ class EventBrowseService
                 throw new NotFoundHttpException(__('api.system.not_found'));
             }
         } else {
-            $event->loadMissing(['branch', 'category']);
+            $event->loadMissing(['branch', 'category', 'sessions']);
             if (! isset($event->attendees_count)) {
                 $event->loadCount('seatHoldingAttendees as attendees_count');
             }
@@ -540,9 +540,22 @@ class EventBrowseService
 
         // price_label already comes from formatEventCard() via the
         // presenter — no second copy of the formatting here.
+        $time = app(LocalTime::class);
+
         return array_merge($card, [
             'description' => $event->translate('description', $locale),
             'date_full' => $start ? $start->format('l, F j, Y') : null,
+            // The schedule, when the event runs over more than one sitting.
+            // start_at/end_at on the card stay the envelope around these, so
+            // a client that only reads those is unaffected.
+            'sessions' => $event->sessions->map(fn ($session) => [
+                'id' => $session->id,
+                'title' => $session->translate('title', $locale),
+                'date' => $time->toLocal($session->start_at)?->format('Y-m-d'),
+                'date_full' => $time->toLocal($session->start_at)?->format('l, F j, Y'),
+                'start_time' => $time->toLocal($session->start_at)?->format('H:i'),
+                'end_time' => $time->toLocal($session->end_at)?->format('H:i'),
+            ])->all(),
         ]);
     }
 

@@ -56,6 +56,21 @@ class EventResource extends JsonResource
             'start_time' => $localStart?->format('H:i'),
             'end_time' => $localEnd?->format('H:i'),
             'timezone' => $time->timezone(),
+            // The schedule, when the event runs over more than one sitting.
+            // start_at/end_at above stay the envelope around these, so a
+            // client that only knows about those keeps working.
+            'sessions' => $this->whenLoaded('sessions', fn () => $this->sessions->map(fn ($session) => [
+                'id' => $session->id,
+                'title' => $isAdmin ? $session->title : $session->translate('title', $locale),
+                'start_at' => $isAdmin
+                    ? $session->start_at?->toISOString()
+                    : $time->toLocal($session->start_at)?->format('Y-m-d'),
+                'end_at' => $isAdmin
+                    ? $session->end_at?->toISOString()
+                    : $time->toLocal($session->end_at)?->format('Y-m-d'),
+                'start_time' => $time->toLocal($session->start_at)?->format('H:i'),
+                'end_time' => $time->toLocal($session->end_at)?->format('H:i'),
+            ])->all()),
             'location' => app(EventLocationService::class)->displayLocation($this->resource, $locale),
             'capacity' => $this->capacity,
             'requires_approval' => (bool) $this->requires_approval,

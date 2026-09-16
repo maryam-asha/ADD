@@ -23,6 +23,7 @@ class UpdateEventRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->interpretLocalTimes(['start_at', 'end_at']);
+        $this->interpretLocalTimesIn('sessions', ['start_at', 'end_at']);
 
         if ($this->has('room_id') && ! $this->has('space_id')) {
             $this->merge([
@@ -52,6 +53,15 @@ class UpdateEventRequest extends FormRequest
                 // free-text address). Never both — a stored location
                 // would shadow the derived one.
                 'location' => ['nullable', 'string', 'max:255', 'prohibits:space_id,room_id'],
+                // A schedule, when the event runs over more than one sitting.
+                // The envelope above is derived from these, so it is not
+                // typed alongside them.
+                'sessions' => ['nullable', 'array', 'max:60'],
+                'sessions.*.start_at' => ['required_with:sessions', 'date'],
+                'sessions.*.end_at' => ['required_with:sessions', 'date', 'after:sessions.*.start_at'],
+                'sessions.*.title' => ['nullable', 'array'],
+                'sessions.*.title.en' => ['nullable', 'string', 'max:255'],
+                'sessions.*.title.ar' => ['nullable', 'string', 'max:255'],
                 'capacity' => ['nullable', 'integer', 'min:1'],
                 'requires_approval' => ['nullable', 'boolean'],
                 // Registration happens here or there, never both: an

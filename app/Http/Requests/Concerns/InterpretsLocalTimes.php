@@ -19,6 +19,46 @@ use App\Support\Time\LocalTime;
 trait InterpretsLocalTimes
 {
     /**
+     * The same, for a list of nested rows — `sessions.*.start_at`.
+     *
+     * A session's hours are typed by the same admin in the same box as an
+     * event's, so they mean the same thing and have to be read the same way.
+     * Doing it here rather than in the service keeps every wall clock in this
+     * application interpreted at the edge, which is what the guard in
+     * tests/Guards/UserSuppliedTimesAreInterpretedLocallyTest exists to hold.
+     *
+     * @param  list<string>  $fields
+     */
+    protected function interpretLocalTimesIn(string $key, array $fields): void
+    {
+        $rows = $this->input($key);
+
+        if (! is_array($rows)) {
+            return;
+        }
+
+        $local = app(LocalTime::class);
+
+        foreach ($rows as $index => $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+
+            foreach ($fields as $field) {
+                $value = $row[$field] ?? null;
+
+                if (! is_string($value) || trim($value) === '') {
+                    continue;
+                }
+
+                $rows[$index][$field] = $local->toUtc($value)->toDateTimeString();
+            }
+        }
+
+        $this->merge([$key => $rows]);
+    }
+
+    /**
      * @param  list<string>  $fields
      */
     protected function interpretLocalTimes(array $fields): void

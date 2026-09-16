@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventBrowseService;
 use App\Domain\Experience\Services\EventLocationService;
+use App\Domain\Experience\Services\EventSchedule;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Requests\Admin\StoreEventRequest;
@@ -25,21 +26,64 @@ class EventController extends AdminResourceController
         return EventResource::class;
     }
 
+    public function __construct(private EventSchedule $schedule) {}
+
     public function store(StoreEventRequest $request): EventResource
     {
         $validated = $this->resolvePlacement($request->validated());
+        $sessions = $this->takeSessions($validated);
 
-        return new EventResource(Event::create(array_merge(
+        $event = Event::create(array_merge(
             ['order' => 0, 'status' => 'draft'],
             $validated
-        )));
+        ));
+
+        if ($sessions !== null) {
+            $this->schedule->replace($event, $sessions);
+            // refresh(), not fresh(): the latter returns a different instance
+            // that Laravel no longer treats as recently created, which turns
+            // the 201 into a 200.
+            $event->refresh();
+        }
+
+        return new EventResource($event);
     }
 
     public function update(UpdateEventRequest $request, Event $event): JsonResponse
     {
-        $event->update($this->resolvePlacement($request->validated(), $event));
+        $validated = $this->resolvePlacement($request->validated(), $event);
+        $sessions = $this->takeSessions($validated);
+
+        $event->update($validated);
+
+        // Absent means "leave the schedule alone"; an empty list means the
+        // admin cleared it and the event falls back to its own envelope.
+        if ($sessions !== null) {
+            $this->schedule->replace($event, $sessions);
+        }
 
         return response()->json(['message' => __('api.admin.event_updated')]);
+    }
+
+    /**
+     * Pull the schedule out of the validated payload.
+     *
+     * `sessions` is not a column, and start_at/end_at are derived from it
+     * rather than stored alongside it, so it must not reach the model.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return list<array<string, mixed>>|null
+     */
+    private function takeSessions(array &$validated): ?array
+    {
+        if (! array_key_exists('sessions', $validated)) {
+            return null;
+        }
+
+        $sessions = $validated['sessions'];
+        unset($validated['sessions']);
+
+        return is_array($sessions) ? array_values($sessions) : [];
     }
 
     /**

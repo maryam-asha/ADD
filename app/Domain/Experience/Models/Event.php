@@ -96,6 +96,24 @@ class Event extends Model
             ->whereIn('status', EventRegistrationStatus::seatHoldingValues());
     }
 
+    /**
+     * The sittings this event runs, in order.
+     *
+     * events.start_at/end_at is the envelope around these and is derived from
+     * them by EventSchedule — an event with several sessions has no single
+     * typed interval of its own.
+     */
+    public function sessions(): HasMany
+    {
+        return $this->hasMany(EventSession::class)->orderBy('start_at');
+    }
+
+    /** Whether this event runs over more than one sitting. */
+    public function hasMultipleSessions(): bool
+    {
+        return $this->sessions()->count() > 1;
+    }
+
     public function registrationFields(): HasMany
     {
         return $this->hasMany(EventRegistrationField::class)->orderBy('order');
