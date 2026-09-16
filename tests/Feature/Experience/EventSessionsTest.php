@@ -46,6 +46,16 @@ class EventSessionsTest extends TestCase
     }
 
     /** @param array<string, mixed> $overrides */
+    private function published(array $overrides = []): Event
+    {
+        return Event::factory()->create(array_merge([
+            'status' => 'published',
+            'start_at' => now()->addWeek(),
+            'end_at' => now()->addWeek()->addHours(2),
+        ], $overrides));
+    }
+
+    /** @param array<string, mixed> $overrides */
     private function createEvent(array $overrides = []): TestResponse
     {
         return $this->postJson('/api/v1/admin/events', array_merge([
@@ -275,5 +285,81 @@ class EventSessionsTest extends TestCase
         $this->postJson('/api/v1/admin/events', [
             'title' => ['en' => 'Expo', 'ar' => 'معرض'],
         ])->assertStatus(422)->assertJsonValidationErrors('start_at');
+    }
+
+    // ── What the card says about a multi-day event ───────────────────────
+
+    /**
+     * The card's `time` block took the first day's start and the LAST day's
+     * end and presented them as one range. For an event running 09:00-17:00,
+     * then 10:00-14:00, then 16:00-21:00 it advertised "09:00 AM - 09:00 PM",
+     * which is not when the event is open on any of its days — a member
+     * reading it would arrive on day two at 20:00 to a closed hall.
+     */
+    public function test_the_card_does_not_invent_a_single_range_across_days(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-05-03', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-05-04', '10:00', '14:00')->create();
+        EventSession::factory()->for($event)->on('2027-05-05', '16:00', '21:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        // The invented range is gone rather than merely different.
+        $this->assertNotSame('09:00 AM – 09:00 PM', $card['time']['range']);
+        $this->assertTrue($card['is_multi_day']);
+        $this->assertSame(3, $card['session_count']);
+
+        // The first sitting is what a card can honestly show, and it is
+        // labelled as the first rather than as the whole event.
+        $this->assertSame('09:00 AM', $card['time']['start']);
+        $this->assertSame('05:00 PM', $card['time']['end']);
+    }
+
+    public function test_the_card_reports_the_span_of_days_not_one_date(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-05-03', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-05-05', '16:00', '21:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertSame('03', $card['date']['day']);
+        $this->assertSame('MAY', $card['date']['month']);
+        $this->assertSame('05', $card['date']['end_day']);
+        $this->assertSame('MAY', $card['date']['end_month']);
+    }
+
+    /** A one-day event keeps exactly the shape every client already handles. */
+    public function test_a_single_day_event_reads_as_it_always_did(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-05-03', '09:00', '17:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertFalse($card['is_multi_day']);
+        $this->assertSame(1, $card['session_count']);
+        $this->assertSame('09:00 AM – 05:00 PM', $card['time']['range']);
+        $this->assertNull($card['date']['end_day']);
+    }
+
+    /** An event predating schedules has none; it must not become multi-day. */
+    public function test_an_event_without_a_schedule_is_not_reported_as_multi_day(): void
+    {
+        $event = $this->published();
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertFalse($card['is_multi_day']);
+        $this->assertSame(0, $card['session_count']);
+        $this->assertNotNull($card['time']['range']);
     }
 }

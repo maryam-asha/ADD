@@ -50,7 +50,7 @@ class EventBrowseService
     public function browse(array $filters = [], ?User $user = null): array
     {
         $query = Event::query()
-            ->with(['branch', 'category', 'space.building.branch'])
+            ->with(['branch', 'category', 'space.building.branch', 'sessions'])
             ->withCount('seatHoldingAttendees as attendees_count');
 
         // 1. Cancelled / Status filter
@@ -216,6 +216,7 @@ class EventBrowseService
                 'branch',
                 'category',
                 'space.building.branch',
+                'sessions',
                 'attendees' => $userAttendeeCondition,
             ])
             ->withCount('seatHoldingAttendees as attendees_count');
@@ -494,6 +495,17 @@ class EventBrowseService
         // a client has nothing to compute.
         $price = app(EventPricePresenter::class)->presentForDisplay($event, $user, $locale);
 
+        // The hours a card can honestly state are one sitting's, not the
+        // envelope's. Taking the first day's start with the last day's end
+        // produced a range the event is open for on no day at all.
+        $sessions = $event->relationLoaded('sessions') ? $event->sessions : $event->sessions()->get();
+        $sessionCount = $sessions->count();
+        $isMultiDay = $sessionCount > 1;
+
+        $firstSitting = $sessions->first();
+        $sittingStart = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->start_at) : $start;
+        $sittingEnd = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->end_at) : $end;
+
         return [
             'id' => $event->id,
             'title' => $event->translate('title', $locale),
@@ -509,12 +521,26 @@ class EventBrowseService
                 'day' => $start ? $start->format('d') : null,
                 'weekday' => $start ? strtoupper($start->format('D')) : null,
                 'formatted' => $start ? $start->format('F d, Y') : null,
+                // Null on a single-day event, so a client that ignores these
+                // keeps rendering exactly what it rendered before.
+                'end_month' => $isMultiDay && $end ? strtoupper($end->format('M')) : null,
+                'end_day' => $isMultiDay && $end ? $end->format('d') : null,
+                'end_weekday' => $isMultiDay && $end ? strtoupper($end->format('D')) : null,
+                'end_formatted' => $isMultiDay && $end ? $end->format('F d, Y') : null,
             ],
+            // One sitting's hours — the first. On a multi-day event the
+            // remaining days have their own and are listed in `sessions` on
+            // the detail endpoint; is_multi_day tells a card not to present
+            // these as the whole story.
             'time' => [
-                'start' => $start ? $start->format('h:i A') : null,
-                'end' => $end ? $end->format('h:i A') : null,
-                'range' => $start && $end ? ($start->format('h:i A').' – '.$end->format('h:i A')) : null,
+                'start' => $sittingStart?->format('h:i A'),
+                'end' => $sittingEnd?->format('h:i A'),
+                'range' => $sittingStart && $sittingEnd
+                    ? ($sittingStart->format('h:i A').' – '.$sittingEnd->format('h:i A'))
+                    : null,
             ],
+            'is_multi_day' => $isMultiDay,
+            'session_count' => $sessionCount,
             'location' => app(EventLocationService::class)->displayLocation($event, $locale),
             'space_id' => $event->space_id,
             'branch' => $event->branch ? [
