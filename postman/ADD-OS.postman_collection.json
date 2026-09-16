@@ -140,6 +140,21 @@
             "key": "service_field_id",
             "type": "string",
             "value": ""
+        },
+        {
+            "key": "event_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "event_field_id",
+            "value": "1",
+            "type": "string"
+        },
+        {
+            "key": "attendee_id",
+            "value": "1",
+            "type": "string"
         }
     ],
     "event": [
@@ -3092,6 +3107,119 @@
                                     ]
                                 },
                                 "description": "تسجيل العضو الحالي في الفعالية. تؤخذ بيانات العضو تلقائياً من حسابه (الاسم، البريد، الهاتف). في الفعاليات المجانية يتم التسجيل الفوري، وفي الفعاليات المدفوعة يتم خصم سعر الفعالية بالنقاط (price_points) مباشرة من محفظة العضو."
+                            }
+                        },
+                        {
+                            "name": "Get Registration Form",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/events/{{event_id}}/registration-form",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-form"
+                                    ]
+                                },
+                                "description": "Always answers, even when the event asks nothing — `fields` is then [] and the app has one code path. `identity` carries the member's own name, phone and email as read-only: those are never asked again."
+                            }
+                        },
+                        {
+                            "name": "Register — answering the form",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/events/{{event_id}}/register",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "events",
+                                        "{{event_id}}",
+                                        "register"
+                                    ]
+                                },
+                                "description": "Answers are validated against the event's stored field definitions. Submitting name/phone/email is refused with 422 — they come from the token.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"fields\": {\n    \"dietary_needs\": \"No nuts\",\n    \"shirt_size\": \"m\",\n    \"topics\": [\n      \"ai\"\n    ]\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Register — profile only",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/events/{{event_id}}/register",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "events",
+                                        "{{event_id}}",
+                                        "register"
+                                    ]
+                                },
+                                "description": "Most events need nothing the account does not already hold. An empty body is valid; check has_registration_form on the details endpoint first."
                             }
                         }
                     ]
@@ -10928,10 +11056,10 @@
                                         "events"
                                     ]
                                 },
-                                "description": "Create a new event.",
+                                "description": "Create a new event.\n\nsessions: one entry per day the event runs, each with its own hours. start_at/end_at are derived from these — the earliest start and the latest end — so an event sending a schedule need not send them. An event must state its times one way or the other.\n\nexternal_form_url and registration fields are mutually exclusive: an event registers here or there, never both.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"title\": {\n    \"en\": \"AI Hackathon\",\n    \"ar\": \"ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط°ظƒط§ط، ط§ظ„ط§طµط·ظ†ط§ط¹ظٹ\"\n  },\n  \"description\": {\n    \"en\": \"Annual 48-hour hackathon.\",\n    \"ar\": \"ط§ظ„ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط³ظ†ظˆظٹ ظ„ظ…ط¯ط© 48 ط³ط§ط¹ط©.\"\n  },\n  \"start_at\": \"2026-10-01 10:00:00\",\n  \"end_at\": \"2026-10-03 18:00:00\",\n  \"location\": \"Event Hall A\",\n  \"capacity\": 100,\n  \"status\": \"published\",\n  \"category_id\": 1\n}",
+                                    "raw": "{\n  \"title\": {\n    \"en\": \"AI Hackathon\",\n    \"ar\": \"ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط°ظƒط§ط، ط§ظ„ط§طµط·ظ†ط§ط¹ظٹ\"\n  },\n  \"description\": {\n    \"en\": \"Annual 48-hour hackathon.\",\n    \"ar\": \"ط§ظ„ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط³ظ†ظˆظٹ ظ„ظ…ط¯ط© 48 ط³ط§ط¹ط©.\"\n  },\n  \"start_at\": \"2026-10-01 10:00:00\",\n  \"end_at\": \"2026-10-03 18:00:00\",\n  \"location\": \"Event Hall A\",\n  \"capacity\": 100,\n  \"status\": \"published\",\n  \"category_id\": 1,\n  \"sessions\": [\n    {\n      \"start_at\": \"2026-12-01T09:00:00+03:00\",\n      \"end_at\": \"2026-12-01T17:00:00+03:00\"\n    },\n    {\n      \"start_at\": \"2026-12-02T16:00:00+03:00\",\n      \"end_at\": \"2026-12-02T21:00:00+03:00\"\n    }\n  ],\n  \"requires_approval\": false,\n  \"external_form_url\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -11005,10 +11133,10 @@
                                         "{{event_id}}"
                                     ]
                                 },
-                                "description": "Update event details.",
+                                "description": "Update event details.\n\nsessions: one entry per day the event runs, each with its own hours. start_at/end_at are derived from these — the earliest start and the latest end — so an event sending a schedule need not send them. An event must state its times one way or the other.\n\nexternal_form_url and registration fields are mutually exclusive: an event registers here or there, never both.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"title\": {\n    \"en\": \"AI Hackathon 2026\",\n    \"ar\": \"ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط°ظƒط§ط، ط§ظ„ط§طµط·ظ†ط§ط¹ظٹ 2026\"\n  },\n  \"description\": {\n    \"en\": \"Annual 48-hour hackathon.\",\n    \"ar\": \"ط§ظ„ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط³ظ†ظˆظٹ ظ„ظ…ط¯ط© 48 ط³ط§ط¹ط©.\"\n  },\n  \"status\": \"published\"\n}",
+                                    "raw": "{\n  \"title\": {\n    \"en\": \"AI Hackathon 2026\",\n    \"ar\": \"ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط°ظƒط§ط، ط§ظ„ط§طµط·ظ†ط§ط¹ظٹ 2026\"\n  },\n  \"description\": {\n    \"en\": \"Annual 48-hour hackathon.\",\n    \"ar\": \"ط§ظ„ظ‡ط§ظƒط§ط«ظˆظ† ط§ظ„ط³ظ†ظˆظٹ ظ„ظ…ط¯ط© 48 ط³ط§ط¹ط©.\"\n  },\n  \"status\": \"published\",\n  \"sessions\": [\n    {\n      \"start_at\": \"2026-12-01T09:00:00+03:00\",\n      \"end_at\": \"2026-12-01T17:00:00+03:00\"\n    },\n    {\n      \"start_at\": \"2026-12-02T16:00:00+03:00\",\n      \"end_at\": \"2026-12-02T21:00:00+03:00\"\n    }\n  ],\n  \"requires_approval\": false,\n  \"external_form_url\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -11047,6 +11175,624 @@
                                     ]
                                 },
                                 "description": "Delete an event."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Registration Form Fields",
+                    "description": "The questions an event asks on top of the member's own profile. Name, phone and email are never fields here — they come from the account. An event that sends registration to an external form cannot have any.",
+                    "item": [
+                        {
+                            "name": "List Fields",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "Every field, active or hidden: this is the editor, not the form."
+                            }
+                        },
+                        {
+                            "name": "Add Field — Short Text",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "A text question with character limits. `validation` accepts only the keys the chosen type allows — min/max here are characters.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"dietary_needs\",\n  \"label\": {\n    \"en\": \"Dietary needs\",\n    \"ar\": \"الاحتياجات الغذائية\"\n  },\n  \"placeholder\": {\n    \"en\": \"Allergies, preferences…\",\n    \"ar\": \"حساسية، تفضيلات…\"\n  },\n  \"type\": \"text\",\n  \"is_required\": true,\n  \"is_active\": true,\n  \"order\": 0,\n  \"validation\": {\n    \"min\": 2,\n    \"max\": 200\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — Date within a range",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "Date bounds use min_date/max_date, not min/max: those hold numbers on every other type. Absolute YYYY-MM-DD only — \"today\" and \"+30 days\" are refused rather than half-supported.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"arrival_day\",\n  \"label\": {\n    \"en\": \"Arrival day\",\n    \"ar\": \"يوم الوصول\"\n  },\n  \"type\": \"date\",\n  \"is_required\": false,\n  \"validation\": {\n    \"min_date\": \"2026-12-01\",\n    \"max_date\": \"2026-12-31\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — Single Choice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "Select and checkbox are refused without at least one option: an empty set would accept any value at submit time.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"shirt_size\",\n  \"label\": {\n    \"en\": \"Shirt size\",\n    \"ar\": \"مقاس القميص\"\n  },\n  \"type\": \"select\",\n  \"is_required\": true,\n  \"options\": [\n    {\n      \"value\": \"s\",\n      \"label\": {\n        \"en\": \"Small\",\n        \"ar\": \"صغير\"\n      }\n    },\n    {\n      \"value\": \"m\",\n      \"label\": {\n        \"en\": \"Medium\",\n        \"ar\": \"وسط\"\n      }\n    },\n    {\n      \"value\": \"l\",\n      \"label\": {\n        \"en\": \"Large\",\n        \"ar\": \"كبير\"\n      }\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — Multiple Choice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "min/max on a checkbox bound how many boxes may be ticked.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"topics\",\n  \"label\": {\n    \"en\": \"Topics of interest\",\n    \"ar\": \"المواضيع المهمة\"\n  },\n  \"type\": \"checkbox\",\n  \"options\": [\n    {\n      \"value\": \"ai\",\n      \"label\": {\n        \"en\": \"AI\",\n        \"ar\": \"ذكاء اصطناعي\"\n      }\n    },\n    {\n      \"value\": \"iot\",\n      \"label\": {\n        \"en\": \"IoT\",\n        \"ar\": \"إنترنت الأشياء\"\n      }\n    }\n  ],\n  \"validation\": {\n    \"min\": 1,\n    \"max\": 2\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — File Upload",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "`accept` takes a shorthand the server maps to mime rules; an unmapped value is logged and the constraint dropped rather than rejecting every upload.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"portfolio\",\n  \"label\": {\n    \"en\": \"Portfolio\",\n    \"ar\": \"أعمال سابقة\"\n  },\n  \"type\": \"file\",\n  \"validation\": {\n    \"accept\": \".pdf\",\n    \"max_kb\": 5120\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — Digits only (named pattern)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields"
+                                    ]
+                                },
+                                "description": "`regex` takes a NAME, never an expression: alpha, alphanumeric, digits, email, url, syrian_phone, no_urls. A free-form pattern is refused — Laravel splits rule strings on |, so one could append rules to a member-facing validator, and a nested quantifier hangs the worker.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"national_id\",\n  \"label\": {\n    \"en\": \"National ID\",\n    \"ar\": \"الرقم الوطني\"\n  },\n  \"type\": \"text\",\n  \"validation\": {\n    \"regex\": \"digits\",\n    \"min\": 11,\n    \"max\": 11\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Field",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields/{{event_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields",
+                                        "{{event_field_id}}"
+                                    ]
+                                },
+                                "description": "Omitting `validation` leaves the stored limits untouched; sending {} clears them.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"label\": {\n    \"en\": \"Dietary needs\",\n    \"ar\": \"الاحتياجات الغذائية\"\n  },\n  \"is_required\": false,\n  \"validation\": {\n    \"max\": 500\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Field",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/registration-fields/{{event_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "registration-fields",
+                                        "{{event_field_id}}"
+                                    ]
+                                },
+                                "description": "Answers already given are removed with it."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Event Attendees & Approval",
+                    "description": "An event with requires_approval holds each registration as pending. A pending row holds a seat but is charged nothing — points are debited on approval, which is why rejecting needs no refund.",
+                    "item": [
+                        {
+                            "name": "List Attendees",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/attendees?status=pending&page=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "attendees"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "status",
+                                            "value": "pending"
+                                        },
+                                        {
+                                            "key": "page",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "The roster, with each member's answers to the event's own questions."
+                            }
+                        },
+                        {
+                            "name": "List Pending Only",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/attendees/pending",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "attendees",
+                                        "pending"
+                                    ]
+                                },
+                                "description": "Just the applications still awaiting a decision."
+                            }
+                        },
+                        {
+                            "name": "Approve",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/attendees/{{attendee_id}}/approve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "attendees",
+                                        "{{attendee_id}}",
+                                        "approve"
+                                    ]
+                                },
+                                "description": "Debits the points and takes the seat. Fails with 422 if the member's balance has dropped since they applied — the row stays pending and the wallet is untouched, because the whole thing runs in one transaction. 409 if someone already decided it, or the event filled up meanwhile."
+                            }
+                        },
+                        {
+                            "name": "Reject",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/attendees/{{attendee_id}}/reject",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "attendees",
+                                        "{{attendee_id}}",
+                                        "reject"
+                                    ]
+                                },
+                                "description": "A reason is mandatory and is shown to the member on the event's detail endpoint. Nothing was debited, so nothing is refunded.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"reason\": \"The session is full.\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Reject All Pending",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/{{event_id}}/attendees/reject-pending",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "{{event_id}}",
+                                        "attendees",
+                                        "reject-pending"
+                                    ]
+                                },
+                                "description": "Turns down every undecided application at once. Deciding a queue one row at a time is how queues get abandoned, so the way out is one action.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"reason\": \"This session did not go ahead.\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             }
                         }
                     ]
