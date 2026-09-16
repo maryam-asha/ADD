@@ -10,6 +10,7 @@ use App\Support\Presenters\EventPricePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class EventBrowseService
@@ -423,6 +424,34 @@ class EventBrowseService
      *
      * @return array<string, mixed>
      */
+
+    /**
+     * This member's own application to an event, rejected ones included.
+     *
+     * A rejection is a decision they are entitled to see — scoping this to
+     * seat-holding rows meant a turned-down member was shown no trace of
+     * their own application. Ordered so a live application wins when someone
+     * has applied again after being turned down.
+     */
+    private function myRegistrationFor(Event $event, ?User $user): ?Model
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        return $event->attendees()
+            ->where(function ($q) use ($user) {
+                $q->where('user_id', $user->id)
+                    ->orWhere('email', $user->email);
+                if ($user->phone) {
+                    $q->orWhere('phone', $user->phone);
+                }
+            })
+            ->orderByRaw("CASE WHEN status = 'rejected' THEN 1 ELSE 0 END asc")
+            ->orderByDesc('id')
+            ->first();
+    }
+
     public function formatEventCard(Event $event, ?User $user = null): array
     {
         $locale = $this->resolveLocale();
@@ -452,21 +481,12 @@ class EventBrowseService
         // One lookup, not two: the row itself answers both "is this member
         // in" and "where does their registration stand". Rejected rows are
         // excluded, so a rejected member may register again.
-        $myRegistration = $user
-            ? $event->attendees()
-                ->seatHolding()
-                ->where(function ($q) use ($user) {
-                    $q->where('user_id', $user->id)
-                        ->orWhere('email', $user->email);
-                    if ($user->phone) {
-                        $q->orWhere('phone', $user->phone);
-                    }
-                })
-                ->first()
-            : null;
+        $myRegistration = $this->myRegistrationFor($event, $user);
 
-        $isRegistered = $myRegistration !== null;
         $registrationStatus = $myRegistration?->status?->value;
+        // Rejected is a decision, not a place on the list: is_registered
+        // drives "you are in", which a turned-down member is not.
+        $isRegistered = $myRegistration !== null && $registrationStatus !== 'rejected';
 
         // Member-facing: the two display labels only. The raw point count
         // and the unformatted currency figures stay server-side —
@@ -512,7 +532,10 @@ class EventBrowseService
             'computed_status' => $computedStatus,
             'badge' => $badge,
             'is_registered' => $isRegistered,
-            'registration_status' => $registrationStatus,
+            // On a card, only a live application: a rejection against every
+            // browsed event is noise the listing cannot explain. The detail
+            // view carries the decision and its reason.
+            'registration_status' => $isRegistered ? $registrationStatus : null,
             'requires_approval' => (bool) $event->requires_approval,
             'has_registration_form' => (bool) $event->has_registration_form,
             'external_form_url' => $event->external_form_url,
@@ -542,9 +565,18 @@ class EventBrowseService
         // presenter — no second copy of the formatting here.
         $time = app(LocalTime::class);
 
+        $mine = $this->myRegistrationFor($event, $user);
+
         return array_merge($card, [
             'description' => $event->translate('description', $locale),
             'date_full' => $start ? $start->format('l, F j, Y') : null,
+            // The decision on this member's own application, which the card
+            // leaves out. A turned-down member was previously shown nothing
+            // at all — no status, no reason, and an invitation to apply
+            // again with no hint of what had happened.
+            'registration_status' => $mine?->status?->value,
+            'rejection_reason' => $mine?->rejection_reason,
+            'registered_at' => $mine?->created_at?->toISOString(),
             // The schedule, when the event runs over more than one sitting.
             // start_at/end_at on the card stay the envelope around these, so
             // a client that only reads those is unaffected.
