@@ -101,3 +101,133 @@ Reserved identity keys are now enforced on **both** domains. The Services field 
 - **Events still run on `role:` middleware, not the `permission:` pilot.** Consistent with every other resource except Branches; converting them belongs with the rest of that rollout, not here.
 - **Notifications are `NotificationLog` rows, not real delivery** — inherited unchanged from `BookingApprovalService`, and `docs/decisions/booking-creation-approval-extension.md` covers why. A member whose registration expires or is bulk-rejected therefore learns of it by opening the app, not by being told.
 - **The expiry sweep does not notify differently from a manual rejection.** Both write `event.registration_rejected`, so a member cannot tell from the notification alone whether a person decided or a deadline passed. The `rejection_reason` text does distinguish them.
+
+## Per-field-type validation constraints
+
+A field could declare its type but not its limits: a text question accepted
+10,000 characters, a date question any date in any century. The `validation`
+JSON column already existed on both tables and a few branches of
+`FieldRuleBuilder` already read it, but nothing specified what it could hold,
+so the admin API stored whatever it was handed.
+
+`App\Support\Forms\FieldConstraints` is that specification now, and both
+halves of the engine read it — the rule builder turning stored keys into
+rules, `ValidationVocabularyRule` refusing to store a key the chosen type does
+not accept. One `match()`, so they cannot drift.
+
+| Type | Keys | Meaning |
+|---|---|---|
+| `text`, `textarea` | `min`, `max`, `regex` | characters, named pattern |
+| `number` | `min`, `max` | value, fractions allowed |
+| `date` | `min_date`, `max_date` | absolute `YYYY-MM-DD` |
+| `checkbox` | `min`, `max` | how many boxes ticked |
+| `rating` | `min`, `max` | stars, 1..5 by default |
+| `file` | `accept`, `max_kb` | unchanged |
+| `select` | — | its options are the constraint |
+| *all* | `required` | OR'd with the `is_required` column |
+
+### Why dates do not reuse `min`/`max`
+
+Every other type stores a number there. A date bound is a string, and
+`EventRegistrationFieldResource` ships `validation` raw to a member app that
+is a separate codebase we cannot inspect or revise. A client doing the obvious
+thing — `input.maxLength = field.validation.max` — would be handed
+`"2026-12-31"`. A new key an old client ignores is safe in a way a redefined
+one is not, and that asymmetry is the whole argument: forward compatibility by
+omission is the only compatibility direction available.
+
+### Free-form regex was removed, not guarded
+
+`"regex:{$v['regex']}"` was built by concatenation from admin input. Two holes
+at once. Laravel splits a rule string on `|`, so a stored
+`/^a/|exists:users,email` appended two rules to a **member-facing** validator —
+an existence oracle handed to anyone who can edit a field. And a nested
+quantifier like `(a+)+$` hangs the worker on a long input, which needs no
+attacker at all; that shape is ordinary copy-paste.
+
+Only the names in `FieldConstraints::PATTERNS` are honoured: `alpha`,
+`alphanumeric`, `digits`, `email`, `url`, `syrian_phone`, `no_urls`. The two
+with a `null` expression emit Laravel's own rule, which is already translated
+in both locales and words the failure far better than "format is invalid".
+
+This was checked against the live database before shipping: four rows carried
+constraints, none carried a `regex`. So dropping it cost nothing — and that
+window does not stay open. **It is still a contract change for the member app**,
+which will now receive a short name where the field's type says PCRE. Nothing
+in flight breaks because nothing in flight uses it, but the owner of that app
+should be told.
+
+Reads stay lenient and only writes are strict, the same posture
+`acceptToMimes()` already took: an unrecognised legacy value is dropped and
+logged rather than rejected, so a live configuration cannot start refusing
+every submission on deploy.
+
+### The timezone guard needed no exemption
+
+`UserSuppliedTimesAreInterpretedLocallyTest` was expected to be the awkward
+part, and it was not — but only because the design avoids it deliberately
+rather than by luck, so the reasoning is worth keeping.
+
+Its Form Request half matches `/=>\s*\[[^\]]*'date'/`, which a line like
+`'validation.min_date' => ['nullable', 'date']` **would** trip. There is no
+such line: the vocabulary is enforced by a rule object, so no admin Form
+Request declares a literal `date` rule. Its controller half bans
+`Carbon::parse($request->…)`. There is no such call either — a bound is
+validated with `preg_match` plus `checkdate()` and passed to
+`after_or_equal:` as a raw string.
+
+Both are correct on the merits, not just convenient. `max_date: 2026-12-31`
+means that date wherever the reader is; converting it to an instant would be
+the bug. The submission side is safe for the same reason and additionally
+because its `date` rules are built at runtime from the database, so the
+literal never appears in source.
+
+If a future field type accepts a date**time** rather than a date, this changes:
+it would need `interpretLocalTimes` over a dynamically-built field list, which
+the trait cannot do today.
+
+### Relative bounds are deferred, and rejected meanwhile
+
+`today` and `+30 days` are the more useful version of a date range and will
+likely be asked for. They are refused rather than partially supported, because
+"today" is a different calendar day in `Asia/Damascus` than in UTC for three
+hours out of every 24 — the bug class that has already bitten this project
+twice — and because they make the generated rule depend on the day it was
+built, which every `assertSame` test in `FieldRuleBuilderTest` would have to
+freeze time to tolerate.
+
+### Failures now name the question
+
+`'attributes' => []` was empty in both locales and no Form Request implemented
+`attributes()`, so a failed dynamic rule rendered `:attribute` as the dotted
+path it was keyed by. An Arabic member reading "يجب ألا يكون طول حقل
+fields.dietary_needs أكبر من 50 حرفاً" has been told which key failed, not
+which question. The label was already stored bilingually and already sent to
+clients; `FieldRuleBuilder::attributesFor()` now carries it into the validator,
+including the `.*` path so a checkbox element error does not read as a bare
+index.
+
+### Two unrelated defects found on the way
+
+`AdminServiceTypeController::store()` and `storeField()` declared a Resource
+return type but returned the `JsonResponse` that `->response()` produces, so
+both threw a `TypeError` on every success. Creating a service type, or a field
+on one, was broken outright. Neither had a test; the vocabulary tests, which
+run against both domains precisely because these four requests are
+near-duplicates, are what surfaced it.
+
+### No migration
+
+The column was already `json`, nullable, cast and fillable on both tables, and
+all four constrained rows in production remain valid under the vocabulary on
+their own type. No backfill, and no new enum column, so
+`NoNewMysqlEnumColumnsTest` and the 64-character identifier trap are both moot.
+
+### The vocabulary is duplicated, unavoidably
+
+`FieldConstraints::for()` in PHP, `VALIDATION_KEYS_BY_TYPE` in
+`ADDOS/src/add-os/components/resource/form-fields.ts`. There is no shared
+schema mechanism between the repos. `FieldConstraintsTest` snapshots the
+backend's list and names that file in its failure message, so the two cannot
+drift silently. Generating the TS from the PHP at build time is the real fix if
+this grows.
