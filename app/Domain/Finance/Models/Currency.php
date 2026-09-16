@@ -6,6 +6,7 @@ use App\Concerns\HasTranslations;
 use Database\Factories\CurrencyFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Admin-managed currency lookup, replacing the hardcoded
@@ -47,9 +48,35 @@ class Currency extends Model
         ];
     }
 
+    /**
+     * The base currency's code.
+     *
+     * One fact for the whole request, and it changes almost never — but it
+     * was being read from the database by every caller that needed it, which
+     * on an events page meant once per card. Memoised in-process on top of
+     * the cache, because CACHE_STORE is `database` in production and a cache
+     * hit is itself a query there.
+     */
+    public static function baseCode(): string
+    {
+        return static::$baseCodeMemo ??= Cache::rememberForever(
+            'base_currency_code',
+            fn () => static::where('is_base', true)->value('code') ?? 'USD'
+        );
+    }
+
+    /** Cleared by the booted() hooks below when the base currency moves. */
+    protected static ?string $baseCodeMemo = null;
+
+    public static function forgetBaseCode(): void
+    {
+        static::$baseCodeMemo = null;
+        Cache::forget('base_currency_code');
+    }
+
     public static function defaultCode(): string
     {
-        return \Illuminate\Support\Facades\Cache::rememberForever('default_currency_code', function () {
+        return Cache::rememberForever('default_currency_code', function () {
             return static::where('is_default', true)->value('code')
                 ?? static::where('is_base', true)->value('code')
                 ?? 'USD';
@@ -58,6 +85,10 @@ class Currency extends Model
 
     protected static function booted(): void
     {
+        // A moved base currency must not leave a stale memo behind.
+        static::saved(fn () => static::forgetBaseCode());
+        static::deleted(fn () => static::forgetBaseCode());
+
         static::saving(function (Currency $currency) {
             // Keep is_default and is_base synchronized
             if ($currency->is_default) {
@@ -78,13 +109,13 @@ class Currency extends Model
         });
 
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('default_currency_code');
-            \Illuminate\Support\Facades\Cache::forget('active_currencies_list');
+            Cache::forget('default_currency_code');
+            Cache::forget('active_currencies_list');
         });
 
         static::deleted(function (Currency $currency) {
-            \Illuminate\Support\Facades\Cache::forget('default_currency_code');
-            \Illuminate\Support\Facades\Cache::forget('active_currencies_list');
+            Cache::forget('default_currency_code');
+            Cache::forget('active_currencies_list');
 
             if ($currency->is_default || $currency->is_base) {
                 $next = static::where('code', '!=', $currency->code)->orderBy('order')->first();

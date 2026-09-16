@@ -112,10 +112,17 @@ class EventPricePresenter
      */
     private function withSymbol(string $amount, string $currencyCode): string
     {
-        $currency = Currency::find($currencyCode);
+        // Memoised for the request: a listing formats a price per card, and
+        // this used to read the same currency row every time. The instance
+        // is per-resolution, which is the life of one request here.
+        $currency = $this->currencyRows[$currencyCode] ??= Currency::find($currencyCode);
+
         $decimals = $currency?->decimal_places ?? 2;
         $symbol = $currency?->symbol ?: $currencyCode;
 
         return number_format((float) $amount, $decimals).' '.$symbol;
     }
+
+    /** @var array<string, Currency|null> */
+    private array $currencyRows = [];
 }

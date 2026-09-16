@@ -4,8 +4,11 @@ namespace App\Providers;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Policies\CompanyPolicy;
+use App\Domain\Settings\Services\SettingService;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
 use App\Listeners\SetLocaleFromUserPreference;
+use App\Support\Presenters\EventPricePresenter;
+use App\Support\Time\LocalTime;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -23,7 +26,17 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Both hold a per-request memo of values that do not change during a
+        // request — the configured timezone, the point rate, the base
+        // currency. Without singletons each resolution built a fresh
+        // instance with an empty memo, and CACHE_STORE is `database` here, so
+        // every re-read was a query: one events page read the configured
+        // timezone 68 times and the point rate 34 more.
+        $this->app->singleton(SettingService::class);
+        $this->app->singleton(LocalTime::class);
+        // Same reason: it memoises currency rows to format a price, and a
+        // listing formats one per card.
+        $this->app->singleton(EventPricePresenter::class);
     }
 
     /**

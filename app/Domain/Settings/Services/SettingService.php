@@ -18,18 +18,29 @@ use InvalidArgumentException;
  */
 class SettingService
 {
+    /** @var array<string, mixed> Resolved values, for this request only. */
+    private array $memo = [];
+
     public function get(
         string $key,
         mixed $default = null,
         SettingScope $scopeType = SettingScope::Global,
         int $scopeId = 0,
     ): mixed {
-        $value = Cache::rememberForever(
-            $this->cacheKey($key, $scopeType, $scopeId),
-            fn () => $this->find($key, $scopeType, $scopeId)?->resolvedValue(),
-        );
+        $cacheKey = $this->cacheKey($key, $scopeType, $scopeId);
 
-        return $value ?? $default;
+        // Memoised for the life of this instance, which is the request.
+        // CACHE_STORE is `database` in production, so a cache hit is itself a
+        // query — and a settings value read once per rendered row added up
+        // fast: one events page read app.timezone 68 times.
+        if (! array_key_exists($cacheKey, $this->memo)) {
+            $this->memo[$cacheKey] = Cache::rememberForever(
+                $cacheKey,
+                fn () => $this->find($key, $scopeType, $scopeId)?->resolvedValue(),
+            );
+        }
+
+        return $this->memo[$cacheKey] ?? $default;
     }
 
     public function set(
@@ -53,7 +64,10 @@ class SettingService
         $setting->value = Setting::encodeValue($type, $value);
         $setting->save();
 
-        Cache::forget($this->cacheKey($key, $scopeType, $scopeId));
+        $cacheKey = $this->cacheKey($key, $scopeType, $scopeId);
+
+        unset($this->memo[$cacheKey]);
+        Cache::forget($cacheKey);
 
         return $setting;
     }

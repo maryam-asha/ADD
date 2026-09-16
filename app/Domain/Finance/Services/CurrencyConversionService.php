@@ -18,7 +18,7 @@ class CurrencyConversionService
 {
     public function baseCurrencyCode(): string
     {
-        return Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+        return Currency::baseCode();
     }
 
     public function convert(float $amount, string $fromCurrency, string $toCurrency): ?float
