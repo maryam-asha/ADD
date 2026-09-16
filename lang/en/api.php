@@ -295,6 +295,8 @@ return [
     ],
 
     'event' => [
+        'form_is_internal' => 'This event already asks its own :count question(s). Remove them before sending registration to an external form.',
+        'form_is_external' => 'This event sends registration to an external form, so it has no questions of its own. Clear the link first.',
         'registers_externally' => 'Registration for this event is handled on an external form.',
         'pending_rejected' => 'Closed out :count pending registration(s).',
         'pending_expired' => 'Closed automatically: not reviewed before the event.',

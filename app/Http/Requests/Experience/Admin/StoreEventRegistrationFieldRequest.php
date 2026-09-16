@@ -2,11 +2,13 @@
 
 namespace App\Http\Requests\Experience\Admin;
 
+use App\Domain\Experience\Models\Event;
 use App\Support\Forms\FieldType;
 use App\Support\Forms\ReservedFieldKeys;
 use App\Support\Forms\Rules\ValidationVocabularyRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class StoreEventRegistrationFieldRequest extends FormRequest
 {
@@ -81,5 +83,23 @@ class StoreEventRegistrationFieldRequest extends FormRequest
         }
 
         return null;
+    }
+
+    /**
+     * An event that sends registration elsewhere has no questions of its own
+     * to ask — the member never reaches our endpoint. Keyed to `key` so the
+     * builder shows it against the field being added rather than as a bare
+     * banner.
+     */
+    protected function prepareForValidation(): void
+    {
+        $event = $this->route('event');
+        $event = $event instanceof Event ? $event : Event::find($event);
+
+        if ($event !== null && $event->registersExternally()) {
+            throw ValidationException::withMessages([
+                'key' => [__('api.event.form_is_external')],
+            ]);
+        }
     }
 }

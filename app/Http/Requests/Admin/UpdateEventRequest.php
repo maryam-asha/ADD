@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Experience\Models\Event;
 use App\Http\Requests\Concerns\InterpretsLocalTimes;
+use App\Rules\RegistrationSourceIsExclusive;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -54,7 +56,12 @@ class UpdateEventRequest extends FormRequest
                 'requires_approval' => ['nullable', 'boolean'],
                 // Registration happens here or there, never both: an
                 // external form knows nothing about our seats or approvals.
-                'external_form_url' => ['nullable', 'string', 'url', 'max:2048'],
+                // A hidden question counts — it is one the admin wrote and
+                // expects back, and a link over the top would strand it.
+                'external_form_url' => [
+                    'nullable', 'string', 'url', 'max:2048',
+                    new RegistrationSourceIsExclusive($this->targetEvent()),
+                ],
                 'is_free' => ['nullable', 'boolean'],
                 'price_points' => ['nullable', 'integer', 'min:0'],
 
@@ -63,5 +70,13 @@ class UpdateEventRequest extends FormRequest
                 'order' => ['nullable', 'integer', 'min:0'],
             ]
         );
+    }
+
+    /** The event being edited, for rules that depend on what it already has. */
+    private function targetEvent(): ?Event
+    {
+        $event = $this->route('event');
+
+        return $event instanceof Event ? $event : Event::find($event);
     }
 }
