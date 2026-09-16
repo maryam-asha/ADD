@@ -231,3 +231,65 @@ schema mechanism between the repos. `FieldConstraintsTest` snapshots the
 backend's list and names that file in its failure message, so the two cannot
 drift silently. Generating the TS from the PHP at build time is the real fix if
 this grows.
+
+## An event runs on a schedule, not one unbroken stretch
+
+A three-day exhibition that opens 09:00–17:00, then 10:00–14:00, then
+16:00–21:00 could not be expressed. `events.start_at`/`end_at` is a single
+interval, so the admin had to either state hours that were wrong on two days
+out of three, or create three events and split the registrations between them.
+
+`event_sessions` carries the real hours, one row per sitting.
+
+### The envelope is derived, not replaced
+
+`start_at`/`end_at` stay on `events` and stay authoritative — they drive
+ordering, the upcoming/past filters, the registration deadline, the card, and
+the member app's whole idea of when an event is. Replacing them would have
+meant rewriting every one of those and changing a public API shape consumed by
+an app we do not control.
+
+Instead they became *derived*: the earliest session's start and the latest
+session's end, recomputed by `EventSchedule` whenever the schedule changes.
+Every existing query kept working untouched, which is the entire argument for
+this shape. `EventSchedule::syncEnvelope()` is therefore the only place those
+two columns may be written once an event has sessions; anything else setting
+them by hand is overwritten on the next schedule edit, deliberately — a
+mismatch would show one set of hours on the card and another on the detail
+page.
+
+An event with no sessions keeps whatever envelope it has rather than having it
+blanked, or clearing a schedule would drop the event out of every listing.
+
+### Registration stays one act
+
+A member registers for the event, not for a sitting, and attendance is not
+tracked per sitting — hence no pivot. Per-session seats would make capacity,
+approval, points and the expiry sweep all per-session, which is a much larger
+change than what was asked for. If it is ever wanted, `event_sessions` is the
+table to hang it off.
+
+### Existing events were backfilled
+
+Every event with times became a single-session event, so nothing has to
+special-case "an event with no schedule" in the read path. Verified against
+MySQL rather than SQLite: 20 events, 20 sessions, none stranded.
+
+### Two bugs the tests caught, worth recording
+
+- **`EventSessionFactory` wrote its wall clock straight to the column.** That
+  stored 09:00 as 09:00 UTC and read it back as 12:00 local — the same
+  three-hour drift this application has now shipped twice. It interprets
+  through `LocalTime` like the Form Request does. Left alone it would have
+  baked the drift into every future test using it, which is worse than a bug
+  in production code: it would have made the wrong behaviour look verified.
+- **Returning `$event->fresh()` from `store()` turned the 201 into a 200**,
+  because the refetched instance is no longer "recently created" as far as
+  Laravel's resource response is concerned. Caught by the nine existing
+  timezone tests. `refresh()` keeps the flag.
+
+Session hours are interpreted at the edge like every other wall clock here:
+`interpretLocalTimesIn()` extends the existing trait to nested rows rather
+than reimplementing the timezone rule beside it, so
+`UserSuppliedTimesAreInterpretedLocallyTest` still describes the whole
+application.
