@@ -243,4 +243,37 @@ class EventSessionsTest extends TestCase
         $this->assertNotNull($payload['start_at']);
         $this->assertSame([], $payload['sessions']);
     }
+
+    // ── The schedule is how an event states its times ────────────────────
+
+    /**
+     * The admin form no longer offers a start and an end: it offers a
+     * schedule, of which a one-day event is simply one row. So a create
+     * carrying only sessions has to work, and has to derive the envelope
+     * that every listing still reads.
+     */
+    public function test_an_event_can_be_created_from_its_schedule_alone(): void
+    {
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Expo', 'ar' => 'معرض'],
+            'sessions' => [
+                ['start_at' => '2026-12-01 09:00', 'end_at' => '2026-12-01 17:00'],
+                ['start_at' => '2026-12-02 10:00', 'end_at' => '2026-12-02 14:00'],
+            ],
+        ])->assertStatus(201);
+
+        $event = Event::find($response->json('data.id'));
+
+        $this->assertSame(2, $event->sessions()->count());
+        $this->assertSame('2026-12-01 09:00', $event->start_at->setTimezone('Asia/Damascus')->format('Y-m-d H:i'));
+        $this->assertSame('2026-12-02 14:00', $event->end_at->setTimezone('Asia/Damascus')->format('Y-m-d H:i'));
+    }
+
+    /** An event still has to say when it happens, one way or the other. */
+    public function test_an_event_with_neither_a_schedule_nor_an_envelope_is_refused(): void
+    {
+        $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Expo', 'ar' => 'معرض'],
+        ])->assertStatus(422)->assertJsonValidationErrors('start_at');
+    }
 }

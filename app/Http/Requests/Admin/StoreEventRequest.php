@@ -44,8 +44,11 @@ class StoreEventRequest extends FormRequest
                 'room_id' => ['nullable', 'integer', 'exists:spaces,id'],
                 'room' => ['nullable', 'string', 'max:100'],
                 'category_id' => ['nullable', 'integer', 'exists:event_categories,id'],
-                'start_at' => ['required', 'date'],
-                'end_at' => ['required', 'date', 'after:start_at'],
+                // The envelope is derived from the schedule by EventSchedule,
+                // so a client that sends sessions need not send these — but an
+                // event has to say when it happens one way or the other.
+                'start_at' => ['required_without:sessions', 'date'],
+                'end_at' => ['required_without:sessions', 'date', 'after:start_at'],
                 // An event is on-site (space_id, label derived at read
                 // time from live branch/space names) or off-site (this
                 // free-text address). Never both — a stored location
@@ -54,7 +57,7 @@ class StoreEventRequest extends FormRequest
                 // A schedule, when the event runs over more than one sitting.
                 // The envelope above is derived from these, so it is not
                 // typed alongside them.
-                'sessions' => ['nullable', 'array', 'max:60'],
+                'sessions' => ['nullable', 'array', 'max:60', 'required_without:start_at'],
                 'sessions.*.start_at' => ['required_with:sessions', 'date'],
                 'sessions.*.end_at' => ['required_with:sessions', 'date', 'after:sessions.*.start_at'],
                 'sessions.*.title' => ['nullable', 'array'],

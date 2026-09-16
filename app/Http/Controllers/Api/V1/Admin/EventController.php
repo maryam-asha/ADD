@@ -33,6 +33,14 @@ class EventController extends AdminResourceController
         $validated = $this->resolvePlacement($request->validated());
         $sessions = $this->takeSessions($validated);
 
+        // start_at/end_at are NOT NULL and are derived from the schedule, so
+        // a payload carrying only sessions needs the envelope seeded before
+        // the row exists. EventSchedule recomputes it immediately after.
+        if ($sessions !== null && ! isset($validated['start_at'])) {
+            $validated['start_at'] = collect($sessions)->min('start_at');
+            $validated['end_at'] = collect($sessions)->max('end_at');
+        }
+
         $event = Event::create(array_merge(
             ['order' => 0, 'status' => 'draft'],
             $validated
