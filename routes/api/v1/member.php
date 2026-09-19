@@ -53,6 +53,17 @@ Route::get('spaces/{space}/availability/quote', [SpaceAvailabilityController::cl
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 
+// The member's own bookings: the list with its tab counts, one booking's
+// detail with the approval stepper, self-service cancellation (the same
+// BookingCancellationService reception calls), and the confirmation
+// screen's price breakdown and payment options, which creates nothing.
+// Static segments before the wildcard so `preview` is not swallowed by
+// `{booking}`.
+Route::get('bookings', [BookingController::class, 'index']);
+Route::post('bookings/preview', [BookingController::class, 'preview']);
+Route::get('bookings/{booking}', [BookingController::class, 'show']);
+Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+
 // Reception kiosk "I'm here" signal (docs/decisions/kiosk-display.md) —
 // never changes booking/session state by itself.
 Route::post('arrival-requests', [ArrivalRequestController::class, 'store']);

@@ -201,6 +201,39 @@ return [
             'outside_hours' => 'Outside hours',
         ],
         'range_too_long' => 'The requested date range is too long. Request at most :days days.',
+
+        // Member booking lifecycle: list, detail, cancellation, preview.
+        'cancelled' => 'Booking cancelled.',
+        'not_your_booking' => 'This booking does not belong to you.',
+        'cancellation_note' => 'You can cancel this booking up to :duration before the start time.',
+        'points_amount' => ':points pts',
+        'vat_label' => 'VAT (:percent%)',
+        'hours_times_rate' => ':duration × :rate / hour',
+        'note_label' => 'Add a Note (Optional)',
+        'note_placeholder' => 'e.g. Meeting purpose, special requests…',
+        'statuses' => [
+            'confirmed' => 'Confirmed',
+            'pending' => 'Under Review',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+        ],
+        'steps' => [
+            'submitted' => 'Submitted',
+            'under_review' => 'Under Review',
+            'approved' => 'Approved',
+            'rejected' => 'Rejected',
+            'confirmed' => 'Confirmed',
+            'cancelled' => 'Cancelled',
+        ],
+        'payment_methods' => [
+            'wallet' => 'Use Wallet Balance',
+            'cash' => 'Pay Cash at Arrival',
+        ],
+        'tabs' => [
+            'upcoming' => 'Upcoming',
+            'past' => 'Past',
+            'all' => 'All',
+        ],
     ],
 
     'kiosk' => [

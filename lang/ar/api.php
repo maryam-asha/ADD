@@ -200,6 +200,39 @@ return [
             'outside_hours' => 'خارج ساعات العمل',
         ],
         'range_too_long' => 'النطاق الزمني المطلوب طويل جداً. اطلب :days يوماً كحد أقصى.',
+
+        // دورة حياة حجز العضو: القائمة والتفاصيل والإلغاء والمعاينة.
+        'cancelled' => 'تم إلغاء الحجز.',
+        'not_your_booking' => 'هذا الحجز لا يخصّك.',
+        'cancellation_note' => 'يمكنك إلغاء هذا الحجز حتى :duration قبل وقت البدء.',
+        'points_amount' => ':points نقطة',
+        'vat_label' => 'ضريبة القيمة المضافة (:percent%)',
+        'hours_times_rate' => ':duration × :rate / ساعة',
+        'note_label' => 'أضف ملاحظة (اختياري)',
+        'note_placeholder' => 'مثال: غرض الاجتماع، طلبات خاصة…',
+        'statuses' => [
+            'confirmed' => 'مؤكد',
+            'pending' => 'قيد المراجعة',
+            'rejected' => 'مرفوض',
+            'cancelled' => 'ملغى',
+        ],
+        'steps' => [
+            'submitted' => 'تم الإرسال',
+            'under_review' => 'قيد المراجعة',
+            'approved' => 'تمت الموافقة',
+            'rejected' => 'مرفوض',
+            'confirmed' => 'مؤكد',
+            'cancelled' => 'ملغى',
+        ],
+        'payment_methods' => [
+            'wallet' => 'استخدام رصيد المحفظة',
+            'cash' => 'الدفع نقداً عند الوصول',
+        ],
+        'tabs' => [
+            'upcoming' => 'القادمة',
+            'past' => 'السابقة',
+            'all' => 'الكل',
+        ],
     ],
 
     'kiosk' => [

@@ -31,6 +31,7 @@ class StoreBookingRequest extends FormRequest
             'end_at' => ['required', 'date', 'after:start_at'],
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
+            'note' => ['nullable', 'string', 'max:500'],
         ];
     }
 }

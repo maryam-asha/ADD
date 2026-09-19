@@ -47,6 +47,7 @@ class BookingCreationService
         CarbonInterface $endAt,
         ?OwnerType $walletOwnerType = null,
         ?int $walletOwnerId = null,
+        ?string $note = null,
     ): Booking {
         // Normalize to UTC: Eloquent's datetime cast stores the Carbon
         // value's current wall-clock as-is and reinterprets it as UTC on
@@ -63,7 +64,7 @@ class BookingCreationService
         $this->assertValidGranularity($startAt, $rules);
         $this->assertValidDuration($startAt, $endAt, $rules);
 
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules) {
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
             // Re-read inside the lock. Nothing the calendar computed is
@@ -97,6 +98,7 @@ class BookingCreationService
                 'currency' => 'USD',
                 'payment_state' => $paymentState,
                 'payment_source' => $paymentSource,
+                'note' => $note,
             ]);
 
             // Inside the same transaction and the same Space lock as the

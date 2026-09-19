@@ -40,6 +40,7 @@ class Booking extends Model
         'paid_at',
         'cancelled_at',
         'rejection_reason',
+        'note',
         'approved_by',
         'approved_at',
     ];
