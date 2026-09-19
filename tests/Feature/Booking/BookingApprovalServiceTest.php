@@ -34,6 +34,17 @@ class BookingApprovalServiceTest extends TestCase
         parent::setUp();
         $this->seed(RoleSeeder::class);
         $this->approvals = app(BookingApprovalService::class);
+        // This class books a hardcoded 2026-08-17 (a Monday) but never
+        // froze the clock, so those windows drifted into the past as real
+        // time moved on. Harmless until bookings had to start in the
+        // future; pinning `now()` is what every other booking test does.
+        Carbon::setTestNow(Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus'));
+    }
+
+    protected function tearDown(): void
+    {
+        Carbon::setTestNow();
+        parent::tearDown();
     }
 
     public function test_approving_a_pending_booking_confirms_it_and_notifies_the_member(): void

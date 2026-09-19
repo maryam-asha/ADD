@@ -205,6 +205,9 @@ return [
         // Member booking lifecycle: list, detail, cancellation, preview.
         'cancelled' => 'Booking cancelled.',
         'not_your_booking' => 'This booking does not belong to you.',
+        'start_in_the_past' => 'A booking cannot start in the past.',
+        'batch_partially_unavailable' => 'Some of the selected dates are not available. Nothing was booked.',
+        'batch_created' => ':count bookings created.',
         'cancellation_note' => 'You can cancel this booking up to :duration before the start time.',
         'points_amount' => ':points pts',
         'vat_label' => 'VAT (:percent%)',

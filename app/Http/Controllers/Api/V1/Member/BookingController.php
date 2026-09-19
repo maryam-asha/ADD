@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Exceptions\BatchUnavailableException;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\AvailabilityService;
+use App\Domain\Booking\Services\BookingBatchCreationService;
 use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
@@ -18,6 +20,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
 use App\Http\Requests\Member\Booking\ListBookingsRequest;
 use App\Http\Requests\Member\Booking\PreviewBookingRequest;
+use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Http\Resources\MemberBookingDetailResource;
@@ -198,6 +201,56 @@ class BookingController extends Controller
         $this->logSensitiveAction('booking_created', $booking);
 
         return response()->json(['data' => new BookingResource($booking)], 201);
+    }
+
+    /**
+     * Several dates, one request, all or nothing.
+     *
+     * A failure names each window that could not be taken by its index in
+     * the submitted list, so the app can mark the offending chips rather
+     * than saying "something went wrong".
+     */
+    public function storeBatch(StoreBookingBatchRequest $request, BookingBatchCreationService $batches): JsonResponse
+    {
+        $walletOwnerType = $request->validated('wallet_owner_type')
+            ? OwnerType::from($request->validated('wallet_owner_type'))
+            : null;
+
+        try {
+            $bookings = $batches->createMany(
+                $request->validated('windows'),
+                $request->user(),
+                $walletOwnerType,
+                $request->validated('wallet_owner_id'),
+                $request->validated('note'),
+            );
+        } catch (BatchUnavailableException $e) {
+            return response()->json([
+                'message' => __('api.booking.batch_partially_unavailable'),
+                'errors' => array_map(fn (array $failure) => [
+                    'index' => $failure['index'],
+                    'start_at' => $failure['start_at'],
+                    'reason' => $failure['reason'],
+                    'message' => __($failure['message_key']),
+                ], $e->failures),
+            ], 422);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (WalletChoiceRequiredException $e) {
+            return response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422);
+        }
+
+        foreach ($bookings as $booking) {
+            $this->logSensitiveAction('booking_created', $booking);
+        }
+
+        return response()->json([
+            'message' => __('api.booking.batch_created', ['count' => count($bookings)]),
+            'data' => BookingResource::collection($bookings)->resolve(),
+        ], 201);
     }
 
     public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse

@@ -204,6 +204,9 @@ return [
         // دورة حياة حجز العضو: القائمة والتفاصيل والإلغاء والمعاينة.
         'cancelled' => 'تم إلغاء الحجز.',
         'not_your_booking' => 'هذا الحجز لا يخصّك.',
+        'start_in_the_past' => 'لا يمكن أن يبدأ الحجز في وقت مضى.',
+        'batch_partially_unavailable' => 'بعض التواريخ المختارة غير متاحة. لم يتم حجز أي منها.',
+        'batch_created' => 'تم إنشاء :count حجز.',
         'cancellation_note' => 'يمكنك إلغاء هذا الحجز حتى :duration قبل وقت البدء.',
         'points_amount' => ':points نقطة',
         'vat_label' => 'ضريبة القيمة المضافة (:percent%)',

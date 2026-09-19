@@ -17,6 +17,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -38,6 +39,7 @@ class BookingCreationService
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
+        private readonly SettingService $settings,
     ) {}
 
     public function create(
@@ -60,6 +62,7 @@ class BookingCreationService
 
         $rules = $this->availability->rulesFor($space);
 
+        $this->assertInTheFuture($startAt);
         $this->assertWithinBusinessHours($space, $startAt, $endAt, $rules);
         $this->assertValidGranularity($startAt, $rules);
         $this->assertValidDuration($startAt, $endAt, $rules);
@@ -186,6 +189,30 @@ class BookingCreationService
     // would make the calendar and this method drift apart silently, which
     // is what tests/Guards/AvailabilityRulesAreCentralizedTest prevents.
     // ------------------------------------------------------------------
+
+    /**
+     * A booking cannot start in the past.
+     *
+     * Closes a real trap rather than a theoretical one: a past-dated
+     * booking could be created and paid for, and BookingCancellationService
+     * then refuses to cancel it because its cancellation window has long
+     * gone — so it could never be undone.
+     *
+     * A booking starting this very minute is fine; only a start strictly
+     * before now is refused. The `booking.allow_past_bookings` setting
+     * exists so reception can later be given a back-dating override
+     * without this method changing.
+     */
+    private function assertInTheFuture(CarbonInterface $start): void
+    {
+        if ((bool) $this->settings->get('booking.allow_past_bookings', false)) {
+            return;
+        }
+
+        if ($start->lessThan(now())) {
+            throw new ReceptionActionException('api.booking.start_in_the_past');
+        }
+    }
 
     private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {

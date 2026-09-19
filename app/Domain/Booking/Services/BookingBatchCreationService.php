@@ -1,0 +1,364 @@
+<?php
+
+namespace App\Domain\Booking\Services;
+
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Exceptions\BatchUnavailableException;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\SpaceBookingRules;
+use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\NotificationLog;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Services\WalletService;
+use Carbon\CarbonImmutable;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+
+/**
+ * The multi-date picker: several windows, one request, all or nothing.
+ *
+ * ## Why N rows rather than one booking with N windows
+ *
+ * `bookings` has no multi-session analogue to `event_sessions`, and adding
+ * one would fork every consumer — check-in, check-out, extension,
+ * cancellation, access-grant issuance, capacity counting and the reception
+ * dashboard all assume one booking is one window. Each chosen date is
+ * independently checked into, cancelled and priced, so one row per window
+ * is the shape the rest of the domain already speaks.
+ *
+ * ## Why atomic rather than partial
+ *
+ * The screen shows one running total and one confirm. If the third of four
+ * days failed after the wallet had been debited for the first two, the
+ * member would be part-charged for a booking they never got, and the app
+ * would need a reconciliation screen nobody designed. So: every window is
+ * validated, then all are created, or nothing is.
+ *
+ * ## Deliberate limitation
+ *
+ * A batch is not a unit after creation. Cancelling one day does not cancel
+ * the rest, and no `batch_id` links them — that is schema growth for a
+ * grouping the member never asks to act on as a group. If "cancel my whole
+ * multi-day booking" is ever wanted, a nullable `booking_group_id` is the
+ * additive path.
+ */
+class BookingBatchCreationService
+{
+    /**
+     * Bounds the number of row locks one request holds at once.
+     */
+    public const MAX_WINDOWS = 10;
+
+    public function __construct(
+        private readonly AvailabilityService $availability,
+        private readonly CapacitySlotSynchronizer $capacitySlots,
+        private readonly AmountCalculator $amounts,
+        private readonly WalletService $wallets,
+        private readonly PointConversionService $points,
+    ) {}
+
+    /**
+     * @param  list<array{space_id: int, start_at: string, end_at: string}>  $windows
+     * @return list<Booking>
+     */
+    public function createMany(
+        array $windows,
+        User $member,
+        ?OwnerType $walletOwnerType = null,
+        ?int $walletOwnerId = null,
+        ?string $note = null,
+    ): array {
+        $normalized = $this->normalize($windows);
+
+        // Stateless rules first, outside any lock — they depend on nothing
+        // shared, so failing here costs no lock time.
+        $failures = $this->statelessFailures($normalized);
+
+        if ($failures !== []) {
+            throw new BatchUnavailableException($failures);
+        }
+
+        return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note) {
+            // Lock every distinct space in ascending id order. Two
+            // concurrent batches touching the same pair of spaces would
+            // otherwise be free to grab them in opposite orders and
+            // deadlock.
+            $spaceIds = collect($normalized)->pluck('space_id')->unique()->sort()->values();
+
+            $locked = $spaceIds
+                ->mapWithKeys(fn (int $id) => [
+                    $id => Space::query()->whereKey($id)->lockForUpdate()->firstOrFail(),
+                ]);
+
+            $failures = [];
+            /** @var array<int, Collection<int, Booking>> $blocking */
+            $blocking = [];
+            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, points: int}> $accepted */
+            $accepted = [];
+
+            foreach ($normalized as $window) {
+                $space = $locked[$window['space_id']];
+                $rules = $this->availability->rulesFor($space);
+
+                // One fetch per space covering its whole requested span.
+                $blocking[$space->id] ??= $this->spanFor($space, $normalized, $rules);
+
+                // Windows already accepted in THIS batch count too — two
+                // picked dates that overlap each other would otherwise both
+                // pass, since neither is in the database yet.
+                $candidates = $blocking[$space->id]->concat(
+                    collect($accepted)
+                        ->filter(fn (array $row) => $row['space']->id === $space->id)
+                        ->map(fn (array $row) => new Booking([
+                            'space_id' => $space->id,
+                            'start_at' => $row['start'],
+                            'end_at' => $row['end'],
+                        ]))
+                );
+
+                $reasonKey = $this->contendedFailure($candidates, $window['start'], $window['end'], $rules);
+
+                if ($reasonKey !== null) {
+                    $failures[] = $this->failure($window, $reasonKey);
+
+                    continue;
+                }
+
+                $accepted[] = [
+                    'index' => $window['index'],
+                    'space' => $space,
+                    'start' => $window['start'],
+                    'end' => $window['end'],
+                    'points' => $this->amounts->forRange($space, $window['start'], $window['end']),
+                ];
+            }
+
+            if ($failures !== []) {
+                // Rolls back the whole transaction — nothing created, no
+                // wallet touched.
+                throw new BatchUnavailableException($failures);
+            }
+
+            $totalPoints = collect($accepted)->sum('points');
+
+            // Routed once for the summed total, so a member with two
+            // eligible wallets is asked to choose once rather than N times.
+            [$paymentState, $paymentSource] = $this->routePayment(
+                $member,
+                $totalPoints,
+                $walletOwnerType,
+                $walletOwnerId,
+            );
+
+            $created = [];
+
+            foreach ($accepted as $row) {
+                $space = $row['space'];
+                $status = $space->requires_approval ? BookingStatus::Pending : BookingStatus::Confirmed;
+
+                $booking = Booking::create([
+                    'space_id' => $space->id,
+                    'user_id' => $member->id,
+                    'start_at' => $row['start'],
+                    'end_at' => $row['end'],
+                    'status' => $status,
+                    'amount_owed' => $this->points->pointsToUsd($row['points']),
+                    'currency' => 'USD',
+                    'payment_state' => $paymentState,
+                    'payment_source' => $paymentSource,
+                    'note' => $note,
+                ]);
+
+                $this->capacitySlots->occupy($booking, $space, $this->availability->rulesFor($space));
+
+                if ($status === BookingStatus::Pending) {
+                    $this->notifyOperations();
+                }
+
+                $created[] = $booking;
+            }
+
+            return $created;
+        });
+    }
+
+    /**
+     * Parse and sort, keeping each window's original index so a failure can
+     * name the one the member picked.
+     *
+     * @param  list<array{space_id: int, start_at: string, end_at: string}>  $windows
+     * @return list<array{index: int, space_id: int, start: CarbonImmutable, end: CarbonImmutable}>
+     */
+    private function normalize(array $windows): array
+    {
+        $normalized = [];
+
+        foreach (array_values($windows) as $index => $window) {
+            $normalized[] = [
+                'index' => $index,
+                'space_id' => (int) $window['space_id'],
+                'start' => CarbonImmutable::parse($window['start_at'], 'UTC'),
+                'end' => CarbonImmutable::parse($window['end_at'], 'UTC'),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * @param  list<array{index: int, space_id: int, start: CarbonImmutable, end: CarbonImmutable}>  $windows
+     * @return list<array{index: int, start_at: string, reason: string, message_key: string}>
+     */
+    private function statelessFailures(array $windows): array
+    {
+        $failures = [];
+        $spaces = Space::query()
+            ->whereIn('id', collect($windows)->pluck('space_id')->unique())
+            ->with('building.branch')
+            ->get()
+            ->keyBy('id');
+
+        foreach ($windows as $window) {
+            $space = $spaces->get($window['space_id']);
+
+            if ($space === null) {
+                $failures[] = $this->failure($window, 'api.system.not_found');
+
+                continue;
+            }
+
+            $rules = $this->availability->rulesFor($space);
+
+            $reasonKey = match (true) {
+                $window['start']->lessThan(now()) => 'api.booking.start_in_the_past',
+                ! $this->availability->isWithinBusinessHours($space, $window['start'], $window['end'], $rules) => 'api.reception.outside_business_hours',
+                ! $this->availability->isValidGranularity($window['start'], $rules) => 'api.booking.invalid_start_time',
+                ! $this->availability->isLongEnough($window['start'], $window['end'], $rules) => 'api.booking.duration_too_short',
+                ! $this->availability->matchesDurationGranularity($window['start'], $window['end'], $rules) => 'api.booking.duration_invalid_granularity',
+                default => null,
+            };
+
+            if ($reasonKey !== null) {
+                $failures[] = $this->failure($window, $reasonKey);
+            }
+        }
+
+        return $failures;
+    }
+
+    /**
+     * @param  Collection<int, Booking>  $candidates
+     */
+    private function contendedFailure(
+        Collection $candidates,
+        CarbonImmutable $start,
+        CarbonImmutable $end,
+        SpaceBookingRules $rules,
+    ): ?string {
+        if ($this->availability->overlapCount($candidates, $start, $end) >= $rules->concurrencyCeiling) {
+            return 'api.booking.slot_unavailable';
+        }
+
+        if ($this->availability->violatesBuffer($candidates, $start, $end, $rules)) {
+            return 'api.booking.buffer_conflict';
+        }
+
+        return null;
+    }
+
+    /**
+     * Every blocking booking across this space's whole requested span, in
+     * one query rather than one per window.
+     *
+     * @param  list<array{index: int, space_id: int, start: CarbonImmutable, end: CarbonImmutable}>  $windows
+     * @return Collection<int, Booking>
+     */
+    private function spanFor(Space $space, array $windows, SpaceBookingRules $rules): Collection
+    {
+        $forSpace = collect($windows)->where('space_id', $space->id);
+
+        return $this->availability->blockingBookings(
+            $space,
+            $forSpace->min('start'),
+            $forSpace->max('end'),
+            $rules,
+        );
+    }
+
+    /**
+     * @param  array{index: int, space_id: int, start: CarbonImmutable, end: CarbonImmutable}  $window
+     * @return array{index: int, start_at: string, reason: string, message_key: string}
+     */
+    private function failure(array $window, string $messageKey): array
+    {
+        return [
+            'index' => $window['index'],
+            'start_at' => $window['start']->toIso8601String(),
+            'reason' => str_contains($messageKey, '.') ? substr($messageKey, strrpos($messageKey, '.') + 1) : $messageKey,
+            'message_key' => $messageKey,
+        ];
+    }
+
+    /**
+     * @return array{0: PaymentState, 1: ?PaymentSource}
+     */
+    private function routePayment(User $member, int $points, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
+    {
+        if ($points <= 0) {
+            return [PaymentState::Unpaid, null];
+        }
+
+        $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
+
+        if ($walletOwnerType !== null && $walletOwnerId !== null) {
+            $matched = collect($options)->first(
+                fn (array $option) => $option['owner_type'] === $walletOwnerType->value && $option['owner_id'] === $walletOwnerId
+            );
+
+            if ($matched === null) {
+                throw new ReceptionActionException('api.booking.wallet_not_owned');
+            }
+
+            if ($matched['usable_balance'] < $points) {
+                return [PaymentState::Unpaid, null];
+            }
+
+            $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, 'Multi-date booking');
+
+            return [PaymentState::Paid, PaymentSource::Wallet];
+        }
+
+        if (count($options) > 1) {
+            throw new WalletChoiceRequiredException($options);
+        }
+
+        if (count($options) === 1 && $options[0]['usable_balance'] >= $points) {
+            $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
+            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, 'Multi-date booking');
+
+            return [PaymentState::Paid, PaymentSource::Wallet];
+        }
+
+        return [PaymentState::Unpaid, null];
+    }
+
+    private function notifyOperations(): void
+    {
+        User::role(['operations', 'admin'])->get()->each(function (User $recipient) {
+            NotificationLog::create([
+                'user_id' => $recipient->id,
+                'channel' => 'push',
+                'template_key' => 'booking.pending_approval',
+                'status' => 'sent',
+            ]);
+        });
+    }
+}

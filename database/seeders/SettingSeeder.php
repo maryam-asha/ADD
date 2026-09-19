@@ -34,6 +34,11 @@ class SettingSeeder extends Seeder
         // decision, not a hardcoded literal — the arithmetic path handles a
         // non-zero rate even though it currently always evaluates to zero.
         $settings->setDefault('booking.vat_percent', 0, SettingValueType::Int);
+        // A past-dated booking could be created and paid for, and could
+        // then never be cancelled, since its cancellation window had
+        // already gone. Off by default; the flag exists so reception can be
+        // given a back-dating override later without a code change.
+        $settings->setDefault('booking.allow_past_bookings', false, SettingValueType::Bool);
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);

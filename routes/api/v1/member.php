@@ -61,6 +61,10 @@ Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 // `{booking}`.
 Route::get('bookings', [BookingController::class, 'index']);
 Route::post('bookings/preview', [BookingController::class, 'preview']);
+// The multi-select date strip: several windows, one request, all or
+// nothing. Partial success would leave the member part-charged for a
+// booking they never got.
+Route::post('bookings/batch', [BookingController::class, 'storeBatch']);
 Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 
