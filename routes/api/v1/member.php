@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
+use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
 use App\Http\Controllers\Api\V1\Member\SpaceController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -32,9 +33,20 @@ use Illuminate\Support\Facades\Route;
 // clearly labeled by source. No spend happens here.
 Route::get('wallet/options', [WalletController::class, 'options']);
 
-// Browse spaces for members with working hours, filtering, amenities, and available slots
+// Browse spaces for members with working hours, filtering and amenities.
 Route::get('spaces', [SpaceController::class, 'index']);
 Route::get('spaces/{space}', [SpaceController::class, 'show']);
+
+// docs/decisions/booking-availability-and-calendar.md — the read side of
+// the booking rules: which days are open, which slots are free on a day,
+// and what each duration would cost from a chosen start. Read-only and
+// advisory; none of these hold a slot, so POST bookings still re-checks
+// under a row lock. Each slot's `reason` is the very message that endpoint
+// would return for the same window, because both go through
+// AvailabilityService.
+Route::get('spaces/{space}/availability', [SpaceAvailabilityController::class, 'month']);
+Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::class, 'day']);
+Route::get('spaces/{space}/availability/quote', [SpaceAvailabilityController::class, 'quote']);
 
 // docs/decisions/booking-creation-approval-extension.md — member-facing
 // booking creation with slot granularity/buffer/approval rules.
@@ -117,9 +129,15 @@ Route::get('events/{event}', [EventController::class, 'show']);
 Route::get('events/{event}/registration-form', [EventController::class, 'registrationForm']);
 Route::post('events/{event}/register', [EventController::class, 'register']);
 
-// ADD Services — catalog and request submission
+// ADD Services — catalog, sections (axes), flat list, and request submission
 Route::get('services', [MemberServiceController::class, 'index']);
+Route::get('services/axes', [MemberServiceController::class, 'axes']);
+Route::get('services/categories', [MemberServiceController::class, 'axes']);
+Route::get('services/axes/{axis}', [MemberServiceController::class, 'axisServices']);
+Route::get('services/all', [MemberServiceController::class, 'all']);
 Route::get('services/{slug}', [MemberServiceController::class, 'show']);
+Route::get('services/{slug}/registration-form', [MemberServiceController::class, 'registrationForm']);
+Route::get('services/{slug}/request-form', [MemberServiceController::class, 'registrationForm']);
 Route::post('services/{slug}/requests', [MemberServiceController::class, 'submitRequest']);
 
 // Member's own service request history

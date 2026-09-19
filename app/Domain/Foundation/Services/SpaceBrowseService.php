@@ -23,9 +23,15 @@ class SpaceBrowseService
     ) {}
 
     /**
+     * Note: there is no `date` filter here. One was documented for a long
+     * time and never read. "Spaces with any availability on this date" is a
+     * real feature but a different one — it means an availability
+     * computation per card per page — and it belongs after the calendar
+     * exists and can be measured. Dates live in
+     * Member\SpaceAvailabilityController.
+     *
      * @param array{
      *     space_type?: ?string,
-     *     date?: ?string,
      *     min_capacity?: ?int,
      *     branch_id?: ?int,
      *     amenity?: ?string,

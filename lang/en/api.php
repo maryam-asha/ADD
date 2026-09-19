@@ -183,6 +183,24 @@ return [
         'wallet_not_owned' => 'You are not authorized to spend from that wallet.',
         'check_in_requires_approval' => 'This booking must be approved before it can be checked in.',
         'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
+
+        // Availability calendar. `slot_in_past` and `space_at_capacity`
+        // are the two slot states the write path has no error for — a past
+        // slot is simply never offered, and a co_space at its ceiling is a
+        // capacity refusal rather than an overlap one.
+        'slot_in_past' => 'This time has already passed.',
+        'space_at_capacity' => 'This space is fully booked for the requested time.',
+        'branch_closed_on_date' => ':branch is closed on this date.',
+        'choose_another_day' => 'Choose another day.',
+        'branch_hours_title' => ':branch Hours',
+        'timezone_note' => 'All times shown in your local time (:offset)',
+        'slots_greyed_note' => 'Greyed-out slots are already booked.',
+        'legend' => [
+            'available' => 'Available',
+            'booked' => 'Booked',
+            'outside_hours' => 'Outside hours',
+        ],
+        'range_too_long' => 'The requested date range is too long. Request at most :days days.',
     ],
 
     'kiosk' => [
@@ -287,6 +305,7 @@ return [
         'request_not_found' => 'Service request not found.',
         'not_form_based' => 'This service does not accept form submissions.',
         'request_already_terminal' => 'This request is already closed and cannot be updated.',
+        'request_submitted' => ':service request submitted successfully.',
         'type_updated' => 'Service type updated.',
         'type_deleted' => 'Service type deleted.',
         'field_updated' => 'Field updated.',
