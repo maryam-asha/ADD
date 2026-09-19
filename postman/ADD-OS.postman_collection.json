@@ -155,6 +155,21 @@
             "key": "attendee_id",
             "value": "1",
             "type": "string"
+        },
+        {
+            "key": "slug",
+            "value": "general",
+            "type": "string"
+        },
+        {
+            "key": "axis_slug",
+            "value": "core",
+            "type": "string"
+        },
+        {
+            "key": "member_user_id",
+            "value": "",
+            "type": "string"
         }
     ],
     "event": [
@@ -1157,6 +1172,166 @@
                     ]
                 },
                 {
+                    "name": "Availability (Calendar)",
+                    "description": "docs/decisions/booking-availability-and-calendar.md — the read side of the booking rules, powering the date picker and time-slot grid. Read-only and advisory: nothing here holds a slot, so POST bookings still re-checks under a row lock. Each slot's `reason` is the very message that endpoint would return for the same window, because both go through AvailabilityService.",
+                    "item": [
+                        {
+                            "name": "Month Calendar (أي الأيام متاحة)",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability?from=2026-09-01&to=2026-09-30",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-09-01",
+                                            "description": "Optional local date (Y-m-d). Defaults to the start of the current month."
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-09-30",
+                                            "description": "Optional local date (Y-m-d). Max 62 days from `from`, else 422."
+                                        }
+                                    ]
+                                },
+                                "description": "Day states for a date range: available | closed | full | past. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots, so it shows no banner. Also returns the branch-hours card, the legend and the rules block. Range capped at 62 days."
+                            }
+                        },
+                        {
+                            "name": "Day Slots (الشرائح المتاحة في يوم)",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability/slots?date=2026-09-24",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability",
+                                        "slots"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "date",
+                                            "value": "2026-09-24",
+                                            "description": "Required local date (Y-m-d)."
+                                        }
+                                    ]
+                                },
+                                "description": "The time-slot grid for one date. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past — plus `is_available` and a translated `reason`. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
+                            }
+                        },
+                        {
+                            "name": "Duration Quote (المدد والأسعار)",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability/quote?start_at=2026-09-24 10:00",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability",
+                                        "quote"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "start_at",
+                                            "value": "2026-09-24 10:00",
+                                            "description": "Required. Local wall-clock time; a bare value means local, an explicit offset is honoured."
+                                        }
+                                    ]
+                                },
+                                "description": "Powers the duration selector, computed end time, price and running total. The ladder comes from the booking.duration_options_minutes setting (seeded 60/90/120/180 = 1h/1.5h/2h/3h). An option that would run past closing, overlap a booking or break the space's granularity is returned with available:false and a stated reason rather than being hidden, so the app greys the chip out and can say why."
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "Bookings",
                     "item": [
                         {
@@ -1462,6 +1637,350 @@
                                     ]
                                 },
                                 "description": "422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
+                            }
+                        },
+                        {
+                            "name": "List My Bookings (حجوزاتي)",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings?filter=upcoming&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "filter",
+                                            "value": "upcoming",
+                                            "description": "Optional: upcoming (default) | past | all"
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "description": "Optional, max 100"
+                                        },
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional"
+                                        }
+                                    ]
+                                },
+                                "description": "The member's own bookings with tab counts, following the {counts, data, meta} convention. `filter` splits on the booking's END time, so a booking under way still counts as upcoming. Each card carries `can_cancel`, driven by the exact predicate the cancel endpoint enforces."
+                            }
+                        },
+                        {
+                            "name": "Get Booking Detail (تفاصيل الحجز + مؤشر الحالة)",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}"
+                                    ]
+                                },
+                                "description": "The detail screen: price breakdown, payment, note, and `request_status` — the Submitted → Under Review → Approved/Rejected stepper, derived from status and approved_at, never stored. A space that auto-confirms never had a review, so its stepper collapses to two steps. `actions.can_cancel` and `cancel_deadline_at` come from BookingCancellationService, so the button is never shown for an action that would 422. 403 for another member's booking."
+                            }
+                        },
+                        {
+                            "name": "Preview Booking (شاشة التأكيد)",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2026-09-24 10:00\",\n  \"end_at\": \"2026-09-24 12:00\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/preview",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "preview"
+                                    ]
+                                },
+                                "description": "Builds the confirmation screen WITHOUT creating anything: price breakdown (N hours × rate, subtotal, VAT from booking.vat_percent, total), the payment methods, and the note field. Every spendable wallet is listed — one that cannot cover the cost comes back with sufficient:false rather than being omitted — plus a synthetic `cash` option, which is what PaymentState::Unpaid plus reception settlement already means. `unavailable_reason` is the exact message POST bookings would return for the same window."
+                            }
+                        },
+                        {
+                            "name": "Cancel Booking (إلغاء الحجز)",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Self-service cancellation — the same BookingCancellationService reception calls. Refuses once the space's cancellation window has passed (422), after check-in (409), or for another member's booking (403). A wallet-paid booking is refunded to the member's personal wallet, and the slot is released."
+                            }
+                        },
+                        {
+                            "name": "Create Booking — Multi-date (حجز عدة تواريخ)",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"windows\": [\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-24 10:00\",\n      \"end_at\": \"2026-09-24 11:00\"\n    },\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-25 10:00\",\n      \"end_at\": \"2026-09-25 11:00\"\n    }\n  ],\n  \"note\": \"Weekly standup\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/batch",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "batch"
+                                    ]
+                                },
+                                "description": "The multi-select date strip: up to 10 windows, ALL OR NOTHING. Partial success would leave the member part-charged for a booking they never got, so any failure rolls the whole batch back and nothing is debited. Windows already accepted earlier in the same batch are checked against each other too. The wallet is debited ONCE for the summed total."
+                            }
+                        },
+                        {
+                            "name": "Create Booking — Batch Error: One Date Taken",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"windows\": [\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-24 10:00\",\n      \"end_at\": \"2026-09-24 11:00\"\n    },\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-24 10:00\",\n      \"end_at\": \"2026-09-24 11:00\"\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/batch",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "batch"
+                                    ]
+                                },
+                                "description": "422 with a per-window `errors` array naming each bad window by its index in the submitted list, so the app can mark the offending chip. These two windows overlap EACH OTHER — neither is in the database yet, so a check against stored rows alone would pass both. Nothing is created."
+                            }
+                        },
+                        {
+                            "name": "Create Booking — Error: Start in the Past",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2020-01-01 10:00\",\n  \"end_at\": \"2020-01-01 11:00\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings"
+                                    ]
+                                },
+                                "description": "422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting."
                             }
                         }
                     ]
@@ -3223,6 +3742,427 @@
                             }
                         }
                     ]
+                },
+                {
+                    "name": "Services",
+                    "item": [
+                        {
+                            "name": "Get Service Axes",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/axes",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "axes"
+                                    ]
+                                },
+                                "description": "جلب الأقسام الرئيسية للخدمات (ADD Core, ADD Experience, ADD Ecosystem) بشكل منفصل، مع عدد الخدمات المتاحة في كل قسم."
+                            }
+                        },
+                        {
+                            "name": "Get Services by Axis",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/axes/{{axis_slug}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "axes",
+                                        "{{axis_slug}}"
+                                    ]
+                                },
+                                "description": "جلب خدمات قسم رئيسي محدد باستخدام المتغير {{axis_slug}} (مثل: core أو experience أو ecosystem)."
+                            }
+                        },
+                        {
+                            "name": "Get All Services (Flat List)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/all",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "all"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "axis",
+                                            "value": "{{axis_slug}}",
+                                            "disabled": true,
+                                            "description": "فلترة اختيارية حسب القسم"
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "cleaning",
+                                            "disabled": true,
+                                            "description": "بحث بالاسم أو الوصف"
+                                        }
+                                    ]
+                                },
+                                "description": "جلب جميع الخدمات المتاحة للعضو كقائمة مسطحة ومباشرة (Flat List) دون تجميعها تحت مصفوفات الأقسام."
+                            }
+                        },
+                        {
+                            "name": "Browse Services Catalog",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "axis",
+                                            "value": "{{axis_slug}}",
+                                            "disabled": true,
+                                            "description": "فلترة الكتالوج حسب قسم محدد"
+                                        }
+                                    ]
+                                },
+                                "description": "جلب كتالوج الخدمات كاملاً مجمّعاً حسب الأقسام وبدون حقول الفورم لتسريع العرض."
+                            }
+                        },
+                        {
+                            "name": "Get Service Details",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/{{slug}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "{{slug}}"
+                                    ]
+                                },
+                                "description": "جلب تفاصيل خدمة محددة باستخدام المتغير {{slug}} (مثل: general, technical, business-address, mentorship) مع نموذج التسجيل registration_form الخاص بها."
+                            }
+                        },
+                        {
+                            "name": "Get Service Registration Form",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/{{slug}}/registration-form",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "{{slug}}",
+                                        "registration-form"
+                                    ]
+                                },
+                                "description": "جلب نموذج التسجيل الديناميكي للخدمة المحددة عبر {{slug}} بشكل مستقل ومطابق لـ events."
+                            }
+                        },
+                        {
+                            "name": "Submit Service Request",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/services/{{slug}}/requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "services",
+                                        "{{slug}}",
+                                        "requests"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"fields\": {\n        \"description\": \"Request details for this service.\"\n    },\n    \"space_id\": 1\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "تقديم طلب للخدمة المحددة بالمتغير {{slug}}. يُرجع رسالة نجاح مباشرة."
+                            }
+                        },
+                        {
+                            "name": "List My Service Requests",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/service-requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "service-requests"
+                                    ]
+                                },
+                                "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها."
+                            }
+                        },
+                        {
+                            "name": "Get My Service Request Detail",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/service-requests/{{service_request_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "service-requests",
+                                        "{{service_request_id}}"
+                                    ]
+                                },
+                                "description": "تفاصيل طلب خدمة محدد بواسطة المعرف {{service_request_id}}."
+                            }
+                        }
+                    ],
+                    "description": "خدمات مجتمع ADD — تصفح الخدمات، جلب تفاصيل الخدمة ونموذجها، وتقديم ومتابعة الطلبات.",
+                    "auth": {
+                        "type": "bearer",
+                        "bearer": [
+                            {
+                                "key": "token",
+                                "value": "{{member_token}}"
+                            }
+                        ]
+                    }
                 }
             ]
         },
@@ -6010,6 +6950,261 @@
                                     }
                                 }
                             ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Calendar & Bookings",
+                    "description": "docs/decisions/booking-availability-and-calendar.md — the operations calendar and the general bookings index. Read-only: every write verb lives under Reception Operations. Occupancy is computed from the same BusinessHoursService periods the member calendar uses, so the two can never disagree about what 'open' means.",
+                    "item": [
+                        {
+                            "name": "Operations Calendar (تقويم المساحات)",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/calendar?view=week&date=2026-09-24",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "calendar"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "view",
+                                            "value": "week",
+                                            "description": "Optional: day | week (default) | month. The week runs Sunday–Saturday."
+                                        },
+                                        {
+                                            "key": "date",
+                                            "value": "2026-09-24",
+                                            "description": "Optional anchor date (Y-m-d). Defaults to today."
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional. Defaults to the default branch."
+                                        },
+                                        {
+                                            "key": "space_type",
+                                            "value": "room",
+                                            "disabled": true,
+                                            "description": "Optional: co_space | room | business | event_hall"
+                                        },
+                                        {
+                                            "key": "space_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional: narrow to a single space"
+                                        }
+                                    ]
+                                },
+                                "description": "Spaces as rows, days as cells. Each cell carries its open periods, its bookings (with the member, payment state and check-in) and its occupancy. Occupancy is booked minutes over open minutes, clipped to the open window so a booking running past closing cannot report more minutes than the day has; a multi-occupant space is measured against its concurrency ceiling rather than reading 2000% full. Loaded in a bounded number of queries — it does not query per space or per day."
+                            }
+                        },
+                        {
+                            "name": "Calendar Occupancy (نِسَب الإشغال فقط)",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/calendar/occupancy?view=month&date=2026-09-24",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "calendar",
+                                        "occupancy"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "view",
+                                            "value": "month",
+                                            "description": "Optional: day | week | month"
+                                        },
+                                        {
+                                            "key": "date",
+                                            "value": "2026-09-24",
+                                            "description": "Optional anchor date (Y-m-d)"
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional"
+                                        }
+                                    ]
+                                },
+                                "description": "The same calendar reduced to its figures — per-cell occupancy and a booking count, without the per-booking detail. What a dashboard tile needs."
+                            }
+                        },
+                        {
+                            "name": "List All Bookings (فهرس الحجوزات)",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/bookings?per_page=25",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "bookings"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "status",
+                                            "value": "confirmed",
+                                            "disabled": true,
+                                            "description": "Optional: confirmed | pending | cancelled | rejected"
+                                        },
+                                        {
+                                            "key": "payment_state",
+                                            "value": "unpaid",
+                                            "disabled": true,
+                                            "description": "Optional: paid | unpaid"
+                                        },
+                                        {
+                                            "key": "space_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional"
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional"
+                                        },
+                                        {
+                                            "key": "user_id",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "Optional"
+                                        },
+                                        {
+                                            "key": "from",
+                                            "value": "2026-09-01",
+                                            "disabled": true,
+                                            "description": "Optional (Y-m-d), on the booking's start_at"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-09-30",
+                                            "disabled": true,
+                                            "description": "Optional (Y-m-d), on the booking's start_at"
+                                        },
+                                        {
+                                            "key": "q",
+                                            "value": "Layla",
+                                            "disabled": true,
+                                            "description": "Optional: matches the member's name or phone"
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "25",
+                                            "description": "Optional, max 100"
+                                        }
+                                    ]
+                                },
+                                "description": "The general operations index — previously this existed only as the pending-approval special case. Date filters compare against the booking's own window, not created_at: 'what is booked next week' means the booking's dates. Paginated at 25."
+                            }
+                        },
+                        {
+                            "name": "Get Booking Detail (تفاصيل حجز للإدارة)",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/bookings/{{booking_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "bookings",
+                                        "{{booking_id}}"
+                                    ]
+                                },
+                                "description": "The operations view of one booking: the index row plus the same breakdown, stepper and actions the member sees, so operations and the member never disagree about what a booking cost or where its approval stands."
+                            }
+                        },
+                        {
+                            "name": "Create Booking for a Member (حجز نيابة عن عضو)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"user_id\": \"{{member_user_id}}\",\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2026-09-24 14:00\",\n  \"end_at\": \"2026-09-24 15:00\",\n  \"note\": \"Booked at the desk\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reception/bookings",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reception",
+                                        "bookings"
+                                    ]
+                                },
+                                "description": "Reception booking a member in at the desk, and the calendar's 'book it for them' action. Reuses BookingCreationService unchanged, so every rule the member endpoint enforces applies here too — reception cannot double-book a room the member endpoint would have refused, and cannot back-date either. The member comes from the body rather than the token."
+                            }
                         }
                     ]
                 },
@@ -12204,6 +13399,788 @@
                             "body": "{\n  \"url\": \"/storage/uploads/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0.webp\",\n  \"path\": \"uploads/a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0.webp\",\n  \"name\": \"banner.png\",\n  \"size\": 48215,\n  \"mime\": \"image/webp\"\n}"
                         }
                     ]
+                },
+                {
+                    "name": "Service Types",
+                    "item": [
+                        {
+                            "name": "List All Service Types",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types"
+                                    ]
+                                },
+                                "description": "جميع أنواع الخدمات مع محورها ومنهجية الطلب."
+                            }
+                        },
+                        {
+                            "name": "Get Service Type Detail",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create Service Type — Form",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"service_axis_id\": 1,\n    \"slug\": \"printing\",\n    \"name\": {\n        \"en\": \"Printing Service\",\n        \"ar\": \"خدمة الطباعة\"\n    },\n    \"description\": {\n        \"en\": \"Request printing for your documents.\",\n        \"ar\": \"طلب طباعة المستندات.\"\n    },\n    \"icon\": \"printer\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"requires_location\": true,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"form\",\n    \"request_config\": null,\n    \"allowed_plan_module_ids\": null,\n    \"order\": 10\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "request_method: form | external_link | phone | whatsapp | internal_redirect | info_only\n\nمثال external_link:\n\"request_method\": \"external_link\",\n\"request_config\": {\"url\": \"https://example.com\", \"open\": \"browser\"}\n\nمثال phone:\n\"request_method\": \"phone\",\n\"request_config\": {\"number\": \"+963944000000\"}"
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    var json = pm.response.json();",
+                                            "    pm.collectionVariables.set('service_type_id', json.data.id);",
+                                            "    console.log('Service Type ID:', json.data.id);",
+                                            "}"
+                                        ],
+                                        "type": "text/javascript"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Create Service Type — External Link",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"service_axis_id\": 2,\n    \"slug\": \"club-membership\",\n    \"name\": {\n        \"en\": \"ADD Club\",\n        \"ar\": \"ADD Club\"\n    },\n    \"description\": {\n        \"en\": \"Join the ADD Club.\",\n        \"ar\": \"انضم إلى مجتمع ADD Club.\"\n    },\n    \"icon\": \"users\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"requires_location\": false,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"external_link\",\n    \"request_config\": {\n        \"url\": \"https://addclub.sy\",\n        \"open\": \"browser\"\n    },\n    \"order\": 2\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Service Type",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"order\": 5\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Partial update — أرسل فقط الحقول التي تريد تغييرها."
+                            }
+                        },
+                        {
+                            "name": "Toggle Coming Soon",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"is_coming_soon\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Service Type",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}"
+                                    ]
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Service Type Fields",
+                    "item": [
+                        {
+                            "name": "List Fields for Service Type",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — Textarea",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"key\": \"description\",\n    \"label\": {\n        \"en\": \"Description\",\n        \"ar\": \"الوصف\"\n    },\n    \"placeholder\": {\n        \"en\": \"Describe your request…\",\n        \"ar\": \"اكتب تفاصيل طلبك…\"\n    },\n    \"type\": \"textarea\",\n    \"validation\": {\n        \"max\": 500\n    },\n    \"is_required\": false,\n    \"order\": 1\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    var json = pm.response.json();",
+                                            "    pm.collectionVariables.set('service_field_id', json.data.id);",
+                                            "}"
+                                        ],
+                                        "type": "text/javascript"
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Add Field — Select (with options)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"key\": \"priority\",\n    \"label\": {\n        \"en\": \"Priority\",\n        \"ar\": \"الأولوية\"\n    },\n    \"type\": \"select\",\n    \"options\": [\n        {\n            \"value\": \"low\",\n            \"label\": {\n                \"en\": \"Low\",\n                \"ar\": \"منخفضة\"\n            }\n        },\n        {\n            \"value\": \"medium\",\n            \"label\": {\n                \"en\": \"Medium\",\n                \"ar\": \"متوسطة\"\n            }\n        },\n        {\n            \"value\": \"high\",\n            \"label\": {\n                \"en\": \"High\",\n                \"ar\": \"عالية\"\n            }\n        }\n    ],\n    \"validation\": {\n        \"required\": true\n    },\n    \"is_required\": true,\n    \"order\": 2\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Add Field — File Upload",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"key\": \"attachment\",\n    \"label\": {\n        \"en\": \"Add files or photos\",\n        \"ar\": \"أضف ملفات أو صور\"\n    },\n    \"type\": \"file\",\n    \"validation\": {\n        \"accept\": \"image/*\",\n        \"max_kb\": 5120\n    },\n    \"is_required\": false,\n    \"order\": 3\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Field",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields/{{service_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields",
+                                        "{{service_field_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"is_required\": true,\n    \"order\": 1,\n    \"validation\": {\n        \"max\": 300\n    }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Field",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields/{{service_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-types",
+                                        "{{service_type_id}}",
+                                        "fields",
+                                        "{{service_field_id}}"
+                                    ]
+                                }
+                            }
+                        }
+                    ],
+                    "description": "إدارة حقول النموذج الديناميكية لكل خدمة.\nكل تعديل هنا يُغيّر الفورم فوراً على التطبيق بدون كود إضافي.\n\nأنواع الحقول المدعومة: text | textarea | select | file | checkbox | date | number | rating"
+                },
+                {
+                    "name": "Service Requests",
+                    "item": [
+                        {
+                            "name": "List All Service Requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": false
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "service_type_id",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "الفلاتر المتاحة: branch_id | status (pending/in_progress/resolved/rejected/cancelled) | service_type_id"
+                            }
+                        },
+                        {
+                            "name": "Filter by Branch + Status",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "branch_id",
+                                            "value": "1",
+                                            "disabled": false
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "pending",
+                                            "disabled": false
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Service Request Detail",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests",
+                                        "{{service_request_id}}"
+                                    ]
+                                },
+                                "description": "يعيد التفاصيل الكاملة: المحتوى، قيم الحقول، العضو، الموقع."
+                            }
+                        },
+                        {
+                            "name": "Update Status — In Progress",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests",
+                                        "{{service_request_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"in_progress\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Status — Resolved",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests",
+                                        "{{service_request_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"resolved\",\n    \"resolution_note\": {\n        \"en\": \"Issue has been fixed. Please check again.\",\n        \"ar\": \"تمت معالجة الطلب. يرجى التحقق مجدداً.\"\n    }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Status — Rejected",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "Accept-Language",
+                                        "value": "ar"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "service-requests",
+                                        "{{service_request_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"rejected\",\n    \"resolution_note\": {\n        \"en\": \"Request cannot be fulfilled at this time.\",\n        \"ar\": \"لا يمكن تنفيذ هذا الطلب في الوقت الحالي.\"\n    }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ],
+                    "description": "جميع الطلبات مرئية لكل موظف (Operations / Admin).\nيمكن تحديد فرع معين عبر ?branch_id= لعرض طلبات فرع محدد فقط."
                 }
             ]
         },
@@ -12652,1051 +14629,6 @@
                     }
                 }
             ]
-        },
-        {
-            "name": "ADD Services — نظام الخدمات",
-            "item": [
-                {
-                    "name": "خدمات الأعضاء | Member Services",
-                    "item": [
-                        {
-                            "name": "عرض كتالوج الخدمات | Get Service Catalog",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "services"
-                                    ]
-                                },
-                                "description": "يعيد المحاور الثلاثة (Core / Experience / Ecosystem) مع أنواع الخدمات المتاحة للعضو.\nخدمات is_coming_soon=true تُعرض بـ badge فقط."
-                            }
-                        },
-                        {
-                            "name": "تفاصيل خدمة | Get Service Type Detail + Fields",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services/general",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "services",
-                                        "general"
-                                    ]
-                                },
-                                "description": "يعيد تعريف الخدمة مع حقول النموذج الديناميكية.\nغيّر 'general' إلى أي slug: technical | business-address | business-cafe"
-                            }
-                        },
-                        {
-                            "name": "تقديم طلب خدمة عامة | Submit General Service Request",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services/general/requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "services",
-                                        "general",
-                                        "requests"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"location_source\": \"manual\",\n    \"branch_id\": 1,\n    \"space_id\": null,\n    \"fields\": {\n        \"description\": \"أحتاج مساعدة في الطابعة\"\n    }\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                },
-                                "description": "يُنشئ طلب خدمة (فقط لـ request_method=form).\nالحقول في 'fields' تُبنى من service_type_fields الخاصة بهذه الخدمة."
-                            },
-                            "event": [
-                                {
-                                    "listen": "test",
-                                    "script": {
-                                        "exec": [
-                                            "if (pm.response.code === 201) {",
-                                            "    var json = pm.response.json();",
-                                            "    pm.collectionVariables.set('service_request_id', json.data.id);",
-                                            "    console.log('Service Request ID:', json.data.id);",
-                                            "}"
-                                        ],
-                                        "type": "text/javascript"
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            "name": "تقديم طلب مشكلة تقنية | Submit Technical Issue Request",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services/technical/requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "services",
-                                        "technical",
-                                        "requests"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"location_source\": \"qr\",\n    \"branch_id\": 1,\n    \"space_id\": 1,\n    \"fields\": {\n        \"issue_type\": \"internet\",\n        \"description\": \"الإنترنت بطيء جداً في الطابق الثاني\"\n    }\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "قائمة طلباتي | List My Service Requests",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/service-requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "service-requests"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "page",
-                                            "value": "1",
-                                            "disabled": false
-                                        }
-                                    ]
-                                },
-                                "description": "قائمة طلبات العضو الحالي مرتبة من الأحدث."
-                            }
-                        },
-                        {
-                            "name": "تفاصيل طلبي | Get My Service Request Detail",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "value": "Bearer {{member_token}}"
-                                    },
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/service-requests/{{service_request_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "service-requests",
-                                        "{{service_request_id}}"
-                                    ]
-                                },
-                                "description": "تفاصيل طلب محدد مع قيم الحقول وملاحظة الحل."
-                            }
-                        }
-                    ],
-                    "description": "واجهة الأعضاء — استعراض الخدمات وتقديم الطلبات ومتابعتها."
-                },
-                {
-                    "name": "أنواع الخدمات (Admin) | Admin — Service Types",
-                    "item": [
-                        {
-                            "name": "قائمة أنواع الخدمات | List All Service Types",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types"
-                                    ]
-                                },
-                                "description": "جميع أنواع الخدمات مع محورها ومنهجية الطلب."
-                            }
-                        },
-                        {
-                            "name": "تفاصيل نوع خدمة | Get Service Type Detail",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}"
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            "name": "إنشاء خدمة بنموذج | Create Service Type — Form",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"service_axis_id\": 1,\n    \"slug\": \"printing\",\n    \"name\": {\n        \"en\": \"Printing Service\",\n        \"ar\": \"خدمة الطباعة\"\n    },\n    \"description\": {\n        \"en\": \"Request printing for your documents.\",\n        \"ar\": \"طلب طباعة المستندات.\"\n    },\n    \"icon\": \"printer\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"requires_location\": true,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"form\",\n    \"request_config\": null,\n    \"allowed_plan_module_ids\": null,\n    \"order\": 10\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                },
-                                "description": "request_method: form | external_link | phone | whatsapp | internal_redirect | info_only\n\nمثال external_link:\n\"request_method\": \"external_link\",\n\"request_config\": {\"url\": \"https://example.com\", \"open\": \"browser\"}\n\nمثال phone:\n\"request_method\": \"phone\",\n\"request_config\": {\"number\": \"+963944000000\"}"
-                            },
-                            "event": [
-                                {
-                                    "listen": "test",
-                                    "script": {
-                                        "exec": [
-                                            "if (pm.response.code === 201) {",
-                                            "    var json = pm.response.json();",
-                                            "    pm.collectionVariables.set('service_type_id', json.data.id);",
-                                            "    console.log('Service Type ID:', json.data.id);",
-                                            "}"
-                                        ],
-                                        "type": "text/javascript"
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            "name": "إنشاء خدمة رابط خارجي | Create Service Type — External Link",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"service_axis_id\": 2,\n    \"slug\": \"club-membership\",\n    \"name\": {\n        \"en\": \"ADD Club\",\n        \"ar\": \"ADD Club\"\n    },\n    \"description\": {\n        \"en\": \"Join the ADD Club.\",\n        \"ar\": \"انضم إلى مجتمع ADD Club.\"\n    },\n    \"icon\": \"users\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"requires_location\": false,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"external_link\",\n    \"request_config\": {\n        \"url\": \"https://addclub.sy\",\n        \"open\": \"browser\"\n    },\n    \"order\": 2\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "تعديل نوع خدمة | Update Service Type",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"order\": 5\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                },
-                                "description": "Partial update — أرسل فقط الحقول التي تريد تغييرها."
-                            }
-                        },
-                        {
-                            "name": "تفعيل شارة قريباً | Toggle Coming Soon",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"is_coming_soon\": true\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "حذف نوع خدمة | Delete Service Type",
-                            "request": {
-                                "method": "DELETE",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}"
-                                    ]
-                                }
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "حقول النموذج (Admin) | Admin — Service Type Fields",
-                    "item": [
-                        {
-                            "name": "قائمة حقول خدمة | List Fields for Service Type",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields"
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            "name": "إضافة حقل نص | Add Field — Textarea",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"key\": \"description\",\n    \"label\": {\n        \"en\": \"Description\",\n        \"ar\": \"الوصف\"\n    },\n    \"placeholder\": {\n        \"en\": \"Describe your request…\",\n        \"ar\": \"اكتب تفاصيل طلبك…\"\n    },\n    \"type\": \"textarea\",\n    \"validation\": {\n        \"max\": 500\n    },\n    \"is_required\": false,\n    \"order\": 1\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            },
-                            "event": [
-                                {
-                                    "listen": "test",
-                                    "script": {
-                                        "exec": [
-                                            "if (pm.response.code === 201) {",
-                                            "    var json = pm.response.json();",
-                                            "    pm.collectionVariables.set('service_field_id', json.data.id);",
-                                            "}"
-                                        ],
-                                        "type": "text/javascript"
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            "name": "إضافة حقل اختيار | Add Field — Select (with options)",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"key\": \"priority\",\n    \"label\": {\n        \"en\": \"Priority\",\n        \"ar\": \"الأولوية\"\n    },\n    \"type\": \"select\",\n    \"options\": [\n        {\n            \"value\": \"low\",\n            \"label\": {\n                \"en\": \"Low\",\n                \"ar\": \"منخفضة\"\n            }\n        },\n        {\n            \"value\": \"medium\",\n            \"label\": {\n                \"en\": \"Medium\",\n                \"ar\": \"متوسطة\"\n            }\n        },\n        {\n            \"value\": \"high\",\n            \"label\": {\n                \"en\": \"High\",\n                \"ar\": \"عالية\"\n            }\n        }\n    ],\n    \"validation\": {\n        \"required\": true\n    },\n    \"is_required\": true,\n    \"order\": 2\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "إضافة حقل رفع ملف | Add Field — File Upload",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"key\": \"attachment\",\n    \"label\": {\n        \"en\": \"Add files or photos\",\n        \"ar\": \"أضف ملفات أو صور\"\n    },\n    \"type\": \"file\",\n    \"validation\": {\n        \"accept\": \"image/*\",\n        \"max_kb\": 5120\n    },\n    \"is_required\": false,\n    \"order\": 3\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "تعديل حقل | Update Field",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields/{{service_field_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields",
-                                        "{{service_field_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"is_required\": true,\n    \"order\": 1,\n    \"validation\": {\n        \"max\": 300\n    }\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "حذف حقل | Delete Field",
-                            "request": {
-                                "method": "DELETE",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-types/{{service_type_id}}/fields/{{service_field_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-types",
-                                        "{{service_type_id}}",
-                                        "fields",
-                                        "{{service_field_id}}"
-                                    ]
-                                }
-                            }
-                        }
-                    ],
-                    "description": "إدارة حقول النموذج الديناميكية لكل خدمة.\nكل تعديل هنا يُغيّر الفورم فوراً على التطبيق بدون كود إضافي.\n\nأنواع الحقول المدعومة: text | textarea | select | file | checkbox | date | number | rating"
-                },
-                {
-                    "name": "طلبات الخدمة (Admin) | Admin — Service Requests",
-                    "item": [
-                        {
-                            "name": "قائمة كل الطلبات | List All Service Requests",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "page",
-                                            "value": "1",
-                                            "disabled": false
-                                        },
-                                        {
-                                            "key": "branch_id",
-                                            "value": "",
-                                            "disabled": true
-                                        },
-                                        {
-                                            "key": "status",
-                                            "value": "",
-                                            "disabled": true
-                                        },
-                                        {
-                                            "key": "service_type_id",
-                                            "value": "",
-                                            "disabled": true
-                                        }
-                                    ]
-                                },
-                                "description": "الفلاتر المتاحة: branch_id | status (pending/in_progress/resolved/rejected/cancelled) | service_type_id"
-                            }
-                        },
-                        {
-                            "name": "فلترة حسب الفرع | Filter by Branch + Status",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "branch_id",
-                                            "value": "1",
-                                            "disabled": false
-                                        },
-                                        {
-                                            "key": "status",
-                                            "value": "pending",
-                                            "disabled": false
-                                        }
-                                    ]
-                                }
-                            }
-                        },
-                        {
-                            "name": "تفاصيل طلب | Get Service Request Detail",
-                            "request": {
-                                "method": "GET",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests",
-                                        "{{service_request_id}}"
-                                    ]
-                                },
-                                "description": "يعيد التفاصيل الكاملة: المحتوى، قيم الحقول، العضو، الموقع."
-                            }
-                        },
-                        {
-                            "name": "تحديث الحالة: قيد التنفيذ | Update Status — In Progress",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests",
-                                        "{{service_request_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"status\": \"in_progress\"\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "تحديث الحالة: تم الحل | Update Status — Resolved",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests",
-                                        "{{service_request_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"status\": \"resolved\",\n    \"resolution_note\": {\n        \"en\": \"Issue has been fixed. Please check again.\",\n        \"ar\": \"تمت معالجة الطلب. يرجى التحقق مجدداً.\"\n    }\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        },
-                        {
-                            "name": "تحديث الحالة: مرفوض | Update Status — Rejected",
-                            "request": {
-                                "method": "PATCH",
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "Accept-Language",
-                                        "value": "ar"
-                                    },
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/service-requests/{{service_request_id}}",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "service-requests",
-                                        "{{service_request_id}}"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n    \"status\": \"rejected\",\n    \"resolution_note\": {\n        \"en\": \"Request cannot be fulfilled at this time.\",\n        \"ar\": \"لا يمكن تنفيذ هذا الطلب في الوقت الحالي.\"\n    }\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    ],
-                    "description": "جميع الطلبات مرئية لكل موظف (Operations / Admin).\nيمكن تحديد فرع معين عبر ?branch_id= لعرض طلبات فرع محدد فقط."
-                }
-            ],
-            "description": "نظام خدمات ADD الديناميكي.\n\nالمحاور الثلاثة:\n• ADD Core (أحمر) — عنوان الشركة، Co-space، قاعات، تسريع، حاضنة\n• ADD Experience (سماوي) — Business Café، النادي، الفعاليات\n• ADD Ecosystem (أخضر) — الشركاء، المجتمع، الأعضاء، المكان\n\nلكل خدمة request_method يحدد طريقة الطلب:\nform | external_link | phone | whatsapp | internal_redirect | info_only"
         }
     ]
 }
