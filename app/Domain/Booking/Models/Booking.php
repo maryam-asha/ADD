@@ -11,6 +11,8 @@ use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -59,6 +61,33 @@ class Booking extends Model
             'cancelled_at' => 'datetime',
             'approved_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The statuses that hold a slot. A `pending` booking is itself the hold
+     * — there is no separate reservation mechanism — while `cancelled` and
+     * `rejected` fall outside, so the very next overlap check sees the slot
+     * free again with no explicit release step
+     * (docs/decisions/booking-creation-approval-extension.md).
+     */
+    public function scopeBlocking(Builder $query): Builder
+    {
+        return $query->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending]);
+    }
+
+    /**
+     * Half-open interval intersection: a booking ending exactly when the
+     * window starts does not overlap it. Adjacency is the buffer's concern,
+     * not this one.
+     */
+    public function scopeOverlapping(Builder $query, CarbonInterface $start, CarbonInterface $end): Builder
+    {
+        return $query->where('start_at', '<', $end)->where('end_at', '>', $start);
+    }
+
+    public function scopeForSpace(Builder $query, int $spaceId): Builder
+    {
+        return $query->where('space_id', $spaceId);
     }
 
     public function space(): BelongsTo

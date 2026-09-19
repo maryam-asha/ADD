@@ -2,7 +2,6 @@
 
 namespace App\Domain\Booking\Services;
 
-use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
@@ -11,7 +10,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\WalletService;
-use App\Domain\Settings\Services\SettingService;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,7 +23,8 @@ use Illuminate\Support\Facades\DB;
 class BookingExtensionService
 {
     public function __construct(
-        private readonly SettingService $settings,
+        private readonly AvailabilityService $availability,
+        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
     ) {}
@@ -40,27 +40,29 @@ class BookingExtensionService
 
             $space = Space::query()->whereKey($lockedBooking->space_id)->lockForUpdate()->firstOrFail();
 
-            $granularity = $space->slot_granularity_minutes ?? $this->settings->get('booking.slot_granularity_minutes', 30);
-            $minDuration = (int) $this->settings->get('booking.min_duration_minutes', 60);
+            $rules = $this->availability->rulesFor($space);
 
-            if ($additionalMinutes < $minDuration || ($additionalMinutes - $minDuration) % $granularity !== 0) {
+            if (! $this->availability->isValidDurationInMinutes($additionalMinutes, $rules)) {
                 throw new ReceptionActionException('api.booking.invalid_extension_duration');
             }
 
+            $previousEnd = $lockedBooking->end_at->copy();
             $newEndAt = $lockedBooking->end_at->copy()->addMinutes($additionalMinutes);
 
-            $conflict = Booking::query()
-                ->where('space_id', $lockedBooking->space_id)
-                ->whereKeyNot($lockedBooking->getKey())
-                ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending])
-                ->where('start_at', '<', $newEndAt)
-                ->where('end_at', '>', $lockedBooking->end_at)
-                ->orderBy('start_at')
-                ->first();
+            // The interval being added is what must be free — the booking's
+            // own rows are excluded by ignoreBookingId rather than by a
+            // separate query shape, so this is the same overlap predicate
+            // the calendar and BookingCreationService use.
+            $existing = $this->availability->blockingBookings($space, $previousEnd, $newEndAt, $rules);
 
-            if ($conflict !== null) {
+            $conflicts = $existing
+                ->reject(fn (Booking $row) => $row->getKey() === $lockedBooking->getKey())
+                ->filter(fn (Booking $row) => $row->start_at < $newEndAt && $row->end_at > $previousEnd)
+                ->sortBy('start_at');
+
+            if ($conflicts->isNotEmpty()) {
                 throw new ReceptionActionException('api.booking.extension_conflict', 422, [
-                    'latest_end_at' => $conflict->start_at->toIso8601String(),
+                    'latest_end_at' => $conflicts->first()->start_at->toIso8601String(),
                 ]);
             }
 
@@ -88,6 +90,16 @@ class BookingExtensionService
                 'end_at' => $newEndAt,
                 'payment_state' => $paymentState,
             ])->save();
+
+            // Still inside this method's Space lock, so the counter follows
+            // the window it is derived from.
+            $this->capacitySlots->move(
+                $lockedBooking,
+                $space,
+                CarbonImmutable::instance($lockedBooking->start_at),
+                CarbonImmutable::instance($previousEnd),
+                $rules,
+            );
         });
     }
 }

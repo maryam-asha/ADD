@@ -2,7 +2,6 @@
 
 namespace App\Domain\Booking\Services;
 
-use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
@@ -26,7 +25,7 @@ class ArrivalRequestMatcher
 
         return Booking::query()
             ->where('user_id', $member->id)
-            ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending])
+            ->blocking()
             ->whereNull('checked_in_at')
             ->whereBetween('start_at', [$startOfDayUtc, $endOfDayUtc])
             ->where('end_at', '>=', $now)

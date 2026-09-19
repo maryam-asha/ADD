@@ -11,6 +11,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 class BookingCancellationService
@@ -19,6 +20,7 @@ class BookingCancellationService
         private readonly WalletService $wallets,
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
+        private readonly CapacitySlotSynchronizer $capacitySlots,
     ) {}
 
     /**
@@ -36,6 +38,46 @@ class BookingCancellationService
      * would have been charged for the planned window; that's what gets
      * refunded.
      */
+    /**
+     * Whether cancel() would succeed, without attempting it.
+     *
+     * The member's booking detail response shows a Cancel button driven by
+     * this exact predicate, so the button is never offered for an action
+     * that would come straight back as a 422. Both callers share this one
+     * method for the same reason the availability rules are centralised:
+     * two copies of a rule drift.
+     */
+    public function canCancel(Booking $booking): bool
+    {
+        if (in_array($booking->status, [BookingStatus::Cancelled, BookingStatus::Rejected], true)) {
+            return false;
+        }
+
+        if ($booking->checked_in_at !== null) {
+            return false;
+        }
+
+        return ! now()->gt($booking->start_at->copy()->subMinutes($this->windowMinutesFor($booking)));
+    }
+
+    /**
+     * The cancellation window in minutes: the space's own setting, else the
+     * global default.
+     */
+    public function windowMinutesFor(Booking $booking): int
+    {
+        return (int) ($booking->space->cancellation_window_minutes
+            ?? $this->settings->get('booking.cancellation_window_minutes', 60));
+    }
+
+    /**
+     * The instant after which cancellation is refused.
+     */
+    public function deadlineFor(Booking $booking): CarbonInterface
+    {
+        return $booking->start_at->copy()->subMinutes($this->windowMinutesFor($booking));
+    }
+
     public function cancel(Booking $booking): void
     {
         DB::transaction(function () use ($booking) {
@@ -49,8 +91,7 @@ class BookingCancellationService
                 throw new ReceptionActionException('api.reception.already_checked_in', 409);
             }
 
-            $windowMinutes = $locked->space->cancellation_window_minutes
-                ?? $this->settings->get('booking.cancellation_window_minutes', 60);
+            $windowMinutes = $this->windowMinutesFor($locked);
 
             if (now()->gt($locked->start_at->copy()->subMinutes($windowMinutes))) {
                 throw new ReceptionActionException('api.reception.cancellation_window_passed');
@@ -60,6 +101,10 @@ class BookingCancellationService
                 'status' => BookingStatus::Cancelled,
                 'cancelled_at' => now(),
             ])->save();
+
+            // The slot is free again the moment the status leaves the
+            // blocking set, so the derived counter must follow it here.
+            $this->capacitySlots->release($locked, $locked->space);
 
             if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
                 $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);

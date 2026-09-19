@@ -7,6 +7,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Settings\Services\SettingService;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
 /**
@@ -54,38 +55,81 @@ class BusinessHoursService
     {
         $local = $this->toLocal($date);
 
-        $exceptions = BusinessHourException::query()
-            ->where('branch_id', $branch->id)
-            ->whereDate('date', $local->toDateString())
-            ->get();
+        return $this->periodsForRange($local, $local, $branch)[$local->toDateString()] ?? [];
+    }
 
-        if ($exceptions->isNotEmpty()) {
-            if ($exceptions->contains('is_closed', true)) {
-                return [];
+    /**
+     * The same resolution, for every date in a range, in two queries.
+     *
+     * The availability calendar asks this question 31 times per space;
+     * calling periodsFor() in a loop meant 62 queries for one month. The
+     * resolution order is not duplicated here — periodsFor() is now a
+     * one-day call to this method, so there remains exactly one
+     * implementation of "an exception replaces the weekly schedule."
+     *
+     * Both bounds are inclusive.
+     *
+     * @return array<string, array<int, array{open_time: string, close_time: string}>>
+     */
+    public function periodsForRange(CarbonInterface $from, CarbonInterface $to, Branch $branch): array
+    {
+        $localFrom = $this->toLocal($from)->startOfDay();
+        $localTo = $this->toLocal($to)->startOfDay();
+
+        // whereDate on both bounds rather than whereBetween: `date` is a
+        // DATE column that some drivers hand back as "Y-m-d 00:00:00", and a
+        // plain string range then excludes the final day (and, in SQLite,
+        // the first). whereDate normalises both sides the way the original
+        // single-date lookup did.
+        $exceptionsByDate = BusinessHourException::query()
+            ->where('branch_id', $branch->id)
+            ->whereDate('date', '>=', $localFrom->toDateString())
+            ->whereDate('date', '<=', $localTo->toDateString())
+            ->get()
+            ->groupBy(fn (BusinessHourException $exception) => Carbon::parse($exception->date)->toDateString());
+
+        $scheduleByWeekday = BusinessHour::query()
+            ->where('branch_id', $branch->id)
+            ->orderBy('open_time')
+            ->get(['day_of_week', 'open_time', 'close_time'])
+            ->groupBy(fn (BusinessHour $businessHour) => $businessHour->day_of_week instanceof DayOfWeek
+                ? $businessHour->day_of_week->value
+                : (string) $businessHour->day_of_week);
+
+        $resolved = [];
+
+        for ($date = $localFrom->copy(); $date->lessThanOrEqualTo($localTo); $date = $date->addDay()) {
+            $key = $date->toDateString();
+            $exceptions = $exceptionsByDate->get($key);
+
+            if ($exceptions !== null && $exceptions->isNotEmpty()) {
+                $resolved[$key] = $exceptions->contains('is_closed', true)
+                    ? []
+                    : $exceptions
+                        ->sortBy('open_time')
+                        ->values()
+                        ->map(fn (BusinessHourException $exception) => [
+                            'open_time' => $exception->open_time,
+                            'close_time' => $exception->close_time,
+                        ])
+                        ->all();
+
+                continue;
             }
 
-            return $exceptions
+            $weekday = DayOfWeek::fromCarbon($date);
+
+            $resolved[$key] = ($scheduleByWeekday->get($weekday->value) ?? collect())
                 ->sortBy('open_time')
                 ->values()
-                ->map(fn (BusinessHourException $exception) => [
-                    'open_time' => $exception->open_time,
-                    'close_time' => $exception->close_time,
+                ->map(fn (BusinessHour $businessHour) => [
+                    'open_time' => $businessHour->open_time,
+                    'close_time' => $businessHour->close_time,
                 ])
                 ->all();
         }
 
-        $weekday = DayOfWeek::fromCarbon($local);
-
-        return BusinessHour::query()
-            ->where('branch_id', $branch->id)
-            ->where('day_of_week', $weekday)
-            ->orderBy('open_time')
-            ->get(['open_time', 'close_time'])
-            ->map(fn (BusinessHour $businessHour) => [
-                'open_time' => $businessHour->open_time,
-                'close_time' => $businessHour->close_time,
-            ])
-            ->all();
+        return $resolved;
     }
 
     private function toLocal(CarbonInterface $instant): CarbonInterface

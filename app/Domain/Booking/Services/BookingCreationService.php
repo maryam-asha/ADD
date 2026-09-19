@@ -9,16 +9,16 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\WalletService;
-use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,8 +33,8 @@ use Illuminate\Support\Facades\DB;
 class BookingCreationService
 {
     public function __construct(
-        private readonly BusinessHoursService $businessHours,
-        private readonly SettingService $settings,
+        private readonly AvailabilityService $availability,
+        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
@@ -57,20 +57,23 @@ class BookingCreationService
         $startAt = $startAt->copy()->setTimezone('UTC');
         $endAt = $endAt->copy()->setTimezone('UTC');
 
-        $this->assertWithinBusinessHours($space, $startAt, $endAt);
+        $rules = $this->availability->rulesFor($space);
 
-        $granularity = $space->slot_granularity_minutes ?? $this->settings->get('booking.slot_granularity_minutes', 30);
-        $this->assertValidGranularity($startAt, $granularity);
+        $this->assertWithinBusinessHours($space, $startAt, $endAt, $rules);
+        $this->assertValidGranularity($startAt, $rules);
+        $this->assertValidDuration($startAt, $endAt, $rules);
 
-        $minDuration = (int) $this->settings->get('booking.min_duration_minutes', 60);
-        $this->assertValidDuration($startAt, $endAt, $minDuration, $granularity);
-
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId) {
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
-            $this->assertSlotAvailable($locked, $startAt, $endAt);
-            $this->assertOccupancyLeavesRoom($locked);
-            $this->assertBufferRespected($locked, $startAt, $endAt);
+            // Re-read inside the lock. Nothing the calendar computed is
+            // reused here — the read path is advisory, and only these
+            // freshly-read rows decide whether the slot is actually free.
+            $existing = $this->availability->blockingBookings($locked, $startAt, $endAt, $rules);
+
+            $this->assertSlotAvailable($existing, $startAt, $endAt, $rules);
+            $this->assertOccupancyLeavesRoom($locked, $startAt, $endAt);
+            $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
             $points = $this->amounts->forRange($locked, $startAt, $endAt);
 
@@ -95,6 +98,11 @@ class BookingCreationService
                 'payment_state' => $paymentState,
                 'payment_source' => $paymentSource,
             ]);
+
+            // Inside the same transaction and the same Space lock as the
+            // overlap check above, so the counter can never disagree with
+            // the rows it is derived from.
+            $this->capacitySlots->occupy($booking, $locked, $rules);
 
             if ($status === BookingStatus::Pending) {
                 $this->notifyOperationsOfPendingBooking($booking);
@@ -168,73 +176,77 @@ class BookingCreationService
         return [PaymentState::Unpaid, null];
     }
 
-    private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end): void
-    {
-        $branch = $space->building->branch;
-        $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
+    // ------------------------------------------------------------------
+    // Every rule below is decided by AvailabilityService — the one copy in
+    // this codebase. These methods exist only to turn a `false` into the
+    // message key and status this endpoint has always returned, in the
+    // order it has always checked them. Putting the rule itself back here
+    // would make the calendar and this method drift apart silently, which
+    // is what tests/Guards/AvailabilityRulesAreCentralizedTest prevents.
+    // ------------------------------------------------------------------
 
-        if (! $start->copy()->setTimezone($timezone)->isSameDay($end->copy()->setTimezone($timezone))) {
+    private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isWithinBusinessHours($space, $start, $end, $rules)) {
             throw new ReceptionActionException('api.reception.outside_business_hours');
         }
-
-        $startTime = $this->localTimeOfDay($start);
-        $endTime = $this->localTimeOfDay($end);
-
-        foreach ($this->businessHours->periodsFor($start, $branch) as $period) {
-            if ($startTime >= $period['open_time'] && $endTime <= $period['close_time']) {
-                return;
-            }
-        }
-
-        throw new ReceptionActionException('api.reception.outside_business_hours');
     }
 
-    private function assertValidGranularity(CarbonInterface $start, int $granularity): void
+    private function assertValidGranularity(CarbonInterface $start, SpaceBookingRules $rules): void
     {
-        $local = $start->copy()->setTimezone($this->settings->get('app.timezone', 'Asia/Damascus'));
-        $minutesSinceMidnight = $local->hour * 60 + $local->minute;
-
-        if ($local->second !== 0 || $minutesSinceMidnight % $granularity !== 0) {
+        if (! $this->availability->isValidGranularity($start, $rules)) {
             throw new ReceptionActionException('api.booking.invalid_start_time');
         }
     }
 
-    private function assertValidDuration(CarbonInterface $start, CarbonInterface $end, int $minDuration, int $granularity): void
+    private function assertValidDuration(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {
-        $duration = (int) $start->diffInMinutes($end);
-
-        if ($duration < $minDuration) {
+        if (! $this->availability->isLongEnough($start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.duration_too_short');
         }
 
-        if (($duration - $minDuration) % $granularity !== 0) {
+        if (! $this->availability->matchesDurationGranularity($start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.duration_invalid_granularity');
         }
     }
 
-    private function assertSlotAvailable(Space $space, CarbonInterface $start, CarbonInterface $end): void
+    /**
+     * @param  Collection<int, Booking>  $existing
+     */
+    private function assertSlotAvailable(Collection $existing, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {
-        $overlapping = Booking::query()
-            ->where('space_id', $space->id)
-            ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending])
-            ->where('start_at', '<', $end)
-            ->where('end_at', '>', $start)
-            ->exists();
-
-        if ($overlapping) {
+        if ($this->availability->overlapCount($existing, $start, $end) >= $rules->concurrencyCeiling) {
             throw new ReceptionActionException('api.booking.slot_unavailable');
         }
     }
 
     /**
      * Present-moment physical-presence count, reusing
-     * WalkInCapacityService::start()'s exact counting logic — deliberately
-     * not re-solved as a reservation-against-the-future-window check (that's
-     * space_capacity_slots, out of scope this phase; see the decision doc).
+     * WalkInCapacityService::start()'s exact counting logic.
+     *
+     * Narrowed to windows that actually contain now(). It answers "is there
+     * room in this space at this moment", which is the right question for
+     * someone arriving now and the wrong one for next Tuesday: a booking
+     * for tomorrow afternoon used to be refused because the room happened
+     * to be full as the request was made, and no amount of waiting would
+     * fix it. That also made a forward-looking calendar impossible to get
+     * right, since the read path cannot know the present occupancy of a
+     * future slot. Future windows are governed by the overlap-versus-
+     * ceiling check above instead, which is the reservation-based model
+     * space_capacity_slots now records.
+     *
+     * A deliberate loosening, documented in
+     * docs/decisions/booking-availability-and-calendar.md.
      */
-    private function assertOccupancyLeavesRoom(Space $space): void
+    private function assertOccupancyLeavesRoom(Space $space, CarbonInterface $start, CarbonInterface $end): void
     {
         if ($space->capacity === null) {
+            return;
+        }
+
+        $now = now();
+
+        if ($start->greaterThan($now) || $end->lessThanOrEqualTo($now)) {
             return;
         }
 
@@ -255,36 +267,12 @@ class BookingCreationService
     }
 
     /**
-     * A gap exactly equal to buffer_minutes passes — inclusive boundary,
-     * matching BusinessHoursService's own convention for a sibling concept.
+     * @param  Collection<int, Booking>  $existing
      */
-    private function assertBufferRespected(Space $space, CarbonInterface $start, CarbonInterface $end): void
+    private function assertBufferRespected(Collection $existing, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {
-        $buffer = $space->buffer_minutes ?? $this->settings->get('booking.buffer_minutes', 0);
-
-        if ($buffer <= 0) {
-            return;
-        }
-
-        $violation = Booking::query()
-            ->where('space_id', $space->id)
-            ->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending])
-            ->where(function ($query) use ($start, $end, $buffer) {
-                $query->where(function ($q) use ($start, $buffer) {
-                    $q->where('end_at', '<=', $start)->where('end_at', '>', $start->copy()->subMinutes($buffer));
-                })->orWhere(function ($q) use ($end, $buffer) {
-                    $q->where('start_at', '>=', $end)->where('start_at', '<', $end->copy()->addMinutes($buffer));
-                });
-            })
-            ->exists();
-
-        if ($violation) {
+        if ($this->availability->violatesBuffer($existing, $start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.buffer_conflict');
         }
-    }
-
-    private function localTimeOfDay(CarbonInterface $instant): string
-    {
-        return $instant->copy()->setTimezone($this->settings->get('app.timezone', 'Asia/Damascus'))->format('H:i');
     }
 }
