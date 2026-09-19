@@ -5,18 +5,25 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingApprovalService;
 use App\Domain\Booking\Services\BookingCancellationService;
+use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
 use App\Http\Requests\Admin\Reception\ExtendBookingRequest;
 use App\Http\Requests\Admin\Reception\RejectBookingRequest;
 use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
+use App\Http\Requests\Admin\Reception\StoreReceptionBookingRequest;
+use App\Http\Resources\BookingResource;
 use App\Http\Resources\PendingApprovalBookingResource;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -26,6 +33,49 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 class BookingReceptionController extends Controller
 {
     use LogsSensitiveActions;
+
+    /**
+     * Reception creating a booking on a member's behalf — the walk-up at
+     * the desk, and the "book it for them" action on the calendar.
+     *
+     * Reuses BookingCreationService unchanged, so every rule the member
+     * endpoint enforces applies here too: business hours, granularity,
+     * duration, overlap, buffer and the space's own ceiling. The only
+     * difference is that the member comes from the body rather than the
+     * token.
+     */
+    public function store(StoreReceptionBookingRequest $request, BookingCreationService $creations): JsonResponse
+    {
+        $space = Space::findOrFail($request->validated('space_id'));
+        $member = User::findOrFail($request->validated('user_id'));
+
+        $walletOwnerType = $request->validated('wallet_owner_type')
+            ? OwnerType::from($request->validated('wallet_owner_type'))
+            : null;
+
+        try {
+            $booking = $creations->create(
+                $space,
+                $member,
+                Carbon::parse($request->validated('start_at'), 'UTC'),
+                Carbon::parse($request->validated('end_at'), 'UTC'),
+                $walletOwnerType,
+                $request->validated('wallet_owner_id'),
+                $request->validated('note'),
+            );
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (WalletChoiceRequiredException $e) {
+            return response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422);
+        }
+
+        $this->logSensitiveAction('booking_created_by_reception', $booking, ['member_id' => $member->id]);
+
+        return response()->json(['data' => new BookingResource($booking)], 201);
+    }
 
     public function pendingApproval(): AnonymousResourceCollection
     {

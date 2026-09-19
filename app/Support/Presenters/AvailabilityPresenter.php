@@ -258,6 +258,13 @@ class AvailabilityPresenter
 
         $label = fn (int $index) => ucfirst($order[$index]);
 
+        // Every name was unrecognised. Returning null costs the caller a
+        // days label; reading past the end of an empty array costs it the
+        // whole response.
+        if ($indexes === []) {
+            return null;
+        }
+
         if (count($indexes) === 1) {
             return $label($indexes[0]);
         }

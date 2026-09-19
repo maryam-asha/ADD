@@ -1,6 +1,6 @@
 # Booking availability and calendar: one rule engine, a derived capacity counter, and two deliberate behaviour changes
 
-**Status:** in progress, Phase 1 resolved 2026-09-19. **Owner:** Maryam Asha.
+**Status:** resolved 2026-09-19 (Phases 1–5). **Owner:** Maryam Asha.
 **Type:** design doc for a new capability, plus two scoped reversals of previously recorded decisions.
 
 ## What this phase adds
@@ -53,6 +53,13 @@ The design question that mattered was what happens when it drifts, and the answe
 - Two tests pin the safety property directly: with the counter zeroed, and with its rows deleted outright, an overlapping booking is *still* refused.
 
 The cost is honest and accepted: a second write path, a reconciliation command, and a new class of drift bug whose blast radius is a stale calendar cell.
+
+## What the later phases added
+
+- **Phase 2 — the member calendar.** `GET spaces/{space}/availability`, `.../slots`, `.../quote`. A closed day and a full day are distinct states: closed carries the red banner and, when a `BusinessHourException` gave one, its reason; a full day is open and must not claim otherwise. The duration ladder comes from a new `booking.duration_options_minutes` setting seeded to 60/90/120/180, because deriving it from `min_duration` + `granularity` yields a 2.5h fourth chip rather than the design's 3h. `timezone_label` is derived per request — Damascus observes DST, so the design's fixed "GMT+3" is wrong part of the year.
+- **Phase 3 — the member's own bookings.** List with tab counts, detail with the approval stepper, self-service cancellation (previously reception-only), and a preview that builds the confirmation screen without creating anything. The stepper is derived from `status`/`approved_at` and collapses to two steps for an auto-confirming space, which never had a review. A wallet that cannot cover the cost is returned `sufficient: false` rather than omitted. Adds a nullable `bookings.note`.
+- **Phase 4 — multi-date and the past-date rule.** `POST bookings/batch` takes up to ten windows, all or nothing: partial success would leave a member part-charged for a booking they never got. Windows already accepted earlier in the same batch are checked against too — two picked dates that overlap each other are both absent from the database, so a check against stored rows alone passes both. Spaces are locked in ascending id order so two concurrent batches cannot deadlock, and payment is routed once for the summed total. A booking can no longer start in the past, behind `booking.allow_past_bookings`.
+- **Phase 5 — the operations calendar.** `GET admin/calendar` (spaces as rows, days as cells), `.../occupancy`, a general `GET admin/bookings` index, and `POST admin/reception/bookings` for booking a member in at the desk. Occupancy is booked minutes over open minutes, computed from the same `BusinessHoursService` periods the member calendar uses, so the two can never disagree about what "open" means; booked minutes are clipped to the open window, and a multi-occupant space is measured against its ceiling rather than reading 2000% full. Reception creation reuses `BookingCreationService` unchanged, so it cannot double-book a room the member endpoint would have refused.
 
 ## Known gaps, deliberately not addressed in Phase 1
 

@@ -6,6 +6,8 @@ use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
+use App\Http\Controllers\Api\V1\Admin\BookingCalendarController;
+use App\Http\Controllers\Api\V1\Admin\BookingController;
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\BusinessHourController;
@@ -208,11 +210,26 @@ Route::delete('companies/{company}/members/{user}', [CompanyMemberController::cl
 Route::get('error-logs', [ErrorLogController::class, 'index']);
 Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
 
+// docs/decisions/booking-availability-and-calendar.md — the operations
+// calendar (spaces as rows, days as cells, occupancy per cell) and the
+// general bookings index. Read-only: every write verb lives on the
+// reception routes below. Occupancy is computed from the same
+// BusinessHoursService periods the member calendar uses, so the two can
+// never disagree about what "open" means.
+Route::get('bookings', [BookingController::class, 'index']);
+Route::get('bookings/{booking}', [BookingController::class, 'show']);
+Route::get('calendar', [BookingCalendarController::class, 'index']);
+Route::get('calendar/occupancy', [BookingCalendarController::class, 'occupancy']);
+
 // Reception Operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
 // — check-in, check-out, cancellation and payment settlement for bookings.
 // No narrower role gate than the file's own admin|operations group: both do
 // all of it.
 Route::get('reception/bookings/pending-approval', [BookingReceptionController::class, 'pendingApproval']);
+// Reception booking a member in at the desk, and the calendar's "book it
+// for them" action. Reuses BookingCreationService, so every availability
+// rule the member endpoint enforces applies here too.
+Route::post('reception/bookings', [BookingReceptionController::class, 'store']);
 Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController::class, 'checkIn']);
 Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
 Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
