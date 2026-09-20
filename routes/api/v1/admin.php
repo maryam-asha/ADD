@@ -221,6 +221,14 @@ Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::get('calendar', [BookingCalendarController::class, 'index']);
 Route::get('calendar/occupancy', [BookingCalendarController::class, 'occupancy']);
 
+// The slot grid and duration ladder for one space, so the desk's booking
+// form offers the windows BookingCreationService will actually accept
+// instead of a free-form clock that learns the rules one 422 at a time.
+// Same AvailabilityBrowseService the member routes call -- the read side
+// and the write side cannot disagree because there is one of each.
+Route::get('spaces/{space}/availability/slots', [BookingCalendarController::class, 'slots']);
+Route::get('spaces/{space}/availability/quote', [BookingCalendarController::class, 'quote']);
+
 // Reception Operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
 // — check-in, check-out, cancellation and payment settlement for bookings.
 // No narrower role gate than the file's own admin|operations group: both do

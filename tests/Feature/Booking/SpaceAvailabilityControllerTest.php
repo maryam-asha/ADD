@@ -45,6 +45,15 @@ class SpaceAvailabilityControllerTest extends TestCase
         return $member;
     }
 
+    private function actingAsOperations(): User
+    {
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        Sanctum::actingAs($operator, ['*']);
+
+        return $operator;
+    }
+
     /**
      * @param  array<string, mixed>  $attributes
      */
@@ -373,5 +382,89 @@ class SpaceAvailabilityControllerTest extends TestCase
         // now.
         $this->assertNotNull($response->json('rules.approval_notice'));
         $this->assertStringContainsString('Min. 1h', $response->json('rules.min_duration_note'));
+    }
+
+    /**
+     * Reception books through the same BookingCreationService a member does,
+     * so the desk has to be able to see the same slots. These assertions are
+     * deliberately identical in shape to the member ones above: if the two
+     * surfaces ever diverge, one of the pairs fails.
+     */
+    public function test_operations_reads_the_same_slot_grid_as_a_member(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace();
+        $this->book($space, 14);
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17");
+
+        $response->assertOk()
+            ->assertJsonPath('meta.granularity_minutes', 60)
+            ->assertJsonPath('meta.timezone', 'Asia/Damascus');
+
+        $slots = collect($response->json('data'));
+        $booked = $slots->firstWhere('start_time', '14:00');
+
+        $this->assertSame('booked', $booked['state']);
+        $this->assertFalse($booked['is_available']);
+        $this->assertNotNull($booked['reason'], 'a refused slot must say why');
+    }
+
+    public function test_the_admin_and_member_slot_grids_are_byte_identical(): void
+    {
+        $space = $this->openSpace();
+        $this->book($space, 14);
+
+        $this->actingAsMember();
+        $asMember = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertOk()
+            ->json();
+
+        $this->actingAsOperations();
+        $asOperations = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertOk()
+            ->json();
+
+        $this->assertSame($asMember, $asOperations);
+    }
+
+    public function test_operations_reads_the_duration_ladder_with_each_option_priced(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/quote?start_at=2026-08-17 10:00");
+
+        $response->assertOk()
+            ->assertJsonPath('meta.granularity_minutes', 60)
+            ->assertJsonPath('durations.0.minutes', 60);
+
+        // 90 minutes against 60-minute granularity: returned disabled WITH a
+        // reason, never hidden, so the desk can say why it is refused.
+        $ninety = collect($response->json('durations'))->firstWhere('minutes', 90);
+        $this->assertNotNull($ninety, '90 minutes must be listed even when it cannot be booked');
+        $this->assertFalse($ninety['available']);
+        $this->assertNotNull($ninety['reason']);
+    }
+
+    /**
+     * The admin routes sit inside the file's own admin|operations group. A
+     * member reaching them would not be a leak -- the same data is on their
+     * own route -- but it would mean the group stopped applying, which is
+     * worth catching here rather than in whatever gets added next to it.
+     */
+    public function test_a_member_cannot_reach_the_admin_availability_routes(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $this->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertForbidden();
+        $this->getJson("/api/v1/admin/spaces/{$space->id}/availability/quote?start_at=2026-08-17 10:00")
+            ->assertForbidden();
     }
 }

@@ -7167,6 +7167,106 @@
                             }
                         },
                         {
+                            "name": "Day Slots for the Desk - Times Free on a Date",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/availability/slots?date=2026-09-24",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability",
+                                        "slots"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "date",
+                                            "value": "2026-09-24",
+                                            "description": "Required local date (Y-m-d)."
+                                        }
+                                    ]
+                                },
+                                "description": "The same slot grid the member app reads, served to operations so the desk's booking form can offer only the windows BookingCreationService will accept. Identical payload to the member route - the backend serves both from one AvailabilityBrowseService and asserts the two responses match."
+                            }
+                        },
+                        {
+                            "name": "Duration Quote for the Desk - Options & Prices",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/availability/quote?start_at=2026-09-24 14:00",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability",
+                                        "quote"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "start_at",
+                                            "value": "2026-09-24 14:00",
+                                            "description": "Required district wall-clock start (Y-m-d H:i). A bare value is read as local; an ISO offset would be re-interpreted."
+                                        }
+                                    ]
+                                },
+                                "description": "The duration ladder for a chosen start, each option priced in points and USD. An option that cannot be booked is returned with available=false and a translated reason rather than omitted, so the desk can say why it is refused."
+                            }
+                        },
+                        {
                             "name": "Create Booking on a Member’s Behalf",
                             "request": {
                                 "method": "POST",
