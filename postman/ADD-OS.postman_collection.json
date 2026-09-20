@@ -193,7 +193,7 @@
                     "description": "MEMBERS ONLY. An operations or admin account cannot sign in or reset a password anywhere in this folder أ¢â‚¬â€‌ those accounts belong to Admin/Auth, behind Fortify's second factor. Tokens minted here carry the ability `member-app`, which /api/v1/admin/* rejects, so this surface stays sealed off from operations even for someone who is legitimately both.\n\nTwo separate journeys, in order.\n\nSIGN UP (once per member): Register أ¢â‚¬â€‌ Send Code أ¢â€ â€™ Register أ¢â‚¬â€‌ Verify & Create. Step 1 validates the whole profile and parks it, so a number that already has an account is refused there with a 422 rather than after the OTP round trip; step 2 then needs only the phone and the code. Nothing lands in `users` until step 2.\n\nSIGN IN (every time after): Login with phone + password. Refresh Token renews the access token when it expires (60 min) without re-entering the password; Logout ends the session on this device only.\n\nFORGOT IT: Forgot Password أ¢â€ â€™ Reset Password. The reset revokes every token the member holds on every device, and deliberately issues none أ¢â‚¬â€‌ sign in again afterwards.\n\nRegister أ¢â‚¬â€‌ Verify & Create, Login and Refresh Token all capture the pair into {{member_token}} and {{member_refresh_token}}. Account Reactivation -- Verify does the same.\n\nDEACTIVATED, WANT BACK IN: Account Reactivation -- Request Code -> Account Reactivation -- Verify. Only works on an account a member deactivated themselves (Member (App)/Account/Deactivate Account) -- a blocked account can't use this; only an admin can reverse a block. Verify signs the member straight back in with a fresh token pair, since a deactivated account holds no live session to return to.\n\nAlready signed in and just want a new password without having forgotten the old one? That's Member (App)/Account/Change Password instead -- it proves identity with the current password rather than a code, and only ends every *other* session, not this one.",
                     "item": [
                         {
-                            "name": "Register أ¢â‚¬â€‌ Send Code",
+                            "name": "Register — Send Code",
                             "request": {
                                 "method": "POST",
                                 "header": [
@@ -237,7 +237,7 @@
                             }
                         },
                         {
-                            "name": "Register أ¢â‚¬â€‌ Verify & Create",
+                            "name": "Register — Verify & Create",
                             "event": [
                                 {
                                     "listen": "test",
@@ -298,7 +298,7 @@
                             }
                         },
                         {
-                            "name": "Register â€” Resend Code",
+                            "name": "Register — Resend Code",
                             "request": {
                                 "method": "POST",
                                 "header": [],
@@ -1075,7 +1075,7 @@
                             "response": []
                         },
                         {
-                            "name": "Get Space Details (طھظپط§طµظٹظ„ ط§ظ„ظ…ط³ط§ط­ط© ظ„ظ„ط­ط¬ط²)",
+                            "name": "Get Space Details",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -1176,7 +1176,7 @@
                     "description": "docs/decisions/booking-availability-and-calendar.md — the read side of the booking rules, powering the date picker and time-slot grid. Read-only and advisory: nothing here holds a slot, so POST bookings still re-checks under a row lock. Each slot's `reason` is the very message that endpoint would return for the same window, because both go through AvailabilityService.",
                     "item": [
                         {
-                            "name": "Month Calendar (أي الأيام متاحة)",
+                            "name": "Month Calendar — Which Days Are Open",
                             "request": {
                                 "method": "GET",
                                 "auth": {
@@ -1230,7 +1230,7 @@
                             }
                         },
                         {
-                            "name": "Day Slots (الشرائح المتاحة في يوم)",
+                            "name": "Day Slots — Times Free on a Date",
                             "request": {
                                 "method": "GET",
                                 "auth": {
@@ -1280,7 +1280,7 @@
                             }
                         },
                         {
-                            "name": "Duration Quote (المدد والأسعار)",
+                            "name": "Duration Quote — Options & Prices",
                             "request": {
                                 "method": "GET",
                                 "auth": {
@@ -1396,7 +1396,7 @@
                             }
                         },
                         {
-                            "name": "Create Booking â€” Error: Invalid Start Time",
+                            "name": "Create Booking — Error: Invalid Start Time",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -1444,7 +1444,7 @@
                             }
                         },
                         {
-                            "name": "Create Booking â€” Error: Slot Unavailable",
+                            "name": "Create Booking — Error: Slot Unavailable",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -1492,7 +1492,7 @@
                             }
                         },
                         {
-                            "name": "Create Booking â€” Error: Multiple Wallets, Choice Required",
+                            "name": "Create Booking — Error: Multiple Wallets, Choice Required",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -1590,7 +1590,7 @@
                             }
                         },
                         {
-                            "name": "Extend Booking â€” Error: Conflict",
+                            "name": "Extend Booking — Error: Conflict",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -1640,7 +1640,7 @@
                             }
                         },
                         {
-                            "name": "List My Bookings (حجوزاتي)",
+                            "name": "List My Bookings",
                             "request": {
                                 "method": "GET",
                                 "auth": {
@@ -1698,7 +1698,7 @@
                             }
                         },
                         {
-                            "name": "Get Booking Detail (تفاصيل الحجز + مؤشر الحالة)",
+                            "name": "Get Booking Detail — With Status Stepper",
                             "request": {
                                 "method": "GET",
                                 "auth": {
@@ -1739,7 +1739,7 @@
                             }
                         },
                         {
-                            "name": "Preview Booking (شاشة التأكيد)",
+                            "name": "Preview Booking — Confirmation Screen",
                             "request": {
                                 "method": "POST",
                                 "auth": {
@@ -1788,7 +1788,7 @@
                             }
                         },
                         {
-                            "name": "Cancel Booking (إلغاء الحجز)",
+                            "name": "Cancel Booking",
                             "request": {
                                 "method": "POST",
                                 "auth": {
@@ -1838,7 +1838,7 @@
                             }
                         },
                         {
-                            "name": "Create Booking — Multi-date (حجز عدة تواريخ)",
+                            "name": "Create Booking — Multi-date",
                             "request": {
                                 "method": "POST",
                                 "auth": {
@@ -2043,7 +2043,7 @@
                     "name": "Packages & Subscription",
                     "item": [
                         {
-                            "name": "Get Packages & Subscription (ط§ظ„ط¨ط§ظ‚ط§طھ ظˆط§ظ„ط§ط´طھط±ط§ظƒط§طھ)",
+                            "name": "Get Packages & Subscription",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -6958,7 +6958,7 @@
                     "description": "docs/decisions/booking-availability-and-calendar.md — the operations calendar and the general bookings index. Read-only: every write verb lives under Reception Operations. Occupancy is computed from the same BusinessHoursService periods the member calendar uses, so the two can never disagree about what 'open' means.",
                     "item": [
                         {
-                            "name": "Operations Calendar (تقويم المساحات)",
+                            "name": "Operations Calendar",
                             "request": {
                                 "method": "GET",
                                 "header": [
@@ -7014,7 +7014,7 @@
                             }
                         },
                         {
-                            "name": "Calendar Occupancy (نِسَب الإشغال فقط)",
+                            "name": "Calendar Occupancy — Figures Only",
                             "request": {
                                 "method": "GET",
                                 "header": [
@@ -7059,7 +7059,7 @@
                             }
                         },
                         {
-                            "name": "List All Bookings (فهرس الحجوزات)",
+                            "name": "List All Bookings",
                             "request": {
                                 "method": "GET",
                                 "header": [
@@ -7140,7 +7140,7 @@
                             }
                         },
                         {
-                            "name": "Get Booking Detail (تفاصيل حجز للإدارة)",
+                            "name": "Get Booking Detail",
                             "request": {
                                 "method": "GET",
                                 "header": [
@@ -7167,7 +7167,7 @@
                             }
                         },
                         {
-                            "name": "Create Booking for a Member (حجز نيابة عن عضو)",
+                            "name": "Create Booking on a Member’s Behalf",
                             "request": {
                                 "method": "POST",
                                 "header": [
@@ -7244,7 +7244,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Check In Booking â€” Error: Outside Business Hours",
+                                    "name": "Check In Booking — Error: Outside Business Hours",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7325,7 +7325,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Start Walk-in Session â€” Error: No Capacity",
+                                    "name": "Start Walk-in Session — Error: No Capacity",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7406,7 +7406,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Check Out Booking â€” Error: Past Closing Time",
+                                    "name": "Check Out Booking — Error: Past Closing Time",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7517,7 +7517,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Cancel Booking â€” Error: Past Cancellation Window",
+                                    "name": "Cancel Booking — Error: Past Cancellation Window",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7593,7 +7593,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Settle Booking Payment â€” Error: Already Paid",
+                                    "name": "Settle Booking Payment — Error: Already Paid",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7676,7 +7676,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Settle Walk-in Payment â€” Error: Not Yet Checked Out",
+                                    "name": "Settle Walk-in Payment — Error: Not Yet Checked Out",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7801,7 +7801,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Top Up Wallet â€” Error: No Target Specified",
+                                    "name": "Top Up Wallet — Error: No Target Specified",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7944,7 +7944,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Reject Booking â€” Error: Reason Required",
+                                    "name": "Reject Booking — Error: Reason Required",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -7986,7 +7986,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Approve/Reject â€” Error: Not Pending",
+                                    "name": "Approve/Reject — Error: Not Pending",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -8056,7 +8056,7 @@
                                     }
                                 },
                                 {
-                                    "name": "Extend Booking (Reception) â€” Error: Conflict",
+                                    "name": "Extend Booking (Reception) — Error: Conflict",
                                     "request": {
                                         "method": "POST",
                                         "header": [
