@@ -136,11 +136,11 @@ class MemberEventJourneyTest extends TestCase
 
         Sanctum::actingAs($this->member(), ['*']);
 
-        $sessions = $this->getJson("/api/v1/member/events/{$event->id}")->json('data.sessions');
+        $schedule = $this->getJson("/api/v1/member/events/{$event->id}")->json('data.schedule');
 
-        $this->assertCount(2, $sessions);
-        $this->assertSame('09:00', $sessions[0]['start_time']);
-        $this->assertSame('16:00', $sessions[1]['start_time']);
+        $this->assertCount(2, $schedule);
+        $this->assertSame('09:00 AM', $schedule[0]['start_time']);
+        $this->assertSame('04:00 PM', $schedule[1]['start_time']);
     }
 
     // ── Details: where does my application stand? ────────────────────────
@@ -156,8 +156,11 @@ class MemberEventJourneyTest extends TestCase
         $payload = $this->getJson("/api/v1/member/events/{$event->id}")->json('data');
 
         $this->assertTrue($payload['is_registered']);
-        $this->assertSame('pending', $payload['registration_status']);
+        $this->assertSame('Registered', $payload['registration_status']);
         $this->assertFalse($payload['can_register']);
+
+        $payloadAr = $this->withHeaders(['lang' => 'ar'])->getJson("/api/v1/member/events/{$event->id}")->json('data');
+        $this->assertSame('مسجّل', $payloadAr['registration_status']);
     }
 
     public function test_an_accepted_member_sees_that_they_are_in(): void
@@ -169,7 +172,7 @@ class MemberEventJourneyTest extends TestCase
         $this->postJson("/api/v1/member/events/{$event->id}/register")->assertStatus(201);
 
         $this->assertSame(
-            'approved',
+            'Registered',
             $this->getJson("/api/v1/member/events/{$event->id}")->json('data.registration_status')
         );
     }
@@ -195,8 +198,11 @@ class MemberEventJourneyTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $payload = $this->getJson("/api/v1/member/events/{$event->id}")->json('data');
 
-        $this->assertSame('rejected', $payload['registration_status']);
+        $this->assertSame('Rejected', $payload['registration_status']);
         $this->assertSame('The session is full.', $payload['rejection_reason']);
+
+        $payloadAr = $this->withHeaders(['lang' => 'ar'])->getJson("/api/v1/member/events/{$event->id}")->json('data');
+        $this->assertSame('مرفوض', $payloadAr['registration_status']);
     }
 
     /** A rejected application does not hold a seat, so re-applying is allowed. */
@@ -237,13 +243,9 @@ class MemberEventJourneyTest extends TestCase
             ->assertStatus(200)
             ->json('data');
 
-        $this->assertCount(1, $form['fields']);
-        $this->assertSame('dietary_needs', $form['fields'][0]['key']);
-
-        // Identity is never asked for again: it comes from the account.
-        $this->assertTrue($form['identity']['read_only']);
-        $keys = collect($form['identity']['fields'])->pluck('key');
-        $this->assertEqualsCanonicalizing(['name', 'phone', 'email'], $keys->all());
+        $this->assertCount(1, $form['registration_form']);
+        $this->assertSame('dietary_needs', $form['registration_form'][0]['key']);
+        $this->assertArrayNotHasKey('identity', $form);
     }
 
     /** An event that asks nothing still answers, so the app has one path. */
@@ -257,8 +259,8 @@ class MemberEventJourneyTest extends TestCase
             ->assertStatus(200)
             ->json('data');
 
-        $this->assertSame([], $form['fields']);
-        $this->assertFalse($form['has_registration_form']);
+        $this->assertSame([], $form['registration_form']);
+        $this->assertArrayNotHasKey('has_registration_form', $form);
     }
 
     // ── Submitting ───────────────────────────────────────────────────────

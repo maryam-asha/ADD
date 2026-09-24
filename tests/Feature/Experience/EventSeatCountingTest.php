@@ -67,8 +67,10 @@ class EventSeatCountingTest extends TestCase
         $card = collect($response->json('data'))->firstWhere('id', $event->id);
 
         // 3 approved + 2 pending; the 4 rejected do not count.
-        $this->assertSame(5, $card['attendees_count']);
-        $this->assertSame(5, $card['seats_left']);
+        $this->assertSame('5 seats left', $card['seats_left_text']);
+        $this->assertArrayNotHasKey('attendees_count', $card);
+        $this->assertArrayNotHasKey('seats_left', $card);
+        $this->assertArrayNotHasKey('capacity', $card);
     }
 
     public function test_the_full_filter_ignores_rejected_registrations(): void
@@ -129,7 +131,7 @@ class EventSeatCountingTest extends TestCase
 
         $this->assertTrue($card['is_registered']);
         $this->assertFalse($card['can_register']);
-        $this->assertSame('approved', $card['registration_status']);
+        $this->assertSame('Registered', $card['registration_status']);
     }
 
     public function test_a_rejected_member_reads_as_not_registered_and_able_to_apply(): void
@@ -170,7 +172,7 @@ class EventSeatCountingTest extends TestCase
 
         $card = collect($response->json('data'))->firstWhere('id', $event->id);
         $this->assertNotNull($card);
-        $this->assertSame('pending', $card['registration']['status']);
+        $this->assertSame('registered', $card['registration']['status']);
         // No ticket for a registration nobody has admitted yet.
         $this->assertSame('view_event', $card['action']['type']);
     }

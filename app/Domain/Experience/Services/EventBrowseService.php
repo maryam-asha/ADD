@@ -6,6 +6,7 @@ use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
 use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
@@ -476,18 +477,17 @@ class EventBrowseService
             $computedStatus = 'full';
         }
 
-        $badge = $this->resolveBadge($event, $isCancelled, $isFull, $locale);
         $seatsLeftText = $this->resolveSeatsLeftText($capacity, $attendeesCount, $seatsLeft, $isCancelled, $isFull, $locale);
 
         // One lookup, not two: the row itself answers both "is this member
         // in" and "where does their registration stand". Rejected rows are
         // excluded, so a rejected member may register again.
         $myRegistration = $this->myRegistrationFor($event, $user);
-
-        $registrationStatus = $myRegistration?->status?->value;
-        // Rejected is a decision, not a place on the list: is_registered
-        // drives "you are in", which a turned-down member is not.
-        $isRegistered = $myRegistration !== null && $registrationStatus !== 'rejected';
+        $rawRegistrationStatus = $myRegistration?->status?->value;
+        $isRegistered = $myRegistration !== null && $rawRegistrationStatus !== 'rejected';
+        $registrationStatus = $isRegistered
+            ? $this->translateRegistrationStatus($rawRegistrationStatus, $locale)
+            : null;
 
         // Member-facing: the two display labels only. The raw point count
         // and the unformatted currency figures stay server-side —
@@ -506,7 +506,10 @@ class EventBrowseService
         $sittingStart = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->start_at) : $start;
         $sittingEnd = $firstSitting ? app(LocalTime::class)->toLocal($firstSitting->end_at) : $end;
 
-        return [
+        $scheduleAnalysis = app(EventDatePresenter::class)->analyzeSchedule($sessions, $start, $end);
+        $isMember = request()?->is('*member*');
+
+        $card = [
             'id' => $event->id,
             'title' => $event->translate('title', $locale),
             'description' => $event->translate('description', $locale),
@@ -514,49 +517,17 @@ class EventBrowseService
                 'id' => $event->category->id,
                 'name' => $event->category->translate('name', $locale),
             ] : null,
-            'start_at' => $start?->format('Y-m-d'),
-            'end_at' => $end?->format('Y-m-d'),
-            'date' => [
-                'month' => $start ? strtoupper($start->format('M')) : null,
-                'day' => $start ? $start->format('d') : null,
-                'weekday' => $start ? strtoupper($start->format('D')) : null,
-                'formatted' => $start ? $start->format('F d, Y') : null,
-                // Null on a single-day event, so a client that ignores these
-                // keeps rendering exactly what it rendered before.
-                'end_month' => $isMultiDay && $end ? strtoupper($end->format('M')) : null,
-                'end_day' => $isMultiDay && $end ? $end->format('d') : null,
-                'end_weekday' => $isMultiDay && $end ? strtoupper($end->format('D')) : null,
-                'end_formatted' => $isMultiDay && $end ? $end->format('F d, Y') : null,
-            ],
-            // One sitting's hours — the first. On a multi-day event the
-            // remaining days have their own and are listed in `sessions` on
-            // the detail endpoint; is_multi_day tells a card not to present
-            // these as the whole story.
-            'time' => [
-                'start' => $sittingStart?->format('h:i A'),
-                'end' => $sittingEnd?->format('h:i A'),
-                'range' => $sittingStart && $sittingEnd
-                    ? ($sittingStart->format('h:i A').' – '.$sittingEnd->format('h:i A'))
-                    : null,
-            ],
             'is_multi_day' => $isMultiDay,
             'session_count' => $sessionCount,
+            'is_same_time' => $scheduleAnalysis['is_same_time'],
+            'is_continuous' => $scheduleAnalysis['is_continuous'],
+            'schedule' => $scheduleAnalysis['schedule'],
             'location' => app(EventLocationService::class)->displayLocation($event, $locale),
-            'space_id' => $event->space_id,
-            'branch' => $event->branch ? [
-                'id' => $event->branch->id,
-                'name' => $event->branch->translate('name', $locale),
-            ] : null,
             'image_url' => $event->image_url,
-            'capacity' => $capacity,
-            'attendees_count' => $attendeesCount,
-            'seats_left' => $seatsLeft,
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
             ...$price,
-            'status' => $event->status,
-            'computed_status' => $computedStatus,
-            'badge' => $badge,
+            'status' => $computedStatus,
             'is_registered' => $isRegistered,
             // On a card, only a live application: a rejection against every
             // browsed event is noise the listing cannot explain. The detail
@@ -574,6 +545,50 @@ class EventBrowseService
                 && $event->status === 'published'
                 && ! $isRegistered,
         ];
+
+        if (! $isMember) {
+            $card['computed_status'] = $computedStatus;
+            $card['start_at'] = $start?->format('Y-m-d');
+            $card['end_at'] = $end?->format('Y-m-d');
+            $card['date'] = [
+                'month' => $start ? strtoupper($start->format('M')) : null,
+                'day' => $start ? $start->format('d') : null,
+                'weekday' => $start ? strtoupper($start->format('D')) : null,
+                'formatted' => $start ? $start->format('F d, Y') : null,
+                'end_month' => $isMultiDay && $end ? strtoupper($end->format('M')) : null,
+                'end_day' => $isMultiDay && $end ? $end->format('d') : null,
+                'end_weekday' => $isMultiDay && $end ? strtoupper($end->format('D')) : null,
+                'end_formatted' => $isMultiDay && $end ? $end->format('F d, Y') : null,
+            ];
+            $card['time'] = [
+                'start' => $sittingStart?->format('h:i A'),
+                'end' => $sittingEnd?->format('h:i A'),
+                'range' => $sittingStart && $sittingEnd
+                    ? ($sittingStart->format('h:i A').' – '.$sittingEnd->format('h:i A'))
+                    : null,
+            ];
+            $card['sessions'] = $sessions->map(function ($session) {
+                $time = app(LocalTime::class);
+                $from = $time->toLocal($session->start_at);
+                $until = $time->toLocal($session->end_at);
+
+                return [
+                    'id' => $session->id,
+                    'title' => $session->translate('title', $this->resolveLocale()),
+                    'date' => $from?->format('Y-m-d'),
+                    'date_formatted' => $from?->format('F d, Y'),
+                    'weekday' => $from ? strtoupper($from->format('D')) : null,
+                    'start_time' => $from?->format('H:i'),
+                    'end_time' => $until?->format('H:i'),
+                    'start_label' => $from?->format('h:i A'),
+                    'end_label' => $until?->format('h:i A'),
+                    'range' => $from && $until ? ($from->format('h:i A').' – '.$until->format('h:i A')) : null,
+                    'ends_next_day' => $from && $until && $until->toDateString() !== $from->toDateString(),
+                ];
+            })->values()->all();
+        }
+
+        return $card;
     }
 
     /**
@@ -600,20 +615,9 @@ class EventBrowseService
             // leaves out. A turned-down member was previously shown nothing
             // at all — no status, no reason, and an invitation to apply
             // again with no hint of what had happened.
-            'registration_status' => $mine?->status?->value,
+            'registration_status' => $this->translateRegistrationStatus($mine?->status?->value, $locale),
             'rejection_reason' => $mine?->rejection_reason,
             'registered_at' => $mine?->created_at?->toISOString(),
-            // The schedule, when the event runs over more than one sitting.
-            // start_at/end_at on the card stay the envelope around these, so
-            // a client that only reads those is unaffected.
-            'sessions' => $event->sessions->map(fn ($session) => [
-                'id' => $session->id,
-                'title' => $session->translate('title', $locale),
-                'date' => $time->toLocal($session->start_at)?->format('Y-m-d'),
-                'date_full' => $time->toLocal($session->start_at)?->format('l, F j, Y'),
-                'start_time' => $time->toLocal($session->start_at)?->format('H:i'),
-                'end_time' => $time->toLocal($session->end_at)?->format('H:i'),
-            ])->all(),
         ]);
     }
 
@@ -639,8 +643,8 @@ class EventBrowseService
         $isApproved = $attendee?->status === EventRegistrationStatus::Approved;
 
         if ($attendee?->status === EventRegistrationStatus::Pending) {
-            $regStatus = 'pending';
-            $regLabel = $locale === 'ar' ? 'قيد المراجعة' : 'Pending review';
+            $regStatus = 'registered';
+            $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
         } elseif ($attendee?->status === EventRegistrationStatus::Rejected) {
             $regStatus = 'rejected';
             $regLabel = $locale === 'ar' ? 'مرفوض' : 'Rejected';
@@ -766,7 +770,27 @@ class EventBrowseService
         }
 
         return $locale === 'ar'
-            ? ($seatsLeft.' / '.$capacity.' مقاعد متبقية')
-            : ($seatsLeft.' / '.$capacity.' seats left');
+            ? ($seatsLeft.' مقاعد متبقية')
+            : ($seatsLeft.' seats left');
+    }
+
+    /**
+     * Translate registration status according to locale.
+     */
+    public function translateRegistrationStatus(?string $status, string $locale): ?string
+    {
+        if ($status === null) {
+            return null;
+        }
+
+        if ($status === 'rejected') {
+            return $locale === 'ar' ? 'مرفوض' : 'Rejected';
+        }
+
+        if (in_array($status, ['registered', 'approved', 'pending'], true)) {
+            return $locale === 'ar' ? 'مسجّل' : 'Registered';
+        }
+
+        return $status;
     }
 }

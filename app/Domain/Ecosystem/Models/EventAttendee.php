@@ -7,6 +7,7 @@ use App\Domain\Experience\Models\EventRegistrationFieldValue;
 use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -35,10 +36,49 @@ class EventAttendee extends Model
         return [
             'user_id' => 'integer',
             'attended' => 'boolean',
-            'status' => EventRegistrationStatus::class,
             'approved_at' => 'datetime',
             'pending_expires_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (EventAttendee $attendee) {
+            if (empty($attendee->attributes['status'])) {
+                $requiresApproval = $attendee->relationLoaded('event')
+                    ? (bool) $attendee->event?->requires_approval
+                    : (bool) Event::query()->where('id', $attendee->event_id)->value('requires_approval');
+
+                $attendee->status = $requiresApproval
+                    ? EventRegistrationStatus::Pending
+                    : EventRegistrationStatus::Approved;
+            }
+        });
+    }
+
+    protected function status(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value instanceof EventRegistrationStatus) {
+                    return $value;
+                }
+
+                $enum = EventRegistrationStatus::tryFrom((string) $value);
+                if ($enum !== null) {
+                    return $enum;
+                }
+
+                $requiresApproval = $this->relationLoaded('event')
+                    ? (bool) $this->event?->requires_approval
+                    : (bool) Event::query()->where('id', $this->event_id)->value('requires_approval');
+
+                return $requiresApproval
+                    ? EventRegistrationStatus::Pending
+                    : EventRegistrationStatus::Approved;
+            },
+            set: fn ($value) => $value instanceof EventRegistrationStatus ? $value->value : $value,
+        );
     }
 
     public function event(): BelongsTo

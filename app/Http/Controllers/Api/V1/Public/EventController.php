@@ -61,13 +61,18 @@ class EventController extends Controller
             ->where('status', 'published')
             ->findOrFail($id);
 
+        if ($event->registersExternally()) {
+            return response()->json([
+                'data' => [
+                    'external_form_url' => $event->external_form_url,
+                ],
+            ]);
+        }
+
         return response()->json([
             'data' => [
-                'event_id' => $event->id,
-                'requires_approval' => (bool) $event->requires_approval,
-                'has_registration_form' => (bool) $event->has_registration_form,
-                'external_form_url' => $event->external_form_url,
-                'fields' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
+                'external_form_url' => null,
+                'registration_form' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
             ],
         ]);
     }

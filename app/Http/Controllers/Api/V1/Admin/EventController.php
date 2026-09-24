@@ -11,8 +11,10 @@ use App\Domain\Foundation\Models\Space;
 use App\Http\Requests\Admin\StoreEventRequest;
 use App\Http\Requests\Admin\UpdateEventRequest;
 use App\Http\Resources\EventResource;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 
 class EventController extends AdminResourceController
 {
@@ -27,6 +29,18 @@ class EventController extends AdminResourceController
     }
 
     public function __construct(private EventSchedule $schedule) {}
+
+    protected function applyIndexFilters(Builder $query, Request $request): void
+    {
+        $query->with(['category', 'sessions']);
+    }
+
+    public function show(int $id): JsonResource
+    {
+        $event = Event::with(['category', 'sessions'])->findOrFail($id);
+
+        return new EventResource($event);
+    }
 
     public function store(StoreEventRequest $request): EventResource
     {
@@ -54,7 +68,7 @@ class EventController extends AdminResourceController
             $event->refresh();
         }
 
-        return new EventResource($event);
+        return new EventResource($event->loadMissing(['category', 'sessions']));
     }
 
     public function update(UpdateEventRequest $request, Event $event): JsonResponse

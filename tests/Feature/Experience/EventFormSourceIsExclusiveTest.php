@@ -169,7 +169,7 @@ class EventFormSourceIsExclusiveTest extends TestCase
             ->json('data');
 
         $this->assertSame('https://forms.example.com/abc', $payload['external_form_url']);
-        $this->assertSame([], $payload['fields']);
-        $this->assertFalse($payload['has_registration_form']);
+        $this->assertArrayNotHasKey('fields', $payload);
+        $this->assertArrayNotHasKey('registration_form', $payload);
     }
 }

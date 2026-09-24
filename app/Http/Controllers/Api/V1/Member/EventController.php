@@ -95,23 +95,19 @@ class EventController extends Controller
     public function registrationForm(Request $request, int|string $id): JsonResponse
     {
         $event = Event::with('activeRegistrationFields')->findOrFail($id);
-        $user = $request->user();
+
+        if ($event->registersExternally()) {
+            return response()->json([
+                'data' => [
+                    'external_form_url' => $event->external_form_url,
+                ],
+            ]);
+        }
 
         return response()->json([
             'data' => [
-                'event_id' => $event->id,
-                'requires_approval' => (bool) $event->requires_approval,
-                'has_registration_form' => (bool) $event->has_registration_form,
-                'external_form_url' => $event->external_form_url,
-                'identity' => $user ? [
-                    'read_only' => true,
-                    'fields' => [
-                        ['key' => 'name', 'label' => __('api.event.identity_name'), 'value' => $user->name],
-                        ['key' => 'phone', 'label' => __('api.event.identity_phone'), 'value' => $user->phone],
-                        ['key' => 'email', 'label' => __('api.event.identity_email'), 'value' => $user->email],
-                    ],
-                ] : null,
-                'fields' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
+                'external_form_url' => null,
+                'registration_form' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
             ],
         ]);
     }

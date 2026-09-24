@@ -362,4 +362,186 @@ class EventSessionsTest extends TestCase
         $this->assertSame(0, $card['session_count']);
         $this->assertNotNull($card['time']['range']);
     }
+
+    // ── Every sitting, as its own object ─────────────────────────────────
+
+    /**
+     * Reported: the dashboard listing showed only the first day, because the
+     * card had no `sessions` at all — which was also why `time` had to invent
+     * a range spanning them.
+     */
+    public function test_the_card_carries_every_sitting_with_its_own_date_and_hours(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-06-01', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-06-02', '16:00', '21:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertCount(2, $card['sessions']);
+
+        $this->assertSame('2027-06-01', $card['sessions'][0]['date']);
+        $this->assertSame('09:00', $card['sessions'][0]['start_time']);
+        $this->assertSame('17:00', $card['sessions'][0]['end_time']);
+        $this->assertSame('09:00 AM – 05:00 PM', $card['sessions'][0]['range']);
+
+        $this->assertSame('2027-06-02', $card['sessions'][1]['date']);
+        $this->assertSame('16:00', $card['sessions'][1]['start_time']);
+        $this->assertSame('21:00', $card['sessions'][1]['end_time']);
+    }
+
+    /**
+     * Reported: entering 22:30–04:00 stored 01:00–02:30. The editor put both
+     * ends on the same day, so the end landed eighteen hours before the
+     * start. A sitting that runs past midnight ends on the following day and
+     * says so, rather than leaving a client to infer it from two clocks.
+     */
+    public function test_a_sitting_that_runs_past_midnight_is_stored_and_reported_as_one(): void
+    {
+        $response = $this->createEvent([
+            // Published, or it stays out of the public listing checked below.
+            'status' => 'published',
+            'sessions' => [['start_at' => '2026-09-10 22:30', 'end_at' => '2026-09-11 04:00']],
+        ])->assertStatus(201);
+
+        $event = Event::find($response->json('data.id'));
+        $session = $event->sessions()->first();
+
+        $this->assertSame(
+            '2026-09-10 22:30',
+            $session->start_at->setTimezone('Asia/Damascus')->format('Y-m-d H:i')
+        );
+        $this->assertSame(
+            '2026-09-11 04:00',
+            $session->end_at->setTimezone('Asia/Damascus')->format('Y-m-d H:i')
+        );
+
+        $card = collect($this->getJson('/api/v1/events')->json('data'))->firstWhere('id', $event->id);
+
+        $this->assertTrue($card['sessions'][0]['ends_next_day']);
+        $this->assertSame('22:30', $card['sessions'][0]['start_time']);
+        $this->assertSame('04:00', $card['sessions'][0]['end_time']);
+    }
+
+    public function test_a_same_day_sitting_does_not_claim_to_end_tomorrow(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-06-01', '09:00', '17:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->json('data'))->firstWhere('id', $event->id);
+
+        $this->assertFalse($card['sessions'][0]['ends_next_day']);
+    }
+
+    public function test_schedule_returns_list_of_objects_and_detects_same_time_and_continuous_dates(): void
+    {
+        $event = $this->published();
+        // 3 consecutive days with identical hours
+        EventSession::factory()->for($event)->on('2027-06-01', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-06-02', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-06-03', '09:00', '17:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertTrue($card['is_same_time']);
+        $this->assertTrue($card['is_continuous']);
+        $this->assertCount(3, $card['schedule']);
+
+        $this->assertSame('2027-06-01', $card['schedule'][0]['date']);
+        $this->assertSame('09:00 AM', $card['schedule'][0]['start_time']);
+        $this->assertSame('05:00 PM', $card['schedule'][0]['end_time']);
+        $this->assertSame(['date', 'start_time', 'end_time'], array_keys($card['schedule'][0]));
+
+        $this->assertSame('2027-06-02', $card['schedule'][1]['date']);
+        $this->assertSame('2027-06-03', $card['schedule'][2]['date']);
+    }
+
+    public function test_schedule_flags_differing_hours_and_non_continuous_dates(): void
+    {
+        $event = $this->published();
+        // Non-consecutive days with different hours
+        EventSession::factory()->for($event)->on('2027-06-01', '09:00', '17:00')->create();
+        EventSession::factory()->for($event)->on('2027-06-05', '14:00', '19:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $card = collect($this->getJson('/api/v1/events')->assertStatus(200)->json('data'))
+            ->firstWhere('id', $event->id);
+
+        $this->assertFalse($card['is_same_time']);
+        $this->assertFalse($card['is_continuous']);
+        $this->assertCount(2, $card['schedule']);
+    }
+
+    public function test_member_event_omits_date_time_start_at_end_at_and_keeps_clean_schedule(): void
+    {
+        $event = $this->published();
+        EventSession::factory()->for($event)->on('2027-06-01', '09:00', '17:00')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/member/events')->assertStatus(200);
+        $card = collect($response->json('data'))->firstWhere('id', $event->id);
+
+        // date, time, start_at, end_at, sessions are completely omitted
+        $this->assertArrayNotHasKey('start_at', $card);
+        $this->assertArrayNotHasKey('end_at', $card);
+        $this->assertArrayNotHasKey('date', $card);
+        $this->assertArrayNotHasKey('time', $card);
+        $this->assertArrayNotHasKey('sessions', $card);
+
+        // schedule has strictly date, start_time, end_time
+        $this->assertArrayHasKey('schedule', $card);
+        $this->assertCount(1, $card['schedule']);
+        $this->assertSame(['date', 'start_time', 'end_time'], array_keys($card['schedule'][0]));
+        $this->assertSame('2027-06-01', $card['schedule'][0]['date']);
+        $this->assertSame('09:00 AM', $card['schedule'][0]['start_time']);
+        $this->assertSame('05:00 PM', $card['schedule'][0]['end_time']);
+
+        // Flags are present
+        $this->assertTrue($card['is_same_time']);
+        $this->assertTrue($card['is_continuous']);
+
+        // status returns computed_status directly ("open") and computed_status is omitted
+        $this->assertSame('open', $card['status']);
+        $this->assertArrayNotHasKey('computed_status', $card);
+    }
+
+    public function test_schedule_is_strictly_ordered_ascending_regardless_of_session_insertion_order(): void
+    {
+        $event = $this->published();
+        // Insert sessions deliberately out of chronological order (middle, late, early)
+        EventSession::factory()->for($event)->on('2027-06-21', '16:00', '18:30')->create();
+        EventSession::factory()->for($event)->on('2027-06-24', '17:00', '19:30')->create();
+        EventSession::factory()->for($event)->on('2027-06-10', '09:00', '10:30')->create();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $response = $this->getJson('/api/v1/member/events')->assertStatus(200);
+        $card = collect($response->json('data'))->firstWhere('id', $event->id);
+
+        $this->assertCount(3, $card['schedule']);
+
+        // First item is strictly the start date
+        $this->assertSame('2027-06-10', $card['schedule'][0]['date']);
+        $this->assertSame('09:00 AM', $card['schedule'][0]['start_time']);
+
+        // Middle item
+        $this->assertSame('2027-06-21', $card['schedule'][1]['date']);
+        $this->assertSame('04:00 PM', $card['schedule'][1]['start_time']);
+
+        // Last item is strictly the end date
+        $this->assertSame('2027-06-24', $card['schedule'][2]['date']);
+        $this->assertSame('05:00 PM', $card['schedule'][2]['start_time']);
+    }
 }

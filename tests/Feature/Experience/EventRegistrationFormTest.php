@@ -124,7 +124,7 @@ class EventRegistrationFormTest extends TestCase
 
     // ── Fetching the form ────────────────────────────────────────────────────
 
-    public function test_a_member_gets_their_own_identity_alongside_the_questions(): void
+    public function test_a_member_gets_the_registration_form_questions(): void
     {
         $event = Event::factory()->withForm()->create();
         EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
@@ -136,18 +136,14 @@ class EventRegistrationFormTest extends TestCase
         $response = $this->getJson("/api/v1/member/events/{$event->id}/registration-form");
         $response->assertOk();
 
-        $this->assertTrue($response->json('data.identity.read_only'));
-        $values = collect($response->json('data.identity.fields'))->pluck('value', 'key');
-        $this->assertSame('Real Member', $values['name']);
-        $this->assertSame('real@example.com', $values['email']);
-
         // Inactive fields are never rendered.
-        $keys = collect($response->json('data.fields'))->pluck('key');
+        $keys = collect($response->json('data.registration_form'))->pluck('key');
         $this->assertContains('company', $keys);
         $this->assertNotContains('retired', $keys);
+        $this->assertNull($response->json('data.identity'));
     }
 
-    public function test_the_public_form_carries_no_identity_block(): void
+    public function test_the_public_form_carries_registration_form(): void
     {
         $event = Event::factory()->withForm()->create();
         EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
@@ -156,10 +152,10 @@ class EventRegistrationFormTest extends TestCase
 
         $response->assertOk();
         $this->assertNull($response->json('data.identity'));
-        $this->assertCount(1, $response->json('data.fields'));
+        $this->assertCount(1, $response->json('data.registration_form'));
     }
 
-    public function test_an_event_without_a_form_still_answers_with_an_empty_field_list(): void
+    public function test_an_event_without_a_form_still_answers_with_an_empty_registration_form(): void
     {
         $event = Event::factory()->create();
 
@@ -167,8 +163,23 @@ class EventRegistrationFormTest extends TestCase
         $response = $this->getJson("/api/v1/member/events/{$event->id}/registration-form");
 
         $response->assertOk();
-        $this->assertFalse($response->json('data.has_registration_form'));
-        $this->assertSame([], $response->json('data.fields'));
+        $this->assertSame([], $response->json('data.registration_form'));
+    }
+
+    public function test_an_event_with_external_form_returns_no_fields(): void
+    {
+        $event = Event::factory()->create([
+            'external_form_url' => 'https://forms.example.com/external',
+            'status' => 'published',
+        ]);
+
+        Sanctum::actingAs($this->member(), ['*']);
+        $response = $this->getJson("/api/v1/member/events/{$event->id}/registration-form");
+
+        $response->assertOk();
+        $this->assertSame('https://forms.example.com/external', $response->json('data.external_form_url'));
+        $this->assertArrayNotHasKey('registration_form', $response->json('data'));
+        $this->assertArrayNotHasKey('fields', $response->json('data'));
     }
 
     // ── Submitting the form ──────────────────────────────────────────────────

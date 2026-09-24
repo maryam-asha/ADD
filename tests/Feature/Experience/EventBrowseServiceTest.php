@@ -137,14 +137,10 @@ class EventBrowseServiceTest extends TestCase
                     'date' => ['month', 'day', 'weekday', 'formatted'],
                     'time' => ['start', 'end', 'range'],
                     'location',
-                    'capacity',
-                    'attendees_count',
-                    'seats_left',
                     'seats_left_text',
                     'is_free',
                     'price_label',
                     'price_display_label',
-                    'badge' => ['type', 'label'],
                     'is_registered',
                     'can_register',
                 ],
@@ -157,11 +153,12 @@ class EventBrowseServiceTest extends TestCase
         $freeItem = $data->firstWhere('id', $freeEvent->id);
         $this->assertSame('Startup Essentials', $freeItem['title']);
         $this->assertEquals(['id' => $category->id, 'name' => 'Workshops'], $freeItem['category']);
-        $this->assertEquals(50, $freeItem['capacity']);
-        $this->assertEquals(32, $freeItem['attendees_count']);
-        $this->assertEquals(18, $freeItem['seats_left']);
-        $this->assertEquals('18 / 50 seats left', $freeItem['seats_left_text']);
-        $this->assertEquals('free', $freeItem['badge']['type']);
+        $this->assertEquals('18 seats left', $freeItem['seats_left_text']);
+        $this->assertArrayNotHasKey('capacity', $freeItem);
+        $this->assertArrayNotHasKey('attendees_count', $freeItem);
+        $this->assertArrayNotHasKey('seats_left', $freeItem);
+        $this->assertArrayNotHasKey('badge', $freeItem);
+        $this->assertArrayNotHasKey('branch', $freeItem);
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $freeItem['start_at']);
         $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}$/', $freeItem['end_at']);
         $this->assertTrue($freeItem['can_register']);
@@ -169,15 +166,12 @@ class EventBrowseServiceTest extends TestCase
         // Check Paid Event
         $paidItem = $data->firstWhere('id', $paidEvent->id);
         $this->assertSame('Brand Building Masterclass', $paidItem['title']);
-        $this->assertEquals('paid', $paidItem['badge']['type']);
-        $this->assertEquals('150 pts', $paidItem['badge']['label']);
+        $this->assertFalse($paidItem['is_free']);
+        $this->assertEquals('150 pts', $paidItem['price_label']);
 
         // Check Full Event
         $fullItem = $data->firstWhere('id', $fullEvent->id);
-        $this->assertEquals(0, $fullItem['seats_left']);
         $this->assertEquals('Full • 40/40 seats', $fullItem['seats_left_text']);
-        $this->assertEquals('full', $fullItem['badge']['type']);
-        $this->assertEquals('Full', $fullItem['badge']['label']);
         $this->assertFalse($fullItem['can_register']);
 
         // Check Arabic header
@@ -186,7 +180,7 @@ class EventBrowseServiceTest extends TestCase
         $freeItemAr = collect($resAr->json('data'))->firstWhere('id', $freeEvent->id);
         $this->assertSame('أساسيات الشركات الناشئة', $freeItemAr['title']);
         $this->assertEquals(['id' => $category->id, 'name' => 'ورش عمل'], $freeItemAr['category']);
-        $this->assertSame('مجاني', $freeItemAr['badge']['label']);
+        $this->assertSame('مجاني', $freeItemAr['price_label']);
     }
 
     public function test_translatable_fields_return_string_based_on_header_lang_and_not_both_languages(): void
