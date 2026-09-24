@@ -1070,7 +1070,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner (e.g. 8:00 AM - 10:00 PM)\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination (data, links, meta)"
+                                "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner (e.g. 8:00 AM - 10:00 PM)\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination (meta) — `data` is an object holding `working_hours_banner` and the `spaces` array"
                             },
                             "response": []
                         },
@@ -2043,7 +2043,7 @@
                     "name": "Packages & Subscription",
                     "item": [
                         {
-                            "name": "Get Packages & Subscription",
+                            "name": "Get Package Catalog",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -2079,11 +2079,48 @@
                                         "packages"
                                     ]
                                 },
-                                "description": "Returns the member Packages & Subscription screen data matching the mobile UI design.\n\nIncludes:\n- Current plan card (name, active status, expiration date, renew CTA)\n- Plan benefits (Cafأ©, Printing, Meeting rooms, Discounts)\n- Granted wallet balances (Cafأ© balance, Printing balance with expiry)\n- All available packages (Starter, Professional, Enterprise) with tags, prices, and Current Plan / Change Plan actions"
+                                "description": "Returns the package catalog for the \"Packages\" tab — every active subscription plan, as a lightweight browsing list.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here — see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `features`: capped at the first 3, plus `more_features_count` for the remainder (e.g. 5 total → 3 returned + `more_features_count: 2`).\n- `tags`, `balances_grant`, `discounts`, `resources_grant` are NOT included here — they're all \"View details\" data. See \"Get Package Details\" below, which returns them plus the full, untruncated `features` list for one plan."
                             },
                             "response": [
                                 {
-                                    "name": "200 OK - Packages & Subscription",
+                                    "name": "200 OK - Package Catalog",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/packages",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "packages"
+                                            ]
+                                        },
+                                        "description": "Returns the package catalog for the \"Packages\" tab — every active subscription plan.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here — see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `tags`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration (a matching `plan_balances` category, or an active discount), not a fixed list.\n- `balances_grant`, `discounts`, `resources_grant`: what the plan is configured to grant (not live per-member usage)."
+                                    },
                                     "status": "OK",
                                     "code": 200,
                                     "_postman_previewlanguage": "json",
@@ -2094,7 +2131,304 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"current_plan\": null,\n        \"available_packages\": [\n            {\n                \"id\": 1,\n                \"name\": \"The Smart Starter\",\n                \"module\": {\n                    \"id\": 1,\n                    \"name\": \"Flexi Desk\",\n                    \"slug\": \"flexi_desk\",\n                    \"icon\": \"layout\"\n                },\n                \"subtitle\": \"Perfect for individuals getting started with flexible hours.\",\n                \"price\": 50,\n                \"currency\": \"USD\",\n                \"currency_symbol\": \"$\",\n                \"billing_period\": \"mo\",\n                \"formatted_price\": \"$50.00 /mo\",\n                \"duration_days\": 30,\n                \"included_hours\": 8,\n                \"tags\": [\n                    {\n                        \"key\": \"8-days-per-month\",\n                        \"label\": \"8 Days per month\",\n                        \"icon\": \"calendar\"\n                    },\n                    {\n                        \"key\": \"access-to-a-hot-desk\",\n                        \"label\": \"Access to a Hot Desk\",\n                        \"icon\": \"monitor\"\n                    },\n                    {\n                        \"key\": \"internet-access\",\n                        \"label\": \"Internet Access\",\n                        \"icon\": \"wifi\"\n                    },\n                    {\n                        \"key\": \"unlimited-coffee\",\n                        \"label\": \"Unlimited Coffee\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"key\": \"30-on-meeting-rooms-and-event-spaces\",\n                        \"label\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"icon\": \"percent\"\n                    },\n                    {\n                        \"key\": \"first-access-during-reception-hours\",\n                        \"label\": \"First access during reception hours\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"8 Days per month\",\n                        \"value\": \"8 Days\",\n                        \"icon\": \"calendar\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 2,\n                        \"name\": \"Access to a Hot Desk\",\n                        \"value\": null,\n                        \"icon\": \"monitor\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 3,\n                        \"name\": \"Internet Access\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 4,\n                        \"name\": \"Unlimited Coffee\",\n                        \"value\": null,\n                        \"icon\": \"coffee\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 5,\n                        \"name\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"value\": \"30%\",\n                        \"icon\": \"percent\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 6,\n                        \"name\": \"First access during reception hours\",\n                        \"value\": null,\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    }\n                ],\n                \"balances_grant\": [\n                    {\n                        \"category\": \"cafe\",\n                        \"title\": \"Cafأ© Balance\",\n                        \"amount\": 20,\n                        \"formatted\": \"$20.00\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"category\": \"printing_internet\",\n                        \"title\": \"Printing & Internet Balance\",\n                        \"amount\": 15,\n                        \"formatted\": \"$15.00\",\n                        \"icon\": \"printer\"\n                    }\n                ],\n                \"is_current\": false\n            },\n            {\n                \"id\": 2,\n                \"name\": \"The Free Bird\",\n                \"module\": {\n                    \"id\": 1,\n                    \"name\": \"Flexi Desk\",\n                    \"slug\": \"flexi_desk\",\n                    \"icon\": \"layout\"\n                },\n                \"subtitle\": \"Designed for growing professionals needing more flexibility.\",\n                \"price\": 75,\n                \"currency\": \"USD\",\n                \"currency_symbol\": \"$\",\n                \"billing_period\": \"mo\",\n                \"formatted_price\": \"$75.00 /mo\",\n                \"duration_days\": 30,\n                \"included_hours\": 12,\n                \"tags\": [\n                    {\n                        \"key\": \"12-days-per-month\",\n                        \"label\": \"12 Days per month\",\n                        \"icon\": \"calendar\"\n                    },\n                    {\n                        \"key\": \"access-to-a-hot-desk\",\n                        \"label\": \"Access to a Hot Desk\",\n                        \"icon\": \"monitor\"\n                    },\n                    {\n                        \"key\": \"internet-access\",\n                        \"label\": \"Internet Access\",\n                        \"icon\": \"wifi\"\n                    },\n                    {\n                        \"key\": \"unlimited-coffee\",\n                        \"label\": \"Unlimited Coffee\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"key\": \"30-on-meeting-rooms-and-event-spaces\",\n                        \"label\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"icon\": \"percent\"\n                    },\n                    {\n                        \"key\": \"first-access-during-reception-hours\",\n                        \"label\": \"First access during reception hours\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"features\": [\n                    {\n                        \"id\": 7,\n                        \"name\": \"12 Days per month\",\n                        \"value\": \"12 Days\",\n                        \"icon\": \"calendar\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 8,\n                        \"name\": \"Access to a Hot Desk\",\n                        \"value\": null,\n                        \"icon\": \"monitor\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 9,\n                        \"name\": \"Internet Access\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 10,\n                        \"name\": \"Unlimited Coffee\",\n                        \"value\": null,\n                        \"icon\": \"coffee\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 11,\n                        \"name\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"value\": \"30%\",\n                        \"icon\": \"percent\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 12,\n                        \"name\": \"First access during reception hours\",\n                        \"value\": null,\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    }\n                ],\n                \"balances_grant\": [\n                    {\n                        \"category\": \"cafe\",\n                        \"title\": \"Cafأ© Balance\",\n                        \"amount\": 30,\n                        \"formatted\": \"$30.00\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"category\": \"printing_internet\",\n                        \"title\": \"Printing & Internet Balance\",\n                        \"amount\": 20,\n                        \"formatted\": \"$20.00\",\n                        \"icon\": \"printer\"\n                    }\n                ],\n                \"is_current\": false\n            },\n            {\n                \"id\": 3,\n                \"name\": \"The Happy Committer\",\n                \"module\": {\n                    \"id\": 1,\n                    \"name\": \"Flexi Desk\",\n                    \"slug\": \"flexi_desk\",\n                    \"icon\": \"layout\"\n                },\n                \"subtitle\": \"Full month access for everyday productive work.\",\n                \"price\": 110,\n                \"currency\": \"USD\",\n                \"currency_symbol\": \"$\",\n                \"billing_period\": \"mo\",\n                \"formatted_price\": \"$110.00 /mo\",\n                \"duration_days\": 30,\n                \"included_hours\": 25,\n                \"tags\": [\n                    {\n                        \"key\": \"1-month-unlimited\",\n                        \"label\": \"1 month unlimited\",\n                        \"icon\": \"calendar\"\n                    },\n                    {\n                        \"key\": \"access-to-a-hot-desk\",\n                        \"label\": \"Access to a Hot Desk\",\n                        \"icon\": \"monitor\"\n                    },\n                    {\n                        \"key\": \"internet-access\",\n                        \"label\": \"Internet Access\",\n                        \"icon\": \"wifi\"\n                    },\n                    {\n                        \"key\": \"unlimited-coffee\",\n                        \"label\": \"Unlimited Coffee\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"key\": \"30-on-meeting-rooms-and-event-spaces\",\n                        \"label\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"icon\": \"percent\"\n                    },\n                    {\n                        \"key\": \"first-access-to-add-during-reception-hours\",\n                        \"label\": \"First access to ADD during reception hours\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"features\": [\n                    {\n                        \"id\": 13,\n                        \"name\": \"1 month unlimited\",\n                        \"value\": \"1 Month\",\n                        \"icon\": \"calendar\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 14,\n                        \"name\": \"Access to a Hot Desk\",\n                        \"value\": null,\n                        \"icon\": \"monitor\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 15,\n                        \"name\": \"Internet Access\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 16,\n                        \"name\": \"Unlimited Coffee\",\n                        \"value\": null,\n                        \"icon\": \"coffee\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 17,\n                        \"name\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"value\": \"30%\",\n                        \"icon\": \"percent\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 18,\n                        \"name\": \"First access to ADD during reception hours\",\n                        \"value\": null,\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    }\n                ],\n                \"balances_grant\": [\n                    {\n                        \"category\": \"cafe\",\n                        \"title\": \"Cafأ© Balance\",\n                        \"amount\": 40,\n                        \"formatted\": \"$40.00\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"category\": \"printing_internet\",\n                        \"title\": \"Printing & Internet Balance\",\n                        \"amount\": 25,\n                        \"formatted\": \"$25.00\",\n                        \"icon\": \"printer\"\n                    }\n                ],\n                \"is_current\": false\n            },\n            {\n                \"id\": 5,\n                \"name\": \"The Dedicated\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Your personal permanent desk with private storage.\",\n                \"price\": 199,\n                \"currency\": \"USD\",\n                \"currency_symbol\": \"$\",\n                \"billing_period\": \"mo\",\n                \"formatted_price\": \"$199.00 /mo\",\n                \"duration_days\": 30,\n                \"included_hours\": 10,\n                \"tags\": [\n                    {\n                        \"key\": \"1-month-access\",\n                        \"label\": \"1 Month access\",\n                        \"icon\": \"calendar\"\n                    },\n                    {\n                        \"key\": \"access-to-a-dedicated-desk\",\n                        \"label\": \"Access to a Dedicated Desk\",\n                        \"icon\": \"briefcase\"\n                    },\n                    {\n                        \"key\": \"internet-access\",\n                        \"label\": \"Internet Access\",\n                        \"icon\": \"wifi\"\n                    },\n                    {\n                        \"key\": \"unlimited-coffee\",\n                        \"label\": \"Unlimited Coffee\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"key\": \"access-to-locker\",\n                        \"label\": \"Access to Locker\",\n                        \"icon\": \"lock\"\n                    },\n                    {\n                        \"key\": \"30-on-meeting-rooms-and-event-spaces\",\n                        \"label\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"icon\": \"percent\"\n                    },\n                    {\n                        \"key\": \"first-access-to-add-during-reception-hours\",\n                        \"label\": \"First access to ADD during reception hours\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"features\": [\n                    {\n                        \"id\": 24,\n                        \"name\": \"1 Month access\",\n                        \"value\": \"1 Month\",\n                        \"icon\": \"calendar\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 25,\n                        \"name\": \"Access to a Dedicated Desk\",\n                        \"value\": null,\n                        \"icon\": \"briefcase\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 26,\n                        \"name\": \"Internet Access\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 27,\n                        \"name\": \"Unlimited Coffee\",\n                        \"value\": null,\n                        \"icon\": \"coffee\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 28,\n                        \"name\": \"Access to Locker\",\n                        \"value\": null,\n                        \"icon\": \"lock\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 29,\n                        \"name\": \"30% on Meeting Rooms and Event Spaces\",\n                        \"value\": \"30%\",\n                        \"icon\": \"percent\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 30,\n                        \"name\": \"First access to ADD during reception hours\",\n                        \"value\": null,\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    }\n                ],\n                \"balances_grant\": [\n                    {\n                        \"category\": \"cafe\",\n                        \"title\": \"Cafأ© Balance\",\n                        \"amount\": 40,\n                        \"formatted\": \"$40.00\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"category\": \"printing_internet\",\n                        \"title\": \"Printing & Internet Balance\",\n                        \"amount\": 25,\n                        \"formatted\": \"$25.00\",\n                        \"icon\": \"printer\"\n                    }\n                ],\n                \"is_current\": false\n            },\n            {\n                \"id\": 6,\n                \"name\": \"The Dedicated +\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Premium dedicated desk with printing quotas and meeting room hours.\",\n                \"price\": 250,\n                \"currency\": \"USD\",\n                \"currency_symbol\": \"$\",\n                \"billing_period\": \"mo\",\n                \"formatted_price\": \"$250.00 /mo\",\n                \"duration_days\": 30,\n                \"included_hours\": 8,\n                \"tags\": [\n                    {\n                        \"key\": \"1-month-access\",\n                        \"label\": \"1 Month access\",\n                        \"icon\": \"calendar\"\n                    },\n                    {\n                        \"key\": \"access-to-a-dedicated-desk\",\n                        \"label\": \"Access to a Dedicated Desk\",\n                        \"icon\": \"briefcase\"\n                    },\n                    {\n                        \"key\": \"internet-access\",\n                        \"label\": \"Internet Access\",\n                        \"icon\": \"wifi\"\n                    },\n                    {\n                        \"key\": \"unlimited-coffee\",\n                        \"label\": \"Unlimited Coffee\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"key\": \"access-to-locker\",\n                        \"label\": \"Access to Locker\",\n                        \"icon\": \"lock\"\n                    },\n                    {\n                        \"key\": \"printing-100-bw-50-colored\",\n                        \"label\": \"Printing: 100 B&W, 50 Colored\",\n                        \"icon\": \"printer\"\n                    },\n                    {\n                        \"key\": \"access-to-meeting-rooms-8-hours-50-on-additional-hours\",\n                        \"label\": \"Access to Meeting Rooms: 8 Hours, 50% on additional hours\",\n                        \"icon\": \"clock\"\n                    },\n                    {\n                        \"key\": \"50-on-event-spaces\",\n                        \"label\": \"50% on Event Spaces\",\n                        \"icon\": \"percent\"\n                    },\n                    {\n                        \"key\": \"first-access-to-add-during-reception-hours\",\n                        \"label\": \"First access to ADD during reception hours\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"features\": [\n                    {\n                        \"id\": 31,\n                        \"name\": \"1 Month access\",\n                        \"value\": \"1 Month\",\n                        \"icon\": \"calendar\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 32,\n                        \"name\": \"Access to a Dedicated Desk\",\n                        \"value\": null,\n                        \"icon\": \"briefcase\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 33,\n                        \"name\": \"Internet Access\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 34,\n                        \"name\": \"Unlimited Coffee\",\n                        \"value\": null,\n                        \"icon\": \"coffee\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 35,\n                        \"name\": \"Access to Locker\",\n                        \"value\": null,\n                        \"icon\": \"lock\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 36,\n                        \"name\": \"Printing: 100 B&W, 50 Colored\",\n                        \"value\": \"100 B&W, 50 Colored\",\n                        \"icon\": \"printer\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 37,\n                        \"name\": \"Access to Meeting Rooms: 8 Hours, 50% on additional hours\",\n                        \"value\": \"8 Hours\",\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 38,\n                        \"name\": \"50% on Event Spaces\",\n                        \"value\": \"50%\",\n                        \"icon\": \"percent\",\n                        \"is_included\": true\n                    },\n                    {\n                        \"id\": 39,\n                        \"name\": \"First access to ADD during reception hours\",\n                        \"value\": null,\n                        \"icon\": \"clock\",\n                        \"is_included\": true\n                    }\n                ],\n                \"balances_grant\": [\n                    {\n                        \"category\": \"cafe\",\n                        \"title\": \"Cafأ© Balance\",\n                        \"amount\": 50,\n                        \"formatted\": \"$50.00\",\n                        \"icon\": \"coffee\"\n                    },\n                    {\n                        \"category\": \"printing_internet\",\n                        \"title\": \"Printing & Internet Balance\",\n                        \"amount\": 35,\n                        \"formatted\": \"$35.00\",\n                        \"icon\": \"printer\"\n                    },\n                    {\n                        \"category\": \"space_specific\",\n                        \"title\": \"Meeting Room Hours\",\n                        \"amount\": 8,\n                        \"formatted\": \"$8.00\",\n                        \"icon\": \"clock\"\n                    }\n                ],\n                \"is_current\": false\n            }\n        ]\n    }\n}"
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"The Smart Starter\",\n            \"module\": {\n                \"id\": 1,\n                \"name\": \"Flexi Desk\",\n                \"slug\": \"flexi_desk\",\n                \"icon\": \"layout\"\n            },\n            \"subtitle\": \"Perfect for individuals getting started with flexible hours.\",\n            \"formatted_price\": \"$50.00 /mo\",\n            \"formatted_point_price\": \"500 pts /mo\",\n            \"duration_days\": 30,\n            \"included_hours\": 8,\n            \"features\": [\n                {\n                    \"id\": 46,\n                    \"name\": \"8 Days per month\",\n                    \"value\": \"8 Days\",\n                    \"icon\": \"calendar\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 47,\n                    \"name\": \"Access to a Hot Desk\",\n                    \"value\": null,\n                    \"icon\": \"monitor\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 48,\n                    \"name\": \"Internet Access\",\n                    \"value\": null,\n                    \"icon\": \"wifi\",\n                    \"is_included\": true\n                }\n            ],\n            \"is_current\": false,\n            \"more_features_count\": 3\n        },\n        {\n            \"id\": 2,\n            \"name\": \"The Free Bird\",\n            \"module\": {\n                \"id\": 1,\n                \"name\": \"Flexi Desk\",\n                \"slug\": \"flexi_desk\",\n                \"icon\": \"layout\"\n            },\n            \"subtitle\": \"Designed for growing professionals needing more flexibility.\",\n            \"formatted_price\": \"$75.00 /mo\",\n            \"formatted_point_price\": \"750 pts /mo\",\n            \"duration_days\": 30,\n            \"included_hours\": 12,\n            \"features\": [\n                {\n                    \"id\": 7,\n                    \"name\": \"12 Days per month\",\n                    \"value\": \"12 Days\",\n                    \"icon\": \"calendar\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 8,\n                    \"name\": \"Access to a Hot Desk\",\n                    \"value\": null,\n                    \"icon\": \"monitor\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 9,\n                    \"name\": \"Internet Access\",\n                    \"value\": null,\n                    \"icon\": \"wifi\",\n                    \"is_included\": true\n                }\n            ],\n            \"is_current\": false,\n            \"more_features_count\": 3\n        },\n        {\n            \"id\": 3,\n            \"name\": \"The Happy Committer\",\n            \"module\": {\n                \"id\": 1,\n                \"name\": \"Flexi Desk\",\n                \"slug\": \"flexi_desk\",\n                \"icon\": \"layout\"\n            },\n            \"subtitle\": \"Full month access for everyday productive work.\",\n            \"formatted_price\": \"$110.00 /mo\",\n            \"formatted_point_price\": \"1,100 pts /mo\",\n            \"duration_days\": 30,\n            \"included_hours\": 25,\n            \"features\": [\n                {\n                    \"id\": 13,\n                    \"name\": \"1 month unlimited\",\n                    \"value\": \"1 Month\",\n                    \"icon\": \"calendar\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 14,\n                    \"name\": \"Access to a Hot Desk\",\n                    \"value\": null,\n                    \"icon\": \"monitor\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 15,\n                    \"name\": \"Internet Access\",\n                    \"value\": null,\n                    \"icon\": \"wifi\",\n                    \"is_included\": true\n                }\n            ],\n            \"is_current\": false,\n            \"more_features_count\": 3\n        },\n        {\n            \"id\": 5,\n            \"name\": \"The Dedicated\",\n            \"module\": {\n                \"id\": 2,\n                \"name\": \"Dedicated Desk\",\n                \"slug\": \"dedicated_desk\",\n                \"icon\": \"briefcase\"\n            },\n            \"subtitle\": \"Your personal permanent desk with private storage.\",\n            \"formatted_price\": \"$199.00 /mo\",\n            \"formatted_point_price\": \"1,990 pts /mo\",\n            \"duration_days\": 30,\n            \"included_hours\": 10,\n            \"features\": [\n                {\n                    \"id\": 24,\n                    \"name\": \"1 Month access\",\n                    \"value\": \"1 Month\",\n                    \"icon\": \"calendar\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 25,\n                    \"name\": \"Access to a Dedicated Desk\",\n                    \"value\": null,\n                    \"icon\": \"briefcase\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 26,\n                    \"name\": \"Internet Access\",\n                    \"value\": null,\n                    \"icon\": \"wifi\",\n                    \"is_included\": true\n                }\n            ],\n            \"is_current\": false,\n            \"more_features_count\": 4\n        },\n        {\n            \"id\": 6,\n            \"name\": \"The Dedicated +\",\n            \"module\": {\n                \"id\": 2,\n                \"name\": \"Dedicated Desk\",\n                \"slug\": \"dedicated_desk\",\n                \"icon\": \"briefcase\"\n            },\n            \"subtitle\": \"Premium dedicated desk with printing quotas and meeting room hours.\",\n            \"formatted_price\": \"$250.00 /mo\",\n            \"formatted_point_price\": \"2,500 pts /mo\",\n            \"duration_days\": 30,\n            \"included_hours\": 8,\n            \"features\": [\n                {\n                    \"id\": 31,\n                    \"name\": \"1 Month access\",\n                    \"value\": \"1 Month\",\n                    \"icon\": \"calendar\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 32,\n                    \"name\": \"Access to a Dedicated Desk\",\n                    \"value\": null,\n                    \"icon\": \"briefcase\",\n                    \"is_included\": true\n                },\n                {\n                    \"id\": 33,\n                    \"name\": \"Internet Access\",\n                    \"value\": null,\n                    \"icon\": \"wifi\",\n                    \"is_included\": true\n                }\n            ],\n            \"is_current\": true,\n            \"more_features_count\": 6\n        }\n    ]\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get Current Membership",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/memberships/current",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "memberships",
+                                        "current"
+                                    ]
+                                },
+                                "description": "Returns the member's own active plan and this-cycle usage, for the \"My Subscription\" tab. `data` is `null` (still a 200) when the member has no active membership — a normal state, not an error.\n\n- `benefits`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration, not a fixed list.\n- `balances`: one entry per balance category the plan actually grants, with `granted`/`used`/`remaining`/`percentage_used` for the current billing cycle (`current_period_start` onward), plus ready-to-render `formatted_*` strings. Café/Printing are in USD; Meeting Rooms (`space_specific`) is in hours.\n- `current_period_start`/`current_period_end`, `billing_cycle_text`, `balance_rollover_notice`: for the \"Current cycle: ...\" header and the rollover warning shown under Plan Benefits.\n- `discounts`, `resources`: real plan_discounts / plan_resource_grants rows, `resources[].remaining` computed live per membership."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK - No Active Membership",
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": null\n}",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/memberships/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "memberships",
+                                                "current"
+                                            ]
+                                        },
+                                        "description": "Returns the member's own active plan and this-cycle usage, for the \"My Subscription\" tab. `data` is `null` (still a 200) when the member has no active membership — a normal state, not an error.\n\n- `benefits`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration, not a fixed list.\n- `balances`: one entry per balance category the plan actually grants, with `granted`/`used`/`remaining`/`percentage_used` for the current billing cycle (`current_period_start` onward), plus ready-to-render `formatted_*` strings. Café/Printing are in USD; Meeting Rooms (`space_specific`) is in hours.\n- `current_period_start`/`current_period_end`, `billing_cycle_text`, `balance_rollover_notice`: for the \"Current cycle: ...\" header and the rollover warning shown under Plan Benefits.\n- `discounts`, `resources`: real plan_discounts / plan_resource_grants rows, `resources[].remaining` computed live per membership."
+                                    }
+                                },
+                                {
+                                    "name": "200 OK - Active Membership (Usage Tracking)",
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 6,\n        \"membership_id\": 7,\n        \"name\": \"The Dedicated +\",\n        \"module\": {\n            \"id\": 2,\n            \"name\": \"Dedicated Desk\",\n            \"slug\": \"dedicated_desk\",\n            \"icon\": \"briefcase\"\n        },\n        \"tag\": \"YOUR CURRENT PLAN\",\n        \"status\": \"active\",\n        \"status_label\": \"Active\",\n        \"is_active\": true,\n        \"current_period_start\": \"2025-05-15T00:00:00+00:00\",\n        \"current_period_end\": \"2025-06-15T23:59:59+00:00\",\n        \"validity_text\": \"Active until Jun 15, 2025\",\n        \"billing_cycle_text\": \"Current cycle: May 15 – Jun 15, 2025\",\n        \"benefits_title\": \"Plan Benefits\",\n        \"benefits\": [\n            {\n                \"key\": \"cafe_access\",\n                \"title\": \"Café Access\",\n                \"subtitle\": \"Included\",\n                \"icon\": \"coffee\"\n            },\n            {\n                \"key\": \"printing_credits\",\n                \"title\": \"Printing Credits\",\n                \"subtitle\": \"Included\",\n                \"icon\": \"printer\"\n            },\n            {\n                \"key\": \"meeting_rooms\",\n                \"title\": \"Meeting Rooms\",\n                \"subtitle\": \"Included\",\n                \"icon\": \"users\"\n            },\n            {\n                \"key\": \"member_discounts\",\n                \"title\": \"Member Discounts\",\n                \"subtitle\": \"Included\",\n                \"icon\": \"percent\"\n            }\n        ],\n        \"discounts\": [\n            {\n                \"id\": 9,\n                \"percentage\": 50,\n                \"title\": \"50% on Event Spaces\",\n                \"space_id\": null,\n                \"space_type\": \"event_hall\",\n                \"usage_limit\": null,\n                \"icon\": \"percent\"\n            }\n        ],\n        \"resources\": [],\n        \"usage_title\": \"Your Usage This Cycle\",\n        \"balance_rollover_notice\": \"Any granted balance ends with the billing cycle and does not roll over.\",\n        \"balances\": [\n            {\n                \"category\": \"cafe\",\n                \"title\": \"Café Balance\",\n                \"unit\": \"usd\",\n                \"granted\": 50,\n                \"used\": 20,\n                \"remaining\": 30,\n                \"percentage_used\": 40,\n                \"formatted_granted\": \"$50.00\",\n                \"formatted_used\": \"$20.00\",\n                \"formatted_remaining\": \"$30.00\",\n                \"remaining_label\": \"$30.00 remaining\",\n                \"amount\": 30,\n                \"formatted\": \"$30.00\",\n                \"icon\": \"coffee\"\n            },\n            {\n                \"category\": \"printing_internet\",\n                \"title\": \"Printing & Internet Balance\",\n                \"unit\": \"usd\",\n                \"granted\": 35,\n                \"used\": 10,\n                \"remaining\": 25,\n                \"percentage_used\": 29,\n                \"formatted_granted\": \"$35.00\",\n                \"formatted_used\": \"$10.00\",\n                \"formatted_remaining\": \"$25.00\",\n                \"remaining_label\": \"$25.00 remaining\",\n                \"amount\": 25,\n                \"formatted\": \"$25.00\",\n                \"icon\": \"printer\"\n            },\n            {\n                \"category\": \"space_specific\",\n                \"title\": \"Meeting Room Hours\",\n                \"unit\": \"hours\",\n                \"granted\": 80,\n                \"used\": 30,\n                \"remaining\": 50,\n                \"percentage_used\": 38,\n                \"formatted_granted\": \"80 hours\",\n                \"formatted_used\": \"30 hours\",\n                \"formatted_remaining\": \"50 hours\",\n                \"remaining_label\": \"50 hours remaining\",\n                \"amount\": 50,\n                \"formatted\": \"50\",\n                \"icon\": \"users\"\n            }\n        ]\n    }\n}",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/memberships/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "memberships",
+                                                "current"
+                                            ]
+                                        },
+                                        "description": "Returns the member's own active plan and this-cycle usage, for the \"My Subscription\" tab. `data` is `null` (still a 200) when the member has no active membership — a normal state, not an error.\n\n- `benefits`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration, not a fixed list.\n- `balances`: one entry per balance category the plan actually grants, with `granted`/`used`/`remaining`/`percentage_used` for the current billing cycle (`current_period_start` onward), plus ready-to-render `formatted_*` strings. Café/Printing are in USD; Meeting Rooms (`space_specific`) is in hours.\n- `current_period_start`/`current_period_end`, `billing_cycle_text`, `balance_rollover_notice`: for the \"Current cycle: ...\" header and the rollover warning shown under Plan Benefits.\n- `discounts`, `resources`: real plan_discounts / plan_resource_grants rows, `resources[].remaining` computed live per membership."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get Package Details",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/packages/6",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "packages",
+                                        "6"
+                                    ],
+                                    "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
+                                },
+                                "description": "One plan's full details for the \"View details\" screen — same base fields as a catalog entry, plus `tags`, `balances_grant`, `discounts`, `resources_grant` (none of which are on the catalog card), and `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) — the same visibility rule the catalog list applies."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK - Package Details",
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 6,\n        \"name\": \"The Dedicated +\",\n        \"module\": {\n            \"id\": 2,\n            \"name\": \"Dedicated Desk\",\n            \"slug\": \"dedicated_desk\",\n            \"icon\": \"briefcase\"\n        },\n        \"subtitle\": \"Premium dedicated desk with printing quotas and meeting room hours.\",\n        \"formatted_price\": \"$250.00 /mo\",\n        \"formatted_point_price\": \"2,500 pts /mo\",\n        \"duration_days\": 30,\n        \"included_hours\": 8,\n        \"tags\": [\n            {\n                \"key\": \"cafe\",\n                \"label\": \"Café\",\n                \"icon\": \"coffee\"\n            },\n            {\n                \"key\": \"printing\",\n                \"label\": \"Printing\",\n                \"icon\": \"printer\"\n            },\n            {\n                \"key\": \"meeting\",\n                \"label\": \"Meeting\",\n                \"icon\": \"users\"\n            },\n            {\n                \"key\": \"discounts\",\n                \"label\": \"Discounts\",\n                \"icon\": \"percent\"\n            }\n        ],\n        \"features\": [\n            {\n                \"id\": 31,\n                \"name\": \"1 Month access\",\n                \"value\": \"1 Month\",\n                \"icon\": \"calendar\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 32,\n                \"name\": \"Access to a Dedicated Desk\",\n                \"value\": null,\n                \"icon\": \"briefcase\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 33,\n                \"name\": \"Internet Access\",\n                \"value\": null,\n                \"icon\": \"wifi\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 34,\n                \"name\": \"Unlimited Coffee\",\n                \"value\": null,\n                \"icon\": \"coffee\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 35,\n                \"name\": \"Access to Locker\",\n                \"value\": null,\n                \"icon\": \"lock\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 36,\n                \"name\": \"Printing: 100 B&W, 50 Colored\",\n                \"value\": \"100 B&W, 50 Colored\",\n                \"icon\": \"printer\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 37,\n                \"name\": \"Access to Meeting Rooms: 8 Hours, 50% on additional hours\",\n                \"value\": \"8 Hours\",\n                \"icon\": \"clock\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 38,\n                \"name\": \"50% on Event Spaces\",\n                \"value\": \"50%\",\n                \"icon\": \"percent\",\n                \"is_included\": true\n            },\n            {\n                \"id\": 39,\n                \"name\": \"First access to ADD during reception hours\",\n                \"value\": null,\n                \"icon\": \"clock\",\n                \"is_included\": true\n            }\n        ],\n        \"balances_grant\": [\n            {\n                \"category\": \"cafe\",\n                \"title\": \"Café Balance\",\n                \"amount_points\": 500,\n                \"amount\": 50,\n                \"formatted\": \"$50.00\",\n                \"icon\": \"coffee\"\n            },\n            {\n                \"category\": \"printing_internet\",\n                \"title\": \"Printing & Internet Balance\",\n                \"amount_points\": 350,\n                \"amount\": 35,\n                \"formatted\": \"$35.00\",\n                \"icon\": \"printer\"\n            },\n            {\n                \"category\": \"space_specific\",\n                \"title\": \"Meeting Room Hours\",\n                \"amount_points\": 80,\n                \"amount\": 8,\n                \"formatted\": \"$8.00\",\n                \"icon\": \"clock\"\n            }\n        ],\n        \"discounts\": [\n            {\n                \"id\": 9,\n                \"percentage\": 50,\n                \"title\": \"50% on Event Spaces\",\n                \"space_id\": null,\n                \"space_type\": \"event_hall\",\n                \"usage_limit\": null,\n                \"icon\": \"percent\"\n            }\n        ],\n        \"resources_grant\": [],\n        \"is_current\": true\n    }\n}",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/packages/6",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "packages",
+                                                "6"
+                                            ],
+                                            "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
+                                        },
+                                        "description": "One plan's full details for the \"View details\" screen — same shape as a catalog entry, but `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) — the same visibility rule the catalog list applies."
+                                    }
+                                },
+                                {
+                                    "name": "404 Not Found - Plan Not Browsable",
+                                    "status": "Not Found",
+                                    "code": 404,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Not Found.\"\n}",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/packages/6",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "packages",
+                                                "6"
+                                            ],
+                                            "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
+                                        },
+                                        "description": "One plan's full details for the \"View details\" screen — same shape as a catalog entry, but `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) — the same visibility rule the catalog list applies."
+                                    }
                                 }
                             ]
                         },
@@ -3878,10 +4212,22 @@
                                             "value": "cleaning",
                                             "disabled": true,
                                             "description": "بحث بالاسم أو الوصف"
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true,
+                                            "description": "عدد النتائج في الصفحة (1-100، افتراضي 15)"
+                                        },
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "رقم الصفحة (افتراضي 1)"
                                         }
                                     ]
                                 },
-                                "description": "جلب جميع الخدمات المتاحة للعضو كقائمة مسطحة ومباشرة (Flat List) دون تجميعها تحت مصفوفات الأقسام."
+                                "description": "جلب جميع الخدمات المتاحة للعضو كقائمة مسطحة ومباشرة (Flat List) دون تجميعها تحت مصفوفات الأقسام. النتائج مقسّمة إلى صفحات — الصفوف تحت data وعدادات الصفحات تحت meta."
                             }
                         },
                         {
@@ -3999,7 +4345,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services/{{slug}}/registration-form",
+                                    "raw": "{{base_url}}/api/v1/member/services/{{service_type_id}}/registration-form",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -4008,7 +4354,7 @@
                                         "v1",
                                         "member",
                                         "services",
-                                        "{{slug}}",
+                                        "{{service_type_id}}",
                                         "registration-form"
                                     ]
                                 },
@@ -4046,7 +4392,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/member/services/{{slug}}/requests",
+                                    "raw": "{{base_url}}/api/v1/member/services/{{service_type_id}}/requests",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -4055,7 +4401,7 @@
                                         "v1",
                                         "member",
                                         "services",
-                                        "{{slug}}",
+                                        "{{service_type_id}}",
                                         "requests"
                                     ]
                                 },
@@ -4106,9 +4452,23 @@
                                         "v1",
                                         "member",
                                         "service-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true,
+                                            "description": "عدد النتائج في الصفحة (1-100، افتراضي 15)"
+                                        },
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true,
+                                            "description": "رقم الصفحة (افتراضي 1)"
+                                        }
                                     ]
                                 },
-                                "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها."
+                                "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links."
                             }
                         },
                         {
