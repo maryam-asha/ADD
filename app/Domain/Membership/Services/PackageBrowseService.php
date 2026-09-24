@@ -382,7 +382,6 @@ class PackageBrowseService
             'formatted_price' => $formattedPrice,
             'formatted_point_price' => $formattedPointPrice,
             'duration_days' => $plan->duration_days,
-            'included_hours' => (float) $plan->included_hours,
             'tags' => $tags,
             'features' => $features,
             'balances_grant' => $balancesGrant,

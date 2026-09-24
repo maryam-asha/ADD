@@ -211,3 +211,40 @@ with it.
 body, which still shows the pre-points `price`/`pricing_currency`/`overage_rate`
 names. It was already stale before this change — those columns were dropped by
 the September points migration — so re-pinning it is a separate correction.
+
+---
+
+## Reversal, 2026-09-24 (second): `included_hours` is dropped too
+
+The `plans.included_hours` column described above — "granted as a
+`wallet_transactions` credit, `category=space_specific`, on purchase" — is
+**removed**, along with the fallback branch in
+`MembershipActivationService::grantPlanBalances()` that applied it
+(`2026_09_24_130000_drop_included_hours_from_plans_table.php`).
+
+**What was given up.** PRD §5.2's "included room hours" no longer has a
+dedicated column. A plan that wants to bundle hours now expresses them as a
+`plan_resource_grant` (natural units, consumed through `ResourceQuotaService`)
+or as a `plan_balance` (points). Neither is a drop-in rename of this column —
+both are explicit about their unit, which is the whole point.
+
+**Why.** Two reasons:
+
+1. **It only ever fired as a fallback.** `grantPlanBalances()` used it when,
+   and only when, a plan carried no `plan_balances` rows at all. Every seeded
+   plan has balances, so the branch was already dead in practice.
+
+2. **Where it did fire, it was wrong**, and its own `TODO(spec-C)` said so:
+   the column holds an *hours* figure, the ledger holds *points*, and the value
+   was written through 1:1 because that was the pre-points behaviour. So
+   `included_hours = 20` granted 20 points, not 20 hours' worth of them. The
+   real hours→points rule was never decided, and deciding it would have meant
+   inventing pricing semantics the column never had.
+
+`plan_balances` is now the single grant path on both activation routes
+(member purchase and operations activation). The plan access-window hours
+feature never used this column — it draws on `plan_resource_grants` — so it is
+unaffected (see [plan-access-windows.md](plan-access-windows.md)).
+
+The dashboard's "Included hours" input and its i18n keys were removed in the
+same change.

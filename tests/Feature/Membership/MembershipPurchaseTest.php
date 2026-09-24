@@ -90,7 +90,6 @@ class MembershipPurchaseTest extends TestCase
             'is_active' => true,
             'price_points' => 1200,
             'duration_days' => 30,
-            'included_hours' => '40.00',
         ]);
 
         Sanctum::actingAs($member, ['*']);
@@ -114,16 +113,17 @@ class MembershipPurchaseTest extends TestCase
             $membership->current_period_end->toDateTimeString()
         );
 
-        $hoursCredit = WalletTransaction::where('wallet_id', $wallet->id)
-            ->where('category', WalletTransactionCategory::SpaceSpecific)
-            ->where('amount', '>', 0)
-            ->first();
-
-        $this->assertNotNull($hoursCredit);
-        $this->assertSame(40, (int) $hoursCredit->amount);
+        // A plan with no `plan_balances` rows grants nothing. The old
+        // `included_hours` fallback that used to credit a SpaceSpecific
+        // allowance here is gone — it counted hours and spent points 1:1.
+        // Grants now come only from balances, or from plan_resource_grants
+        // for natural-unit quotas.
         $this->assertSame(
-            $membership->current_period_end->toDateTimeString(),
-            $hoursCredit->expires_at->toDateTimeString()
+            0,
+            WalletTransaction::where('wallet_id', $wallet->id)
+                ->where('category', WalletTransactionCategory::SpaceSpecific)
+                ->where('amount', '>', 0)
+                ->count()
         );
     }
 
@@ -145,7 +145,6 @@ class MembershipPurchaseTest extends TestCase
             'is_active' => true,
             'price_points' => 100,
             'duration_days' => 30,
-            'included_hours' => '0.00',
         ]);
 
         Sanctum::actingAs($member, ['*']);
@@ -169,7 +168,6 @@ class MembershipPurchaseTest extends TestCase
             'is_active' => true,
             'price_points' => 1200,
             'duration_days' => 30,
-            'included_hours' => '40.00',
         ]);
 
         $membershipCountBefore = Membership::count();
@@ -222,7 +220,6 @@ class MembershipPurchaseTest extends TestCase
             'is_active' => true,
             'price_points' => 1200,
             'duration_days' => 30,
-            'included_hours' => '0.00',
         ]);
 
         Sanctum::actingAs($admin, ['*']);

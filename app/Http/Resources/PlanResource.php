@@ -29,7 +29,6 @@ class PlanResource extends JsonResource
             'subtitle' => $this->subtitle,
             'is_subscription' => $this->is_subscription,
             'duration_days' => $this->duration_days,
-            'included_hours' => $this->included_hours,
             'access_window_start' => $this->access_window_start,
             'access_window_end' => $this->access_window_end,
             'is_active' => $this->is_active,

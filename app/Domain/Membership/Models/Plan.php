@@ -36,7 +36,6 @@ class Plan extends Model
         'is_subscription',
         'price_points',
         'duration_days',
-        'included_hours',
         'access_window_start',
         'access_window_end',
         'is_active',
@@ -51,7 +50,6 @@ class Plan extends Model
             'subtitle' => 'array',
             'is_subscription' => 'boolean',
             'price_points' => 'integer',
-            'included_hours' => 'decimal:2',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
         ];

@@ -36,7 +36,6 @@ class PlanCatalogTest extends TestCase
             'is_subscription' => true,
             'price_points' => 500,
             'duration_days' => 30,
-            'included_hours' => 40,
             'is_active' => true,
             'order' => 1,
         ], $overrides);

@@ -25,6 +25,11 @@ use Illuminate\Support\Facades\DB;
  * The plan-balance granting below must run on BOTH paths — an activated
  * member with no granted balances would hold a subscription with nothing in
  * it — which is exactly why this was extracted rather than duplicated.
+ *
+ * `plan_balances` is the ONLY grant path. The old `plans.included_hours`
+ * fallback (used when a plan carried no balances) is gone: it counted hours
+ * but credited points 1:1, which its own TODO admitted was wrong. Natural-unit
+ * quotas belong in `plan_resource_grants` instead, where the unit is explicit.
  */
 class MembershipActivationService
 {
@@ -75,46 +80,24 @@ class MembershipActivationService
 
     private function grantPlanBalances(Plan $plan, Membership $membership, Wallet $wallet): void
     {
-        if ($plan->balances()->exists()) {
-            foreach ($plan->balances as $grant) {
-                $desc = $grant->translate('description')
-                    ?? "{$grant->category->value} allowance for membership #{$membership->id}";
+        foreach ($plan->balances as $grant) {
+            $desc = $grant->translate('description')
+                ?? "{$grant->category->value} allowance for membership #{$membership->id}";
 
-                if ($grant->category === WalletTransactionCategory::General) {
-                    $this->wallets->creditGeneral($wallet, (int) $grant->amount_points, WalletTransactionSource::SubscriptionGrant, $desc);
-                } else {
-                    $this->wallets->creditCategorized(
-                        $wallet,
-                        $grant->category,
-                        (int) $grant->amount_points,
-                        WalletTransactionSource::SubscriptionGrant,
-                        $membership->current_period_end,
-                        $grant->restricted_space_id,
-                        [],
-                        $desc
-                    );
-                }
+            if ($grant->category === WalletTransactionCategory::General) {
+                $this->wallets->creditGeneral($wallet, (int) $grant->amount_points, WalletTransactionSource::SubscriptionGrant, $desc);
+            } else {
+                $this->wallets->creditCategorized(
+                    $wallet,
+                    $grant->category,
+                    (int) $grant->amount_points,
+                    WalletTransactionSource::SubscriptionGrant,
+                    $membership->current_period_end,
+                    $grant->restricted_space_id,
+                    [],
+                    $desc
+                );
             }
-
-            return;
-        }
-
-        if (bccomp((string) $plan->included_hours, '0.00', 2) > 0) {
-            // TODO(spec-C): `included_hours` is an hours figure, not a
-            // point count, and was already being written into the ledger
-            // 1:1 before the ledger became point-denominated. Cast
-            // preserves exactly that pre-existing behaviour; deciding
-            // the real hours->points rule belongs with the pricing work.
-            $this->wallets->creditCategorized(
-                $wallet,
-                WalletTransactionCategory::SpaceSpecific,
-                (int) $plan->included_hours,
-                WalletTransactionSource::SubscriptionGrant,
-                $membership->current_period_end,
-                null,
-                [],
-                "Included hours for membership #{$membership->id}"
-            );
         }
     }
 }

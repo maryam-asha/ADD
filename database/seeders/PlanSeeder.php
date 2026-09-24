@@ -26,7 +26,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => true,
                 'price_points' => 500,
                 'duration_days' => 30,
-                'included_hours' => 8.00,
                 'is_active' => true,
                 'order' => 1,
                 'balances' => [
@@ -109,7 +108,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => true,
                 'price_points' => 750,
                 'duration_days' => 30,
-                'included_hours' => 12.00,
                 'is_active' => true,
                 'order' => 2,
                 'balances' => [
@@ -192,7 +190,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => true,
                 'price_points' => 1100,
                 'duration_days' => 30,
-                'included_hours' => 25.00,
                 'is_active' => true,
                 'order' => 3,
                 'balances' => [
@@ -275,7 +272,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => false,
                 'price_points' => 220,
                 'duration_days' => 1,
-                'included_hours' => 8.00,
                 'is_active' => true,
                 'order' => 4,
                 'balances' => [
@@ -338,7 +334,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => true,
                 'price_points' => 1990,
                 'duration_days' => 30,
-                'included_hours' => 10.00,
                 'is_active' => true,
                 'order' => 5,
                 'balances' => [
@@ -428,7 +423,6 @@ class PlanSeeder extends Seeder
                 'is_subscription' => true,
                 'price_points' => 2500,
                 'duration_days' => 30,
-                'included_hours' => 8.00,
                 'is_active' => true,
                 'order' => 6,
                 'balances' => [
