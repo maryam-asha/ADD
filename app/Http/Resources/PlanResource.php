@@ -58,6 +58,20 @@ class PlanResource extends JsonResource
                 'is_active' => $d->is_active,
                 'order' => $d->order,
             ])),
+            'resource_grants' => $this->whenLoaded('resourceGrants', fn () => $this->resourceGrants->map(fn ($g) => [
+                'id' => $g->id,
+                'resource_type_id' => $g->resource_type_id,
+                'resource_type' => $g->relationLoaded('resourceType') && $g->resourceType ? [
+                    'id' => $g->resourceType->id,
+                    'slug' => $g->resourceType->slug,
+                    'name' => $g->resourceType->name,
+                    'unit_label' => $g->resourceType->unit_label,
+                    'icon' => $g->resourceType->icon,
+                ] : null,
+                'quantity' => (float) $g->quantity,
+                'description' => $g->description,
+                'order' => $g->order,
+            ])),
             'created_at' => $this->created_at,
         ];
 

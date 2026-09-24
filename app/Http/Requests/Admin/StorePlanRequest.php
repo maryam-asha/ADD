@@ -63,6 +63,14 @@ class StorePlanRequest extends FormRequest
                 'discounts.*.description.en' => ['nullable', 'string'],
                 'discounts.*.is_active' => ['nullable', 'boolean'],
                 'discounts.*.order' => ['nullable', 'integer', 'min:0'],
+
+                'resource_grants' => ['nullable', 'array'],
+                'resource_grants.*.resource_type_id' => ['required', 'integer', 'exists:resource_types,id'],
+                'resource_grants.*.quantity' => ['required', 'numeric', 'min:0.01'],
+                'resource_grants.*.description' => ['nullable', 'array'],
+                'resource_grants.*.description.ar' => ['nullable', 'string'],
+                'resource_grants.*.description.en' => ['nullable', 'string'],
+                'resource_grants.*.order' => ['nullable', 'integer', 'min:0'],
             ]
         );
     }

@@ -25,7 +25,7 @@ class MembershipResolver
             ->where('owner_id', $user->id)
             ->where('status', MembershipStatus::Active)
             ->where('current_period_end', '>=', now())
-            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts'])
+            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();
 
@@ -44,7 +44,7 @@ class MembershipResolver
             ->whereIn('owner_id', $companyIds)
             ->where('status', MembershipStatus::Active)
             ->where('current_period_end', '>=', now())
-            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts'])
+            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();
     }
@@ -63,7 +63,7 @@ class MembershipResolver
             ->where('owner_id', $ownerId)
             ->where('status', MembershipStatus::Active)
             ->where('current_period_end', '>=', now())
-            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts'])
+            ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();
     }

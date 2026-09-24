@@ -37,9 +37,11 @@ use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as Rece
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
+use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
@@ -137,6 +139,12 @@ Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
 Route::apiResource('plan-modules', PlanModuleController::class)
     ->parameters(['plan-modules' => 'planModule']);
+
+// Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
+// segment is `resource-types`, not `resources` — that name is already taken
+// by the physical Resource model's admin route above.
+Route::apiResource('resource-types', ResourceTypeController::class)
+    ->parameters(['resource-types' => 'resourceType']);
 
 // Contact Links — public org content (social/app-store/website/phone
 // links), admin-managed. Same permission tier as Founders/Partners (no
@@ -277,6 +285,12 @@ Route::get('reception/wallet-balance', [WalletTopUpController::class, 'balance']
 Route::post('reception/wallet-top-ups/preview', [WalletTopUpController::class, 'preview']);
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
 Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
+
+// Manual-entry recording of natural-unit resource consumption (Printing,
+// Internet, ...) against a member/company's active membership's
+// PlanResourceGrant (docs/decisions/resource-quota-design.md). Same
+// user_id/company_id owner-resolution pattern as wallet-top-ups above.
+Route::post('reception/resource-consumptions', [ResourceConsumptionController::class, 'store']);
 
 // Cash Register Sessions per staff member per shift (S6-BE-03 / PRD 5.9)
 Route::get('reception/cash-register-sessions', [CashRegisterSessionController::class, 'index']);

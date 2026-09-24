@@ -100,6 +100,7 @@ return [
         'contact_link_updated' => 'Contact link updated.',
         'plan_updated' => 'Plan updated.',
         'plan_module_updated' => 'Plan module updated.',
+        'resource_type_updated' => 'Resource type updated.',
         'event_category_updated' => 'Event category updated.',
         'event_updated' => 'Event updated.',
         'community_member_updated' => 'Community member updated.',
@@ -151,6 +152,10 @@ return [
         'exchange_rates_block_reassignment' => 'Cannot reassign the base currency while exchange rate history exists.',
     ],
 
+    'resource_type' => [
+        'in_use' => 'This resource type is granted by one or more plans. Deactivate it instead of deleting it.',
+    ],
+
     'reception' => [
         'checked_in' => 'Checked in.',
         'checked_out' => 'Checked out.',
@@ -167,6 +172,9 @@ return [
         'checkout_past_closing' => "The checkout time cannot be after the branch's closing time.",
         'not_yet_checked_out' => 'This booking or session must be checked out before payment can be settled.',
         'cancellation_window_passed' => 'This booking is past its cancellation window.',
+        'no_active_membership' => 'This member or company has no active membership.',
+        'resource_grant_not_found' => 'The active plan does not grant a quota for this resource type.',
+        'resource_quota_insufficient' => 'The requested quantity exceeds what remains of this resource quota.',
     ],
 
     'booking' => [

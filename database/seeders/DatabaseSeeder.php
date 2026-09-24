@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         $this->call(AdminUserSeeder::class);
         $this->call(SpaceSeeder::class);
         $this->call(PlanModuleSeeder::class);
+        $this->call(ResourceTypeSeeder::class);
         $this->call(PlanSeeder::class);
         $this->call(ServiceAxisSeeder::class);
         $this->call(EventSeeder::class);

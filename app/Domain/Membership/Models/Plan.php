@@ -62,4 +62,9 @@ class Plan extends Model
     {
         return $this->hasMany(PlanDiscount::class)->orderBy('order');
     }
+
+    public function resourceGrants(): HasMany
+    {
+        return $this->hasMany(PlanResourceGrant::class)->orderBy('order');
+    }
 }

@@ -26,12 +26,12 @@ class PlanController extends AdminResourceController
 
     protected function applyIndexFilters(Builder $query, Request $request): void
     {
-        $query->with(['planModule', 'balances', 'features', 'discounts']);
+        $query->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']);
     }
 
     public function show(int $id): JsonResource
     {
-        $plan = Plan::with(['planModule', 'balances', 'features', 'discounts'])->findOrFail($id);
+        $plan = Plan::with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType'])->findOrFail($id);
 
         return new PlanResource($plan);
     }
@@ -42,9 +42,10 @@ class PlanController extends AdminResourceController
         $balancesData = $validated['balances'] ?? [];
         $featuresData = $validated['features'] ?? [];
         $discountsData = $validated['discounts'] ?? [];
-        unset($validated['balances'], $validated['features'], $validated['discounts']);
+        $resourceGrantsData = $validated['resource_grants'] ?? [];
+        unset($validated['balances'], $validated['features'], $validated['discounts'], $validated['resource_grants']);
 
-        $plan = DB::transaction(function () use ($validated, $balancesData, $featuresData, $discountsData) {
+        $plan = DB::transaction(function () use ($validated, $balancesData, $featuresData, $discountsData, $resourceGrantsData) {
             $plan = Plan::create(array_merge(
                 ['is_active' => true, 'order' => 0],
                 $validated
@@ -62,10 +63,14 @@ class PlanController extends AdminResourceController
                 $plan->discounts()->createMany($discountsData);
             }
 
+            if (! empty($resourceGrantsData)) {
+                $plan->resourceGrants()->createMany($resourceGrantsData);
+            }
+
             return $plan;
         });
 
-        return new PlanResource($plan->load(['planModule', 'balances', 'features', 'discounts']));
+        return new PlanResource($plan->load(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']));
     }
 
     public function update(UpdatePlanRequest $request, Plan $plan): JsonResponse
@@ -74,12 +79,14 @@ class PlanController extends AdminResourceController
         $hasBalances = array_key_exists('balances', $validated);
         $hasFeatures = array_key_exists('features', $validated);
         $hasDiscounts = array_key_exists('discounts', $validated);
+        $hasResourceGrants = array_key_exists('resource_grants', $validated);
         $balancesData = $validated['balances'] ?? [];
         $featuresData = $validated['features'] ?? [];
         $discountsData = $validated['discounts'] ?? [];
-        unset($validated['balances'], $validated['features'], $validated['discounts']);
+        $resourceGrantsData = $validated['resource_grants'] ?? [];
+        unset($validated['balances'], $validated['features'], $validated['discounts'], $validated['resource_grants']);
 
-        DB::transaction(function () use ($plan, $validated, $hasBalances, $balancesData, $hasFeatures, $featuresData, $hasDiscounts, $discountsData) {
+        DB::transaction(function () use ($plan, $validated, $hasBalances, $balancesData, $hasFeatures, $featuresData, $hasDiscounts, $discountsData, $hasResourceGrants, $resourceGrantsData) {
             $plan->update($validated);
 
             if ($hasBalances) {
@@ -100,6 +107,13 @@ class PlanController extends AdminResourceController
                 $plan->discounts()->delete();
                 if (! empty($discountsData)) {
                     $plan->discounts()->createMany($discountsData);
+                }
+            }
+
+            if ($hasResourceGrants) {
+                $plan->resourceGrants()->delete();
+                if (! empty($resourceGrantsData)) {
+                    $plan->resourceGrants()->createMany($resourceGrantsData);
                 }
             }
         });

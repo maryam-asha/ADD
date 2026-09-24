@@ -100,6 +100,7 @@ return [
         'contact_link_updated' => 'تم تحديث رابط التواصل.',
         'plan_updated' => 'تم تحديث الباقة.',
         'plan_module_updated' => 'تم تحديث موديول الباقة بنجاح.',
+        'resource_type_updated' => 'تم تحديث نوع المورد.',
         'event_category_updated' => 'تم تحديث فئة الفعالية.',
         'event_updated' => 'تم تحديث الفعالية.',
         'community_member_updated' => 'تم تحديث عضو المجتمع.',
@@ -151,6 +152,10 @@ return [
         'exchange_rates_block_reassignment' => 'لا يمكن إعادة تعيين العملة الأساسية بينما يوجد سجل لأسعار الصرف.',
     ],
 
+    'resource_type' => [
+        'in_use' => 'هذا النوع من الموارد ممنوح من قبل باقة واحدة أو أكثر. قم بتعطيله بدلاً من حذفه.',
+    ],
+
     'reception' => [
         'checked_in' => 'تم تسجيل الدخول.',
         'checked_out' => 'تم تسجيل الخروج.',
@@ -167,6 +172,9 @@ return [
         'checkout_past_closing' => 'لا يمكن أن يكون وقت تسجيل الخروج بعد وقت إغلاق الفرع.',
         'not_yet_checked_out' => 'يجب تسجيل خروج هذا الحجز أو الجلسة قبل تسوية الدفع.',
         'cancellation_window_passed' => 'تجاوز هذا الحجز مهلة الإلغاء المسموحة.',
+        'no_active_membership' => 'لا يوجد اشتراك فعّال لهذا العضو أو الشركة.',
+        'resource_grant_not_found' => 'الباقة الحالية لا تمنح حصة لهذا النوع من الموارد.',
+        'resource_quota_insufficient' => 'الكمية المطلوبة تتجاوز المتبقي من حصة هذا المورد.',
     ],
 
     'booking' => [

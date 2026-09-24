@@ -7,6 +7,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanModule;
+use App\Domain\Membership\Models\ResourceType;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -303,6 +304,77 @@ class PlanCatalogTest extends TestCase
         $showResponse->assertJsonPath('data.discounts.0.percentage', 20);
         $showResponse->assertJsonPath('data.discounts.0.space_type', 'room');
         $this->assertDatabaseCount('plan_discounts', 1);
+    }
+
+    /**
+     * plan_resource_grants is the natural-unit (not points) sibling of
+     * plan_balances/plan_discounts (docs/decisions/resource-quota-design.md)
+     * — same embedded create/replace-on-update pattern. `quantity` is a
+     * decimal, not an integer, to support fractional grants like 5.5 hours
+     * of internet.
+     */
+    public function test_admin_can_create_and_update_a_plan_with_resource_grants(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $printing = ResourceType::create([
+            'slug' => 'printing',
+            'name' => ['en' => 'Printing', 'ar' => 'طباعة'],
+            'unit_label' => ['en' => 'page', 'ar' => 'صفحة'],
+        ]);
+        $internet = ResourceType::create([
+            'slug' => 'internet',
+            'name' => ['en' => 'Internet', 'ar' => 'إنترنت'],
+            'unit_label' => ['en' => 'hour', 'ar' => 'ساعة'],
+        ]);
+
+        $payload = $this->payload([
+            'resource_grants' => [
+                [
+                    'resource_type_id' => $printing->id,
+                    'quantity' => 100,
+                    'description' => ['en' => '100 pages', 'ar' => '100 صفحة'],
+                    'order' => 1,
+                ],
+                [
+                    'resource_type_id' => $internet->id,
+                    'quantity' => 5.5,
+                    'order' => 2,
+                ],
+            ],
+        ]);
+
+        $createResponse = $this->postJson('/api/v1/admin/plans', $payload);
+
+        $createResponse->assertCreated();
+        $createResponse->assertJsonCount(2, 'data.resource_grants');
+        $createResponse->assertJsonPath('data.resource_grants.0.resource_type_id', $printing->id);
+        $createResponse->assertJsonPath('data.resource_grants.0.quantity', 100);
+        $createResponse->assertJsonPath('data.resource_grants.0.resource_type.slug', 'printing');
+        $createResponse->assertJsonPath('data.resource_grants.1.resource_type_id', $internet->id);
+        $createResponse->assertJsonPath('data.resource_grants.1.quantity', 5.5);
+
+        $planId = $createResponse->json('data.id');
+        $this->assertDatabaseCount('plan_resource_grants', 2);
+
+        $updateResponse = $this->putJson("/api/v1/admin/plans/{$planId}", $this->payload([
+            'resource_grants' => [
+                [
+                    'resource_type_id' => $internet->id,
+                    'quantity' => 8.25,
+                    'order' => 1,
+                ],
+            ],
+        ]));
+        $updateResponse->assertOk();
+
+        $showResponse = $this->getJson("/api/v1/admin/plans/{$planId}");
+        $showResponse->assertJsonCount(1, 'data.resource_grants');
+        $showResponse->assertJsonPath('data.resource_grants.0.resource_type_id', $internet->id);
+        $showResponse->assertJsonPath('data.resource_grants.0.quantity', 8.25);
+        $this->assertDatabaseCount('plan_resource_grants', 1);
     }
 
     public function test_creating_a_plan_discount_with_both_space_id_and_space_type_is_rejected(): void
