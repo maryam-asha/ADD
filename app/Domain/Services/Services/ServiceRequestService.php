@@ -85,6 +85,9 @@ class ServiceRequestService
         $serviceRequest->update([
             'status' => $newStatus,
             'resolution_note' => $resolutionNote ?? $serviceRequest->resolution_note,
+            // Closing the request (resolved | rejected) is the moment it was
+            // processed; in_progress is still being worked on.
+            'processed_at' => $newStatus->isTerminal() ? now() : null,
         ]);
 
         return $serviceRequest->fresh('serviceType', 'user', 'branch', 'space', 'values.field');

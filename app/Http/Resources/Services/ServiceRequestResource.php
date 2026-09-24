@@ -13,6 +13,8 @@ class ServiceRequestResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'reference' => $this->reference,
+            'service_name' => $this->whenLoaded('serviceType', fn () => $this->serviceType->translate('name')),
             'service_type' => new ServiceTypeResource($this->whenLoaded('serviceType')),
             'status' => $this->status->value,
             'location_source' => $this->location_source?->value,
@@ -35,6 +37,7 @@ class ServiceRequestResource extends JsonResource
                 ]);
             }),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
+            'processed_at' => $this->processed_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),
         ];
     }

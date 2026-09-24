@@ -3,9 +3,11 @@
 namespace Tests\Feature\Services;
 
 use App\Domain\Identity\Models\User;
+use App\Domain\Services\Enums\RequestStatus;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceRequest;
 use App\Domain\Services\Models\ServiceType;
+use App\Domain\Services\Services\ServiceRequestService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -49,7 +51,7 @@ class MemberServiceRequestsListTest extends TestCase
             'order' => 1,
         ]);
 
-        foreach (range(1, $count) as $i) {
+        for ($i = 1; $i <= $count; $i++) {
             ServiceRequest::create([
                 'service_type_id' => $type->id,
                 'user_id' => $user->id,
@@ -129,4 +131,51 @@ class MemberServiceRequestsListTest extends TestCase
         $response->assertJsonPath('meta.total', 0);
     }
 
+    public function test_each_row_carries_reference_service_name_and_dates(): void
+    {
+        $this->actingAsMemberWithRequests(1);
+
+        $response = $this->getJson('/api/v1/member/service-requests');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.0.service_name', 'تنظيف المكاتب');
+        $response->assertJsonPath('data.0.status', 'pending');
+        $response->assertJsonPath('data.0.processed_at', null);
+        $this->assertNotNull($response->json('data.0.submitted_at'));
+        $this->assertMatchesRegularExpression(
+            '/^REQ-\d{4}-\d{5}$/',
+            $response->json('data.0.reference'),
+        );
+    }
+
+    public function test_references_are_sequential_within_a_year_and_restart_the_next(): void
+    {
+        $this->actingAsMemberWithRequests(0);
+        $type = ServiceType::first();
+        $userId = User::first()->id;
+
+        $make = fn (string $at) => ServiceRequest::create([
+            'service_type_id' => $type->id,
+            'user_id' => $userId,
+            'status' => 'pending',
+            'submitted_at' => $at,
+        ])->reference;
+
+        $this->assertSame('REQ-2025-00001', $make('2025-03-01 10:00:00'));
+        $this->assertSame('REQ-2025-00002', $make('2025-12-31 23:00:00'));
+        $this->assertSame('REQ-2026-00001', $make('2026-01-01 08:00:00'));
+    }
+
+    public function test_processed_at_is_stamped_when_operations_closes_the_request(): void
+    {
+        $this->actingAsMemberWithRequests(1);
+        $request = ServiceRequest::first();
+        $service = app(ServiceRequestService::class);
+
+        $service->updateStatus($request, RequestStatus::InProgress);
+        $this->assertNull($request->fresh()->processed_at);
+
+        $service->updateStatus($request->fresh(), RequestStatus::Resolved);
+        $this->assertNotNull($request->fresh()->processed_at);
+    }
 }

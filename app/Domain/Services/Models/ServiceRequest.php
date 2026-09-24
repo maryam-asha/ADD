@@ -7,6 +7,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Enums\LocationSource;
 use App\Domain\Services\Enums\RequestStatus;
+use App\Support\ReferenceSequence;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ServiceRequest extends Model
 {
     protected $fillable = [
+        'reference',
         'service_type_id',
         'user_id',
         'branch_id',
@@ -23,6 +25,7 @@ class ServiceRequest extends Model
         'status',
         'resolution_note',
         'submitted_at',
+        'processed_at',
     ];
 
     protected function casts(): array
@@ -32,7 +35,27 @@ class ServiceRequest extends Model
             'status' => RequestStatus::class,
             'resolution_note' => 'array',
             'submitted_at' => 'datetime',
+            'processed_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Every request gets its human-readable number ("REQ-2026-00187") here,
+     * whichever path creates it — the series restarts each calendar year of
+     * `submitted_at`.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $request) {
+            if ($request->reference !== null) {
+                return;
+            }
+
+            $request->submitted_at ??= now();
+            $key = 'REQ-'.$request->submitted_at->format('Y');
+
+            $request->reference = sprintf('%s-%05d', $key, ReferenceSequence::next($key));
+        });
     }
 
     // ── Relationships ────────────────────────────────────────────────────────
