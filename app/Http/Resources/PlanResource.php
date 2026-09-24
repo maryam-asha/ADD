@@ -48,6 +48,16 @@ class PlanResource extends JsonResource
                 'is_included' => $f->is_included,
                 'order' => $f->order,
             ])),
+            'discounts' => $this->whenLoaded('discounts', fn () => $this->discounts->map(fn ($d) => [
+                'id' => $d->id,
+                'percentage' => (int) $d->percentage,
+                'space_id' => $d->space_id,
+                'space_type' => $d->space_type?->value,
+                'usage_limit' => $d->usage_limit,
+                'description' => $d->description,
+                'is_active' => $d->is_active,
+                'order' => $d->order,
+            ])),
             'created_at' => $this->created_at,
         ];
 

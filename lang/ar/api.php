@@ -214,6 +214,7 @@ return [
         'points_amount' => ':points نقطة',
         'vat_label' => 'ضريبة القيمة المضافة (:percent%)',
         'hours_times_rate' => ':duration × :rate / ساعة',
+        'discount_label' => 'خصم (:percent%)',
         'note_label' => 'أضف ملاحظة (اختياري)',
         'note_placeholder' => 'مثال: غرض الاجتماع، طلبات خاصة…',
         'statuses' => [

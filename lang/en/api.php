@@ -215,6 +215,7 @@ return [
         'points_amount' => ':points pts',
         'vat_label' => 'VAT (:percent%)',
         'hours_times_rate' => ':duration × :rate / hour',
+        'discount_label' => 'Discount (:percent%)',
         'note_label' => 'Add a Note (Optional)',
         'note_placeholder' => 'e.g. Meeting purpose, special requests…',
         'statuses' => [

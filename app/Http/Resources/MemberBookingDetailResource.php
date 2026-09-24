@@ -51,7 +51,7 @@ class MemberBookingDetailResource extends JsonResource
             'status' => $booking->status->value,
             'status_label' => __('api.booking.statuses.'.$booking->status->value, [], $locale),
             'note' => $booking->note,
-            'breakdown' => $presentation->breakdown($space, $booking->start_at, $booking->end_at, $locale),
+            'breakdown' => $presentation->breakdown($space, $booking->start_at, $booking->end_at, $locale, booking: $booking),
             'payment' => $presentation->payment($booking, $locale),
             'request_status' => $presentation->requestStatus($booking, $locale),
             'actions' => $presentation->actions($booking, $locale),

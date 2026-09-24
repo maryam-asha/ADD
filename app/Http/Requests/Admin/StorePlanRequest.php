@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
@@ -51,6 +52,17 @@ class StorePlanRequest extends FormRequest
                 'features.*.icon' => ['nullable', 'string', 'max:100'],
                 'features.*.is_included' => ['nullable', 'boolean'],
                 'features.*.order' => ['nullable', 'integer', 'min:0'],
+
+                'discounts' => ['nullable', 'array'],
+                'discounts.*.percentage' => ['required', 'integer', 'min:1', 'max:100'],
+                'discounts.*.space_id' => ['nullable', 'integer', 'exists:spaces,id', 'prohibits:discounts.*.space_type'],
+                'discounts.*.space_type' => ['nullable', Rule::enum(SpaceType::class)],
+                'discounts.*.usage_limit' => ['nullable', 'integer', 'min:1'],
+                'discounts.*.description' => ['nullable', 'array'],
+                'discounts.*.description.ar' => ['nullable', 'string'],
+                'discounts.*.description.en' => ['nullable', 'string'],
+                'discounts.*.is_active' => ['nullable', 'boolean'],
+                'discounts.*.order' => ['nullable', 'integer', 'min:0'],
             ]
         );
     }

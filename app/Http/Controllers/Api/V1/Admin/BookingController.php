@@ -70,7 +70,7 @@ class BookingController extends Controller
                 // member never disagree about what a booking cost or where
                 // its approval stands.
                 'when' => $presentation->when($booking->start_at, $booking->end_at),
-                'breakdown' => $presentation->breakdown($booking->space, $booking->start_at, $booking->end_at, $locale),
+                'breakdown' => $presentation->breakdown($booking->space, $booking->start_at, $booking->end_at, $locale, booking: $booking),
                 'request_status' => $presentation->requestStatus($booking, $locale),
                 'actions' => $presentation->actions($booking, $locale),
             ],

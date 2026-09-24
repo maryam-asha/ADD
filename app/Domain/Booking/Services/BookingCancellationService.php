@@ -9,6 +9,8 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -21,6 +23,7 @@ class BookingCancellationService
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
         private readonly CapacitySlotSynchronizer $capacitySlots,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     /**
@@ -109,9 +112,19 @@ class BookingCancellationService
             if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
                 $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
 
+                // A discounted booking was only ever charged the net
+                // amount, so it is only that net amount that gets
+                // refunded here — not the raw undiscounted rate.
+                $redemption = PlanDiscountRedemption::where('booking_id', $locked->id)->first();
+                $refundPoints = $redemption !== null ? $points - $redemption->points_discounted : $points;
+
                 $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
-                $this->wallets->creditGeneral($wallet, $points, WalletTransactionSource::Refund, 'Booking cancellation refund');
+                $this->wallets->creditGeneral($wallet, $refundPoints, WalletTransactionSource::Refund, 'Booking cancellation refund');
             }
+
+            // The usage this booking consumed is returned once it no
+            // longer holds a charge (docs/decisions/plan-discounts-design.md).
+            $this->discounts->voidFor($locked);
         });
     }
 }

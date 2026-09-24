@@ -57,4 +57,9 @@ class Plan extends Model
     {
         return $this->hasMany(PlanFeature::class)->orderBy('order');
     }
+
+    public function discounts(): HasMany
+    {
+        return $this->hasMany(PlanDiscount::class)->orderBy('order');
+    }
 }

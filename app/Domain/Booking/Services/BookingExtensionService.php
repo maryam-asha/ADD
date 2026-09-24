@@ -9,6 +9,9 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +30,8 @@ class BookingExtensionService
         private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
+        private readonly MembershipResolver $membershipResolver,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     public function extend(Booking $booking, int $additionalMinutes): void
@@ -68,7 +73,23 @@ class BookingExtensionService
 
             $oldPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $lockedBooking->end_at);
             $newPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $newEndAt);
-            $differencePoints = $newPoints - $oldPoints;
+
+            // A discounted booking keeps being discounted as it grows — the
+            // additional time is charged at the same net rate as the rest
+            // of the booking, not the raw undiscounted difference
+            // (docs/decisions/plan-discounts-design.md).
+            $redemption = PlanDiscountRedemption::where('booking_id', $lockedBooking->id)->first();
+            $membership = $redemption !== null ? $this->membershipResolver->activeFor($lockedBooking->user) : null;
+            $discountedNew = null;
+
+            if ($redemption !== null && $membership !== null) {
+                $discount = $redemption->discount;
+                $discountedOld = $this->discounts->apply($oldPoints, $discount);
+                $discountedNew = $this->discounts->apply($newPoints, $discount);
+                $differencePoints = $discountedNew - $discountedOld;
+            } else {
+                $differencePoints = $newPoints - $oldPoints;
+            }
 
             $paymentState = $lockedBooking->payment_state;
 
@@ -84,6 +105,10 @@ class BookingExtensionService
                 }
             } else {
                 $paymentState = PaymentState::Unpaid;
+            }
+
+            if ($redemption !== null && $discountedNew !== null) {
+                $redemption->update(['points_discounted' => $newPoints - $discountedNew]);
             }
 
             $lockedBooking->forceFill([

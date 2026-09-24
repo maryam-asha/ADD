@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Membership;
 
+use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanModule;
@@ -240,5 +242,90 @@ class PlanCatalogTest extends TestCase
         $showResponse->assertJsonCount(2, 'data.features');
         $showResponse->assertJsonPath('data.features.0.name.en', 'Unlimited Coffee');
         $showResponse->assertJsonPath('data.features.1.name.en', 'Access to Locker');
+    }
+
+    /**
+     * plan_discounts is a structured sibling of plan_balances/plan_features
+     * (docs/decisions/plan-discounts-design.md) — same embedded
+     * create/replace-on-update pattern.
+     */
+    public function test_admin_can_create_and_update_a_plan_with_discounts(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $space = Space::factory()->room()->create();
+
+        $payload = $this->payload([
+            'discounts' => [
+                [
+                    'percentage' => 30,
+                    'space_id' => $space->id,
+                    'description' => ['en' => '30% on this room', 'ar' => 'خصم 30% على هذه الغرفة'],
+                    'usage_limit' => 3,
+                    'order' => 1,
+                ],
+                [
+                    'percentage' => 50,
+                    'space_type' => SpaceType::EventHall->value,
+                    'description' => ['en' => '50% on Event Spaces', 'ar' => 'خصم 50% على مساحات الفعاليات'],
+                    'order' => 2,
+                ],
+            ],
+        ]);
+
+        $createResponse = $this->postJson('/api/v1/admin/plans', $payload);
+
+        $createResponse->assertCreated();
+        $createResponse->assertJsonCount(2, 'data.discounts');
+        $createResponse->assertJsonPath('data.discounts.0.percentage', 30);
+        $createResponse->assertJsonPath('data.discounts.0.space_id', $space->id);
+        $createResponse->assertJsonPath('data.discounts.0.usage_limit', 3);
+        $createResponse->assertJsonPath('data.discounts.1.space_type', 'event_hall');
+
+        $planId = $createResponse->json('data.id');
+        $this->assertDatabaseCount('plan_discounts', 2);
+
+        $updateResponse = $this->putJson("/api/v1/admin/plans/{$planId}", $this->payload([
+            'discounts' => [
+                [
+                    'percentage' => 20,
+                    'space_type' => SpaceType::Room->value,
+                    'order' => 1,
+                ],
+            ],
+        ]));
+        $updateResponse->assertOk();
+
+        $showResponse = $this->getJson("/api/v1/admin/plans/{$planId}");
+        $showResponse->assertJsonCount(1, 'data.discounts');
+        $showResponse->assertJsonPath('data.discounts.0.percentage', 20);
+        $showResponse->assertJsonPath('data.discounts.0.space_type', 'room');
+        $this->assertDatabaseCount('plan_discounts', 1);
+    }
+
+    public function test_creating_a_plan_discount_with_both_space_id_and_space_type_is_rejected(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $space = Space::factory()->room()->create();
+
+        $payload = $this->payload([
+            'discounts' => [
+                [
+                    'percentage' => 30,
+                    'space_id' => $space->id,
+                    'space_type' => SpaceType::Room->value,
+                ],
+            ],
+        ]);
+
+        $response = $this->postJson('/api/v1/admin/plans', $payload);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['discounts.0.space_id']);
     }
 }

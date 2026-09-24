@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
 use Illuminate\Database\Seeder;
@@ -73,18 +74,25 @@ class PlanSeeder extends Seeder
                         'order' => 4,
                     ],
                     [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
                         'name' => ['en' => 'First access during reception hours', 'ar' => 'أول دخول خلال ساعات الاستقبال'],
                         'value' => null,
                         'icon' => 'clock',
                         'is_included' => true,
-                        'order' => 6,
+                        'order' => 5,
+                    ],
+                ],
+                'discounts' => [
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::Room->value,
+                        'description' => ['en' => '30% on Meeting Rooms', 'ar' => 'خصم 30% على غرف الاجتماعات'],
+                        'order' => 1,
+                    ],
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::EventHall->value,
+                        'description' => ['en' => '30% on Event Spaces', 'ar' => 'خصم 30% على مساحات الفعاليات'],
+                        'order' => 2,
                     ],
                 ],
             ],
@@ -150,18 +158,25 @@ class PlanSeeder extends Seeder
                         'order' => 4,
                     ],
                     [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
                         'name' => ['en' => 'First access during reception hours', 'ar' => 'أول دخول خلال ساعات الاستقبال'],
                         'value' => null,
                         'icon' => 'clock',
                         'is_included' => true,
-                        'order' => 6,
+                        'order' => 5,
+                    ],
+                ],
+                'discounts' => [
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::Room->value,
+                        'description' => ['en' => '30% on Meeting Rooms', 'ar' => 'خصم 30% على غرف الاجتماعات'],
+                        'order' => 1,
+                    ],
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::EventHall->value,
+                        'description' => ['en' => '30% on Event Spaces', 'ar' => 'خصم 30% على مساحات الفعاليات'],
+                        'order' => 2,
                     ],
                 ],
             ],
@@ -227,18 +242,25 @@ class PlanSeeder extends Seeder
                         'order' => 4,
                     ],
                     [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
                         'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
                         'value' => null,
                         'icon' => 'clock',
                         'is_included' => true,
-                        'order' => 6,
+                        'order' => 5,
+                    ],
+                ],
+                'discounts' => [
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::Room->value,
+                        'description' => ['en' => '30% on Meeting Rooms', 'ar' => 'خصم 30% على غرف الاجتماعات'],
+                        'order' => 1,
+                    ],
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::EventHall->value,
+                        'description' => ['en' => '30% on Event Spaces', 'ar' => 'خصم 30% على مساحات الفعاليات'],
+                        'order' => 2,
                     ],
                 ],
             ],
@@ -375,18 +397,25 @@ class PlanSeeder extends Seeder
                         'order' => 5,
                     ],
                     [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات والفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                    [
                         'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
                         'value' => null,
                         'icon' => 'clock',
                         'is_included' => true,
-                        'order' => 7,
+                        'order' => 6,
+                    ],
+                ],
+                'discounts' => [
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::Room->value,
+                        'description' => ['en' => '30% on Meeting Rooms', 'ar' => 'خصم 30% على غرف الاجتماعات'],
+                        'order' => 1,
+                    ],
+                    [
+                        'percentage' => 30,
+                        'space_type' => SpaceType::EventHall->value,
+                        'description' => ['en' => '30% on Event Spaces', 'ar' => 'خصم 30% على مساحات الفعاليات'],
+                        'order' => 2,
                     ],
                 ],
             ],
@@ -479,18 +508,19 @@ class PlanSeeder extends Seeder
                         'order' => 7,
                     ],
                     [
-                        'name' => ['en' => '50% on Event Spaces', 'ar' => 'خصم 50% على مساحات الفعاليات'],
-                        'value' => ['en' => '50%', 'ar' => '50%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 8,
-                    ],
-                    [
                         'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
                         'value' => null,
                         'icon' => 'clock',
                         'is_included' => true,
-                        'order' => 9,
+                        'order' => 8,
+                    ],
+                ],
+                'discounts' => [
+                    [
+                        'percentage' => 50,
+                        'space_type' => SpaceType::EventHall->value,
+                        'description' => ['en' => '50% on Event Spaces', 'ar' => 'خصم 50% على مساحات الفعاليات'],
+                        'order' => 1,
                     ],
                 ],
             ],
@@ -499,7 +529,8 @@ class PlanSeeder extends Seeder
         foreach ($plans as $planData) {
             $balances = $planData['balances'] ?? [];
             $features = $planData['features'] ?? [];
-            unset($planData['balances'], $planData['features']);
+            $discounts = $planData['discounts'] ?? [];
+            unset($planData['balances'], $planData['features'], $planData['discounts']);
 
             $plan = Plan::updateOrCreate(
                 ['id' => $planData['id']],
@@ -514,6 +545,11 @@ class PlanSeeder extends Seeder
             $plan->features()->delete();
             if (! empty($features)) {
                 $plan->features()->createMany($features);
+            }
+
+            $plan->discounts()->delete();
+            if (! empty($discounts)) {
+                $plan->discounts()->createMany($discounts);
             }
         }
     }

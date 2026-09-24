@@ -16,6 +16,8 @@ use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -40,6 +42,8 @@ class BookingCreationService
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
         private readonly SettingService $settings,
+        private readonly MembershipResolver $membershipResolver,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     public function create(
@@ -81,13 +85,21 @@ class BookingCreationService
 
             $points = $this->amounts->forRange($locked, $startAt, $endAt);
 
-            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $points, $walletOwnerType, $walletOwnerId);
+            // Applied automatically, never an opt-in the member triggers
+            // (docs/decisions/plan-discounts-design.md) — the member's
+            // active membership plan is consulted the same way as any
+            // other benefit.
+            $membership = $this->membershipResolver->activeFor($member);
+            $discount = $membership !== null ? $this->discounts->resolveFor($membership, $locked) : null;
+            $finalPoints = $discount !== null ? $this->discounts->apply($points, $discount) : $points;
+
+            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $finalPoints, $walletOwnerType, $walletOwnerId);
 
             // `amount_owed`/`currency` are the booking's money-denominated
             // record of the charge and remain decimal USD — only the wallet
             // ledger became point-denominated. Converting the point charge
             // back here is the intended direction, not leftover scaffolding.
-            $amount = $this->points->pointsToUsd($points);
+            $amount = $this->points->pointsToUsd($finalPoints);
 
             $status = $locked->requires_approval ? BookingStatus::Pending : BookingStatus::Confirmed;
 
@@ -103,6 +115,10 @@ class BookingCreationService
                 'payment_source' => $paymentSource,
                 'note' => $note,
             ]);
+
+            if ($discount !== null && $paymentState === PaymentState::Paid) {
+                $this->discounts->redeem($discount, $membership, $booking, $points - $finalPoints);
+            }
 
             // Inside the same transaction and the same Space lock as the
             // overlap check above, so the counter can never disagree with

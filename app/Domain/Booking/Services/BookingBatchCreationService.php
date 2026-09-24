@@ -16,6 +16,9 @@ use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Models\PlanDiscount;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
@@ -62,6 +65,8 @@ class BookingBatchCreationService
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
+        private readonly MembershipResolver $membershipResolver,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     /**
@@ -97,10 +102,20 @@ class BookingBatchCreationService
                     $id => Space::query()->whereKey($id)->lockForUpdate()->firstOrFail(),
                 ]);
 
+            // Same member for the whole batch, resolved once rather than
+            // per window (docs/decisions/plan-discounts-design.md).
+            $membership = $this->membershipResolver->activeFor($member);
+
+            // Usage a usage-limited discount has already been earmarked
+            // for earlier in this same not-yet-persisted batch — none of it
+            // has a PlanDiscountRedemption row yet for resolveFor()'s own
+            // ledger count to see, so it must be tracked here instead.
+            $consumedInBatch = [];
+
             $failures = [];
             /** @var array<int, Collection<int, Booking>> $blocking */
             $blocking = [];
-            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, points: int}> $accepted */
+            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, points: int, discount: ?PlanDiscount, points_discounted: int}> $accepted */
             $accepted = [];
 
             foreach ($normalized as $window) {
@@ -131,12 +146,28 @@ class BookingBatchCreationService
                     continue;
                 }
 
+                $rawPoints = $this->amounts->forRange($space, $window['start'], $window['end']);
+
+                // Applied automatically, same as the single-booking path
+                // (docs/decisions/plan-discounts-design.md). $consumedInBatch
+                // stops a usage_limit of e.g. 1 from being claimed by more
+                // than one window in this same batch, since none of them
+                // have a redemption row yet for resolveFor()'s own count.
+                $discount = $membership !== null ? $this->discounts->resolveFor($membership, $space, $consumedInBatch) : null;
+                $finalPoints = $discount !== null ? $this->discounts->apply($rawPoints, $discount) : $rawPoints;
+
+                if ($discount !== null) {
+                    $consumedInBatch[$discount->id] = ($consumedInBatch[$discount->id] ?? 0) + 1;
+                }
+
                 $accepted[] = [
                     'index' => $window['index'],
                     'space' => $space,
                     'start' => $window['start'],
                     'end' => $window['end'],
-                    'points' => $this->amounts->forRange($space, $window['start'], $window['end']),
+                    'points' => $finalPoints,
+                    'discount' => $discount,
+                    'points_discounted' => $rawPoints - $finalPoints,
                 ];
             }
 
@@ -175,6 +206,10 @@ class BookingBatchCreationService
                     'payment_source' => $paymentSource,
                     'note' => $note,
                 ]);
+
+                if ($row['discount'] !== null && $paymentState === PaymentState::Paid) {
+                    $this->discounts->redeem($row['discount'], $membership, $booking, $row['points_discounted']);
+                }
 
                 $this->capacitySlots->occupy($booking, $space, $this->availability->rulesFor($space));
 

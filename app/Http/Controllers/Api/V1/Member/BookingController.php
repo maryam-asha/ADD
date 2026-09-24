@@ -136,7 +136,7 @@ class BookingController extends Controller
             default => null,
         };
 
-        $breakdown = $presentation->breakdown($space, $start, $end, $locale);
+        $breakdown = $presentation->breakdown($space, $start, $end, $locale, member: $request->user());
 
         return response()->json([
             'data' => [
