@@ -25,6 +25,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Domain\Foundation\Enums\AllocationModel;
+use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
@@ -32,6 +33,8 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Foundation\Models\SpaceAmenity;
+use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Identity\Enums\ConsentType;
@@ -112,6 +115,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Resource::class => [
             'category' => ResourceCategory::class,
             'status' => OperationalStatus::class,
+        ],
+        SpaceTypeAmenity::class => [
+            'space_type' => SpaceType::class,
+            'amenity' => AmenityType::class,
+        ],
+        SpaceAmenity::class => [
+            'amenity' => AmenityType::class,
         ],
         BusinessHour::class => [
             'day_of_week' => DayOfWeek::class,

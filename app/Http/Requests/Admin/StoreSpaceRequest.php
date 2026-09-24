@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -31,17 +32,20 @@ class StoreSpaceRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            'building_id' => ['required', 'integer', 'exists:buildings,id'],
-            'zone_id' => ['nullable', 'integer', 'exists:zones,id'],
-            'space_type' => ['required', Rule::enum(SpaceType::class)],
-            'allocation_model' => ['nullable', Rule::enum(AllocationModel::class)],
-            'is_lockable' => ['required', 'boolean'],
-            'capacity' => ['nullable', 'integer', 'min:0'],
-            'images' => ['nullable', 'array'],
-            'images.*' => ['string', 'max:2048'],
-            'image_url' => ['nullable', 'string', 'max:2048'],
-            'hourly_rate_points' => ['nullable', 'integer', 'min:0'],
-        ];
+        return array_merge(
+            TranslatableField::rules('name'),
+            [
+                'building_id' => ['required', 'integer', 'exists:buildings,id'],
+                'zone_id' => ['nullable', 'integer', 'exists:zones,id'],
+                'space_type' => ['required', Rule::enum(SpaceType::class)],
+                'allocation_model' => ['nullable', Rule::enum(AllocationModel::class)],
+                'is_lockable' => ['required', 'boolean'],
+                'capacity' => ['nullable', 'integer', 'min:0'],
+                'images' => ['nullable', 'array'],
+                'images.*' => ['string', 'max:2048'],
+                'image_url' => ['nullable', 'string', 'max:2048'],
+                'hourly_rate_points' => ['nullable', 'integer', 'min:0'],
+            ]
+        );
     }
 }

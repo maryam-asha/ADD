@@ -110,7 +110,11 @@ class BrowseSpacesTest extends TestCase
         $this->actingAsMember();
 
         // 1. Filter by room / meeting_room
-        $response = $this->getJson('/api/v1/member/spaces?space_type=meeting_room');
+        // "lang: en" pins the locale explicitly: Space::name is now
+        // translatable and the request defaults to Arabic (see
+        // SetLocaleFromHeader) absent a header, unlike the hardcoded
+        // English-only title this replaced.
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
         $response->assertOk();
         $response->assertJsonCount(1, 'data');
         $response->assertJsonPath('data.0.space_type', 'room');
@@ -260,6 +264,87 @@ class BrowseSpacesTest extends TestCase
 
         $response = $this->getJson("/api/v1/member/spaces/{$space->id}");
         $response->assertNotFound();
+    }
+
+    public function test_space_title_reflects_its_own_custom_name(): void
+    {
+        $this->actingAsMember();
+
+        $meetingRoom = Space::query()->where('space_type', 'room')->firstOrFail();
+        $meetingRoom->update([
+            'name' => ['en' => 'Boardroom Nile', 'ar' => 'قاعة النيل'],
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
+        $response->assertOk();
+        $response->assertJsonPath('data.0.title', 'Boardroom Nile');
+
+        $detailResponse = $this->withHeader('lang', 'en')->getJson("/api/v1/member/spaces/{$meetingRoom->id}");
+        $detailResponse->assertOk();
+        $detailResponse->assertJsonPath('data.title', 'Boardroom Nile');
+    }
+
+    public function test_two_same_type_spaces_show_distinct_titles(): void
+    {
+        $this->actingAsMember();
+
+        $meetingRoom = Space::query()->where('space_type', 'room')->firstOrFail();
+        Space::factory()->room()->create([
+            'building_id' => $meetingRoom->building_id,
+            'zone_id' => $meetingRoom->zone_id,
+            'name' => ['en' => 'Boardroom Nile', 'ar' => 'قاعة النيل'],
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data');
+
+        $titles = collect($response->json('data'))->pluck('title')->all();
+        $this->assertContains('Meeting Room A', $titles);
+        $this->assertContains('Boardroom Nile', $titles);
+    }
+
+    public function test_amenities_merge_space_amenities_and_equipment_resources(): void
+    {
+        $this->actingAsMember();
+
+        // Wi-Fi is sourced from the space's SpaceAmenity rows (the seeded
+        // default co_space matrix), not a Resource row — a Hot Desk no
+        // longer has any Resource row categorized as an amenity.
+        $hotDesk = Space::query()->where('space_type', 'co_space')->firstOrFail();
+
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=hot_desk');
+        $response->assertOk();
+        $cardAmenity = collect($response->json('data.0.amenities'))->firstWhere('key', 'wifi');
+        $this->assertNotNull($cardAmenity);
+        $this->assertSame('wifi', $cardAmenity['icon']);
+        $this->assertSame('Wi-Fi', $cardAmenity['label']);
+
+        $detailResponse = $this->withHeader('lang', 'en')->getJson("/api/v1/member/spaces/{$hotDesk->id}");
+        $detailResponse->assertOk();
+        $detailAmenity = collect($detailResponse->json('data.amenities'))->firstWhere('key', 'wifi');
+        $this->assertNotNull($detailAmenity);
+        $this->assertSame('wifi', $detailAmenity['icon']);
+        $this->assertSame('Wi-Fi', $detailAmenity['name']);
+
+        // Equipment still merges in alongside amenities — Meeting Room A's
+        // screen is a real, active Resource row, not a SpaceAmenity one.
+        $meetingRoom = Space::query()->where('space_type', 'room')->firstOrFail();
+        $screenResource = $meetingRoom->resources()->where('name', 'Presentation Screen')->firstOrFail();
+
+        $roomResponse = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
+        $roomResponse->assertOk();
+        $screenAmenity = collect($roomResponse->json('data.0.amenities'))->firstWhere('key', 'screen');
+        $this->assertNotNull($screenAmenity);
+        $this->assertSame($screenResource->name, $screenAmenity['label']);
+        $this->assertSame('screen', $screenAmenity['icon']);
+
+        // Meeting Room A also carries its own `ac` SpaceAmenity row (seeded
+        // `room` matrix) — both sources are present on the same card.
+        $acAmenity = collect($roomResponse->json('data.0.amenities'))->firstWhere('key', 'ac');
+        $this->assertNotNull($acAmenity);
+        $this->assertSame('snowflake', $acAmenity['icon']);
+        $this->assertSame('Air Conditioning', $acAmenity['label']);
     }
 
     public function test_browse_returns_first_image_as_main_image_and_details_returns_all_images(): void

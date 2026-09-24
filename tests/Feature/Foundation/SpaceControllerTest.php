@@ -4,6 +4,7 @@ namespace Tests\Feature\Foundation;
 
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Foundation\Models\Zone;
 use App\Domain\Identity\Models\User;
 use Database\Seeders\RoleSeeder;
@@ -47,6 +48,7 @@ class SpaceControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/spaces', [
             'building_id' => $building->id,
+            'name' => ['ar' => 'غرفة الاجتماعات ب', 'en' => 'Meeting Room B'],
             'space_type' => 'room',
             'is_lockable' => true,
             'capacity' => 4,
@@ -54,6 +56,8 @@ class SpaceControllerTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('data.status', 'active');
+        $response->assertJsonPath('data.name.en', 'Meeting Room B');
+        $response->assertJsonPath('data.name.ar', 'غرفة الاجتماعات ب');
         $this->assertDatabaseHas('spaces', ['building_id' => $building->id, 'status' => 'active']);
     }
 
@@ -95,6 +99,7 @@ class SpaceControllerTest extends TestCase
         $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/spaces/{$space->id}", [
             'building_id' => $space->building_id,
             'zone_id' => $space->zone_id,
+            'name' => ['ar' => 'قاعة تجريبية', 'en' => 'Test Room'],
             'space_type' => $space->space_type->value,
             'is_lockable' => $space->is_lockable,
             'capacity' => 10,
@@ -135,6 +140,7 @@ class SpaceControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/spaces', [
             'building_id' => $building->id,
+            'name' => ['ar' => 'غرفة الاجتماعات ب', 'en' => 'Meeting Room B'],
             'space_type' => 'room',
             'is_lockable' => true,
             'capacity' => 6,
@@ -158,6 +164,7 @@ class SpaceControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/spaces', [
             'building_id' => $building->id,
+            'name' => ['ar' => 'غرفة الاجتماعات ب', 'en' => 'Meeting Room B'],
             'space_type' => 'room',
             'is_lockable' => true,
             'capacity' => 4,
@@ -178,6 +185,7 @@ class SpaceControllerTest extends TestCase
 
         $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/spaces/{$space->id}", [
             'building_id' => $space->building_id,
+            'name' => ['ar' => 'قاعة تجريبية', 'en' => 'Test Room'],
             'space_type' => $space->space_type->value,
             'is_lockable' => $space->is_lockable,
             'images' => [
@@ -189,6 +197,102 @@ class SpaceControllerTest extends TestCase
         $response->assertOk();
         $this->assertSame('https://example.com/new-main.jpg', $space->fresh()->image_url);
         $this->assertCount(2, $space->fresh()->images);
+    }
+
+    public function test_admin_can_create_a_space_with_no_amenities_and_set_them_later(): void
+    {
+        $this->actingAsAdmin();
+        $building = Building::factory()->create();
+
+        $response = $this->postJson('/api/v1/admin/spaces', [
+            'building_id' => $building->id,
+            'name' => ['ar' => 'غرفة الاجتماعات ب', 'en' => 'Meeting Room B'],
+            'space_type' => 'room',
+            'is_lockable' => true,
+            'capacity' => 4,
+        ]);
+
+        $response->assertCreated();
+        $this->assertSame([], $response->json('data.amenities'));
+    }
+
+    public function test_admin_can_set_a_spaces_amenities_via_the_dedicated_action(): void
+    {
+        $this->actingAsAdmin();
+        SpaceTypeAmenity::query()->create(['space_type' => 'room', 'amenity' => 'wifi']);
+        SpaceTypeAmenity::query()->create(['space_type' => 'room', 'amenity' => 'ac']);
+        $space = Space::factory()->room()->create();
+
+        $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/spaces/{$space->id}/amenities", [
+            'amenities' => ['wifi', 'ac'],
+        ]);
+
+        $response->assertOk();
+        $response->assertExactJson(['message' => 'Space amenities updated.']);
+
+        $this->assertDatabaseHas('space_amenities', ['space_id' => $space->id, 'amenity' => 'wifi']);
+        $this->assertDatabaseHas('space_amenities', ['space_id' => $space->id, 'amenity' => 'ac']);
+
+        $show = $this->getJson("/api/v1/admin/spaces/{$space->id}");
+        $this->assertEqualsCanonicalizing(['wifi', 'ac'], $show->json('data.amenities'));
+    }
+
+    public function test_admin_can_clear_a_spaces_amenities_with_an_empty_array(): void
+    {
+        $this->actingAsAdmin();
+        SpaceTypeAmenity::query()->create(['space_type' => 'room', 'amenity' => 'wifi']);
+        $space = Space::factory()->room()->create();
+        $space->amenities()->create(['amenity' => 'wifi']);
+
+        $response = $this->patchJson("/api/v1/admin/spaces/{$space->id}/amenities", ['amenities' => []]);
+
+        $response->assertOk();
+        $this->assertDatabaseMissing('space_amenities', ['space_id' => $space->id, 'amenity' => 'wifi']);
+    }
+
+    public function test_setting_an_amenity_not_configured_for_the_spaces_type_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+        // Only wifi is configured for `room` — ac is not.
+        SpaceTypeAmenity::query()->create(['space_type' => 'room', 'amenity' => 'wifi']);
+        $space = Space::factory()->room()->create();
+
+        $response = $this->patchJson("/api/v1/admin/spaces/{$space->id}/amenities", [
+            'amenities' => ['wifi', 'ac'],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('amenities');
+        $this->assertDatabaseMissing('space_amenities', ['space_id' => $space->id]);
+    }
+
+    public function test_setting_an_invalid_amenity_value_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->room()->create();
+
+        $response = $this->patchJson("/api/v1/admin/spaces/{$space->id}/amenities", [
+            'amenities' => ['not-a-real-amenity'],
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors('amenities.0');
+    }
+
+    public function test_a_rejected_amenities_update_leaves_existing_amenities_untouched(): void
+    {
+        $this->actingAsAdmin();
+        SpaceTypeAmenity::query()->create(['space_type' => 'room', 'amenity' => 'wifi']);
+        $space = Space::factory()->room()->create();
+        $space->amenities()->create(['amenity' => 'wifi']);
+
+        $response = $this->patchJson("/api/v1/admin/spaces/{$space->id}/amenities", [
+            'amenities' => ['wifi', 'ac'],
+        ]);
+
+        $response->assertStatus(422);
+        $this->assertDatabaseHas('space_amenities', ['space_id' => $space->id, 'amenity' => 'wifi']);
+        $this->assertDatabaseMissing('space_amenities', ['space_id' => $space->id, 'amenity' => 'ac']);
     }
 
     public function test_admin_can_delete_a_space(): void

@@ -14,6 +14,10 @@ class SpaceController extends Controller
     {
         $result = $service->browse($request->validated(), $request->user());
 
+        // `data` is the spaces list itself, like every other member listing, so a
+        // client can iterate it without unwrapping a named key first. The banner
+        // describes the branch those rows belong to rather than paginating them,
+        // so it sits alongside `data` instead of inside it or inside `meta`.
         return response()->json([
             'working_hours_banner' => $result['working_hours_banner'],
             'data' => $result['spaces'],

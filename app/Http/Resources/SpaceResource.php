@@ -29,6 +29,7 @@ class SpaceResource extends JsonResource
             'id' => $this->id,
             'building_id' => $this->building_id,
             'zone_id' => $this->zone_id,
+            'name' => $this->name,
             'space_type' => $this->space_type,
             'allocation_model' => $this->allocation_model,
             'is_lockable' => $this->is_lockable,
@@ -42,6 +43,7 @@ class SpaceResource extends JsonResource
                 ? ($points->pointsToCurrency($rate, $targetCurrency) ?? $points->pointsToUsd($rate))
                 : null,
             'currency' => $targetCurrency,
+            'amenities' => $this->amenities->pluck('amenity'),
             'status' => $this->status,
             'status_reason' => $this->status_reason,
             'status_from' => $this->status_from,

@@ -58,6 +58,7 @@ return [
         'constraint_unknown_pattern' => '":key" يجب أن يكون أحد: :patterns.',
         'constraint_must_be_text' => '":key" يجب أن يكون نصاً.',
         'constraint_range_inverted' => '":min" يجب ألا يكون أكبر من ":max".',
+        'amenity_not_available_for_space_type' => '":amenity" ليست من وسائل الراحة المتاحة لهذا النوع من المساحات.',
         'failed' => 'البيانات المُرسلة غير صالحة.',
     ],
 
@@ -85,6 +86,8 @@ return [
         'zone_updated' => 'تم تحديث المنطقة.',
         'space_updated' => 'تم تحديث المساحة.',
         'space_status_updated' => 'تم تحديث حالة المساحة.',
+        'space_amenities_updated' => 'تم تحديث مرافق المساحة.',
+        'space_type_amenities_updated' => 'تم تحديث وسائل الراحة.',
         'resource_updated' => 'تم تحديث المورد.',
         'resource_status_updated' => 'تم تحديث حالة المورد.',
         'seat_desk_updated' => 'تم تحديث المقعد/المكتب.',
@@ -291,6 +294,16 @@ return [
             'room' => 'غرفة اجتماعات خاصة ومجهزة بالكامل مصممة للنقاشات المثمرة، ورش العمل التعاونية، وعروض العملاء.',
             'business' => 'مكتب خاص هادئ ومخصص يوفر أقصى درجات التركيز والخصوصية والراحة والأمان.',
             'event_hall' => 'قاعة واسعة ومتعددة الاستخدامات مجهزة بأحدث التقنيات الصوتية والمرئية، مثالية للمؤتمرات وورش العمل الكبرى والفعاليات.',
+        ],
+        'amenities' => [
+            'wifi' => 'واي فاي',
+            'power_outlet' => 'مقابس كهربائية',
+            'printing' => 'خدمة الطباعة',
+            'ergonomic_chairs' => 'كراسي مريحة',
+            'locker' => 'خزانة',
+            'cafe_access' => 'خدمة الكافيه',
+            'ac' => 'تكييف الهواء',
+            'stage' => 'منصة',
         ],
     ],
 

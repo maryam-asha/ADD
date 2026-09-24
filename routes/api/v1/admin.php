@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\SiteInquiryController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
+use App\Http\Controllers\Api\V1\Admin\SpaceTypeAmenityController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
@@ -94,8 +95,17 @@ Route::apiResource('floors', FloorController::class)->except('destroy');
 Route::apiResource('zones', ZoneController::class)->except('destroy');
 Route::apiResource('spaces', SpaceController::class)->except('destroy');
 Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
+Route::patch('spaces/{space}/amenities', [SpaceController::class, 'updateAmenities']);
 Route::apiResource('resources', ResourceController::class)->except('destroy');
 Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
+
+// The type -> amenity config matrix (which AmenityType values are even
+// selectable for a given SpaceType) — a fixed 4-row config, not a
+// paginated CRUD resource, so it isn't a Route::apiResource line. Same
+// role:admin|operations tier as the rest of this file — no
+// permission:-based middleware here, the pilot only covers Branches.
+Route::get('space-type-amenities', [SpaceTypeAmenityController::class, 'index']);
+Route::put('space-type-amenities/{spaceType}', [SpaceTypeAmenityController::class, 'update']);
 
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('seats-desks', SeatDeskController::class)

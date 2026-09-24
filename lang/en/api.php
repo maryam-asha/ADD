@@ -58,6 +58,7 @@ return [
         'constraint_unknown_pattern' => '":key" must be one of: :patterns.',
         'constraint_must_be_text' => '":key" must be text.',
         'constraint_range_inverted' => '":min" must not be greater than ":max".',
+        'amenity_not_available_for_space_type' => '":amenity" is not an available amenity for this space type.',
         'failed' => 'The given data is invalid.',
     ],
 
@@ -85,6 +86,8 @@ return [
         'zone_updated' => 'Zone updated.',
         'space_updated' => 'Space updated.',
         'space_status_updated' => 'Space status updated.',
+        'space_amenities_updated' => 'Space amenities updated.',
+        'space_type_amenities_updated' => 'Amenities updated.',
         'resource_updated' => 'Resource updated.',
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
@@ -292,6 +295,16 @@ return [
             'room' => 'Private and fully-equipped meeting room designed for productive discussions, collaborative workshops, and client presentations.',
             'business' => 'Quiet, dedicated private office designed for maximum focus, confidentiality, comfort, and security.',
             'event_hall' => 'Spacious and versatile hall equipped with modern AV technology, ideal for conferences, large workshops, and gatherings.',
+        ],
+        'amenities' => [
+            'wifi' => 'Wi-Fi',
+            'power_outlet' => 'Power Outlets',
+            'printing' => 'Printing Access',
+            'ergonomic_chairs' => 'Ergonomic Chairs',
+            'locker' => 'Locker',
+            'cafe_access' => 'Cafe Access',
+            'ac' => 'Air Conditioning',
+            'stage' => 'Stage',
         ],
     ],
 

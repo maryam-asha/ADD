@@ -89,6 +89,11 @@ class Space extends Model
         return $this->hasMany(Resource::class);
     }
 
+    public function amenities(): HasMany
+    {
+        return $this->hasMany(SpaceAmenity::class);
+    }
+
     public function seatsDesks(): HasMany
     {
         return $this->hasMany(SeatDesk::class);

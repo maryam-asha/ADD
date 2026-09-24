@@ -6,6 +6,7 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Requests\Admin\StoreSpaceRequest;
+use App\Http\Requests\Admin\UpdateSpaceAmenitiesRequest;
 use App\Http\Requests\Admin\UpdateSpaceRequest;
 use App\Http\Requests\Admin\UpdateSpaceStatusRequest;
 use App\Http\Resources\SpaceResource;
@@ -58,6 +59,23 @@ class SpaceController extends AdminResourceController
         $space->update($request->validated());
 
         return response()->json(['message' => __('api.admin.space_updated')]);
+    }
+
+    /**
+     * Amenities are a separate action from the general edit form — a space's
+     * `amenities` are set here, never through store()/update() above, the
+     * same way `status` is its own action below rather than a field on the
+     * main payload.
+     */
+    public function updateAmenities(UpdateSpaceAmenitiesRequest $request, Space $space): JsonResponse
+    {
+        $space->amenities()->delete();
+
+        foreach ($request->validated('amenities') as $amenity) {
+            $space->amenities()->create(['amenity' => $amenity]);
+        }
+
+        return response()->json(['message' => __('api.admin.space_amenities_updated')]);
     }
 
     public function updateStatus(UpdateSpaceStatusRequest $request, Space $space): JsonResponse
