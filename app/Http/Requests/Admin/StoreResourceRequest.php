@@ -19,7 +19,7 @@ class StoreResourceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'space_id' => ['required', 'integer', 'exists:spaces,id'],
+            'space_id' => ['nullable', 'integer', 'exists:spaces,id'],
             'name' => ['required', 'string', 'max:255'],
             'category' => ['required', Rule::enum(ResourceCategory::class)],
             'quantity' => ['nullable', 'integer', 'min:1'],

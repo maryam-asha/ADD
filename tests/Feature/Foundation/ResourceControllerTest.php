@@ -73,6 +73,49 @@ class ResourceControllerTest extends TestCase
         $this->assertDatabaseHas('resources', ['space_id' => $space->id, 'quantity' => 1]);
     }
 
+    public function test_admin_can_create_a_general_resource_with_no_space(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/resources', [
+            'space_id' => null,
+            'name' => 'Spare Projector',
+            'category' => 'projector',
+        ]);
+
+        $response->assertCreated();
+        $response->assertJsonPath('data.space_id', null);
+        $this->assertDatabaseHas('resources', ['space_id' => null, 'name' => 'Spare Projector']);
+    }
+
+    public function test_admin_can_clear_a_resources_space_id_on_update(): void
+    {
+        $this->actingAsAdmin();
+        $resource = Resource::factory()->create();
+
+        $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/resources/{$resource->id}", [
+            'space_id' => null,
+            'name' => $resource->name,
+            'category' => $resource->category->value,
+            'quantity' => $resource->quantity,
+        ]);
+
+        $response->assertOk();
+        $this->assertNull($resource->fresh()->space_id);
+    }
+
+    public function test_index_includes_general_resources_with_no_space(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->create();
+        Resource::factory()->for($space)->create();
+        Resource::factory()->create(['space_id' => null]);
+
+        $response = $this->getJson('/api/v1/admin/resources');
+
+        $response->assertOk()->assertJsonCount(2, 'data');
+    }
+
     public function test_index_can_be_filtered_by_space_id(): void
     {
         $this->actingAsAdmin();
