@@ -8,6 +8,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceType;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 /**
@@ -30,11 +31,11 @@ class ServiceCatalogService
      *
      * @return Collection<int, ServiceAxis> (with 'serviceTypes' already loaded)
      */
-    public function forMember(User $user): Collection
+    public function forMember(User $user, ?string $axisSlug = null): Collection
     {
         $moduleIds = $this->activePlanModuleIds($user);
 
-        return ServiceAxis::with([
+        $query = ServiceAxis::with([
             'serviceTypes' => function ($query) use ($moduleIds) {
                 $query->active()
                     ->where(function ($q) {
@@ -42,14 +43,120 @@ class ServiceCatalogService
                             ->orWhere('visibility', 'both');
                     })
                     ->accessibleByModules($moduleIds)
-                    ->with('activeFields')
                     ->ordered();
             },
         ])
-            ->ordered()
-            ->get()
+            ->ordered();
+
+        if ($axisSlug !== null) {
+            $query->where('slug', $axisSlug);
+        }
+
+        return $query->get()
             ->filter(fn (ServiceAxis $axis) => $axis->serviceTypes->isNotEmpty())
             ->values();
+    }
+
+    /**
+     * Return the main service sections (axes) for the member without grouping services inside them.
+     * Only returns axes that have accessible services for this member.
+     *
+     * @return Collection<int, ServiceAxis>
+     */
+    public function axesForMember(User $user): Collection
+    {
+        $moduleIds = $this->activePlanModuleIds($user);
+
+        return ServiceAxis::whereHas('serviceTypes', function ($query) use ($moduleIds) {
+            $query->active()
+                ->where(function ($q) {
+                    $q->where('visibility', 'member')
+                        ->orWhere('visibility', 'both');
+                })
+                ->accessibleByModules($moduleIds);
+        })
+            ->withCount(['serviceTypes' => function ($query) use ($moduleIds) {
+                $query->active()
+                    ->where(function ($q) {
+                        $q->where('visibility', 'member')
+                            ->orWhere('visibility', 'both');
+                    })
+                    ->accessibleByModules($moduleIds);
+            }])
+            ->ordered()
+            ->get();
+    }
+
+    /**
+     * Return a single service section (axis) and its accessible services for the given member.
+     */
+    public function servicesForAxis(string $axisSlug, User $user): ?ServiceAxis
+    {
+        $moduleIds = $this->activePlanModuleIds($user);
+
+        $axis = ServiceAxis::where('slug', $axisSlug)
+            ->with([
+                'serviceTypes' => function ($query) use ($moduleIds) {
+                    $query->active()
+                        ->where(function ($q) {
+                            $q->where('visibility', 'member')
+                                ->orWhere('visibility', 'both');
+                        })
+                        ->accessibleByModules($moduleIds)
+                        ->ordered();
+                },
+            ])
+            ->first();
+
+        if ($axis === null || $axis->serviceTypes->isEmpty()) {
+            return null;
+        }
+
+        return $axis;
+    }
+
+    /**
+     * Return all accessible services as a flat list without grouping by axes.
+     *
+     * Paginated, unlike the axis-grouped reads above: this is the flat
+     * catalog a member scrolls, and it grows with every service added,
+     * while an axis holds a small bounded set.
+     *
+     * @param  array<string, mixed>  $filters
+     * @return LengthAwarePaginator<int, ServiceType>
+     */
+    public function allServicesForMember(User $user, array $filters = []): LengthAwarePaginator
+    {
+        $moduleIds = $this->activePlanModuleIds($user);
+
+        $query = ServiceType::active()
+            ->where(function ($q) {
+                $q->where('visibility', 'member')
+                    ->orWhere('visibility', 'both');
+            })
+            ->accessibleByModules($moduleIds)
+            ->with('axis')
+            ->ordered();
+
+        if (! empty($filters['axis'])) {
+            $query->whereHas('axis', fn ($q) => $q->where('slug', $filters['axis']));
+        }
+
+        if (! empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function ($q) use ($search) {
+                $q->where('name->ar', 'like', "%{$search}%")
+                    ->orWhere('name->en', 'like', "%{$search}%")
+                    ->orWhere('description->ar', 'like', "%{$search}%")
+                    ->orWhere('description->en', 'like', "%{$search}%");
+            });
+        }
+
+        // Same 1..100 clamp the other member listings use, so a client
+        // cannot ask for the whole table in one page.
+        $perPage = max(1, min(100, (int) ($filters['per_page'] ?? 15)));
+
+        return $query->paginate($perPage);
     }
 
     /**
@@ -62,6 +169,25 @@ class ServiceCatalogService
 
         return ServiceType::active()
             ->where('slug', $slug)
+            ->where(function ($q) {
+                $q->where('visibility', 'member')
+                    ->orWhere('visibility', 'both');
+            })
+            ->accessibleByModules($moduleIds)
+            ->with('activeFields')
+            ->first();
+    }
+
+    /**
+     * Return a single active service type by id, ensuring the member
+     * can access it (membership gate + visibility).
+     */
+    public function findByIdForMember(int|string $id, User $user): ?ServiceType
+    {
+        $moduleIds = $this->activePlanModuleIds($user);
+
+        return ServiceType::active()
+            ->whereKey($id)
             ->where(function ($q) {
                 $q->where('visibility', 'member')
                     ->orWhere('visibility', 'both');

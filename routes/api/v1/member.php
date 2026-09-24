@@ -158,9 +158,11 @@ Route::get('services/categories', [MemberServiceController::class, 'axes']);
 Route::get('services/axes/{axis}', [MemberServiceController::class, 'axisServices']);
 Route::get('services/all', [MemberServiceController::class, 'all']);
 Route::get('services/{slug}', [MemberServiceController::class, 'show']);
-Route::get('services/{slug}/registration-form', [MemberServiceController::class, 'registrationForm']);
-Route::get('services/{slug}/request-form', [MemberServiceController::class, 'registrationForm']);
-Route::post('services/{slug}/requests', [MemberServiceController::class, 'submitRequest']);
+// The form and submission endpoints are keyed on the service id, like events' own
+// registration-form, while the catalog reads above stay on the slug.
+Route::get('services/{id}/registration-form', [MemberServiceController::class, 'registrationForm'])->whereNumber('id');
+Route::get('services/{id}/request-form', [MemberServiceController::class, 'registrationForm'])->whereNumber('id');
+Route::post('services/{id}/requests', [MemberServiceController::class, 'submitRequest'])->whereNumber('id');
 
 // Member's own service request history
 Route::get('service-requests', [MemberServiceRequestController::class, 'index']);

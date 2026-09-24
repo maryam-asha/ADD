@@ -76,7 +76,7 @@ class ServiceRequestValidationTest extends TestCase
         $this->field($type, ['key' => 'description', 'is_required' => true]);
 
         Sanctum::actingAs($this->member(), ['*']);
-        $this->postJson("/api/v1/member/services/{$type->slug}/requests", ['fields' => []])
+        $this->postJson("/api/v1/member/services/{$type->id}/requests", ['fields' => []])
             ->assertStatus(422)
             ->assertJsonValidationErrors('fields.description');
 
@@ -89,7 +89,7 @@ class ServiceRequestValidationTest extends TestCase
         $this->field($type, ['key' => 'description', 'validation' => ['max' => 10]]);
 
         Sanctum::actingAs($this->member(), ['*']);
-        $this->postJson("/api/v1/member/services/{$type->slug}/requests", [
+        $this->postJson("/api/v1/member/services/{$type->id}/requests", [
             'fields' => ['description' => str_repeat('x', 50)],
         ])->assertStatus(422)->assertJsonValidationErrors('fields.description');
     }
@@ -107,7 +107,7 @@ class ServiceRequestValidationTest extends TestCase
         ]);
 
         Sanctum::actingAs($this->member(), ['*']);
-        $this->postJson("/api/v1/member/services/{$type->slug}/requests", [
+        $this->postJson("/api/v1/member/services/{$type->id}/requests", [
             'fields' => ['priority' => 'catastrophic'],
         ])->assertStatus(422)->assertJsonValidationErrors('fields.priority');
     }
@@ -118,7 +118,7 @@ class ServiceRequestValidationTest extends TestCase
         $this->field($type, ['key' => 'description', 'is_required' => true, 'validation' => ['max' => 100]]);
 
         Sanctum::actingAs($this->member(), ['*']);
-        $this->postJson("/api/v1/member/services/{$type->slug}/requests", [
+        $this->postJson("/api/v1/member/services/{$type->id}/requests", [
             'fields' => ['description' => 'The air conditioning is leaking.'],
         ])->assertCreated();
 
@@ -138,7 +138,7 @@ class ServiceRequestValidationTest extends TestCase
         $this->assertSame([], $shown->json('data.fields'));
 
         // It used to be rendered to the member and then dropped on submit.
-        $this->postJson("/api/v1/member/services/{$type->slug}/requests", ['fields' => []])
+        $this->postJson("/api/v1/member/services/{$type->id}/requests", ['fields' => []])
             ->assertCreated();
     }
 

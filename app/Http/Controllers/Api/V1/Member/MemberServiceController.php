@@ -7,7 +7,7 @@ use App\Domain\Services\Services\ServiceRequestService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Services\StoreServiceRequestRequest;
 use App\Http\Resources\Services\ServiceAxisResource;
-use App\Http\Resources\Services\ServiceRequestResource;
+use App\Http\Resources\Services\ServiceTypeFieldResource;
 use App\Http\Resources\Services\ServiceTypeResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -24,12 +24,69 @@ class MemberServiceController extends Controller
     /**
      * GET /api/v1/member/services
      * Return all axes with their accessible service types for the authenticated member.
+     * Supports ?axis={slug} to filter by a single axis, or ?flat=1 to return a flat list.
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(Request $request): AnonymousResourceCollection|JsonResponse
     {
-        $axes = $this->catalog->forMember($request->user());
+        // ?flat=1 delegates to the paginated flat list, so this route returns
+        // that endpoint's data+meta envelope rather than a bare collection.
+        if ($request->boolean('flat')) {
+            return $this->all($request);
+        }
+
+        $axes = $this->catalog->forMember($request->user(), $request->query('axis'));
 
         return ServiceAxisResource::collection($axes);
+    }
+
+    /**
+     * GET /api/v1/member/services/axes
+     * Return main service sections (axes) separately (e.g. ADD Core, ADD Experience).
+     */
+    public function axes(Request $request): JsonResponse
+    {
+        $axes = $this->catalog->axesForMember($request->user());
+
+        return response()->json([
+            'data' => ServiceAxisResource::collection($axes),
+        ]);
+    }
+
+    /**
+     * GET /api/v1/member/services/axes/{axis}
+     * Return a specific service section and its services.
+     */
+    public function axisServices(Request $request, string $axis): ServiceAxisResource|JsonResponse
+    {
+        $axisModel = $this->catalog->servicesForAxis($axis, $request->user());
+
+        if ($axisModel === null) {
+            return response()->json(['message' => __('api.services.not_found')], Response::HTTP_NOT_FOUND);
+        }
+
+        return new ServiceAxisResource($axisModel);
+    }
+
+    /**
+     * GET /api/v1/member/services/all
+     * Return all accessible services as a flat list without grouping by axes.
+     * Paginated — `?per_page=` (1..100, default 15) and `?page=`.
+     */
+    public function all(Request $request): JsonResponse
+    {
+        $paginator = $this->catalog->allServicesForMember($request->user(), $request->all());
+
+        // Same envelope the other member listings use: the rows under `data`,
+        // the page counters under `meta`.
+        return response()->json([
+            'data' => ServiceTypeResource::collection($paginator->items()),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
+        ]);
     }
 
     /**
@@ -48,12 +105,34 @@ class MemberServiceController extends Controller
     }
 
     /**
-     * POST /api/v1/member/services/{slug}/requests
+     * GET /api/v1/member/services/{id}/registration-form
+     * Fetch the service dynamic form directly, mirroring the events registration-form endpoint,
+     * which is keyed on the id too.
+     */
+    public function registrationForm(Request $request, int|string $id): JsonResponse
+    {
+        $serviceType = $this->catalog->findByIdForMember($id, $request->user());
+
+        if ($serviceType === null) {
+            return response()->json(['message' => __('api.services.not_found')], Response::HTTP_NOT_FOUND);
+        }
+
+        return response()->json([
+            'data' => [
+                'external_form_url' => null,
+                'request_method' => $serviceType->request_method->value,
+                'registration_form' => ServiceTypeFieldResource::collection($serviceType->activeFields),
+            ],
+        ]);
+    }
+
+    /**
+     * POST /api/v1/member/services/{id}/requests
      * Submit a new service request (only for form-based service types).
      */
-    public function submitRequest(StoreServiceRequestRequest $request, string $slug): ServiceRequestResource|JsonResponse
+    public function submitRequest(StoreServiceRequestRequest $request, int|string $id): JsonResponse
     {
-        $serviceType = $this->catalog->findForMember($slug, $request->user());
+        $serviceType = $this->catalog->findByIdForMember($id, $request->user());
 
         if ($serviceType === null) {
             return response()->json(['message' => __('api.services.not_found')], Response::HTTP_NOT_FOUND);
@@ -66,17 +145,19 @@ class MemberServiceController extends Controller
             );
         }
 
-        $serviceRequest = $this->requestService->submit(
-            type:           $serviceType,
-            member:         $request->user(),
-            fieldValues:    $request->input('fields', []),
-            branchId:       $request->input('branch_id'),
-            spaceId:        $request->input('space_id'),
+        $this->requestService->submit(
+            type: $serviceType,
+            member: $request->user(),
+            fieldValues: $request->input('fields', []),
+            branchId: $request->input('branch_id'),
+            spaceId: $request->input('space_id'),
             locationSource: $request->locationSource(),
         );
 
-        return (new ServiceRequestResource($serviceRequest))
-            ->response()
-            ->setStatusCode(Response::HTTP_CREATED);
+        $serviceName = $serviceType->translate('name', app()->getLocale());
+
+        return response()->json([
+            'message' => __('api.services.request_submitted', ['service' => $serviceName]),
+        ], Response::HTTP_CREATED);
     }
 }

@@ -32,13 +32,10 @@ class StoreServiceRequestRequest extends FormRequest
         ];
 
         // Field rules come from the service type's stored definitions. The
-        // slug is on the route, so resolve it here rather than leaving the
+        // id is on the route, so resolve it here rather than leaving the
         // payload unvalidated: if it doesn't resolve, fall through with the
         // structural rules only and let the controller return its 404.
-        $type = ServiceType::query()
-            ->where('slug', $this->route('slug'))
-            ->with('activeFields')
-            ->first();
+        $type = $this->serviceType();
 
         if ($type === null) {
             return $baseRules;
@@ -55,14 +52,24 @@ class StoreServiceRequestRequest extends FormRequest
      */
     public function attributes(): array
     {
-        $type = ServiceType::query()
-            ->where('slug', $this->route('slug'))
-            ->with('activeFields')
-            ->first();
+        $type = $this->serviceType();
 
         return $type === null
             ? []
             : app(FieldRuleBuilder::class)->attributesFor($type->activeFields);
+    }
+
+    /**
+     * The service type this submission targets, resolved from the route id.
+     * Visibility and membership gating stay in the controller — this only
+     * needs the field definitions to build rules from.
+     */
+    private function serviceType(): ?ServiceType
+    {
+        return ServiceType::query()
+            ->whereKey($this->route('id'))
+            ->with('activeFields')
+            ->first();
     }
 
     /**
