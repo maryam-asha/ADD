@@ -22,6 +22,11 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
+/**
+ * `GET /api/v1/member/packages` — the package catalog ("Packages" tab).
+ * The member's own subscription and usage is a separate endpoint/response,
+ * see `MembershipCurrentControllerTest`.
+ */
 class PackageBrowseTest extends TestCase
 {
     use RefreshDatabase;
@@ -64,122 +69,84 @@ class PackageBrowseTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_member_with_active_plan_and_balances_gets_matching_design_payload(): void
+    public function test_package_catalog_matches_design_payload_and_marks_the_current_plan(): void
     {
         $member = $this->actingAsMember();
 
         $proPlan = Plan::find(2); // The Free Bird
 
-        // Create active membership ending on Jun 15, 2025
-        $endDate = Carbon::parse('2025-06-15 23:59:59', 'Asia/Damascus');
         Membership::create([
             'plan_id' => $proPlan->id,
             'owner_type' => OwnerType::User,
             'owner_id' => $member->id,
             'status' => MembershipStatus::Active,
             'current_period_start' => Carbon::now('Asia/Damascus')->subDays(15),
-            'current_period_end' => $endDate,
+            'current_period_end' => Carbon::parse('2025-06-15 23:59:59', 'Asia/Damascus'),
         ]);
-
-        // Create wallet and credit Cafe ($40.00) and Printing ($25.00)
-        $wallet = Wallet::firstOrCreate([
-            'owner_type' => OwnerType::User,
-            'owner_id' => $member->id,
-        ]);
-
-        $wallets = app(WalletService::class);
-        $wallets->creditCategorized(
-            $wallet,
-            WalletTransactionCategory::Cafe,
-            '40.00',
-            WalletTransactionSource::SubscriptionGrant,
-            $endDate,
-            null,
-            [],
-            'Café monthly balance'
-        );
-        $wallets->creditCategorized(
-            $wallet,
-            WalletTransactionCategory::PrintingInternet,
-            '25.00',
-            WalletTransactionSource::SubscriptionGrant,
-            $endDate,
-            null,
-            [],
-            'Printing monthly balance'
-        );
 
         $response = $this->getJson('/api/v1/member/packages');
 
         $response->assertOk();
         $response->assertJsonStructure([
             'data' => [
-                'current_plan' => [
+                '*' => [
                     'id',
-                    'membership_id',
                     'name',
                     'module',
-                    'tag',
-                    'status',
-                    'status_label',
-                    'is_active',
-                    'current_period_end',
-                    'validity_text',
-                    'benefits' => [
-                        '*' => ['key', 'title', 'subtitle', 'icon'],
+                    'subtitle',
+                    'formatted_price',
+                    'formatted_point_price',
+                    'features' => [
+                        '*' => ['id', 'name', 'value', 'icon', 'is_included'],
                     ],
-                    'balances' => [
-                        '*' => ['category', 'title', 'amount', 'formatted', 'expires_at', 'icon'],
-                    ],
-                ],
-                'available_packages' => [
-                    '*' => [
-                        'id',
-                        'name',
-                        'module',
-                        'subtitle',
-                        'price',
-                        'currency',
-                        'currency_symbol',
-                        'billing_period',
-                        'formatted_price',
-                        'tags' => [
-                            '*' => ['key', 'label', 'icon'],
-                        ],
-                        'features' => [
-                            '*' => ['id', 'name', 'value', 'icon', 'is_included'],
-                        ],
-                        'balances_grant' => [
-                            '*' => ['category', 'title', 'amount', 'formatted', 'icon'],
-                        ],
-                        'is_current',
-                    ],
+                    'more_features_count',
+                    'is_current',
                 ],
             ],
         ]);
 
-        $response->assertJsonMissingPath('data.header');
-        $response->assertJsonMissingPath('data.current_plan.balance_notice');
-        $response->assertJsonMissingPath('data.current_plan.action_button');
-        $response->assertJsonMissingPath('data.available_packages.0.action_button');
-        $response->assertJsonMissingPath('data.available_packages.0.view_details');
-        $response->assertJsonPath('data.current_plan.name', 'The Free Bird');
-        $response->assertJsonPath('data.current_plan.status', 'active');
-        $response->assertJsonPath('data.current_plan.balances.0.amount', 40);
-        $response->assertJsonPath('data.current_plan.balances.0.formatted', '$40.00');
-        $response->assertJsonPath('data.current_plan.balances.1.amount', 25);
-        $response->assertJsonPath('data.current_plan.balances.1.formatted', '$25.00');
+        // Lightweight browsing list — tags/balances_grant/discounts/
+        // resources_grant are all "View details" data, not shown on the
+        // card; getPackageDetails() (packages/{plan}) is the one place a
+        // client reads them.
+        $response->assertJsonMissingPath('data.0.tags');
+        $response->assertJsonMissingPath('data.0.balances_grant');
+        $response->assertJsonMissingPath('data.0.discounts');
+        $response->assertJsonMissingPath('data.0.resources_grant');
+        $response->assertJsonMissingPath('data.0.action_button');
+        $response->assertJsonMissingPath('data.0.view_details');
 
         // Check available subscription packages (5 active subscriptions)
-        $response->assertJsonCount(5, 'data.available_packages');
-        $response->assertJsonPath('data.available_packages.0.name', 'The Smart Starter');
-        $response->assertJsonPath('data.available_packages.0.is_current', false);
+        $response->assertJsonCount(5, 'data');
+        $response->assertJsonPath('data.0.name', 'The Smart Starter');
+        $response->assertJsonPath('data.0.is_current', false);
 
-        $response->assertJsonPath('data.available_packages.1.name', 'The Free Bird');
-        $response->assertJsonPath('data.available_packages.1.is_current', true);
+        $response->assertJsonPath('data.1.name', 'The Free Bird');
+        $response->assertJsonPath('data.1.is_current', true);
+        // price_points 750, point.rate_usd 0.10 (SettingSeeder) -> $75.00.
+        $response->assertJsonPath('data.1.formatted_price', '$75.00 /mo');
+        $response->assertJsonPath('data.1.formatted_point_price', '750 pts /mo');
 
-        $response->assertJsonPath('data.available_packages.2.name', 'The Happy Committer');
-        $response->assertJsonPath('data.available_packages.2.is_current', false);
+        $response->assertJsonPath('data.2.name', 'The Happy Committer');
+        $response->assertJsonPath('data.2.is_current', false);
+    }
+
+    /**
+     * The catalog is a browsing list, not a details screen — `features` (a
+     * free-text bullet list) is capped at 3 with a `more_features_count`
+     * remainder. "The Smart Starter" (plan 1) has 5 seeded features.
+     */
+    public function test_catalog_caps_features_at_three_with_a_remainder_count(): void
+    {
+        $this->actingAsMember();
+
+        $response = $this->getJson('/api/v1/member/packages');
+
+        $response->assertOk();
+
+        $starter = collect($response->json('data'))->firstWhere('id', 1);
+        $this->assertCount(3, $starter['features']);
+        $this->assertSame(2, $starter['more_features_count']);
     }
 
     public function test_filtering_packages_by_module(): void
@@ -189,31 +156,78 @@ class PackageBrowseTest extends TestCase
         // Filter by Flexi Desk slug
         $response = $this->getJson('/api/v1/member/packages?module=flexi_desk');
         $response->assertOk();
-        $response->assertJsonCount(3, 'data.available_packages');
-        $response->assertJsonPath('data.available_packages.0.name', 'The Smart Starter');
-        $response->assertJsonPath('data.available_packages.1.name', 'The Free Bird');
-        $response->assertJsonPath('data.available_packages.2.name', 'The Happy Committer');
+        $response->assertJsonCount(3, 'data');
+        $response->assertJsonPath('data.0.name', 'The Smart Starter');
+        $response->assertJsonPath('data.1.name', 'The Free Bird');
+        $response->assertJsonPath('data.2.name', 'The Happy Committer');
 
         // Filter by Dedicated Desk slug
         $responseDedicated = $this->getJson('/api/v1/member/packages?module=dedicated_desk');
         $responseDedicated->assertOk();
-        $responseDedicated->assertJsonCount(2, 'data.available_packages');
-        $responseDedicated->assertJsonPath('data.available_packages.0.name', 'The Dedicated');
-        $responseDedicated->assertJsonPath('data.available_packages.1.name', 'The Dedicated +');
+        $responseDedicated->assertJsonCount(2, 'data');
+        $responseDedicated->assertJsonPath('data.0.name', 'The Dedicated');
+        $responseDedicated->assertJsonPath('data.1.name', 'The Dedicated +');
     }
 
-    public function test_member_without_active_membership_returns_null_current_plan(): void
+    public function test_member_without_active_membership_has_no_package_marked_current(): void
     {
         $this->actingAsMember();
 
         $response = $this->getJson('/api/v1/member/packages');
 
         $response->assertOk();
-        $response->assertJsonPath('data.current_plan', null);
-        $response->assertJsonCount(5, 'data.available_packages');
-        $response->assertJsonPath('data.available_packages.0.is_current', false);
-        $response->assertJsonPath('data.available_packages.1.is_current', false);
-        $response->assertJsonPath('data.available_packages.2.is_current', false);
+        $response->assertJsonCount(5, 'data');
+        $response->assertJsonPath('data.0.is_current', false);
+        $response->assertJsonPath('data.1.is_current', false);
+        $response->assertJsonPath('data.2.is_current', false);
+    }
+
+    public function test_a_plan_with_no_discounts_returns_an_empty_array_not_a_missing_key(): void
+    {
+        $this->actingAsMember();
+
+        $plan = Plan::create([
+            'name' => ['en' => 'No Discount Plan', 'ar' => 'خطة بدون خصم'],
+            'is_subscription' => true,
+            'price_points' => 100,
+            'duration_days' => 30,
+            'included_hours' => 0,
+            'overage_rate_points' => 0,
+            'is_active' => true,
+            'order' => 99,
+        ]);
+
+        // `discounts` is a "View details" field, not on the catalog card.
+        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.discounts', []);
+    }
+
+    /**
+     * Mirrors the discounts empty-array assertion above, for the
+     * resources_grant key (docs/decisions/resource-quota-design.md).
+     */
+    public function test_a_plan_with_no_resource_grants_returns_an_empty_array_not_a_missing_key(): void
+    {
+        $this->actingAsMember();
+
+        $plan = Plan::create([
+            'name' => ['en' => 'No Resource Grant Plan', 'ar' => 'خطة بدون موارد'],
+            'is_subscription' => true,
+            'price_points' => 100,
+            'duration_days' => 30,
+            'included_hours' => 0,
+            'overage_rate_points' => 0,
+            'is_active' => true,
+            'order' => 99,
+        ]);
+
+        // `resources_grant` is a "View details" field, not on the catalog card.
+        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.resources_grant', []);
     }
 
     public function test_purchasing_membership_auto_grants_plan_balances(): void
@@ -259,5 +273,170 @@ class PackageBrowseTest extends TestCase
         $this->assertSame(80, (int) $spaceTx->amount);
         $this->assertEquals(WalletTransactionSource::SubscriptionGrant, $spaceTx->source);
         $this->assertNotNull($spaceTx->expires_at);
+    }
+
+    public function test_unauthenticated_user_cannot_access_package_details(): void
+    {
+        $response = $this->getJson('/api/v1/member/packages/1');
+        $response->assertUnauthorized();
+    }
+
+    /**
+     * `GET packages/{plan}` — "View details": the one place a client reads
+     * a plan's full, untruncated `features` list (the catalog caps it at 3).
+     */
+    public function test_package_details_returns_the_full_untruncated_feature_list(): void
+    {
+        $this->actingAsMember();
+
+        // "The Smart Starter" (plan 1) has 5 seeded features.
+        $response = $this->getJson('/api/v1/member/packages/1');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.id', 1);
+        $response->assertJsonPath('data.name', 'The Smart Starter');
+        $response->assertJsonCount(5, 'data.features');
+        $response->assertJsonMissingPath('data.more_features_count');
+    }
+
+    /**
+     * `tags`/`balances_grant`/`discounts` — dropped from the catalog list —
+     * are exactly what "View details" exists to show. Badges reflect real
+     * plan configuration (a matching `plan_balances` category, or an active
+     * discount), not a fixed list: "The Dedicated +" (Cafe/Printing/Meeting
+     * balances + a real discount) shows all four.
+     */
+    public function test_package_details_includes_tags_balances_grant_and_discounts(): void
+    {
+        $this->actingAsMember();
+
+        $response = $this->getJson('/api/v1/member/packages/6');
+
+        $response->assertOk();
+        $response->assertJsonStructure([
+            'data' => [
+                'tags' => ['*' => ['key', 'label', 'icon']],
+                'balances_grant' => ['*' => ['category', 'title', 'amount', 'formatted', 'icon']],
+                'discounts' => ['*' => ['id', 'percentage', 'title', 'space_id', 'space_type', 'usage_limit', 'icon']],
+                'resources_grant',
+            ],
+        ]);
+
+        $tagKeys = collect($response->json('data.tags'))->pluck('key')->all();
+        $this->assertSame(['cafe', 'printing', 'meeting', 'discounts'], $tagKeys);
+
+        // "The Smart Starter" (id 1) has no meeting-room balance.
+        $starterResponse = $this->getJson('/api/v1/member/packages/1');
+        $starterTagKeys = collect($starterResponse->json('data.tags'))->pluck('key')->all();
+        $this->assertNotContains('meeting', $starterTagKeys);
+    }
+
+    public function test_package_details_marks_the_members_own_active_plan(): void
+    {
+        $member = $this->actingAsMember();
+
+        Membership::create([
+            'plan_id' => 2,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => Carbon::now('Asia/Damascus')->subDays(1),
+            'current_period_end' => Carbon::now('Asia/Damascus')->addDays(29),
+        ]);
+
+        $response = $this->getJson('/api/v1/member/packages/2');
+
+        $response->assertOk();
+        $response->assertJsonPath('data.is_current', true);
+    }
+
+    public function test_package_details_404s_for_a_nonexistent_plan(): void
+    {
+        $this->actingAsMember();
+
+        $response = $this->getJson('/api/v1/member/packages/999999');
+
+        $response->assertNotFound();
+    }
+
+    public function test_package_details_404s_for_a_non_subscription_plan(): void
+    {
+        $this->actingAsMember();
+
+        // "1 Day Pass" (plan 4) is a one-time purchase, not a subscription —
+        // same visibility rule as the catalog list (is_subscription=true).
+        $response = $this->getJson('/api/v1/member/packages/4');
+
+        $response->assertNotFound();
+    }
+
+    public function test_package_details_404s_for_an_inactive_plan(): void
+    {
+        $this->actingAsMember();
+
+        $plan = Plan::create([
+            'name' => ['en' => 'Retired Plan', 'ar' => 'خطة متوقفة'],
+            'is_subscription' => true,
+            'price_points' => 100,
+            'duration_days' => 30,
+            'included_hours' => 0,
+            'overage_rate_points' => 0,
+            'is_active' => false,
+            'order' => 99,
+        ]);
+
+        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
+
+        $response->assertNotFound();
+    }
+
+    public function test_package_details_404s_for_a_private_plan(): void
+    {
+        $this->actingAsMember();
+
+        $plan = Plan::factory()->private()->create();
+
+        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
+
+        $response->assertNotFound();
+    }
+
+    public function test_a_private_plan_is_absent_from_the_catalog(): void
+    {
+        $this->actingAsMember();
+
+        $plan = Plan::factory()->private()->create([
+            'name' => ['en' => 'Acme Staff Evenings', 'ar' => 'مسائيات أكمي'],
+        ]);
+
+        $response = $this->getJson('/api/v1/member/packages');
+
+        $response->assertOk();
+        $this->assertNotContains($plan->id, array_column($response->json('data'), 'id'));
+    }
+
+    /**
+     * Operations assigns a private plan from the dashboard, so its holder
+     * never browsed to it. Their own package screen must still open.
+     */
+    public function test_the_holder_of_a_private_plan_can_still_see_its_details(): void
+    {
+        $member = $this->actingAsMember();
+
+        $plan = Plan::factory()->private()->create();
+
+        Membership::create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(29),
+        ]);
+
+        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
+
+        $response->assertOk();
+        $response->assertJsonPath('data.is_current', true);
     }
 }

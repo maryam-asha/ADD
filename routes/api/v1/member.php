@@ -89,13 +89,20 @@ Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberControlle
 // docs/decisions/wallet-points-categorization.md.
 Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationController::class, 'store']);
 
-// Browse packages and member's current subscription
+// Browse the package catalog — "Packages" tab. Each entry carries
+// `is_current`; the member's own subscription and usage is a separate call.
+// `features` is capped at 3 (+ more_features_count); packages/{plan} below
+// is where a client reads one plan's full, untruncated details.
 Route::get('packages', [PackageController::class, 'index']);
+Route::get('packages/{plan}', [PackageController::class, 'show']);
 
 // A member buys a plan for themselves, or (via an optional company_id in the
 // body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
 // their company — one endpoint, self-service checked in the controller.
 Route::post('memberships', [MembershipController::class, 'store']);
+
+// The member's own active plan and this-cycle usage — "My Subscription" tab.
+Route::get('memberships/current', [MembershipController::class, 'current']);
 
 // Unit 1 design (2026-08-09): both writable by the member at any time.
 // preferred_language becoming writable here is a reversal of prior

@@ -339,6 +339,11 @@ return [
         'benefits_title' => 'مزايا الباقة',
         'expires_on' => 'ينتهي في :date',
         'per_month' => 'شهرياً',
+        'points_unit' => 'نقطة',
+        'billing_cycle' => 'الدورة الحالية: :start – :end',
+        'usage_title' => 'استخدامك خلال هذه الدورة',
+        'balance_rollover_notice' => 'أي رصيد ممنوح ينتهي بنهاية الدورة الفوترية ولا يُرحّل للدورة التالية.',
+        'remaining_label' => 'المتبقي: :amount',
         'benefits' => [
             'cafe_access' => 'دخول الكافيه',
             'printing_credits' => 'رصيد الطباعة',
@@ -349,12 +354,19 @@ return [
         'balances' => [
             'cafe' => 'رصيد الكافيه',
             'printing' => 'رصيد الطباعة',
+            'meeting' => 'ساعات غرف الاجتماعات',
+        ],
+        'units' => [
+            'hours' => 'ساعة',
         ],
         'tags' => [
             'cafe' => 'كافيه',
             'printing' => 'طباعة',
             'meeting' => 'اجتماعات',
             'discounts' => 'خصومات',
+        ],
+        'discounts' => [
+            'default' => 'وفّر :percentage% على حجوزاتك.',
         ],
         'subtitles' => [
             'starter' => 'مثالية للأفراد والفرق الصغيرة.',

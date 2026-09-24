@@ -7,9 +7,12 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Membership\Services\PackageBrowseService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\MembershipResource;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -21,6 +24,19 @@ use Illuminate\Support\Facades\Gate;
  */
 class MembershipController extends Controller
 {
+    /**
+     * The member's own active plan and this-cycle usage, for the "My
+     * Subscription" screen — see `PackageController::index()` for the
+     * separate package-catalog endpoint. `data: null` (still 200) when the
+     * member has no active membership — a normal state, not an error.
+     */
+    public function current(Request $request, PackageBrowseService $service): JsonResponse
+    {
+        return response()->json([
+            'data' => $service->getCurrentSubscription($request->user()),
+        ]);
+    }
+
     public function store(StoreMembershipRequest $request, MembershipActivationService $activations): MembershipResource
     {
         $plan = Plan::findOrFail($request->validated('plan_id'));

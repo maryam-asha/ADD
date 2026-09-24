@@ -340,6 +340,11 @@ return [
         'benefits_title' => 'Plan Benefits',
         'expires_on' => 'Expires :date',
         'per_month' => 'mo',
+        'points_unit' => 'pts',
+        'billing_cycle' => 'Current cycle: :start – :end',
+        'usage_title' => 'Your Usage This Cycle',
+        'balance_rollover_notice' => 'Any granted balance ends with the billing cycle and does not roll over.',
+        'remaining_label' => ':amount remaining',
         'benefits' => [
             'cafe_access' => 'Café Access',
             'printing_credits' => 'Printing Credits',
@@ -350,12 +355,19 @@ return [
         'balances' => [
             'cafe' => 'Café Balance',
             'printing' => 'Printing Balance',
+            'meeting' => 'Meeting Room Hours',
+        ],
+        'units' => [
+            'hours' => 'hours',
         ],
         'tags' => [
             'cafe' => 'Café',
             'printing' => 'Printing',
             'meeting' => 'Meeting',
             'discounts' => 'Discounts',
+        ],
+        'discounts' => [
+            'default' => 'Save :percentage% on your bookings.',
         ],
         'subtitles' => [
             'starter' => 'Perfect for individuals and small teams.',
