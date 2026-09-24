@@ -192,7 +192,6 @@ class PackageBrowseTest extends TestCase
             'price_points' => 100,
             'duration_days' => 30,
             'included_hours' => 0,
-            'overage_rate_points' => 0,
             'is_active' => true,
             'order' => 99,
         ]);
@@ -218,7 +217,6 @@ class PackageBrowseTest extends TestCase
             'price_points' => 100,
             'duration_days' => 30,
             'included_hours' => 0,
-            'overage_rate_points' => 0,
             'is_active' => true,
             'order' => 99,
         ]);
@@ -380,7 +378,6 @@ class PackageBrowseTest extends TestCase
             'price_points' => 100,
             'duration_days' => 30,
             'included_hours' => 0,
-            'overage_rate_points' => 0,
             'is_active' => false,
             'order' => 99,
         ]);

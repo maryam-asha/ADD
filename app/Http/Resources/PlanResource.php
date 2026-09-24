@@ -106,9 +106,6 @@ class PlanResource extends JsonResource
         $data['price_usd'] = $points->pointsToUsd((int) $this->price_points);
         $data['price_display'] = $convertedDisplay ?? $data['price_usd'];
         $data['currency'] = $targetCurrency;
-        $data['overage_rate_points'] = $this->overage_rate_points !== null
-            ? (int) $this->overage_rate_points
-            : null;
 
         // Deprecated: superseded by price_display/currency above, which
         // this pair simply mirrors — kept for one release only because the

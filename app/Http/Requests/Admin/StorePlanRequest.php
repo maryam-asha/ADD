@@ -36,7 +36,6 @@ class StorePlanRequest extends FormRequest
                 'price_points' => ['required', 'integer', 'min:0'],
                 'duration_days' => ['required', 'integer', 'min:1'],
                 'included_hours' => ['required', 'numeric', 'min:0'],
-                'overage_rate_points' => ['nullable', 'integer', 'min:0'],
                 'access_window_start' => ['nullable', 'date_format:H:i', 'required_with:access_window_end'],
                 'access_window_end' => ['nullable', 'date_format:H:i', 'required_with:access_window_start'],
                 'is_active' => ['nullable', 'boolean'],

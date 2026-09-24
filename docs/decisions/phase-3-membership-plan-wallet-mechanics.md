@@ -170,3 +170,44 @@ applied without asking: `MemberAuthController::verifyOtp` gains the same
 one-line hook `CompanyController::store` gets, inside the existing
 `wasRecentlyCreated` branch — the wallet is created exactly where the `User`
 row itself first comes into existence, no new endpoint.
+
+---
+
+## Reversal, 2026-09-24: `overage_rate` is dropped, not implemented
+
+The `plans` column described above as "a catalog attribute only, not applied
+by any logic yet — booking/overage billing is Phase 5" has been **removed
+from the schema** rather than wired up. It survived the points migration as
+`overage_rate_points`; that column is now dropped
+(`2026_09_24_120000_drop_overage_rate_points_from_plans_table.php`).
+
+**What was given up.** PRD §5.2's hybrid pricing named three parts: a duration
+permit, included room hours, and a discounted rate for usage past them. The
+third part no longer has a field, so a plan cannot currently offer its holder
+a *cheaper* hourly rate than a walk-in visitor pays. If that discount is
+wanted later, it comes back as a new column and the billing logic to apply it,
+not as a revival of this one.
+
+**Why.** Two reasons, and the first alone would have been enough:
+
+1. In the whole lifetime of the column, nothing ever read it. Every charge in
+   the app is computed by `AmountCalculator` from `spaces.hourly_rate_points`.
+   `docs/superpowers/specs/2026-09-12-add-point-c-wallet-design.md` had already
+   flagged the choice as open — "convert it to `overage_rate_points` if it is
+   to be charged, or drop the column" — and deferred it. This resolves it.
+
+2. Plan-hour overrun now has a definite answer that does not use it
+   ([plan-access-windows.md](plan-access-windows.md)): when a member's granted
+   hours run out, or the session falls outside the plan's access window, the
+   time is billed at the space's ordinary rate — the same rate a visitor with
+   no plan pays. Keeping a second, unapplied rate on the plan next to that rule
+   only invited the two to drift apart.
+
+The dashboard's plan form and its `overageRatePoints` i18n keys were removed in
+the same change, per that repo's rule that a removed control takes its keys
+with it.
+
+**Not touched:** `postman/ADD-OS.postman_collection.json`'s Create-Plan example
+body, which still shows the pre-points `price`/`pricing_currency`/`overage_rate`
+names. It was already stale before this change — those columns were dropped by
+the September points migration — so re-pinning it is a separate correction.

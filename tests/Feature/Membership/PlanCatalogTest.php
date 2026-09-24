@@ -37,7 +37,6 @@ class PlanCatalogTest extends TestCase
             'price_points' => 500,
             'duration_days' => 30,
             'included_hours' => 40,
-            'overage_rate_points' => 15,
             'is_active' => true,
             'order' => 1,
         ], $overrides);

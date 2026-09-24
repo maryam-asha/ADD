@@ -26,7 +26,6 @@ class PlanFactory extends Factory
             'price_points' => 500,
             'duration_days' => 30,
             'included_hours' => 0,
-            'overage_rate_points' => 30,
             'access_window_start' => null,
             'access_window_end' => null,
             'is_active' => true,

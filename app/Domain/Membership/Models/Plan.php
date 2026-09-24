@@ -12,9 +12,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
- * Public catalog (two-tier Admin/Public controller, later phase). `price_points`
- * and `overage_rate_points` are whole ADD Points — a cardinal quantity, cast
- * as integers rather than the decimal cast used for the old dollar columns.
+ * Public catalog (two-tier Admin/Public controller, later phase).
+ * `price_points` is whole ADD Points — a cardinal quantity, cast as an
+ * integer rather than the decimal cast used for the old dollar columns.
  *
  * `access_window_start`/`access_window_end` are plain `H:i` strings, not a
  * Carbon cast — see the migration for why. They are deliberately NOT compared
@@ -35,7 +35,6 @@ class Plan extends Model
         'subtitle',
         'is_subscription',
         'price_points',
-        'overage_rate_points',
         'duration_days',
         'included_hours',
         'access_window_start',
@@ -53,7 +52,6 @@ class Plan extends Model
             'is_subscription' => 'boolean',
             'price_points' => 'integer',
             'included_hours' => 'decimal:2',
-            'overage_rate_points' => 'integer',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
         ];
