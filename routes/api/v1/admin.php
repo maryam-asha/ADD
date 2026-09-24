@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
+use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
@@ -312,6 +313,11 @@ Route::get('users/{user}', [UserController::class, 'show']);
 
 // Narrower than the group above: creating, mutating accounts, and managing roles is admin-only
 Route::middleware('role:admin')->group(function () {
+    // Activating a plan for someone with no wallet debit is a money-adjacent
+    // grant, so it sits with the other admin-only actions rather than in the
+    // shared admin|operations block above.
+    Route::post('memberships', [MembershipController::class, 'store']);
+
     Route::post('users', [UserController::class, 'store']);
     Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update']);
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);

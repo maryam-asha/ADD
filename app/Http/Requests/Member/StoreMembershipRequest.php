@@ -59,6 +59,16 @@ class StoreMembershipRequest extends FormRequest
                     'This plan is no longer available.'
                 );
             }
+
+            // A private plan is assigned by operations from the dashboard, never
+            // bought. Nobody can browse to one, so this is a defensive guard
+            // against a hand-crafted plan_id rather than a reachable flow.
+            if (! $plan->is_public) {
+                $validator->errors()->add(
+                    'plan_id',
+                    'This plan is not available for purchase.'
+                );
+            }
         });
     }
 }

@@ -66,7 +66,7 @@ class KioskController extends Controller
     private function activePlans(): array
     {
         return Plan::query()
-            ->where('is_active', true)
+            ->publiclyListable()
             ->orderBy('order')
             ->get()
             ->map(fn (Plan $plan) => [

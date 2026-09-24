@@ -36,6 +36,17 @@ class PointPricingTest extends TestCase
             ->assertJsonPath('data.0.currency', 'USD');
     }
 
+    public function test_a_private_plan_is_absent_from_the_public_plan_list(): void
+    {
+        $public = Plan::factory()->create(['price_points' => 500]);
+        Plan::factory()->private()->create(['price_points' => 900]);
+
+        $response = $this->getJson('/api/v1/plans');
+
+        $response->assertOk()->assertJsonCount(1, 'data');
+        $this->assertSame($public->id, $response->json('data.0.id'));
+    }
+
     public function test_the_currency_header_changes_display_but_not_the_stored_points(): void
     {
         ExchangeRate::factory()->create([

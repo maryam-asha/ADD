@@ -52,7 +52,7 @@ class WalkInCapacityServiceTest extends TestCase
         $space = $this->openSpace(2);
         $member = User::factory()->create();
 
-        $session = $this->capacity->start($space, $member);
+        $session = $this->capacity->start($space, $member)->session;
 
         $this->assertInstanceOf(WalkinSession::class, $session);
         $this->assertTrue($session->checked_in_at->equalTo(now()));
@@ -65,7 +65,7 @@ class WalkInCapacityServiceTest extends TestCase
         $space = $this->openSpace(null);
 
         $this->capacity->start($space, User::factory()->create());
-        $second = $this->capacity->start($space, User::factory()->create());
+        $second = $this->capacity->start($space, User::factory()->create())->session;
 
         $this->assertInstanceOf(WalkinSession::class, $second);
     }
@@ -113,7 +113,7 @@ class WalkInCapacityServiceTest extends TestCase
             'checked_out_at' => now()->subMinutes(10),
         ]);
 
-        $session = $this->capacity->start($space, User::factory()->create());
+        $session = $this->capacity->start($space, User::factory()->create())->session;
 
         $this->assertInstanceOf(WalkinSession::class, $session);
     }

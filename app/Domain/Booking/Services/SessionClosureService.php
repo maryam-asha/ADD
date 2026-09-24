@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
@@ -12,6 +13,7 @@ use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -24,6 +26,7 @@ class SessionClosureService
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
+        private readonly PlanHourCoverageService $planHours,
     ) {}
 
     /**
@@ -131,14 +134,24 @@ class SessionClosureService
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
+        $coveredSeconds = $this->consumePlanCoverage($session, $checkedOutAt);
+
         // `amount_owed`/`currency` are the session's money-denominated record
         // of the charge and remain decimal USD — only the wallet ledger became
         // point-denominated. Converting the point charge back to USD here is
         // the intended direction, not leftover scaffolding.
-        $points = $this->amounts->forRange($session->space, $session->checked_in_at, $checkedOutAt);
+        $points = $this->amounts->forRange(
+            $session->space,
+            $session->checked_in_at,
+            // Bill only what the plan did not absorb. Shortening the range by
+            // the covered seconds, rather than pricing the whole thing and
+            // subtracting, keeps AmountCalculator's documented ceil-to-whole-
+            // points rounding (Invariant 2) applied once to the real charge.
+            $coveredSeconds > 0 ? $checkedOutAt->copy()->subSeconds($coveredSeconds) : $checkedOutAt,
+        );
         $amount = $this->points->pointsToUsd($points);
 
-        $session->forceFill([
+        $attributes = [
             // Normalize to UTC: Eloquent's datetime cast stores the Carbon value's
             // current wall-clock as-is and reinterprets it as UTC on read, so
             // non-UTC inputs (e.g. from autoClose()'s Damascus-timezone closing time)
@@ -148,7 +161,52 @@ class SessionClosureService
             'termination_source' => $source,
             'amount_owed' => $amount,
             'currency' => 'USD',
-        ])->save();
+        ];
+
+        if ($session instanceof WalkinSession && $coveredSeconds > 0) {
+            $attributes['plan_covered_seconds'] = $coveredSeconds;
+
+            // Only a session the plan covered in FULL is settled here. A
+            // partly covered one still owes money and stays Unpaid, to be
+            // collected through settlePayment() like any other walk-in.
+            if (bccomp((string) $amount, '0.00', 2) <= 0) {
+                $attributes['payment_state'] = PaymentState::Paid;
+                $attributes['payment_source'] = PaymentSource::Plan;
+                $attributes['paid_at'] = now();
+            }
+        }
+
+        $session->forceFill($attributes)->save();
+    }
+
+    /**
+     * Spends whatever of this session falls inside the member's plan access
+     * window against their remaining hour quota, and returns the seconds
+     * actually absorbed.
+     *
+     * Bookings are excluded on purpose: they already have their own plan
+     * benefit in PlanDiscountService, applied at creation, and stacking the
+     * two would discount the same hour twice.
+     */
+    private function consumePlanCoverage(Booking|WalkinSession $session, CarbonInterface $checkedOutAt): int
+    {
+        if (! $session instanceof WalkinSession || $session->membership_id === null) {
+            return 0;
+        }
+
+        $membership = $session->membership;
+
+        if ($membership === null) {
+            return 0;
+        }
+
+        $coverable = $this->planHours->coverableSeconds($membership, $session->checked_in_at, $checkedOutAt);
+
+        if ($coverable <= 0) {
+            return 0;
+        }
+
+        return $this->planHours->consume($membership, $session, $coverable);
     }
 
     private function localTimeOfDay(CarbonInterface $instant): string

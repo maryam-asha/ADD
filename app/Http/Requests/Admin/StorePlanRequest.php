@@ -8,6 +8,13 @@ use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * `access_window_start`/`access_window_end` are validated as a pair, but
+ * deliberately WITHOUT StoreBusinessHourRequest's "end must be after start"
+ * rule: a plan window is allowed to wrap past midnight (20:00-00:00 is the
+ * evening package this was built for), so an end at or before the start is
+ * meaningful here rather than an error.
+ */
 class StorePlanRequest extends FormRequest
 {
     public function authorize(): bool
@@ -30,7 +37,10 @@ class StorePlanRequest extends FormRequest
                 'duration_days' => ['required', 'integer', 'min:1'],
                 'included_hours' => ['required', 'numeric', 'min:0'],
                 'overage_rate_points' => ['nullable', 'integer', 'min:0'],
+                'access_window_start' => ['nullable', 'date_format:H:i', 'required_with:access_window_end'],
+                'access_window_end' => ['nullable', 'date_format:H:i', 'required_with:access_window_start'],
                 'is_active' => ['nullable', 'boolean'],
+                'is_public' => ['nullable', 'boolean'],
                 'order' => ['nullable', 'integer', 'min:0'],
 
                 'balances' => ['nullable', 'array'],

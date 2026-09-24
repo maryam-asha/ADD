@@ -24,7 +24,10 @@ class EnumsTest extends TestCase
 
     public function test_payment_source_cases(): void
     {
-        $this->assertSame(['wallet', 'cash'], array_column(PaymentSource::cases(), 'value'));
+        // `plan` marks a walk-in absorbed in full by the member's plan access
+        // window, where nothing was collected at all
+        // (docs/decisions/plan-access-windows.md).
+        $this->assertSame(['wallet', 'cash', 'plan'], array_column(PaymentSource::cases(), 'value'));
     }
 
     public function test_termination_source_cases(): void

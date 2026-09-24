@@ -8,6 +8,7 @@ use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,8 +20,10 @@ class WalkinSession extends Model
     protected $fillable = [
         'space_id',
         'user_id',
+        'membership_id',
         'checked_in_at',
         'checked_out_at',
+        'plan_covered_seconds',
         'payment_state',
         'payment_source',
         'termination_source',
@@ -40,6 +43,7 @@ class WalkinSession extends Model
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
             'amount_owed' => 'decimal:2',
+            'plan_covered_seconds' => 'integer',
             'payment_method' => PaymentMethod::class,
             'paid_at' => 'datetime',
         ];
@@ -53,5 +57,16 @@ class WalkinSession extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The membership in force when this session started, stamped at check-in
+     * so a later change to the member's subscription cannot rewrite an
+     * already-running session's bill. Null for a walk-in by someone with no
+     * active membership — the ordinary case.
+     */
+    public function membership(): BelongsTo
+    {
+        return $this->belongsTo(Membership::class);
     }
 }

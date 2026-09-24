@@ -64,6 +64,18 @@ class KioskControllerTest extends TestCase
         $response->assertJsonPath('plans.0.price_points', $plan->price_points);
     }
 
+    public function test_a_private_plan_never_reaches_the_unauthenticated_kiosk(): void
+    {
+        $public = Plan::factory()->create(['order' => 1]);
+        Plan::factory()->private()->create(['order' => 2]);
+
+        $response = $this->getJson('/api/v1/public/kiosk');
+
+        $response->assertOk();
+        $response->assertJsonCount(1, 'plans');
+        $response->assertJsonPath('plans.0.id', $public->id);
+    }
+
     public function test_plans_name_resolves_to_one_string_for_the_current_locale_not_the_ar_en_object(): void
     {
         Plan::factory()->create(['is_active' => true, 'name' => ['ar' => 'خطة شهرية', 'en' => 'Monthly plan']]);
