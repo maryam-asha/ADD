@@ -126,7 +126,14 @@ class EventRegistrationService
             $pricePoints = (int) ($lockedEvent->price_points ?? 0);
             $pointsDeducted = 0;
 
-            if ($status === EventRegistrationStatus::Approved && ! $isFree && $pricePoints > 0) {
+            // TEMPORARY (config/events.php → EVENT_SKIP_BALANCE_CHECK): skips
+            // the debit outright for testing, so a member registers for a paid
+            // event without being charged and without a balance check. The
+            // debit and the check are one operation, so neither survives alone.
+            // Must be false in production — see the config note.
+            $skipDebit = (bool) config('events.skip_balance_check', false);
+
+            if ($status === EventRegistrationStatus::Approved && ! $isFree && $pricePoints > 0 && ! $skipDebit) {
                 $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
 
                 $eventTitle = is_array($lockedEvent->title)
