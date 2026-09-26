@@ -3,7 +3,8 @@
 namespace Tests\Feature\Experience;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationField;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Support\Forms\FieldType;
 use Database\Seeders\RoleSeeder;
@@ -68,7 +69,7 @@ class EventFormSourceIsExclusiveTest extends TestCase
             ->assertStatus(422)
             ->assertJsonValidationErrors('key');
 
-        $this->assertSame(0, $event->registrationFields()->count());
+        $this->assertSame(0, ($event->registrationForm?->fields()->count() ?? 0));
     }
 
     // ── Pointing a questioned event at an external form ──────────────────
@@ -76,7 +77,7 @@ class EventFormSourceIsExclusiveTest extends TestCase
     public function test_an_event_with_questions_cannot_be_pointed_at_an_external_form(): void
     {
         $event = Event::factory()->create();
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'notes',
             'type' => FieldType::Text,
         ]);
@@ -118,7 +119,7 @@ class EventFormSourceIsExclusiveTest extends TestCase
     public function test_removing_the_last_question_frees_the_event_for_an_external_form(): void
     {
         $event = Event::factory()->create();
-        $field = EventRegistrationField::factory()->for($event)->create([
+        $field = FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'notes',
             'type' => FieldType::Text,
         ]);
@@ -140,7 +141,7 @@ class EventFormSourceIsExclusiveTest extends TestCase
     public function test_a_hidden_question_still_blocks_an_external_form(): void
     {
         $event = Event::factory()->create();
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'notes',
             'type' => FieldType::Text,
             'is_active' => false,

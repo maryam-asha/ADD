@@ -4,7 +4,8 @@ namespace Tests\Feature\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationField;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
@@ -73,7 +74,7 @@ class EventRegistrationFormTest extends TestCase
                 ->assertJsonValidationErrors('key');
         }
 
-        $this->assertSame(0, EventRegistrationField::count());
+        $this->assertSame(0, FormField::count());
     }
 
     public function test_a_key_that_would_break_rule_paths_is_refused(): void
@@ -113,13 +114,13 @@ class EventRegistrationFormTest extends TestCase
     {
         $eventA = Event::factory()->create();
         $eventB = Event::factory()->create();
-        $field = EventRegistrationField::factory()->create(['event_id' => $eventB->id]);
+        $field = FormField::factory()->forOwner($eventB, FormPurpose::Registration)->create();
 
         Sanctum::actingAs($this->admin(), ['*']);
         $this->deleteJson("/api/v1/admin/events/{$eventA->id}/registration-fields/{$field->id}")
             ->assertStatus(404);
 
-        $this->assertDatabaseHas('event_registration_fields', ['id' => $field->id]);
+        $this->assertDatabaseHas('form_fields', ['id' => $field->id]);
     }
 
     // ── Fetching the form ────────────────────────────────────────────────────
@@ -127,8 +128,8 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_member_gets_the_registration_form_questions(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
-        EventRegistrationField::factory()->inactive()->create(['event_id' => $event->id, 'key' => 'retired']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'company']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->inactive()->create(['key' => 'retired']);
 
         $user = $this->member();
         Sanctum::actingAs($user, ['*']);
@@ -146,7 +147,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_the_public_form_carries_registration_form(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'company']);
 
         $response = $this->getJson("/api/v1/events/{$event->id}/registration-form");
 
@@ -188,8 +189,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_missing_required_answer_is_refused(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->required()->create([
-            'event_id' => $event->id,
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->required()->create([
             'key' => 'company',
         ]);
 
@@ -204,8 +204,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_select_answer_outside_its_choices_is_refused(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->select(['small', 'large'])->create([
-            'event_id' => $event->id,
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->select(['small', 'large'])->create([
             'key' => 'size',
         ]);
 
@@ -219,8 +218,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_checkbox_answer_with_an_invalid_element_is_refused(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->checkbox(['ai', 'iot'])->create([
-            'event_id' => $event->id,
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->checkbox(['ai', 'iot'])->create([
             'key' => 'topics',
         ]);
 
@@ -233,7 +231,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_submitting_an_identity_key_is_refused_and_never_overwrites_the_account(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'company']);
 
         $user = $this->member();
         Sanctum::actingAs($user, ['*']);
@@ -259,9 +257,9 @@ class EventRegistrationFormTest extends TestCase
     {
         $event = Event::factory()->withForm()->create();
 
-        $text = EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
-        $select = EventRegistrationField::factory()->select(['s', 'm'])->create(['event_id' => $event->id, 'key' => 'size']);
-        $rating = EventRegistrationField::factory()->ofType(FieldType::Rating)->create(['event_id' => $event->id, 'key' => 'stars']);
+        $text = FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'company']);
+        $select = FormField::factory()->forOwner($event, FormPurpose::Registration)->select(['s', 'm'])->create(['key' => 'size']);
+        $rating = FormField::factory()->forOwner($event, FormPurpose::Registration)->ofType(FieldType::Rating)->create(['key' => 'stars']);
 
         Sanctum::actingAs($this->member(), ['*']);
         $this->postJson("/api/v1/member/events/{$event->id}/register", [
@@ -269,7 +267,7 @@ class EventRegistrationFormTest extends TestCase
         ])->assertCreated();
 
         $attendee = EventAttendee::firstOrFail();
-        $values = $attendee->values()->with('field')->get()->keyBy(fn ($v) => $v->field->key);
+        $values = $attendee->formAnswers()->with('field')->get()->keyBy(fn ($v) => $v->field->key);
 
         $this->assertSame('ACME', $values['company']->value_text);
         $this->assertNull($values['company']->value_json);
@@ -278,9 +276,9 @@ class EventRegistrationFormTest extends TestCase
         $this->assertSame('m', $values['size']->resolvedValue());
         $this->assertSame(4, $values['stars']->resolvedValue());
 
-        $this->assertSame($text->id, $values['company']->event_registration_field_id);
-        $this->assertSame($select->id, $values['size']->event_registration_field_id);
-        $this->assertSame($rating->id, $values['stars']->event_registration_field_id);
+        $this->assertSame($text->id, $values['company']->form_field_id);
+        $this->assertSame($select->id, $values['size']->form_field_id);
+        $this->assertSame($rating->id, $values['stars']->form_field_id);
     }
 
     public function test_an_uploaded_answer_is_stored_and_referenced_by_path(): void
@@ -288,8 +286,7 @@ class EventRegistrationFormTest extends TestCase
         Storage::fake('public');
 
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->ofType(FieldType::File)->create([
-            'event_id' => $event->id,
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->ofType(FieldType::File)->create([
             'key' => 'cv',
             'validation' => ['accept' => '.pdf', 'max_kb' => 2048],
         ]);
@@ -299,7 +296,7 @@ class EventRegistrationFormTest extends TestCase
             'fields' => ['cv' => UploadedFile::fake()->create('cv.pdf', 100, 'application/pdf')],
         ])->assertCreated();
 
-        $value = EventAttendee::firstOrFail()->values()->firstOrFail();
+        $value = EventAttendee::firstOrFail()->formAnswers()->firstOrFail();
 
         $this->assertNotNull($value->value_file);
         $this->assertNull($value->value_text);
@@ -311,8 +308,7 @@ class EventRegistrationFormTest extends TestCase
         Storage::fake('public');
 
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->ofType(FieldType::File)->create([
-            'event_id' => $event->id,
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->ofType(FieldType::File)->create([
             'key' => 'cv',
             'validation' => ['max_kb' => 10],
         ]);
@@ -336,7 +332,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_the_admin_roster_shows_what_each_member_answered(): void
     {
         $event = Event::factory()->withForm()->create();
-        EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'company']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'company']);
 
         Sanctum::actingAs($this->member(), ['*']);
         $this->postJson("/api/v1/member/events/{$event->id}/register", [
@@ -359,7 +355,7 @@ class EventRegistrationFormTest extends TestCase
 
         $this->expectException(\RuntimeException::class);
 
-        EventRegistrationField::factory()->create(['event_id' => $event->id, 'key' => 'email']);
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create(['key' => 'email']);
     }
 
     // ── Constraints reach the member, and name themselves ─────────────────
@@ -367,7 +363,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_text_answer_over_its_character_limit_is_refused(): void
     {
         $event = Event::factory()->create(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'bio', 'type' => FieldType::Text, 'validation' => ['max' => 10],
         ]);
 
@@ -381,7 +377,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_date_answer_outside_the_allowed_range_is_refused(): void
     {
         $event = Event::factory()->create(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'arrival',
             'type' => FieldType::Date,
             'validation' => ['min_date' => '2026-06-01', 'max_date' => '2026-06-30'],
@@ -400,7 +396,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_date_answer_inside_the_range_is_accepted(): void
     {
         $event = Event::factory()->create(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'arrival',
             'type' => FieldType::Date,
             'validation' => ['min_date' => '2026-06-01', 'max_date' => '2026-06-30'],
@@ -416,7 +412,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_checkbox_under_its_minimum_selection_count_is_refused(): void
     {
         $event = Event::factory()->create(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'topics',
             'type' => FieldType::Checkbox,
             'options' => [
@@ -441,7 +437,7 @@ class EventRegistrationFormTest extends TestCase
     public function test_a_failure_names_the_question_in_the_members_language(): void
     {
         $event = Event::factory()->create(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'dietary_needs',
             'label' => ['en' => 'Dietary needs', 'ar' => 'الاحتياجات الغذائية'],
             'type' => FieldType::Text,

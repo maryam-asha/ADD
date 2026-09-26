@@ -54,7 +54,7 @@ class AdminServiceRequestController extends Controller
      */
     public function show(ServiceRequest $serviceRequest): ServiceRequestResource
     {
-        $serviceRequest->load('serviceType', 'user', 'branch', 'space', 'values.field');
+        $serviceRequest->load('serviceType', 'user', 'branch', 'space', 'formAnswers.field');
 
         return new ServiceRequestResource($serviceRequest);
     }
@@ -69,7 +69,7 @@ class AdminServiceRequestController extends Controller
     ): JsonResponse {
         $this->requestService->updateStatus(
             serviceRequest: $serviceRequest,
-            newStatus:      RequestStatus::from($request->validated('status')),
+            newStatus: RequestStatus::from($request->validated('status')),
             resolutionNote: $request->validated('resolution_note'),
         );
 

@@ -39,7 +39,8 @@ class RegistrationSourceIsExclusive implements ValidationRule
             return;
         }
 
-        $questions = $this->event->registrationFields()->count();
+        // Hidden questions count too: they are still the event's own form.
+        $questions = $this->event->registrationForm?->fields()->count() ?? 0;
 
         if ($questions > 0) {
             $fail(__('api.event.form_is_internal', ['count' => $questions]));

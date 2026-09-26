@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Http\Resources\Forms\FormAnswerResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -32,11 +33,7 @@ class EventAttendeeResource extends JsonResource
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
             'registered_at' => $this->created_at?->toISOString(),
-            'answers' => $this->whenLoaded('values', fn () => $this->values->map(fn ($value) => [
-                'field_key' => $value->field?->key,
-                'label' => $value->field?->translate('label'),
-                'value' => $value->resolvedValue(),
-            ])->values()),
+            'answers' => FormAnswerResource::collection($this->whenLoaded('formAnswers')),
         ];
     }
 }

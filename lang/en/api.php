@@ -279,6 +279,13 @@ return [
         'cash_register_already_closed' => 'This cash register session is already closed.',
     ],
 
+    // The shared form-field editor (AdminFormFieldController), for every
+    // form owner — events, service types, and whatever owns a form next.
+    'forms' => [
+        'field_updated' => 'Field updated.',
+        'field_deleted' => 'Field deleted.',
+    ],
+
     'payment' => [
         // Shown to the member. Never mentions the gateway's own fault
         // conditions (a rejected key, an unregistered server IP) — those are

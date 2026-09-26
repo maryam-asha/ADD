@@ -174,7 +174,7 @@ class ServiceCatalogService
                     ->orWhere('visibility', 'both');
             })
             ->accessibleByModules($moduleIds)
-            ->with('activeFields')
+            ->with('requestForm.activeFields')
             ->first();
     }
 
@@ -193,7 +193,7 @@ class ServiceCatalogService
                     ->orWhere('visibility', 'both');
             })
             ->accessibleByModules($moduleIds)
-            ->with('activeFields')
+            ->with('requestForm.activeFields')
             ->first();
     }
 

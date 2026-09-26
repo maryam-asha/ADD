@@ -59,7 +59,7 @@ class MemberServiceRequestController extends Controller
             return response()->json(['message' => __('api.services.request_not_found')], 404);
         }
 
-        $serviceRequest->load('serviceType.axis', 'values.field');
+        $serviceRequest->load('serviceType.axis', 'formAnswers.field');
 
         return new MemberServiceRequestResource($serviceRequest);
     }

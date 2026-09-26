@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Services;
 
 use App\Domain\Services\Models\ServiceRequest;
+use App\Http\Resources\Forms\FormAnswerResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,12 +31,7 @@ class ServiceRequestResource extends JsonResource
                 $this->resolution_note !== null,
                 fn () => $this->translate('resolution_note'),
             ),
-            'values' => $this->when($this->relationLoaded('values'), function () {
-                return $this->values->map(fn ($v) => [
-                    'field_key' => $v->field?->key,
-                    'value' => $v->resolvedValue(),
-                ]);
-            }),
+            'values' => FormAnswerResource::collection($this->whenLoaded('formAnswers')),
             'submitted_at' => $this->submitted_at?->toIso8601String(),
             'processed_at' => $this->processed_at?->toIso8601String(),
             'updated_at' => $this->updated_at?->toIso8601String(),

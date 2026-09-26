@@ -4,8 +4,9 @@ namespace Tests\Feature\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationField;
 use App\Domain\Experience\Models\EventSession;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
@@ -101,7 +102,7 @@ class MemberEventJourneyTest extends TestCase
     {
         $plain = $this->published();
         $asking = $this->published(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($asking)->create([
+        FormField::factory()->forOwner($asking, FormPurpose::Registration)->create([
             'key' => 'dietary_needs',
             'type' => FieldType::Text,
         ]);
@@ -229,7 +230,7 @@ class MemberEventJourneyTest extends TestCase
     public function test_the_form_carries_the_questions_and_the_members_own_details(): void
     {
         $event = $this->published(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'dietary_needs',
             'label' => ['en' => 'Dietary needs', 'ar' => 'الاحتياجات الغذائية'],
             'type' => FieldType::Text,
@@ -268,7 +269,7 @@ class MemberEventJourneyTest extends TestCase
     public function test_a_member_registers_by_answering_the_form(): void
     {
         $event = $this->published(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'dietary_needs',
             'type' => FieldType::Text,
             'is_required' => true,
@@ -308,7 +309,7 @@ class MemberEventJourneyTest extends TestCase
     public function test_a_missing_required_answer_is_refused(): void
     {
         $event = $this->published(['has_registration_form' => true]);
-        EventRegistrationField::factory()->for($event)->create([
+        FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'dietary_needs',
             'type' => FieldType::Text,
             'is_required' => true,

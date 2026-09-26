@@ -2,11 +2,12 @@
 
 namespace Tests\Feature\Services;
 
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceRequest;
 use App\Domain\Services\Models\ServiceType;
-use App\Domain\Services\Models\ServiceTypeField;
 use App\Support\Forms\FieldType;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -58,10 +59,10 @@ class ServiceRequestValidationTest extends TestCase
     /**
      * @param  array<string, mixed>  $attributes
      */
-    private function field(ServiceType $type, array $attributes): ServiceTypeField
+    private function field(ServiceType $type, array $attributes): FormField
     {
-        return ServiceTypeField::create(array_merge([
-            'service_type_id' => $type->id,
+        return FormField::create(array_merge([
+            'form_id' => $type->formOrCreate(FormPurpose::Request)->id,
             'label' => ['en' => 'Question', 'ar' => 'سؤال'],
             'type' => FieldType::Text,
             'is_required' => false,
@@ -122,8 +123,8 @@ class ServiceRequestValidationTest extends TestCase
             'fields' => ['description' => 'The air conditioning is leaking.'],
         ])->assertCreated();
 
-        $request = ServiceRequest::with('values')->firstOrFail();
-        $this->assertSame('The air conditioning is leaking.', $request->values->first()->resolvedValue());
+        $request = ServiceRequest::with('formAnswers')->firstOrFail();
+        $this->assertSame('The air conditioning is leaking.', $request->formAnswers->first()->resolvedValue());
     }
 
     public function test_an_inactive_field_is_neither_shown_nor_required(): void
@@ -158,7 +159,7 @@ class ServiceRequestValidationTest extends TestCase
             ])->assertStatus(422)->assertJsonValidationErrors('key');
         }
 
-        $this->assertSame(0, ServiceTypeField::where('service_type_id', $type->id)->count());
+        $this->assertSame(0, $type->requestForm?->fields()->count() ?? 0);
     }
 
     public function test_a_service_field_key_that_would_break_rule_paths_is_refused(): void

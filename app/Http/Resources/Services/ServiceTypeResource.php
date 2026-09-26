@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Services;
 
 use App\Domain\Services\Models\ServiceType;
+use App\Http\Resources\Forms\FormFieldResource;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -30,10 +31,16 @@ class ServiceTypeResource extends JsonResource
                 'name' => $this->axis->translate('name', $locale),
                 'color' => $this->axis->color,
             ]),
-            // Form fields: only included when viewing single service details (activeFields loaded)
-            'registration_form' => ServiceTypeFieldResource::collection($this->whenLoaded('activeFields')),
-            'fields' => ServiceTypeFieldResource::collection($this->whenLoaded('activeFields')),
+            // Form fields: only on the single-service views, which load the
+            // request form. `[]` when the type asks nothing.
+            'registration_form' => $this->whenLoaded('requestForm', fn () => $this->formFields()),
+            'fields' => $this->whenLoaded('requestForm', fn () => $this->formFields()),
         ];
+    }
+
+    private function formFields(): mixed
+    {
+        return FormFieldResource::collection($this->requestForm?->activeFields ?? collect());
     }
 
     private function computedStatus(): string

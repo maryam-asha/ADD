@@ -2,10 +2,11 @@
 
 namespace Tests\Feature\Services;
 
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceType;
-use App\Domain\Services\Models\ServiceTypeField;
 use App\Support\Forms\FieldType;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,8 +53,10 @@ class MemberServiceUnifiedContractTest extends TestCase
             'order' => 1,
         ], $typeOverrides));
 
-        $field1 = ServiceTypeField::create([
-            'service_type_id' => $service->id,
+        $form = $service->formOrCreate(FormPurpose::Request);
+
+        $field1 = FormField::create([
+            'form_id' => $form->id,
             'key' => 'room_number',
             'label' => ['en' => 'Room / Desk Number', 'ar' => 'رقم الغرفة أو المكتب'],
             'placeholder' => ['en' => 'e.g. Room 204', 'ar' => 'مثال: غرفة 204'],
@@ -64,8 +67,8 @@ class MemberServiceUnifiedContractTest extends TestCase
             'order' => 1,
         ]);
 
-        $field2 = ServiceTypeField::create([
-            'service_type_id' => $service->id,
+        $field2 = FormField::create([
+            'form_id' => $form->id,
             'key' => 'cleaning_type',
             'label' => ['en' => 'Cleaning Type', 'ar' => 'نوع التنظيف'],
             'placeholder' => ['en' => 'Select type', 'ar' => 'اختر النوع'],

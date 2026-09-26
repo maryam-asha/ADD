@@ -3,7 +3,8 @@
 namespace Tests\Feature\Admin;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationField;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceType;
@@ -227,7 +228,7 @@ class FormFieldValidationVocabularyTest extends TestCase
     public function test_a_patch_without_a_type_validates_against_the_stored_one(): void
     {
         $event = Event::factory()->create();
-        $field = EventRegistrationField::factory()->for($event)->create([
+        $field = FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'notes',
             'type' => FieldType::Text,
         ]);
@@ -245,7 +246,7 @@ class FormFieldValidationVocabularyTest extends TestCase
     public function test_a_patch_omitting_validation_leaves_it_intact(): void
     {
         $event = Event::factory()->create();
-        $field = EventRegistrationField::factory()->for($event)->create([
+        $field = FormField::factory()->forOwner($event, FormPurpose::Registration)->create([
             'key' => 'notes',
             'type' => FieldType::Text,
             'validation' => ['max' => 500],

@@ -6,8 +6,8 @@ use App\Domain\Services\Services\ServiceCatalogService;
 use App\Domain\Services\Services\ServiceRequestService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Services\StoreServiceRequestRequest;
+use App\Http\Resources\Forms\FormFieldResource;
 use App\Http\Resources\Services\ServiceAxisResource;
-use App\Http\Resources\Services\ServiceTypeFieldResource;
 use App\Http\Resources\Services\ServiceTypeResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -121,7 +121,7 @@ class MemberServiceController extends Controller
             'data' => [
                 'external_form_url' => null,
                 'request_method' => $serviceType->request_method->value,
-                'registration_form' => ServiceTypeFieldResource::collection($serviceType->activeFields),
+                'registration_form' => FormFieldResource::collection($serviceType->requestForm?->activeFields ?? collect()),
             ],
         ]);
     }
@@ -148,7 +148,7 @@ class MemberServiceController extends Controller
         $this->requestService->submit(
             type: $serviceType,
             member: $request->user(),
-            fieldValues: $request->input('fields', []),
+            fieldValues: $request->formFieldValues(),
             branchId: $request->input('branch_id'),
             spaceId: $request->input('space_id'),
             locationSource: $request->locationSource(),

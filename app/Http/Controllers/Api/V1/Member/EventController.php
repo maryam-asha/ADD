@@ -7,7 +7,7 @@ use App\Domain\Experience\Services\EventBrowseService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Experience\RegisterForEventRequest;
 use App\Http\Requests\Public\BrowseEventsRequest;
-use App\Http\Resources\Experience\EventRegistrationFieldResource;
+use App\Http\Resources\Forms\FormFieldResource;
 use App\Services\Experience\EventRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -79,7 +79,7 @@ class EventController extends Controller
     ): JsonResponse {
         $event = Event::findOrFail($id);
 
-        $result = $registrationService->register($event, $request->user(), $request->fieldValues());
+        $result = $registrationService->register($event, $request->user(), $request->formFieldValues());
 
         return response()->json(['data' => $result], 201);
     }
@@ -94,7 +94,7 @@ class EventController extends Controller
      */
     public function registrationForm(Request $request, int|string $id): JsonResponse
     {
-        $event = Event::with('activeRegistrationFields')->findOrFail($id);
+        $event = Event::with('registrationForm.activeFields')->findOrFail($id);
 
         if ($event->registersExternally()) {
             return response()->json([
@@ -107,7 +107,7 @@ class EventController extends Controller
         return response()->json([
             'data' => [
                 'external_form_url' => null,
-                'registration_form' => EventRegistrationFieldResource::collection($event->activeRegistrationFields),
+                'registration_form' => FormFieldResource::collection($event->registrationForm?->activeFields ?? collect()),
             ],
         ]);
     }

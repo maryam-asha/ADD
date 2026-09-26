@@ -2,10 +2,11 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Services\Enums\RequestMethod;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceType;
-use App\Domain\Services\Models\ServiceTypeField;
 use Illuminate\Database\Seeder;
 
 /**
@@ -56,8 +57,8 @@ class ServiceAxisSeeder extends Seeder
         );
 
         // General service form fields
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $general->id, 'key' => 'description'],
+        FormField::updateOrCreate(
+            ['form_id' => $general->formOrCreate(FormPurpose::Request)->id, 'key' => 'description'],
             [
                 'label' => ['en' => 'Description', 'ar' => 'الوصف'],
                 'placeholder' => ['en' => 'Describe your request…', 'ar' => 'اكتب تفاصيل طلبك…'],
@@ -68,8 +69,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $general->id, 'key' => 'attachments'],
+        FormField::updateOrCreate(
+            ['form_id' => $general->formOrCreate(FormPurpose::Request)->id, 'key' => 'attachments'],
             [
                 'label' => ['en' => 'Add files or photos', 'ar' => 'أضف ملفات أو صور'],
                 'placeholder' => null,
@@ -99,8 +100,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $technical->id, 'key' => 'issue_type'],
+        FormField::updateOrCreate(
+            ['form_id' => $technical->formOrCreate(FormPurpose::Request)->id, 'key' => 'issue_type'],
             [
                 'label' => ['en' => 'Issue Type', 'ar' => 'نوع المشكلة'],
                 'placeholder' => null,
@@ -118,8 +119,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $technical->id, 'key' => 'description'],
+        FormField::updateOrCreate(
+            ['form_id' => $technical->formOrCreate(FormPurpose::Request)->id, 'key' => 'description'],
             [
                 'label' => ['en' => 'Description', 'ar' => 'الوصف'],
                 'placeholder' => ['en' => 'Describe the problem…', 'ar' => 'اوصف المشكلة…'],
@@ -149,8 +150,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $businessAddress->id, 'key' => 'company_name'],
+        FormField::updateOrCreate(
+            ['form_id' => $businessAddress->formOrCreate(FormPurpose::Request)->id, 'key' => 'company_name'],
             [
                 'label' => ['en' => 'Registered Company Name', 'ar' => 'الاسم التجاري المسجل للشركة'],
                 'placeholder' => ['en' => 'e.g. Aleppo Tech Solutions', 'ar' => 'مثال: شركة حلب للحلول التقنية'],
@@ -161,8 +162,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $businessAddress->id, 'key' => 'commercial_registry'],
+        FormField::updateOrCreate(
+            ['form_id' => $businessAddress->formOrCreate(FormPurpose::Request)->id, 'key' => 'commercial_registry'],
             [
                 'label' => ['en' => 'Commercial Registry Number', 'ar' => 'رقم السجل التجاري (إن وجد)'],
                 'placeholder' => ['en' => 'e.g. 12345/A', 'ar' => 'مثال: 12345/أ'],
@@ -214,8 +215,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $mentorship->id, 'key' => 'advisory_domain'],
+        FormField::updateOrCreate(
+            ['form_id' => $mentorship->formOrCreate(FormPurpose::Request)->id, 'key' => 'advisory_domain'],
             [
                 'label' => ['en' => 'Advisory Domain', 'ar' => 'مجال الاستشارة المطلوب'],
                 'placeholder' => ['en' => 'Select domain', 'ar' => 'اختر المجال'],
@@ -231,8 +232,8 @@ class ServiceAxisSeeder extends Seeder
             ]
         );
 
-        ServiceTypeField::updateOrCreate(
-            ['service_type_id' => $mentorship->id, 'key' => 'session_goals'],
+        FormField::updateOrCreate(
+            ['form_id' => $mentorship->formOrCreate(FormPurpose::Request)->id, 'key' => 'session_goals'],
             [
                 'label' => ['en' => 'Session Objectives & Discussion Points', 'ar' => 'أهداف الجلسة وأبرز النقاط المراد نقاشها'],
                 'placeholder' => ['en' => 'Briefly describe what you want to achieve from this session...', 'ar' => 'اشرح باختصار ما ترغب بتحقيقه من هذه الجلسة...'],

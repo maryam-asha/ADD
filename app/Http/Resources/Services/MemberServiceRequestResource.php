@@ -3,6 +3,7 @@
 namespace App\Http\Resources\Services;
 
 use App\Domain\Services\Models\ServiceRequest;
+use App\Http\Resources\Forms\FormAnswerResource;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonInterface;
 use Illuminate\Http\Request;
@@ -35,11 +36,7 @@ class MemberServiceRequestResource extends JsonResource
             ),
             'submitted_at' => $this->moment($this->submitted_at),
             'processed_at' => $this->moment($this->processed_at),
-            'values' => $this->whenLoaded('values', fn () => $this->values->map(fn ($v) => [
-                'field_key' => $v->field?->key,
-                'label' => $v->field?->fieldLabel(),
-                'value' => $v->resolvedValue(),
-            ])->values()),
+            'values' => FormAnswerResource::collection($this->whenLoaded('formAnswers')),
         ];
     }
 

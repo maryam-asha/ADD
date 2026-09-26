@@ -2,13 +2,14 @@
 
 namespace Tests\Feature\Services;
 
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
+use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Enums\RequestStatus;
 use App\Domain\Services\Models\ServiceAxis;
 use App\Domain\Services\Models\ServiceRequest;
-use App\Domain\Services\Models\ServiceRequestValue;
 use App\Domain\Services\Models\ServiceType;
-use App\Domain\Services\Models\ServiceTypeField;
 use App\Domain\Services\Services\ServiceRequestService;
 use App\Support\Forms\FieldType;
 use Database\Seeders\RoleSeeder;
@@ -236,8 +237,9 @@ class MemberServiceRequestsListTest extends TestCase
         $this->actingAsMemberWithRequests(1);
         $request = ServiceRequest::first();
 
-        $field = ServiceTypeField::create([
-            'service_type_id' => $request->service_type_id,
+        $form = $request->serviceType->formOrCreate(FormPurpose::Request);
+        FormField::create([
+            'form_id' => $form->id,
             'key' => 'room_number',
             'label' => ['en' => 'Room / Desk Number', 'ar' => 'رقم الغرفة أو المكتب'],
             'type' => FieldType::Text,
@@ -245,7 +247,7 @@ class MemberServiceRequestsListTest extends TestCase
             'is_active' => true,
             'order' => 1,
         ]);
-        ServiceRequestValue::fromFieldValue($request->id, $field, 'Room 204')->save();
+        app(FormSubmissionService::class)->record($form, $request, ['room_number' => 'Room 204']);
 
         $detail = $this->getJson("/api/v1/member/service-requests/{$request->id}")->assertOk()->json('data');
 

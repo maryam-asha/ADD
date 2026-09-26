@@ -1,8 +1,9 @@
 <?php
 
+use App\Domain\Experience\Models\Event;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Services\Models\ServiceType;
 use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
-use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
-use App\Http\Controllers\Api\V1\Admin\AdminEventRegistrationFieldController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
+use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
@@ -53,6 +55,7 @@ use App\Http\Controllers\Api\V1\Admin\SpaceTypeAmenityController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
+use App\Http\Routing\FormFieldRoutes;
 use Illuminate\Support\Facades\Route;
 
 // Every route in this file already sits behind auth:sanctum + role:admin|operations
@@ -167,11 +170,9 @@ Route::apiResource('events', EventController::class);
 
 // Per-event registration form definition, and the attendee roster with its
 // approve/reject decisions. All nested under an already-bound event, so
-// they never collide with the apiResource above.
-Route::get('events/{event}/registration-fields', [AdminEventRegistrationFieldController::class, 'index']);
-Route::post('events/{event}/registration-fields', [AdminEventRegistrationFieldController::class, 'store']);
-Route::patch('events/{event}/registration-fields/{field}', [AdminEventRegistrationFieldController::class, 'update']);
-Route::delete('events/{event}/registration-fields/{field}', [AdminEventRegistrationFieldController::class, 'destroy']);
+// they never collide with the apiResource above. The field editor is the
+// shared one every form owner gets (App\Http\Routing\FormFieldRoutes).
+FormFieldRoutes::register('events/{event}/registration-fields', Event::class, FormPurpose::Registration);
 
 Route::get('events/{event}/attendees', [AdminEventAttendeeController::class, 'index']);
 Route::get('events/{event}/attendees/pending', [AdminEventAttendeeController::class, 'pending']);
@@ -354,16 +355,14 @@ Route::middleware('role:admin')->group(function () {
     // to targeted users (all, by role, or specific user IDs).
     Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
 
-    // ADD Service Types — CRUD for service catalog + form fields
+    // ADD Service Types — CRUD for the service catalog; the request-form
+    // field editor is the shared one every form owner gets.
     Route::get('service-types', [AdminServiceTypeController::class, 'index']);
     Route::post('service-types', [AdminServiceTypeController::class, 'store']);
     Route::get('service-types/{serviceType}', [AdminServiceTypeController::class, 'show']);
     Route::patch('service-types/{serviceType}', [AdminServiceTypeController::class, 'update']);
     Route::delete('service-types/{serviceType}', [AdminServiceTypeController::class, 'destroy']);
-    Route::get('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'indexFields']);
-    Route::post('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'storeField']);
-    Route::patch('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'updateField']);
-    Route::delete('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'destroyField']);
+    FormFieldRoutes::register('service-types/{serviceType}/fields', ServiceType::class, FormPurpose::Request);
 
     // ADD Service Requests — staff view all, filter by branch/status/type
     Route::get('service-requests', [AdminServiceRequestController::class, 'index']);

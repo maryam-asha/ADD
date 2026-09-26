@@ -3,7 +3,8 @@
 namespace Database\Seeders;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationField;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\FormField;
 use App\Support\Forms\FieldType;
 use Illuminate\Database\Seeder;
 
@@ -21,13 +22,8 @@ class EventRegistrationFormSeeder extends Seeder
         $this->seedOpenMicNight();
         $this->seedFundraisingExternalForm();
 
-        // Sync has_registration_form flag for all events
-        foreach (Event::all() as $event) {
-            $hasForm = $event->registrationFields()->where('is_active', true)->exists();
-            if ($event->has_registration_form !== $hasForm) {
-                $event->forceFill(['has_registration_form' => $hasForm])->save();
-            }
-        }
+        // No has_registration_form pass needed: FormField's own model events
+        // keep each event's flag in step as its fields are written.
     }
 
     private function findEvent(string $titleEn): ?Event
@@ -488,8 +484,8 @@ class EventRegistrationFormSeeder extends Seeder
             'has_registration_form' => false,
         ])->save();
 
-        // Ensure no fields exist for an externally registered event
-        $event->registrationFields()->delete();
+        // Ensure no questions exist for an externally registered event
+        $event->registrationForm?->delete();
     }
 
     /**
@@ -499,13 +495,17 @@ class EventRegistrationFormSeeder extends Seeder
     {
         $event->forceFill(['external_form_url' => null])->save();
 
+        $form = $event->formOrCreate(FormPurpose::Registration);
         $activeKeys = collect($fields)->pluck('key')->all();
-        $event->registrationFields()->whereNotIn('key', $activeKeys)->delete();
+
+        // One by one, not a query delete, so the model events keep the
+        // event's has_registration_form flag right.
+        $form->fields()->whereNotIn('key', $activeKeys)->get()->each->delete();
 
         foreach ($fields as $fieldData) {
-            EventRegistrationField::query()->updateOrCreate(
+            FormField::query()->updateOrCreate(
                 [
-                    'event_id' => $event->id,
+                    'form_id' => $form->id,
                     'key' => $fieldData['key'],
                 ],
                 $fieldData

@@ -278,6 +278,11 @@ return [
         'cash_register_already_closed' => 'جلسة الصندوق هذه مغلقة بالفعل.',
     ],
 
+    'forms' => [
+        'field_updated' => 'تم تحديث الحقل.',
+        'field_deleted' => 'تم حذف الحقل.',
+    ],
+
     'payment' => [
         'gateway_unavailable' => 'الدفع بالبطاقة غير متاح مؤقتاً. يرجى المحاولة بعد قليل.',
         'could_not_start' => 'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى.',

@@ -4,8 +4,8 @@ namespace App\Services\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationFieldValue;
 use App\Domain\Experience\Services\EventLocationService;
+use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
@@ -13,7 +13,6 @@ use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Support\Enums\EventRegistrationStatus;
 use Carbon\Carbon;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -21,6 +20,7 @@ class EventRegistrationService
 {
     public function __construct(
         private readonly WalletService $wallets,
+        private readonly FormSubmissionService $forms,
     ) {}
 
     /**
@@ -179,9 +179,10 @@ class EventRegistrationService
                 'attended' => null,
             ]);
 
-            // 8. Answers to the event's own questions, if it asks any.
-            if ($lockedEvent->has_registration_form) {
-                $this->persistFieldValues($lockedEvent, $attendee, $fieldValues);
+            // 8. Answers to the event's own questions, if it asks any —
+            // decided by the form itself, not by the listing flag.
+            if ($form = $lockedEvent->registrationForm) {
+                $this->forms->record($form, $attendee, $fieldValues, $user);
             }
 
             $locale = app()->getLocale() ?: 'ar';
@@ -208,32 +209,6 @@ class EventRegistrationService
                 ],
             ];
         });
-    }
-
-    /**
-     * Store the member's answers, one row per answered field.
-     *
-     * Iterates the event's own active fields rather than the submitted
-     * keys, so an unknown or reserved key in the payload cannot create a
-     * row. Validation has already run in the Form Request.
-     *
-     * @param  array<string, mixed>  $fieldValues
-     */
-    private function persistFieldValues(Event $event, EventAttendee $attendee, array $fieldValues): void
-    {
-        foreach ($event->activeRegistrationFields as $field) {
-            $value = $fieldValues[$field->key] ?? null;
-
-            if ($value === null || $value === '') {
-                continue;
-            }
-
-            if ($field->fieldType()->storesFile() && $value instanceof UploadedFile) {
-                $value = $value->store("event-registrations/{$attendee->id}", 'public');
-            }
-
-            EventRegistrationFieldValue::fromFieldValue($attendee->id, $field, $value)->save();
-        }
     }
 
     /**

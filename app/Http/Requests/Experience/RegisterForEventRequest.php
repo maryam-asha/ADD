@@ -3,9 +3,8 @@
 namespace App\Http\Requests\Experience;
 
 use App\Domain\Experience\Models\Event;
-use App\Support\Forms\FieldRuleBuilder;
-use App\Support\Forms\ReservedFieldKeys;
-use Illuminate\Contracts\Validation\Validator;
+use App\Domain\Forms\Models\Form;
+use App\Http\Requests\Concerns\ValidatesFormSubmission;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -17,6 +16,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class RegisterForEventRequest extends FormRequest
 {
+    use ValidatesFormSubmission;
+
     public function authorize(): bool
     {
         return true; // auth:sanctum + role:member guard the route
@@ -27,64 +28,19 @@ class RegisterForEventRequest extends FormRequest
      */
     public function rules(): array
     {
-        $base = ['fields' => ['nullable', 'array']];
-
-        $event = $this->targetEvent();
-
-        if ($event === null || ! $event->has_registration_form) {
-            return $base;
-        }
-
-        return $base + app(FieldRuleBuilder::class)->rulesFor($event->activeRegistrationFields);
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        // Identity comes from the token. Say so plainly rather than
-        // dropping these keys silently.
-        $validator->after(function (Validator $validator) {
-            foreach (ReservedFieldKeys::present((array) $this->input('fields', [])) as $key) {
-                $validator->errors()->add(
-                    "fields.{$key}",
-                    __('api.validation.reserved_field_key', ['key' => $key])
-                );
-            }
-        });
+        return $this->formFieldRules();
     }
 
     /**
-     * Name each generated rule path after the question the admin wrote, so a
-     * failure reads "الاحتياجات الغذائية" rather than "fields.dietary_needs".
-     *
-     * @return array<string, string>
+     * The event's registration form. Whether the event asks questions is
+     * whether this form exists — `has_registration_form` is only the stored
+     * copy the listings read, and is never what decides validation.
      */
-    public function attributes(): array
-    {
-        $event = $this->targetEvent();
-
-        if ($event === null || ! $event->has_registration_form) {
-            return [];
-        }
-
-        return app(FieldRuleBuilder::class)->attributesFor($event->activeRegistrationFields);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function fieldValues(): array
-    {
-        return (array) ($this->validated()['fields'] ?? []);
-    }
-
-    private function targetEvent(): ?Event
+    protected function resolveSubmittedForm(): ?Form
     {
         $event = $this->route('event');
+        $event = $event instanceof Event ? $event : Event::find($event);
 
-        if ($event instanceof Event) {
-            return $event->loadMissing('activeRegistrationFields');
-        }
-
-        return Event::with('activeRegistrationFields')->find($event);
+        return $event?->registrationForm;
     }
 }

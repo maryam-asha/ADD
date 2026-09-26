@@ -30,7 +30,7 @@ class AdminEventAttendeeController extends Controller
     public function index(Request $request, Event $event): AnonymousResourceCollection
     {
         $query = $event->attendees()
-            ->with(['values.field'])
+            ->with(['formAnswers.field'])
             ->latest('id');
 
         if ($status = $request->query('status')) {
@@ -47,7 +47,7 @@ class AdminEventAttendeeController extends Controller
         return EventAttendeeResource::collection(
             $event->attendees()
                 ->where('status', EventRegistrationStatus::Pending)
-                ->with(['values.field'])
+                ->with(['formAnswers.field'])
                 ->oldest('id')
                 ->paginate((int) $request->query('per_page', 20))
         );
