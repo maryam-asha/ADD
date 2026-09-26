@@ -4,6 +4,7 @@ namespace App\Domain\Ecosystem\Models;
 
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventRegistrationFieldValue;
+use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventAttendee extends Model
 {
-    use HasFactory;
+    use HasFactory, HasFormSubmissions;
 
     protected $fillable = [
         'event_id',

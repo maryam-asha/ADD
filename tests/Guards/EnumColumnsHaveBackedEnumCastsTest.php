@@ -24,6 +24,10 @@ use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\Form;
+use App\Domain\Forms\Models\FormAnswer;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\DayOfWeek;
@@ -60,6 +64,7 @@ use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Forms\FieldType;
 use Tests\TestCase;
 
 /**
@@ -170,6 +175,15 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Setting::class => [
             'scope_type' => SettingScope::class,
             'type' => SettingValueType::class,
+        ],
+        Form::class => [
+            'purpose' => FormPurpose::class,
+        ],
+        FormField::class => [
+            'type' => FieldType::class,
+        ],
+        FormAnswer::class => [
+            'field_type' => FieldType::class,
         ],
     ];
 

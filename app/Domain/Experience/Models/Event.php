@@ -5,6 +5,10 @@ namespace App\Domain\Experience\Models;
 use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use App\Domain\Ecosystem\Models\EventAttendee;
+use App\Domain\Forms\Concerns\InteractsWithForms;
+use App\Domain\Forms\Contracts\HasForms;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\Form;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Support\Enums\EventRegistrationStatus;
@@ -12,10 +16,11 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class Event extends Model
+class Event extends Model implements HasForms
 {
-    use HasFactory, HasTranslations;
+    use HasFactory, HasTranslations, InteractsWithForms;
 
     protected $fillable = [
         'branch_id',
@@ -123,5 +128,36 @@ class Event extends Model
     public function activeRegistrationFields(): HasMany
     {
         return $this->registrationFields()->where('is_active', true);
+    }
+
+    /** The questions asked when a member registers, if the event asks any. */
+    public function registrationForm(): MorphOne
+    {
+        return $this->form(FormPurpose::Registration);
+    }
+
+    /**
+     * `has_registration_form` is a stored copy of "the registration form
+     * has at least one active field", read by the browse listings so they
+     * need no join. Kept in step from FormField's own model events.
+     */
+    public function formFieldsChanged(Form $form): void
+    {
+        if ($form->purpose !== FormPurpose::Registration) {
+            return;
+        }
+
+        $this->forceFill(['has_registration_form' => $form->activeFields()->exists()])->save();
+    }
+
+    /**
+     * An event that sends registration elsewhere has no questions of its
+     * own to ask — the member never reaches our endpoint.
+     */
+    public function formFieldCreationBlockedReason(FormPurpose $purpose): ?string
+    {
+        return $purpose === FormPurpose::Registration && $this->registersExternally()
+            ? __('api.event.form_is_external')
+            : null;
     }
 }

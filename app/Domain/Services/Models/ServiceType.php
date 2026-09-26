@@ -3,15 +3,19 @@
 namespace App\Domain\Services\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Forms\Concerns\InteractsWithForms;
+use App\Domain\Forms\Contracts\HasForms;
+use App\Domain\Forms\Enums\FormPurpose;
 use App\Domain\Services\Enums\RequestMethod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class ServiceType extends Model
+class ServiceType extends Model implements HasForms
 {
-    use HasTranslations;
+    use HasTranslations, InteractsWithForms;
 
     protected $fillable = [
         'service_axis_id',
@@ -67,6 +71,12 @@ class ServiceType extends Model
     public function activeFields(): HasMany
     {
         return $this->fields()->where('is_active', true);
+    }
+
+    /** The questions a member answers when filing a request of this type. */
+    public function requestForm(): MorphOne
+    {
+        return $this->form(FormPurpose::Request);
     }
 
     public function requests(): HasMany
