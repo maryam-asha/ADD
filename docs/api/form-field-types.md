@@ -11,7 +11,13 @@ validation vocabulary the server enforces on submit.
 > factory once.
 
 Source of truth: `app/Support/Forms/` — `FieldType.php`, `FieldConstraints.php`,
-`FieldRuleBuilder.php`, `ReservedFieldKeys.php`.
+`FieldRuleBuilder.php`, `ReservedFieldKeys.php`. Forms and answers for every
+feature are stored by `app/Domain/Forms/` (docs/decisions/unified-forms.md).
+
+> **Key answers by `key`, never by `id`.** A field's `id` is only unique
+> within the server and changed once already, when both features moved onto
+> one set of form tables. `key` is the stable, per-form identity — it is also
+> what you submit under.
 
 ---
 
@@ -155,8 +161,8 @@ All answers nest under a single `fields` object keyed by each field's `key`. The
 object is optional — a form with no fields accepts an empty body.
 
 ```jsonc
-// POST /api/v1/events/{event}/register
-// POST /api/v1/services/{id}/requests
+// POST /api/v1/member/events/{event}/register
+// POST /api/v1/member/services/{id}/requests
 
 {
   "fields": {
@@ -173,7 +179,10 @@ object is optional — a form with no fields accepts an empty body.
 > 🚫 **Never send `name`, `phone` or `email` as field keys.** These three are
 > reserved: identity is taken from the auth token and copied onto the submission
 > by the server. Sending one — in any casing — returns a **422** keyed to
-> `fields.<key>` rather than being silently ignored.
+> `fields.<key>` rather than being silently ignored, on both endpoints.
+
+Uploaded files are kept for both features. (Service requests used to drop
+them silently while still validating them; that is fixed.)
 
 ---
 

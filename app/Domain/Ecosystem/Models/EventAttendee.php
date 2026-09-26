@@ -3,7 +3,6 @@
 namespace App\Domain\Ecosystem\Models;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Experience\Models\EventRegistrationFieldValue;
 use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
@@ -12,7 +11,6 @@ use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EventAttendee extends Model
 {
@@ -96,12 +94,6 @@ class EventAttendee extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
-    }
-
-    /** Answers to the event's registration form, if it has one. */
-    public function values(): HasMany
-    {
-        return $this->hasMany(EventRegistrationFieldValue::class);
     }
 
     /**

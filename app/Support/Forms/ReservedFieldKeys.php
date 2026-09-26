@@ -13,9 +13,10 @@ use Illuminate\Validation\Rules\NotIn;
  * them would give two sources for one fact and let a client overwrite the
  * identity the server just established.
  *
- * Enforced on the Events field API today. Services' existing rows predate
- * the rule and are reported by a guard test rather than rejected, so a
- * live configuration can't break on deploy.
+ * Enforced for every form owner: the admin field Form Requests refuse the
+ * key, ValidatesFormSubmission refuses it in submitted answers, and
+ * FormField's saving guard stops tinker, factories and stand-alone seeders
+ * writing one.
  */
 final class ReservedFieldKeys
 {

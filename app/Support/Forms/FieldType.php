@@ -14,9 +14,9 @@ namespace App\Support\Forms;
  *
  * Storage quirk, deliberately preserved: Select and Rating are scalar but
  * report storesJson(), so their value lands in `value_json` as a bare
- * scalar and reads back through the same path. Every existing
- * service_request_values row was written that way — "fixing" it to
- * value_text would strand them.
+ * scalar and reads back through the same path. Every existing answer
+ * (form_answers, and the per-domain tables it was backfilled from) was
+ * written that way — "fixing" it to value_text would strand them.
  */
 enum FieldType: string
 {

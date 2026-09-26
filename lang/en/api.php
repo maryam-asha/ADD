@@ -411,8 +411,6 @@ return [
         'request_submitted' => ':service request submitted successfully.',
         'type_updated' => 'Service type updated.',
         'type_deleted' => 'Service type deleted.',
-        'field_updated' => 'Field updated.',
-        'field_deleted' => 'Field deleted.',
         'request_updated' => 'Request status updated.',
     ],
 
@@ -441,9 +439,6 @@ return [
         'approval_would_exceed_capacity' => 'Cannot approve: the event is already full.',
         'wallet_missing' => 'This member has no wallet.',
         'approve_requires_member' => 'A paid registration can only be approved for a registered member.',
-        'form_field_created' => 'Field created.',
-        'form_field_updated' => 'Field updated.',
-        'form_field_deleted' => 'Field deleted.',
         'identity_name' => 'Full name',
         'identity_phone' => 'Phone number',
         'identity_email' => 'Email',

@@ -3,10 +3,10 @@
 namespace App\Support\Forms;
 
 /**
- * What FieldRuleBuilder and FieldValueRouter need from a field definition,
- * regardless of which domain owns the row. ServiceTypeField and
- * EventRegistrationField both implement it, which is what lets one rule
- * builder serve both without either domain importing the other.
+ * What FieldRuleBuilder and FieldValueRouter need from a field definition.
+ * App\Domain\Forms\Models\FormField implements it for every form owner;
+ * keeping the rule builder against this contract rather than the model is
+ * what lets the engine be unit-tested without a database.
  */
 interface FormFieldContract
 {

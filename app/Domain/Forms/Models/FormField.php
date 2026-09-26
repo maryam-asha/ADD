@@ -54,9 +54,10 @@ class FormField extends Model implements FormFieldContract
     protected static function booted(): void
     {
         // The Form Requests reject reserved keys with a 422; this is the
-        // backstop for a seeder or a tinker session, which have no request
-        // layer in front of them. Only a key being written is checked, so
-        // a row that predates the rule can still be relabelled or hidden.
+        // backstop for tinker, factories and seeders run on their own, which
+        // have no request layer in front of them (DatabaseSeeder mutes model
+        // events, this included). Only a key being written is checked, so a
+        // row that predates the rule can still be relabelled or hidden.
         static::saving(function (self $field) {
             if ($field->isDirty('key') && ReservedFieldKeys::isReserved((string) $field->key)) {
                 throw new RuntimeException(

@@ -403,8 +403,6 @@ return [
         'request_submitted' => 'تم تقديم طلب :service بنجاح.',
         'type_updated' => 'تم تحديث نوع الخدمة.',
         'type_deleted' => 'تم حذف نوع الخدمة.',
-        'field_updated' => 'تم تحديث الحقل.',
-        'field_deleted' => 'تم حذف الحقل.',
         'request_updated' => 'تم تحديث حالة الطلب.',
     ],
 
@@ -433,9 +431,6 @@ return [
         'approval_would_exceed_capacity' => 'تعذّرت الموافقة: الفعالية ممتلئة بالفعل.',
         'wallet_missing' => 'لا توجد محفظة لهذا العضو.',
         'approve_requires_member' => 'لا يمكن الموافقة على تسجيل مدفوع إلا لعضو مسجّل.',
-        'form_field_created' => 'تم إنشاء الحقل.',
-        'form_field_updated' => 'تم تحديث الحقل.',
-        'form_field_deleted' => 'تم حذف الحقل.',
         'identity_name' => 'الاسم الكامل',
         'identity_phone' => 'رقم الهاتف',
         'identity_email' => 'البريد الإلكتروني',

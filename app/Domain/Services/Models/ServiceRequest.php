@@ -13,7 +13,6 @@ use App\Support\ReferenceSequence;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ServiceRequest extends Model
 {
@@ -82,11 +81,6 @@ class ServiceRequest extends Model
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
-    }
-
-    public function values(): HasMany
-    {
-        return $this->hasMany(ServiceRequestValue::class);
     }
 
     // ── Scopes ───────────────────────────────────────────────────────────────

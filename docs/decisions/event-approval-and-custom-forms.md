@@ -3,6 +3,8 @@
 **Status:** resolved 2026-09-15. **Owner:** Maryam Asha.
 **Type:** design doc for a new capability, plus a bug-fix note on an existing one.
 
+> **Partly superseded 2026-09-26 by [unified-forms.md](unified-forms.md).** The per-domain form tables and models named below (`event_registration_fields`, `EventRegistrationField`, `EventRegistrationFieldValue`, `service_type_fields`, `service_request_values`) were replaced by one polymorphic set of form tables in `App\Domain\Forms`. The event-approval, seat-holding, identity and timezone decisions are unaffected. Sections that no longer hold are marked inline.
+
 ## What this adds
 
 An event can require review before it admits a member (`events.requires_approval`), and can ask its own questions at registration (`event_registration_fields` → `event_registration_field_values`). Registrations carry a decision (`event_attendees.status`), and operations approve or reject them through `App\Services\Experience\EventApprovalService`.
@@ -19,11 +21,11 @@ The form engine is not new code. Services already had one; the reusable half of 
 
 - **`name`, `phone` and `email` are never form fields.** They already exist on the member and are copied from the token onto the attendee row; a form field for them would give two sources for one fact and let a client overwrite the identity the server just established. `App\Support\Forms\ReservedFieldKeys` enforces this in three places: the admin field Form Requests reject the key with a 422, `RegisterForEventRequest` rejects a reserved key in the submitted payload rather than dropping it silently, and an `EventRegistrationField::saving` guard throws for seeders and tinker sessions that have no request layer in front of them. The form endpoint returns identity in a separate read-only `identity` block.
 
-- **Separate tables per domain, one logic layer.** `event_registration_fields` mirrors `service_type_fields` column for column rather than both becoming one polymorphic `form_fields` table. A polymorphic table would have required migrating live Services data for no behavioural gain; matching the column shape gets the shared engine anyway.
+- ~~**Separate tables per domain, one logic layer.**~~ *Superseded by [unified-forms.md](unified-forms.md): one set of polymorphic form tables now serves every owner.* `event_registration_fields` mirrors `service_type_fields` column for column rather than both becoming one polymorphic `form_fields` table. A polymorphic table would have required migrating live Services data for no behavioural gain; matching the column shape gets the shared engine anyway.
 
 - **`App\Support\Forms` and `App\Support\Enums` sit outside `app/Domain/` on purpose.** `DomainLayerBoundaryTest` bans Experience and Ecosystem from importing each other or Core, and its regex scans `app/Domain/` only. `EventAttendee` lives in Ecosystem while `EventRegistrationField` lives in Experience, so their shared status enum and form types have to live outside that tree to be legal from both. This is the same reason `EventRegistrationService` — and now `EventApprovalService`, which needs `WalletService` — live under `App\Services\Experience`.
 
-- **`EventRegistrationFieldValue` lives in Experience, not Ecosystem.** It belongs to an `EventAttendee` (Ecosystem) but references an `EventRegistrationField` (Experience). Only the `hasMany` direction is defined, from the allowlisted `EventAttendee`; there is no inverse `belongsTo`, because nothing needs one and the alternative — an inline FQCN that evades the guard's `use`-statement regex — would be a technicality rather than a design.
+- ~~**`EventRegistrationFieldValue` lives in Experience, not Ecosystem.**~~ *Superseded: answers are `App\Domain\Forms\Models\FormAnswer`, and `EventAttendee` reaches them through `HasFormSubmissions`.* It belongs to an `EventAttendee` (Ecosystem) but references an `EventRegistrationField` (Experience). Only the `hasMany` direction is defined, from the allowlisted `EventAttendee`; there is no inverse `belongsTo`, because nothing needs one and the alternative — an inline FQCN that evades the guard's `use`-statement regex — would be a technicality rather than a design.
 
 - **`event_attendees.status` defaults to `approved`.** Every row that existed was created under debit-on-registration: already paid, already holding a seat. Defaulting to `pending` would have retroactively un-seated every past attendee and thrown off every capacity count. The migration is a no-op for existing data.
 
@@ -83,7 +85,7 @@ Most datetime columns needed nothing: `expires_at`, `paid_at`, `checked_in_at`, 
 
 `service_request_values` hit the same wall once already (`2026_09_13_160005_add_unique_to_service_request_values.php`, named `srv_req_values_unique`). Name composite constraints on long table names explicitly, always.
 
-One deliberate divergence from that table: `event_registration_field_values.event_registration_field_id` **cascades** on delete where `service_request_values` restricts. A service field outlives its requests; an event's fields are owned by the event, and restricting would make deleting an event fail.
+*Superseded by [unified-forms.md](unified-forms.md): answers now keep a snapshot of their field and the field FK is null-on-delete for every owner, so neither restrict nor cascade applies.* One deliberate divergence from that table: `event_registration_field_values.event_registration_field_id` **cascades** on delete where `service_request_values` restricts. A service field outlives its requests; an event's fields are owned by the event, and restricting would make deleting an event fail.
 
 ## Closing the seat-holding gap
 

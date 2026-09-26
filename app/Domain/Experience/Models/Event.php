@@ -81,11 +81,6 @@ class Event extends Model implements HasForms
     }
 
     /**
-     * Attendees that occupy a seat. Every capacity calculation goes
-     * through this rather than `attendees()` — a rejected registration
-     * must not keep holding a place.
-     */
-    /**
      * Whether registration happens somewhere other than here. Nothing about
      * seats, approval or points applies to such an event — the member never
      * reaches our registration endpoint at all.
@@ -95,6 +90,11 @@ class Event extends Model implements HasForms
         return filled($this->external_form_url);
     }
 
+    /**
+     * Attendees that occupy a seat. Every capacity calculation goes
+     * through this rather than `attendees()` — a rejected registration
+     * must not keep holding a place.
+     */
     public function seatHoldingAttendees(): HasMany
     {
         return $this->attendees()
@@ -117,17 +117,6 @@ class Event extends Model implements HasForms
     public function hasMultipleSessions(): bool
     {
         return $this->sessions()->count() > 1;
-    }
-
-    public function registrationFields(): HasMany
-    {
-        return $this->hasMany(EventRegistrationField::class)->orderBy('order');
-    }
-
-    /** What a member is actually shown, and what a submission is validated against. */
-    public function activeRegistrationFields(): HasMany
-    {
-        return $this->registrationFields()->where('is_active', true);
     }
 
     /** The questions asked when a member registers, if the event asks any. */

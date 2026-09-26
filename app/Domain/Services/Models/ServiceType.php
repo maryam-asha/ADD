@@ -57,22 +57,6 @@ class ServiceType extends Model implements HasForms
         return $this->belongsTo(ServiceAxis::class, 'service_axis_id');
     }
 
-    public function fields(): HasMany
-    {
-        return $this->hasMany(ServiceTypeField::class)->orderBy('order');
-    }
-
-    /**
-     * The fields a member should actually be shown. `fields()` keeps
-     * returning every row for the admin editor, but rendering an inactive
-     * field to a member invites an answer that persistValues() then drops
-     * on the floor.
-     */
-    public function activeFields(): HasMany
-    {
-        return $this->fields()->where('is_active', true);
-    }
-
     /** The questions a member answers when filing a request of this type. */
     public function requestForm(): MorphOne
     {

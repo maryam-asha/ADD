@@ -28,12 +28,10 @@ class EventRegistrationService
      * Takes user profile information (name, email, phone) automatically.
      * Deducts points from member's wallet if paid; free events register immediately.
      *
+     * @param  array<string, mixed>  $fieldValues  answers to the event form, if any
      * @return array<string, mixed>
      *
      * @throws ValidationException
-     */
-    /**
-     * @param  array<string, mixed>  $fieldValues  answers to the event form, if any
      */
     public function register(Event $event, User $user, array $fieldValues = []): array
     {

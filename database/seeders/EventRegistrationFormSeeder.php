@@ -22,8 +22,16 @@ class EventRegistrationFormSeeder extends Seeder
         $this->seedOpenMicNight();
         $this->seedFundraisingExternalForm();
 
-        // No has_registration_form pass needed: FormField's own model events
-        // keep each event's flag in step as its fields are written.
+        // FormField's model events normally keep has_registration_form in
+        // step, but DatabaseSeeder runs WithoutModelEvents, which silences
+        // them for the whole seed — so set the flag from the forms directly.
+        foreach (Event::with('registrationForm')->get() as $event) {
+            $hasForm = (bool) $event->registrationForm?->activeFields()->exists();
+
+            if ($event->has_registration_form !== $hasForm) {
+                $event->forceFill(['has_registration_form' => $hasForm])->save();
+            }
+        }
     }
 
     private function findEvent(string $titleEn): ?Event
@@ -498,9 +506,7 @@ class EventRegistrationFormSeeder extends Seeder
         $form = $event->formOrCreate(FormPurpose::Registration);
         $activeKeys = collect($fields)->pluck('key')->all();
 
-        // One by one, not a query delete, so the model events keep the
-        // event's has_registration_form flag right.
-        $form->fields()->whereNotIn('key', $activeKeys)->get()->each->delete();
+        $form->fields()->whereNotIn('key', $activeKeys)->delete();
 
         foreach ($fields as $fieldData) {
             FormField::query()->updateOrCreate(

@@ -33,6 +33,8 @@ minimal version that gets reworked later.
 - [reception-operations-scope.md](reception-operations-scope.md) — reception's check-in/check-out/settlement/cancellation/wallet-top-up layer; a deliberate slice of the build plan's Phase 5 (+ a PaymentMethod sliver of Phase 4), not the full thing
 - [profile-fields-completion-score-contact-links.md](profile-fields-completion-score-contact-links.md) — gender/social-link profile fields, the derived completion score, `contact_links`, and the confirmed-absent ADD Member tier
 - [kiosk-display.md](kiosk-display.md) — reception kiosk banner content, one aggregate public endpoint, and QR arrival requests; a deliberate, scoped exception to the R1 "طبقة QR" exclusion
+- [event-approval-and-custom-forms.md](event-approval-and-custom-forms.md) — event approval (debit on approve, pending holds a seat), implicit identity on registration forms, and the shared form rule engine
+- [unified-forms.md](unified-forms.md) — one polymorphic form engine (`forms`/`form_fields`/`form_submissions`/`form_answers`) any model can own; reverses the per-domain form tables
 - [rbac-permission-pilot.md](rbac-permission-pilot.md) — dynamic roles + auto-derived `module.action` permissions replace `Gate::before`'s admin bypass and the coarse `role:admin|operations` check; Branches is the one pilot resource enforcing it today, inside D.8's existing flat-role constraints
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test

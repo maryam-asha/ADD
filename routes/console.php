@@ -1,5 +1,8 @@
 <?php
 
+use App\Domain\Forms\Models\Form;
+use App\Domain\Forms\Models\FormSubmission;
+use App\Domain\Identity\Models\PendingRegistration;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
@@ -13,8 +16,20 @@ Artisan::command('inspire', function () {
  * number, never receives a code, and walks away. Without this sweep,
  * `pending_registrations` would accumulate unverified names and email addresses
  * indefinitely — see App\Domain\Identity\Models\PendingRegistration::prunable().
+ *
+ * The form engine's rows go the same way when a database cascade removes
+ * their owner or the record they answered (Form/FormSubmission::prunable()),
+ * which fires no model event.
+ *
+ * The models are named, not discovered: discovery only looks in app/Models,
+ * which does not exist here, so a bare `model:prune` fails every run.
+ * PrunableModelsAreScheduledTest fails if a Prunable model is left off.
  */
-Schedule::command('model:prune')->hourly();
+Schedule::command('model:prune', ['--model' => [
+    PendingRegistration::class,
+    Form::class,
+    FormSubmission::class,
+]])->hourly();
 
 /*
  * Reception operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
