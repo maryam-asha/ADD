@@ -4465,11 +4465,184 @@
                                             "value": "1",
                                             "disabled": true,
                                             "description": "رقم الصفحة (افتراضي 1)"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "pending",
+                                            "disabled": true,
+                                            "description": "فلترة حسب الحالة: pending | in_progress | resolved | rejected | cancelled. قيمة غير معروفة تعيد 422"
                                         }
                                     ]
                                 },
-                                "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links."
-                            }
+                                "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links.\n\nكل صف: id، reference (مثل REQ-2026-00187)، name (اسم الخدمة)، description (وصف الخدمة)، service_type (اسم القسم الذي تتبع له الخدمة)، status (pending | in_progress | resolved | rejected | cancelled)، resolution_note (فقط عند وجود ملاحظة)، submitted_at و processed_at ككائن {date, time, formatted} بالتوقيت المحلي، و processed_at تكون null حتى إغلاق الطلب."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK - All Statuses",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/service-requests",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "service-requests"
+                                            ]
+                                        },
+                                        "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links.\n\nكل صف: id، reference (مثل REQ-2026-00187)، name (اسم الخدمة)، description (وصف الخدمة)، service_type (اسم القسم الذي تتبع له الخدمة)، status (pending | in_progress | resolved | rejected | cancelled)، resolution_note (فقط عند وجود ملاحظة)، submitted_at و processed_at ككائن {date, time, formatted} بالتوقيت المحلي، و processed_at تكون null حتى إغلاق الطلب."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 191,\n            \"reference\": \"REQ-2026-00191\",\n            \"name\": \"Technical Issue\",\n            \"description\": \"Report an internet / screen / A/C / equipment problem.\",\n            \"service_type\": \"ADD Core\",\n            \"status\": \"pending\",\n            \"submitted_at\": {\n                \"date\": \"Sep 24, 2026\",\n                \"time\": \"10:12 AM\",\n                \"formatted\": \"Sep 24, 2026 · 10:12 AM\"\n            },\n            \"processed_at\": null\n        },\n        {\n            \"id\": 190,\n            \"reference\": \"REQ-2026-00190\",\n            \"name\": \"General Service Request\",\n            \"description\": \"Submit a request for general services and support.\",\n            \"service_type\": \"ADD Core\",\n            \"status\": \"in_progress\",\n            \"submitted_at\": {\n                \"date\": \"Sep 23, 2026\",\n                \"time\": \"03:40 PM\",\n                \"formatted\": \"Sep 23, 2026 · 03:40 PM\"\n            },\n            \"processed_at\": null\n        },\n        {\n            \"id\": 189,\n            \"reference\": \"REQ-2026-00189\",\n            \"name\": \"Technical Issue\",\n            \"description\": \"Report an internet / screen / A/C / equipment problem.\",\n            \"service_type\": \"ADD Core\",\n            \"status\": \"resolved\",\n            \"resolution_note\": \"The router in your area was restarted.\",\n            \"submitted_at\": {\n                \"date\": \"Sep 22, 2026\",\n                \"time\": \"09:05 AM\",\n                \"formatted\": \"Sep 22, 2026 · 09:05 AM\"\n            },\n            \"processed_at\": {\n                \"date\": \"Sep 22, 2026\",\n                \"time\": \"11:30 AM\",\n                \"formatted\": \"Sep 22, 2026 · 11:30 AM\"\n            }\n        },\n        {\n            \"id\": 188,\n            \"reference\": \"REQ-2026-00188\",\n            \"name\": \"Business Address\",\n            \"description\": null,\n            \"service_type\": \"ADD Ecosystem\",\n            \"status\": \"rejected\",\n            \"resolution_note\": \"No business addresses are available this month.\",\n            \"submitted_at\": {\n                \"date\": \"Sep 21, 2026\",\n                \"time\": \"01:15 PM\",\n                \"formatted\": \"Sep 21, 2026 · 01:15 PM\"\n            },\n            \"processed_at\": {\n                \"date\": \"Sep 21, 2026\",\n                \"time\": \"04:00 PM\",\n                \"formatted\": \"Sep 21, 2026 · 04:00 PM\"\n            }\n        },\n        {\n            \"id\": 187,\n            \"reference\": \"REQ-2026-00187\",\n            \"name\": \"General Service Request\",\n            \"description\": \"Submit a request for general services and support.\",\n            \"service_type\": \"ADD Core\",\n            \"status\": \"cancelled\",\n            \"submitted_at\": {\n                \"date\": \"Sep 20, 2026\",\n                \"time\": \"08:45 AM\",\n                \"formatted\": \"Sep 20, 2026 · 08:45 AM\"\n            },\n            \"processed_at\": null\n        }\n    ],\n    \"meta\": {\n        \"current_page\": 1,\n        \"last_page\": 1,\n        \"per_page\": 15,\n        \"total\": 5\n    }\n}"
+                                },
+                                {
+                                    "name": "200 OK - Filtered by Status (resolved)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/service-requests?status=resolved",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "service-requests"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "resolved"
+                                                }
+                                            ]
+                                        },
+                                        "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links.\n\nكل صف: id، reference (مثل REQ-2026-00187)، name (اسم الخدمة)، description (وصف الخدمة)، service_type (اسم القسم الذي تتبع له الخدمة)، status (pending | in_progress | resolved | rejected | cancelled)، resolution_note (فقط عند وجود ملاحظة)، submitted_at و processed_at ككائن {date, time, formatted} بالتوقيت المحلي، و processed_at تكون null حتى إغلاق الطلب."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 189,\n            \"reference\": \"REQ-2026-00189\",\n            \"name\": \"Technical Issue\",\n            \"description\": \"Report an internet / screen / A/C / equipment problem.\",\n            \"service_type\": \"ADD Core\",\n            \"status\": \"resolved\",\n            \"resolution_note\": \"The router in your area was restarted.\",\n            \"submitted_at\": {\n                \"date\": \"Sep 22, 2026\",\n                \"time\": \"09:05 AM\",\n                \"formatted\": \"Sep 22, 2026 · 09:05 AM\"\n            },\n            \"processed_at\": {\n                \"date\": \"Sep 22, 2026\",\n                \"time\": \"11:30 AM\",\n                \"formatted\": \"Sep 22, 2026 · 11:30 AM\"\n            }\n        }\n    ],\n    \"meta\": {\n        \"current_page\": 1,\n        \"last_page\": 1,\n        \"per_page\": 15,\n        \"total\": 1\n    }\n}"
+                                },
+                                {
+                                    "name": "422 Unprocessable - Unknown Status",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/service-requests?status=done",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "service-requests"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "done"
+                                                }
+                                            ]
+                                        },
+                                        "description": "قائمة بالطلبات السابقة التي قدمها العضو الحالي وحالاتها. الصفوف تحت data وعدادات الصفحات تحت meta، بدون كتلة links.\n\nكل صف: id، reference (مثل REQ-2026-00187)، name (اسم الخدمة)، description (وصف الخدمة)، service_type (اسم القسم الذي تتبع له الخدمة)، status (pending | in_progress | resolved | rejected | cancelled)، resolution_note (فقط عند وجود ملاحظة)، submitted_at و processed_at ككائن {date, time, formatted} بالتوقيت المحلي، و processed_at تكون null حتى إغلاق الطلب."
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The given data is invalid.\",\n    \"errors\": {\n        \"status\": [\n            \"The selected status is invalid.\"\n        ]\n    }\n}"
+                                }
+                            ]
                         },
                         {
                             "name": "Get My Service Request Detail",
@@ -4509,8 +4682,114 @@
                                         "{{service_request_id}}"
                                     ]
                                 },
-                                "description": "تفاصيل طلب خدمة محدد بواسطة المعرف {{service_request_id}}."
-                            }
+                                "description": "تفاصيل طلب خدمة محدد بواسطة المعرف {{service_request_id}}.\n\nنفس شكل صف القائمة، مضافاً إليه values: إجابات النموذج المرسلة، كل عنصر {field_key, label, value} و label مترجم حسب لغة الطلب. يعيد 404 إذا لم يكن الطلب للعضو الحالي."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK - Request Detail",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/service-requests/{{service_request_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "service-requests",
+                                                "{{service_request_id}}"
+                                            ]
+                                        },
+                                        "description": "تفاصيل طلب خدمة محدد بواسطة المعرف {{service_request_id}}.\n\nنفس شكل صف القائمة، مضافاً إليه values: إجابات النموذج المرسلة، كل عنصر {field_key, label, value} و label مترجم حسب لغة الطلب. يعيد 404 إذا لم يكن الطلب للعضو الحالي."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 189,\n        \"reference\": \"REQ-2026-00189\",\n        \"name\": \"Technical Issue\",\n        \"description\": \"Report an internet / screen / A/C / equipment problem.\",\n        \"service_type\": \"ADD Core\",\n        \"status\": \"resolved\",\n        \"resolution_note\": \"The router in your area was restarted.\",\n        \"submitted_at\": {\n            \"date\": \"Sep 22, 2026\",\n            \"time\": \"09:05 AM\",\n            \"formatted\": \"Sep 22, 2026 · 09:05 AM\"\n        },\n        \"processed_at\": {\n            \"date\": \"Sep 22, 2026\",\n            \"time\": \"11:30 AM\",\n            \"formatted\": \"Sep 22, 2026 · 11:30 AM\"\n        },\n        \"values\": [\n            {\n                \"field_key\": \"issue_type\",\n                \"label\": \"Issue Type\",\n                \"value\": \"internet\"\n            },\n            {\n                \"field_key\": \"description\",\n                \"label\": \"Description\",\n                \"value\": \"Wi-Fi keeps dropping near the window desks.\"\n            }\n        ]\n    }\n}"
+                                },
+                                {
+                                    "name": "404 Not Found - Not Your Request",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/service-requests/{{service_request_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "service-requests",
+                                                "{{service_request_id}}"
+                                            ]
+                                        },
+                                        "description": "تفاصيل طلب خدمة محدد بواسطة المعرف {{service_request_id}}.\n\nنفس شكل صف القائمة، مضافاً إليه values: إجابات النموذج المرسلة، كل عنصر {field_key, label, value} و label مترجم حسب لغة الطلب. يعيد 404 إذا لم يكن الطلب للعضو الحالي."
+                                    },
+                                    "status": "Not Found",
+                                    "code": 404,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Service request not found.\"\n}"
+                                }
+                            ]
                         }
                     ],
                     "description": "خدمات مجتمع ADD — تصفح الخدمات، جلب تفاصيل الخدمة ونموذجها، وتقديم ومتابعة الطلبات.",

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Services\Models;
 
+use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -15,6 +16,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ServiceRequest extends Model
 {
+    use HasTranslations;
+
     protected $fillable = [
         'reference',
         'service_type_id',
