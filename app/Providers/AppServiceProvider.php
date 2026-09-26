@@ -5,7 +5,11 @@ namespace App\Providers;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Policies\CompanyPolicy;
 use App\Domain\Settings\Services\SettingService;
+use App\Events\Finance\PaymentAccepted;
+use App\Events\Finance\PaymentReversed;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
+use App\Listeners\Finance\FulfilAcceptedPayment;
+use App\Listeners\Finance\ReverseWalletCreditOnPaymentReversed;
 use App\Listeners\SetLocaleFromUserPreference;
 use App\Support\Presenters\EventPricePresenter;
 use App\Support\Time\LocalTime;
@@ -63,6 +67,22 @@ class AppServiceProvider extends ServiceProvider
         // for why this is an event listener and not a middleware.
         Event::listen(TokenAuthenticated::class, EnsureAuthenticatedUserIsActive::class);
         Event::listen(Authenticated::class, EnsureAuthenticatedUserIsActive::class);
+
+        // Card payments (docs/paymera.md): FulfilAcceptedPayment and
+        // ReverseWalletCreditOnPaymentReversed are NOT registered here.
+        //
+        // Laravel 12 auto-discovers a listener from its handle() parameter
+        // type, so an explicit Event::listen() for these would register each
+        // one TWICE and run it twice per event. That was not theoretical:
+        // it made a single reversal write two -100 clawback rows, because
+        // that listener has no idempotence check of its own (the credit
+        // listener's hasBeenCredited() guard happened to absorb its own
+        // double-fire, which is precisely why the bug hid on that side).
+        //
+        // The two listeners above ARE still synchronous rather than queued,
+        // which is deliberate: each moves money, and a queued failure would
+        // leave a payment reading as settled with nothing credited or
+        // clawed back.
 
         // Models live under App\Domain\<Domain>\Policies, not App\Policies, so
         // Laravel's convention-based policy discovery misses these — register

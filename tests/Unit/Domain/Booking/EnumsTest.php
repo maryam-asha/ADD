@@ -35,9 +35,18 @@ class EnumsTest extends TestCase
         $this->assertSame(['reception', 'auto'], array_column(TerminationSource::cases(), 'value'));
     }
 
+    /**
+     * `paymera` joined the four till methods when card payments landed
+     * (docs/paymera.md). It is the only one not taken by hand at reception,
+     * which is why a wallet transaction carrying it has no
+     * `performed_by_user_id`.
+     */
     public function test_payment_method_cases(): void
     {
-        $this->assertSame(['cash', 'sham', 'mtn', 'syriatel'], array_column(PaymentMethod::cases(), 'value'));
+        $this->assertSame(
+            ['cash', 'sham', 'mtn', 'syriatel', 'paymera'],
+            array_column(PaymentMethod::cases(), 'value')
+        );
     }
 
     public function test_wallet_transaction_source_gained_a_refund_case(): void

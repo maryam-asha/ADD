@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
+use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\V1\Admin\AdminEventRegistrationFieldController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
@@ -368,4 +369,28 @@ Route::middleware('role:admin')->group(function () {
     Route::get('service-requests', [AdminServiceRequestController::class, 'index']);
     Route::get('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'show']);
     Route::patch('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'update']);
+});
+
+/*
+ * Card payments (docs/paymera.md). Read access rides on the group's
+ * role:admin|operations check like every other resource here; only the
+ * reversal — which moves real money at the bank — is gated on a granular
+ * permission, following the Branches pilot
+ * (docs/decisions/rbac-permission-pilot.md). It therefore opts out of the
+ * group's role check for that one route and enforces permission instead.
+ *
+ * Note for deploys: permissions:sync (or PermissionSeeder) must run before
+ * anyone, admin included, can reverse a payment — an empty permissions
+ * table grants nothing.
+ *
+ * There is no store/update/destroy: a payment is created by a member
+ * paying and settled by the gateway, never edited by hand.
+ */
+Route::get('payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+Route::get('payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
+
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::post('payments/{payment}/reverse', [AdminPaymentController::class, 'reverse'])
+        ->middleware('permission:payments.reverse')
+        ->name('payments.reverse');
 });

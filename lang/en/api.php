@@ -279,6 +279,24 @@ return [
         'cash_register_already_closed' => 'This cash register session is already closed.',
     ],
 
+    'payment' => [
+        // Shown to the member. Never mentions the gateway's own fault
+        // conditions (a rejected key, an unregistered server IP) — those are
+        // ours, and a member must not read them as their card being declined.
+        'gateway_unavailable' => 'Card payment is temporarily unavailable. Please try again shortly.',
+        'could_not_start' => 'We could not start the payment. Please try again.',
+        'plan_unavailable' => 'This package is not available for purchase.',
+
+        // Admin-facing.
+        'not_reversible' => 'Only an accepted payment can be reversed.',
+        'reversal_failed' => 'The gateway rejected the reversal. Please check the payment at the bank before retrying.',
+        'reversed' => 'The payment has been reversed.',
+
+        // Ledger descriptions — these land in the member's wallet history.
+        'credit_description' => 'Card payment :reference',
+        'reversal_description' => 'Reversal of card payment :reference',
+    ],
+
     'space' => [
         'browse_title' => 'Browse Spaces',
         'browse_subtitle' => 'Find and book the right workspace for your day.',

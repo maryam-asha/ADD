@@ -73,3 +73,13 @@ Schedule::command('events:expire-pending-registrations')->hourly()->withoutOverl
  * ceiling is still enforced by counting `bookings` under a row lock.
  */
 Schedule::command('booking:reconcile-capacity-slots')->dailyAt('03:30')->withoutOverlapping();
+
+/*
+ * Card payments (docs/paymera.md) — the backstop under the callback and the
+ * trigger. A payment can be left pending by a closed browser, a lost trigger
+ * request or a queue worker that was down; without this sweep it would stay
+ * pending forever while the member's money sits at the bank. Every check
+ * goes through SyncPaymentStatus, which locks and re-checks finality, so an
+ * overlap with a live callback cannot double-credit.
+ */
+Schedule::command('paymera:reconcile')->everyFiveMinutes()->withoutOverlapping();

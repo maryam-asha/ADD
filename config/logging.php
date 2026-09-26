@@ -73,6 +73,21 @@ return [
             'replace_placeholders' => true,
         ],
 
+        /*
+         * Every Paymera request, response and state transition, kept apart
+         * from the main log so a payment dispute can be reconstructed
+         * without grepping through everything else. Retained longer than
+         * the default for the same reason. The API key is redacted before
+         * anything reaches here — see PaymeraClient::redact().
+         */
+        'paymera' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/paymera.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('PAYMERA_LOG_DAYS', 90),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),

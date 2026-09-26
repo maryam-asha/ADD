@@ -278,6 +278,19 @@ return [
         'cash_register_already_closed' => 'جلسة الصندوق هذه مغلقة بالفعل.',
     ],
 
+    'payment' => [
+        'gateway_unavailable' => 'الدفع بالبطاقة غير متاح مؤقتاً. يرجى المحاولة بعد قليل.',
+        'could_not_start' => 'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى.',
+        'plan_unavailable' => 'هذه الباقة غير متاحة للشراء.',
+
+        'not_reversible' => 'لا يمكن إلغاء إلا الدفعات المقبولة.',
+        'reversal_failed' => 'رفضت البوابة عملية الإلغاء. يرجى التحقق من الدفعة لدى البنك قبل إعادة المحاولة.',
+        'reversed' => 'تم إلغاء الدفعة.',
+
+        'credit_description' => 'دفع بالبطاقة :reference',
+        'reversal_description' => 'إلغاء دفعة بالبطاقة :reference',
+    ],
+
     'space' => [
         'browse_title' => 'تصفح المساحات',
         'browse_subtitle' => 'ابحث واحجز مساحة العمل المناسبة ليومك.',
