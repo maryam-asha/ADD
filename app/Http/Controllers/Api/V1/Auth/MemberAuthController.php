@@ -17,6 +17,7 @@ use App\Http\Requests\Auth\RegisterVerifyRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\Exceptions\InvalidRefreshTokenException;
 use App\Services\Auth\TokenPairService;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
 use App\Services\Otp\OtpService;
@@ -69,6 +70,9 @@ class MemberAuthController extends Controller
                 'message' => __('api.auth.otp_request_throttled'),
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
+        } catch (OtpDeliveryFailedException) {
+            // The transaction already rolled the parked profile back.
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 
         return response()->json(['message' => __('api.auth.otp_sent')]);
@@ -76,29 +80,38 @@ class MemberAuthController extends Controller
 
     /**
      * Resend the registration OTP for a phone that already has a pending
-     * registration parked by step one. The response is deliberately identical
-     * whether or not a usable pending entry exists — the same reason forgot()
-     * gives for not confirming account existence.
+     * registration parked by step one.
      *
-     * Unlike forgot(), a throttled resend is surfaced as 429: the caller
-     * already knows they are in the middle of sign-up, so a "wait N seconds"
-     * response costs nothing in information and lets the UI give useful feedback.
+     * "Sent" is only ever answered when a code actually went out. This used to
+     * answer 200 whether or not there was anything to resend, to avoid
+     * confirming which numbers have accounts — but register() already says
+     * so (phone_already_registered) and so does password/forgot
+     * (phone_not_found), so the silence hid nothing and only left members
+     * waiting for a code that was never sent.
      */
     public function resendRegistration(ForgotPasswordRequest $request): JsonResponse
     {
         $phone = $request->validated('phone');
 
+        if (User::where('phone', $phone)->exists()) {
+            return response()->json(['message' => __('api.auth.phone_already_registered')], 422);
+        }
+
         $pending = PendingRegistration::where('phone', $phone)->first();
 
-        if ($pending && $pending->isUsable()) {
-            try {
-                $this->otp->request($phone, OtpPurpose::Registration);
-            } catch (OtpThrottledException $e) {
-                return response()->json([
-                    'message' => __('api.auth.otp_request_throttled'),
-                    'retry_after' => $e->retryAfterSeconds,
-                ], 429);
-            }
+        if (! $pending || ! $pending->isUsable()) {
+            return response()->json(['message' => __('api.auth.registration_code_invalid')], 422);
+        }
+
+        try {
+            $this->otp->request($phone, OtpPurpose::Registration);
+        } catch (OtpThrottledException $e) {
+            return response()->json([
+                'message' => __('api.auth.otp_request_throttled'),
+                'retry_after' => $e->retryAfterSeconds,
+            ], 429);
+        } catch (OtpDeliveryFailedException) {
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 
         return response()->json(['message' => __('api.auth.otp_sent')]);

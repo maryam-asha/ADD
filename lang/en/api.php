@@ -5,6 +5,8 @@ return [
     'auth' => [
         'otp_request_throttled' => 'Too many requests. Please wait before requesting a new code.',
         'otp_sent' => 'Verification code sent.',
+        'otp_send_failed' => 'We could not send the verification code right now. Please try again.',
+        'otp_message' => 'Your ADD verification code is :code. It expires in :minutes minutes. Do not share it with anyone.',
         'registration_code_invalid' => 'Invalid or expired code. Please start signing up again.',
         'account_already_exists' => 'An account already exists for this number or email. Please log in instead.',
         'phone_already_registered' => 'This number already has an account. Please log in instead.',

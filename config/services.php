@@ -40,10 +40,9 @@ return [
     | OTP / WhatsApp Gateway
     |--------------------------------------------------------------------------
     |
-    | "mock" logs the code instead of sending it — the only driver until a
-    | real WhatsApp Business integration (Meta Cloud API or a BSP reseller)
-    | is wired up. Swapping the driver here is the only change needed once
-    | real credentials exist.
+    | "mock" logs the code instead of sending it; "hala_sender" sends it over
+    | WhatsApp through Hala Sender. Swapping the driver here is the only
+    | change needed — calling code never changes.
     |
     */
 
@@ -51,10 +50,13 @@ return [
         'driver' => env('OTP_DRIVER', 'mock'),
     ],
 
-    'whatsapp' => [
-        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
-        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
-        'template_name' => env('WHATSAPP_OTP_TEMPLATE', 'otp_verification'),
+    // WhatsApp via Hala Sender — the live driver (OTP_DRIVER=hala_sender).
+    // device_id is required: the linked WhatsApp device (from the Hala Sender
+    // dashboard) every OTP is sent from.
+    'hala_sender' => [
+        'base_url' => env('HALA_SENDER_BASE_URL', 'https://clientarea.hala-sender.com'),
+        'api_key' => env('HALA_SENDER_API_KEY'),
+        'device_id' => env('HALA_SENDER_DEVICE_ID'),
     ],
 
     'sptoday' => [

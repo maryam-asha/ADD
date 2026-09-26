@@ -1,0 +1,78 @@
+<?php
+
+namespace Tests\Feature\Identity;
+
+use App\Domain\Identity\Models\PendingRegistration;
+use App\Services\Otp\OtpProvider;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Support\CapturingOtpProvider;
+use Tests\TestCase;
+
+/**
+ * A gateway that refuses the send must never be reported to the member as
+ * "code sent" — and must not leave them waiting out a cooldown for a code
+ * that never left the building.
+ */
+class OtpDeliveryFailureTest extends TestCase
+{
+    use RefreshDatabase;
+
+    private const PHONE = '+963912345678';
+
+    private bool $gatewayUp = false;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // One provider for the whole test, toggled rather than swapped: the
+        // route keeps its controller (and the OtpService inside it) between
+        // requests, so a later rebinding would never reach it.
+        $test = $this;
+        $this->app->instance(OtpProvider::class, new class($test) extends CapturingOtpProvider
+        {
+            public function __construct(private readonly OtpDeliveryFailureTest $test) {}
+
+            public function send(string $phone, string $code, string $provider): bool
+            {
+                return $this->test->gatewayIsUp() && parent::send($phone, $code, $provider);
+            }
+        });
+    }
+
+    public function gatewayIsUp(): bool
+    {
+        return $this->gatewayUp;
+    }
+
+    private function register()
+    {
+        return $this->postJson('/api/v1/auth/register', [
+            'phone' => self::PHONE,
+            'name' => 'Maryam Asha',
+            'email' => 'maryam@example.com',
+            'password' => 'correct-horse',
+            'password_confirmation' => 'correct-horse',
+        ]);
+    }
+
+    public function test_a_failed_send_is_reported_and_leaves_nothing_behind(): void
+    {
+        $this->register()
+            ->assertStatus(503)
+            ->assertJson(['message' => __('api.auth.otp_send_failed')]);
+
+        $this->assertDatabaseCount('otp_verifications', 0);
+        $this->assertSame(0, PendingRegistration::count());
+    }
+
+    public function test_a_failed_send_does_not_start_the_resend_cooldown(): void
+    {
+        $this->register()->assertStatus(503);
+
+        $this->gatewayUp = true;
+
+        $this->register()->assertOk();
+        $this->assertNotNull(app(OtpProvider::class)->lastCodeFor(self::PHONE));
+    }
+}

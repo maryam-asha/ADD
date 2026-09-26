@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Requests\Auth\VerifyPasswordResetRequest;
 use App\Services\Auth\TokenPairService;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
 use App\Services\Otp\OtpService;
@@ -45,6 +46,8 @@ class MemberPasswordController extends Controller
                 'message' => __('api.auth.otp_request_throttled'),
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
+        } catch (OtpDeliveryFailedException) {
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 
         return response()->json([

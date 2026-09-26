@@ -4,6 +4,7 @@ namespace App\Services\Otp;
 
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Models\OtpVerification;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
@@ -23,6 +24,9 @@ class OtpService
      * is minting and there is no case left where guessing would be right.
      *
      * @throws OtpThrottledException if a code was requested too recently.
+     * @throws OtpDeliveryFailedException if the gateway did not accept the send.
+     *                                    The code row is dropped and the cooldown
+     *                                    is not started, so the member can retry.
      */
     public function request(string $phone, OtpPurpose $purpose): OtpVerification
     {
@@ -43,7 +47,11 @@ class OtpService
             'expires_at' => now()->addMinutes(config('otp.expires_after_minutes')),
         ]);
 
-        $this->provider->send($phone, $code, self::CHANNEL);
+        if (! $this->provider->send($phone, $code, self::CHANNEL)) {
+            $otp->delete();
+
+            throw new OtpDeliveryFailedException;
+        }
 
         RateLimiter::hit($key, config('otp.resend_cooldown_seconds'));
 

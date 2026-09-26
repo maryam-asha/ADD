@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\Otp\Drivers\HalaSenderOtpProvider;
 use App\Services\Otp\Drivers\MockOtpProvider;
 use App\Services\Otp\OtpProvider;
 use Illuminate\Support\ServiceProvider;
@@ -15,8 +16,7 @@ class OtpServiceProvider extends ServiceProvider
     {
         $this->app->bind(OtpProvider::class, function () {
             return match (config('services.otp.driver')) {
-                // a 'whatsapp' driver lands here once real Business API
-                // credentials exist — calling code never changes.
+                'hala_sender' => new HalaSenderOtpProvider,
                 default => new MockOtpProvider,
             };
         });

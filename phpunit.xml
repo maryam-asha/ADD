@@ -39,6 +39,7 @@
              mobile-app testing) — tests that assert on distinct codes would
              otherwise flake whenever that convenience flag is set. -->
         <env name="OTP_FIXED_CODE" value=""/>
+        <env name="OTP_DRIVER" value="mock"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
