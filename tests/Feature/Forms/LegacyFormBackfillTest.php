@@ -17,12 +17,28 @@ use Tests\TestCase;
 /**
  * The one-off copy from the per-domain tables (service_type_fields,
  * service_request_values, event_registration_fields,
- * event_registration_field_values) into the unified form tables. Delete
- * this test with the release that drops the legacy tables.
+ * event_registration_field_values) into the unified form tables.
+ *
+ * Those tables are dropped further down the migration chain, so each case
+ * recreates them empty first — through the drop migration's own down(),
+ * which this therefore also covers. Keep this until the backfill has run
+ * on every environment.
  */
 class LegacyFormBackfillTest extends TestCase
 {
     use RefreshDatabase;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->dropMigration()->down();
+    }
+
+    private function dropMigration(): Migration
+    {
+        return require database_path('migrations/2026_09_27_100006_drop_legacy_form_tables.php');
+    }
 
     private function backfill(): Migration
     {

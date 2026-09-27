@@ -10,7 +10,7 @@ Custom forms — the questions a member answers when registering for an event or
 
 The two copies had already drifted, and the drift was the bugs: service file answers were validated and then dropped (`input()` instead of `validated()`); deleting an answered service field was a 500 (restrict FK) while deleting an event field silently erased its answers (cascade FK); renaming a service field onto a sibling's key was a DB error; a label-only PATCH of an event select demanded `options`; `is_required: null` hit a NOT NULL column; the admin service-type detail returned no fields at all.
 
-They now share four tables, one domain, one controller and one pair of requests. The earlier decision kept the tables apart only to avoid migrating live Services data — there was no behavioural reason — and that migration is now written, reconciled and tested.
+They now share four tables, one domain, one controller and one pair of requests. The earlier decision kept the tables apart only to avoid migrating live Services data — there was no behavioural reason — and that migration is now written, reconciled and tested. The four per-domain tables are dropped in the same release, straight after the copy.
 
 ## The schema
 
@@ -49,11 +49,12 @@ Say `Space` gets a booking form and `Booking` holds the answers:
 6. Inside the transaction that creates the booking: `app(FormSubmissionService::class)->record($form, $booking, $request->formFieldValues(), $user)`.
 7. Render with `FormFieldResource` / `FormAnswerResource`, eager-loading `bookingForm.activeFields` and `formAnswers.field`.
 
-## Migrating the data (expand → contract)
+## Migrating the data — copy, then drop, in one release
 
-- **This release** creates the four tables and runs `2026_09_27_100004_backfill_forms_from_legacy_tables`: query builder only, aliases and field types written as literals, one transaction. It refuses non-empty targets; aborts *before writing* on an unknown field type, a key over 80 characters, or an answer filed against another owner's field; copies value columns as raw text with file paths untouched (no files move); and rolls back if the field and answer counts do not reconcile. Deploy under `php artisan down` so nothing is written between the copy and the code switch.
-- **The legacy tables stay**, read-only, as the rollback source. `LegacyFormTablesAreUnreferencedTest` fails if code in `app/`, `routes/`, seeders or factories touches them. Rolling back before any new submission is `migrate:rollback` plus the previous code, with no loss; after new submissions, fix forward.
-- **A later release** drops the four legacy tables, after at least one release cycle and a backup. Delete `LegacyFormBackfillTest` and the table half of the legacy guard with it.
+- **`2026_09_27_100004_backfill_forms_from_legacy_tables`** copies everything: query builder only, aliases and field types written as literals, one transaction. It refuses non-empty targets; aborts *before writing* on an unknown field type, a key over 80 characters, or an answer filed against another owner's field; copies value columns as raw text with file paths untouched (no files move); and rolls back if the field and answer counts do not reconcile.
+- **`2026_09_27_100006_drop_legacy_form_tables`** then drops the four per-domain tables. The first plan kept them for a release as a rollback source; that was reversed because the data is small (tens of fields, a handful of answers) and a database backup does the same job. Its `down()` recreates them empty, exactly as they were.
+- **So the deploy is:** take a database backup → `php artisan down` → deploy → `php artisan migrate --force` → `php artisan up`. Rolling back means restoring that backup plus the previous code; after new submissions arrive, fix forward instead.
+- `LegacyFormTablesAreUnreferencedTest` asserts the tables are gone and that no code in `app/`, `routes/`, seeders or factories names them or their old models. `LegacyFormBackfillTest` recreates them through the drop's `down()` to replay the copy; keep it until the backfill has run on every environment.
 
 ## In passing
 
