@@ -5,6 +5,7 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Enums\DayOfWeek;
@@ -16,6 +17,7 @@ use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\AvailabilityPresenter;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
@@ -56,15 +58,16 @@ class AvailabilityBrowseService
      *
      * @return array<string, mixed>
      */
-    public function calendar(Space $space, ?string $from, ?string $to, string $locale): array
+    public function calendar(Space $space, ?string $from, ?string $to, string $locale, ?int $durationMinutes = null): array
     {
         $space = $this->assertBookable($space);
         $rules = $this->availability->rulesFor($space);
+        $this->assertAcceptedDuration($durationMinutes, $rules, $locale);
         $branch = $space->building->branch;
 
         [$start, $end] = $this->resolveRange($from, $to, $rules->timezone);
 
-        $days = $this->availability->daysInRange($space, $start, $end, $rules);
+        $days = $this->availability->daysInRange($space, $start, $end, $rules, $durationMinutes);
 
         $today = CarbonImmutable::now($rules->timezone)->startOfDay();
         $todayPeriods = $this->businessHours->periodsFor($today, $branch);
@@ -78,7 +81,7 @@ class AvailabilityBrowseService
                 $rules,
                 $locale,
             ),
-            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES),
+            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES, $this->acceptedDurationOptions($rules)),
             'legend' => $this->presenter->legend($locale),
             'data' => array_map(fn ($day) => [
                 ...$this->presenter->day($day),
@@ -89,6 +92,7 @@ class AvailabilityBrowseService
                 'to' => $end->format('Y-m-d'),
                 'timezone' => $rules->timezone,
                 'total' => count($days),
+                'duration_minutes' => $durationMinutes,
             ],
         ];
     }
@@ -98,20 +102,21 @@ class AvailabilityBrowseService
      *
      * @return array<string, mixed>
      */
-    public function day(Space $space, string $date, string $locale): array
+    public function day(Space $space, string $date, string $locale, ?int $durationMinutes = null): array
     {
         $space = $this->assertBookable($space);
         $rules = $this->availability->rulesFor($space);
+        $this->assertAcceptedDuration($durationMinutes, $rules, $locale);
         $branch = $space->building->branch;
 
         $localDate = CarbonImmutable::parse($date, $rules->timezone)->startOfDay();
 
         // Reuse the month projection for one day so the chip states and the
         // grid cell can never disagree about the same date.
-        $day = $this->availability->daysInRange($space, $localDate, $localDate, $rules)[0];
+        $day = $this->availability->daysInRange($space, $localDate, $localDate, $rules, $durationMinutes)[0];
         $slots = $day->state === DayState::Closed
             ? []
-            : $this->availability->slotsForDay($space, $localDate, $rules);
+            : $this->availability->slotsForDay($space, $localDate, $rules, durationMinutes: $durationMinutes);
 
         return [
             'date' => $this->presenter->day($day),
@@ -124,13 +129,19 @@ class AvailabilityBrowseService
                 $rules,
                 $locale,
             ),
-            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES),
+            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES, $this->acceptedDurationOptions($rules)),
             'legend' => $this->presenter->legend($locale),
-            'data' => $this->presenter->slots($slots, $locale),
+            'data' => $durationMinutes === null
+                ? $this->presenter->slots($slots, $locale)
+                : array_map(fn (SlotAvailability $slot) => [
+                    ...$this->presenter->slot($slot, $locale),
+                    ...$this->priced($space, $durationMinutes),
+                ], $slots),
             'counts' => $this->presenter->slotCounts($slots),
             'meta' => [
                 'granularity_minutes' => $rules->granularityMinutes,
                 'timezone' => $rules->timezone,
+                'duration_minutes' => $durationMinutes,
             ],
         ];
     }
@@ -210,8 +221,10 @@ class AvailabilityBrowseService
         $endUtc = $end->utc();
 
         $state = match (true) {
+            ! $this->availability->isFarEnoughAhead($startUtc, $rules) => SlotState::TooSoon,
+            ! $this->availability->isWithinAdvanceHorizon($startUtc, $rules) => SlotState::TooFarAhead,
             ! $this->availability->fitsWithinPeriods($startUtc, $endUtc, $periods, $rules) => SlotState::OutsideHours,
-            $this->availability->overlapCount($existing, $startUtc, $endUtc) >= $rules->concurrencyCeiling => $rules->allowsConcurrentBookings()
+            $this->availability->exceedsCeiling($existing, $startUtc, $endUtc, $rules) => $rules->allowsConcurrentBookings()
                 ? SlotState::AtCapacity
                 : SlotState::Booked,
             $this->availability->violatesBuffer($existing, $startUtc, $endUtc, $rules) => SlotState::Buffer,
@@ -221,6 +234,7 @@ class AvailabilityBrowseService
         // A configured option that does not fit this space's granularity is
         // returned disabled rather than silently offered.
         $fitsRules = $this->availability->isValidDuration($startUtc, $endUtc, $rules);
+        $tooLong = ! $this->availability->isShortEnough($startUtc, $endUtc, $rules);
         $points = $this->pointsFor($space, $minutes);
         $reasonKey = $state->reasonKey();
 
@@ -234,6 +248,7 @@ class AvailabilityBrowseService
             'available' => $state->isBookable() && $fitsRules,
             'reason' => match (true) {
                 ! $state->isBookable() => __($reasonKey, [], $locale),
+                $tooLong => __('api.booking.duration_too_long', [], $locale),
                 ! $fitsRules => __('api.booking.duration_invalid_granularity', [], $locale),
                 default => null,
             },
@@ -254,6 +269,60 @@ class AvailabilityBrowseService
         }
 
         return (int) ceil($rate * $minutes / 60);
+    }
+
+    /**
+     * The price fields a duration-aware slot carries. The same ceil rule as
+     * the quote; the rate is flat today, so every slot of one duration costs
+     * the same, but the price rides on the slot so a future peak rate has
+     * somewhere to go without a client change.
+     *
+     * @return array{duration_minutes: int, points: int, amount_usd: mixed}
+     */
+    private function priced(Space $space, int $minutes): array
+    {
+        $points = $this->pointsFor($space, $minutes);
+
+        return [
+            'duration_minutes' => $minutes,
+            'points' => $points,
+            'amount_usd' => $this->points->pointsToUsd($points),
+        ];
+    }
+
+    /**
+     * A requested duration the space would never accept is a bad request,
+     * not an empty grid: an empty grid reads as "fully booked", which would
+     * send the member hunting through other days for nothing. The message
+     * is the one the POST would give for the same length.
+     */
+    private function assertAcceptedDuration(?int $minutes, SpaceBookingRules $rules, string $locale): void
+    {
+        if ($minutes === null || $this->availability->isValidDurationInMinutes($minutes, $rules)) {
+            return;
+        }
+
+        $key = match (true) {
+            $minutes < $rules->minDurationMinutes => 'api.booking.duration_too_short',
+            $rules->maxDurationMinutes !== null && $minutes > $rules->maxDurationMinutes => 'api.booking.duration_too_long',
+            default => 'api.booking.duration_invalid_granularity',
+        };
+
+        throw ValidationException::withMessages(['duration' => [__($key, [], $locale)]]);
+    }
+
+    /**
+     * The ladder narrowed to lengths this space accepts — what the
+     * duration-first picker offers before any start time is chosen.
+     *
+     * @return list<int>
+     */
+    private function acceptedDurationOptions(SpaceBookingRules $rules): array
+    {
+        return array_values(array_filter(
+            $this->durationOptions($rules),
+            fn (int $minutes) => $this->availability->isValidDurationInMinutes($minutes, $rules),
+        ));
     }
 
     /**

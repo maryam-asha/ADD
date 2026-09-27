@@ -273,9 +273,12 @@ class BookingBatchCreationService
 
             $reasonKey = match (true) {
                 $window['start']->lessThan(now()) => 'api.booking.start_in_the_past',
+                ! $this->availability->isFarEnoughAhead($window['start'], $rules) => 'api.booking.too_soon',
+                ! $this->availability->isWithinAdvanceHorizon($window['start'], $rules) => 'api.booking.too_far_ahead',
                 ! $this->availability->isWithinBusinessHours($space, $window['start'], $window['end'], $rules) => 'api.reception.outside_business_hours',
                 ! $this->availability->isValidGranularity($window['start'], $rules) => 'api.booking.invalid_start_time',
                 ! $this->availability->isLongEnough($window['start'], $window['end'], $rules) => 'api.booking.duration_too_short',
+                ! $this->availability->isShortEnough($window['start'], $window['end'], $rules) => 'api.booking.duration_too_long',
                 ! $this->availability->matchesDurationGranularity($window['start'], $window['end'], $rules) => 'api.booking.duration_invalid_granularity',
                 default => null,
             };
@@ -297,7 +300,7 @@ class BookingBatchCreationService
         CarbonImmutable $end,
         SpaceBookingRules $rules,
     ): ?string {
-        if ($this->availability->overlapCount($candidates, $start, $end) >= $rules->concurrencyCeiling) {
+        if ($this->availability->exceedsCeiling($candidates, $start, $end, $rules)) {
             return 'api.booking.slot_unavailable';
         }
 

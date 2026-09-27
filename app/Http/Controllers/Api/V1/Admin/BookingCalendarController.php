@@ -74,6 +74,7 @@ class BookingCalendarController extends Controller
             $space,
             $request->validated('date'),
             app()->getLocale(),
+            $request->duration(),
         ));
     }
 

@@ -67,6 +67,7 @@ class BookingCreationService
         $rules = $this->availability->rulesFor($space);
 
         $this->assertInTheFuture($startAt);
+        $this->assertWithinBookingWindow($startAt, $rules);
         $this->assertWithinBusinessHours($space, $startAt, $endAt, $rules);
         $this->assertValidGranularity($startAt, $rules);
         $this->assertValidDuration($startAt, $endAt, $rules);
@@ -230,6 +231,21 @@ class BookingCreationService
         }
     }
 
+    /**
+     * The booking window: at least `min_advance_minutes` of notice, and no
+     * further out than `max_advance_days`. Both default to off.
+     */
+    private function assertWithinBookingWindow(CarbonInterface $start, SpaceBookingRules $rules): void
+    {
+        if (! $this->availability->isFarEnoughAhead($start, $rules)) {
+            throw new ReceptionActionException('api.booking.too_soon');
+        }
+
+        if (! $this->availability->isWithinAdvanceHorizon($start, $rules)) {
+            throw new ReceptionActionException('api.booking.too_far_ahead');
+        }
+    }
+
     private function assertWithinBusinessHours(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {
         if (! $this->availability->isWithinBusinessHours($space, $start, $end, $rules)) {
@@ -250,6 +266,10 @@ class BookingCreationService
             throw new ReceptionActionException('api.booking.duration_too_short');
         }
 
+        if (! $this->availability->isShortEnough($start, $end, $rules)) {
+            throw new ReceptionActionException('api.booking.duration_too_long');
+        }
+
         if (! $this->availability->matchesDurationGranularity($start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.duration_invalid_granularity');
         }
@@ -260,7 +280,7 @@ class BookingCreationService
      */
     private function assertSlotAvailable(Collection $existing, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
     {
-        if ($this->availability->overlapCount($existing, $start, $end) >= $rules->concurrencyCeiling) {
+        if ($this->availability->exceedsCeiling($existing, $start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.slot_unavailable');
         }
     }

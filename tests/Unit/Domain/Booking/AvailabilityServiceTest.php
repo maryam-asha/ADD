@@ -14,6 +14,8 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -343,17 +345,187 @@ class AvailabilityServiceTest extends TestCase
     public function test_a_month_of_days_costs_a_bounded_number_of_queries(): void
     {
         $space = $this->openSpace();
+        // Resolved outside the count: a fixed handful of settings reads per
+        // request, not something that scales with the range.
+        $rules = $this->availability->rulesFor($space);
 
         $queries = 0;
         DB::listen(function () use (&$queries) {
             $queries++;
         });
 
-        $this->availability->daysInRange($space, $this->monday(), $this->monday()->copy()->addDays(30));
+        $this->availability->daysInRange($space, $this->monday(), $this->monday()->copy()->addDays(30), $rules);
 
         // Business hours (1) + exceptions (1) + closure reasons (1) +
         // bookings (1), plus a little slack for relation loading — the
         // point is that it does not scale with the 31 days.
         $this->assertLessThanOrEqual(8, $queries, "A 31-day calendar issued {$queries} queries; it must not query per day.");
+    }
+
+    // ---------------------------------------------------------------
+    // Peak concurrency, not a count of every booking touching the window
+    // ---------------------------------------------------------------
+
+    public function test_a_long_co_space_window_is_measured_by_its_busiest_moment_not_by_every_booking_it_touches(): void
+    {
+        $space = $this->openSpace([
+            'space_type' => SpaceType::CoSpace,
+            'capacity' => 2,
+            'is_lockable' => false,
+        ]);
+
+        // One seat taken 09–10 and another 11–12: never two at once.
+        $this->book($space, 9);
+        $this->book($space, 11);
+
+        $rules = $this->availability->rulesFor($space);
+        $start = $this->monday()->copy()->setTime(9, 0)->utc();
+        $end = $this->monday()->copy()->setTime(12, 0)->utc();
+        $existing = $this->availability->blockingBookings($space, $start, $end, $rules);
+
+        $this->assertFalse($this->availability->exceedsCeiling($existing, $start, $end, $rules));
+
+        // A second seat taken 09–10 fills that hour.
+        $this->book($space, 9);
+        $existing = $this->availability->blockingBookings($space, $start, $end, $rules);
+
+        $this->assertTrue($this->availability->exceedsCeiling($existing, $start, $end, $rules));
+    }
+
+    public function test_back_to_back_bookings_on_a_co_space_do_not_count_as_concurrent(): void
+    {
+        $space = $this->openSpace([
+            'space_type' => SpaceType::CoSpace,
+            'capacity' => 2,
+            'is_lockable' => false,
+        ]);
+
+        // 08–09 ends exactly as 09–10 starts: one seat at any moment.
+        $this->book($space, 8);
+        $this->book($space, 9);
+
+        $rules = $this->availability->rulesFor($space);
+        $start = $this->monday()->copy()->setTime(8, 0)->utc();
+        $end = $this->monday()->copy()->setTime(10, 0)->utc();
+        $existing = $this->availability->blockingBookings($space, $start, $end, $rules);
+
+        $this->assertFalse($this->availability->exceedsCeiling($existing, $start, $end, $rules));
+    }
+
+    // ---------------------------------------------------------------
+    // A cell is only offered if a booking can actually start there
+    // ---------------------------------------------------------------
+
+    public function test_a_cell_too_close_to_the_next_booking_to_hold_the_minimum_duration_is_not_available(): void
+    {
+        // 30-minute cells, 60-minute minimum (the setting's default).
+        $space = $this->openSpace(['slot_granularity_minutes' => 30]);
+        $this->book($space, 11);
+
+        $slots = $this->availability->slotsForDay($space, $this->monday());
+        $at1030 = collect($slots)->first(fn (SlotAvailability $slot) => $slot->startAt->setTimezone('Asia/Damascus')->format('H:i') === '10:30');
+
+        $this->assertSame(SlotState::Booked, $at1030->state, '10:30 cannot hold a 60-minute booking before 11:00.');
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 10));
+    }
+
+    public function test_the_last_cell_of_the_day_is_outside_hours_when_the_minimum_duration_overruns_closing(): void
+    {
+        $space = $this->openSpace(['slot_granularity_minutes' => 30]);
+
+        $slots = $this->availability->slotsForDay($space, $this->monday());
+        $last = end($slots);
+
+        $this->assertSame('19:30', $last->startAt->setTimezone('Asia/Damascus')->format('H:i'));
+        $this->assertSame(SlotState::OutsideHours, $last->state);
+    }
+
+    // ---------------------------------------------------------------
+    // Duration-aware slots
+    // ---------------------------------------------------------------
+
+    public function test_slots_for_a_requested_duration_span_the_whole_duration(): void
+    {
+        $space = $this->openSpace();
+        $this->book($space, 10);
+
+        $slots = $this->availability->slotsForDay($space, $this->monday(), durationMinutes: 120);
+
+        $first = $slots[0];
+        $this->assertSame('08:00', $first->startAt->setTimezone('Asia/Damascus')->format('H:i'));
+        $this->assertSame('10:00', $first->endAt->setTimezone('Asia/Damascus')->format('H:i'));
+        $this->assertSame(SlotState::Available, $first->state);
+
+        // 09–11 runs into the 10:00 booking.
+        $this->assertSame(SlotState::Booked, $this->stateAt($slots, 9));
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 11));
+    }
+
+    public function test_a_start_that_cannot_fit_the_requested_duration_before_closing_is_not_listed(): void
+    {
+        $space = $this->openSpace();
+
+        $slots = $this->availability->slotsForDay($space, $this->monday(), durationMinutes: 120);
+
+        $this->assertSame('18:00', end($slots)->startAt->setTimezone('Asia/Damascus')->format('H:i'));
+        $this->assertNull($this->stateAt($slots, 19));
+    }
+
+    public function test_a_day_with_hours_free_but_no_gap_long_enough_for_the_duration_is_full(): void
+    {
+        $space = $this->openSpace([], [['open' => '08:00', 'close' => '12:00']]);
+        $this->book($space, 9);
+        $this->book($space, 11);
+
+        $day = $this->availability->daysInRange($space, $this->monday(), $this->monday(), durationMinutes: 120)[0];
+
+        $this->assertSame(DayState::Full, $day->state);
+        $this->assertSame(DayState::Available, $this->availability->daysInRange($space, $this->monday(), $this->monday())[0]->state);
+    }
+
+    // ---------------------------------------------------------------
+    // Booking window and maximum duration
+    // ---------------------------------------------------------------
+
+    public function test_slots_inside_the_minimum_notice_are_too_soon(): void
+    {
+        app(SettingService::class)->set('booking.min_advance_minutes', 120, SettingValueType::Int);
+        $space = $this->openSpace();
+
+        $slots = $this->availability->slotsForDay($space, $this->monday());
+
+        $this->assertSame(SlotState::TooSoon, $this->stateAt($slots, 9));
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 10));
+    }
+
+    public function test_days_past_the_advance_window_are_out_of_range(): void
+    {
+        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        $space = $this->openSpace();
+        $nextMonday = $this->monday()->copy()->addWeek();
+        $mondayAfter = $this->monday()->copy()->addWeeks(2);
+
+        $this->assertSame(DayState::Available, $this->availability->daysInRange($space, $nextMonday, $nextMonday)[0]->state);
+        $this->assertSame(DayState::OutOfRange, $this->availability->daysInRange($space, $mondayAfter, $mondayAfter)[0]->state);
+    }
+
+    public function test_a_duration_above_the_maximum_is_not_a_valid_duration(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 180, SettingValueType::Int);
+        $rules = $this->availability->rulesFor($this->openSpace());
+        $start = $this->monday()->copy()->setTime(8, 0);
+
+        $this->assertTrue($this->availability->isShortEnough($start, $start->copy()->addMinutes(180), $rules));
+        $this->assertFalse($this->availability->isShortEnough($start, $start->copy()->addMinutes(240), $rules));
+        $this->assertFalse($this->availability->isValidDurationInMinutes(240, $rules));
+    }
+
+    public function test_no_maximum_duration_is_the_default(): void
+    {
+        $rules = $this->availability->rulesFor($this->openSpace());
+        $start = $this->monday()->copy()->setTime(8, 0);
+
+        $this->assertNull($rules->maxDurationMinutes);
+        $this->assertTrue($this->availability->isShortEnough($start, $start->copy()->addMinutes(720), $rules));
     }
 }

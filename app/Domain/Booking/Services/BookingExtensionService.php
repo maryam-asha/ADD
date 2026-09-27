@@ -54,6 +54,12 @@ class BookingExtensionService
             $previousEnd = $lockedBooking->end_at->copy();
             $newEndAt = $lockedBooking->end_at->copy()->addMinutes($additionalMinutes);
 
+            // The added interval is legal on its own; the booking it produces
+            // must still respect the maximum length a fresh booking would.
+            if (! $this->availability->isShortEnough($lockedBooking->start_at, $newEndAt, $rules)) {
+                throw new ReceptionActionException('api.booking.duration_too_long');
+            }
+
             // The interval being added is what must be free — the booking's
             // own rows are excluded by ignoreBookingId rather than by a
             // separate query shape, so this is the same overlap predicate

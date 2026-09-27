@@ -20,6 +20,8 @@ enum DayState: string
     case Closed = 'closed';
     case Full = 'full';
     case Past = 'past';
+    // Beyond booking.max_advance_days: open, but not yet bookable.
+    case OutOfRange = 'out_of_range';
 
     /**
      * Whether the month grid lets the member tap this date.

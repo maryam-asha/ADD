@@ -127,11 +127,14 @@ class BookingController extends Controller
         $existing = $availability->blockingBookings($space, $start, $end, $rules);
 
         $unavailableKey = match (true) {
+            ! $availability->isFarEnoughAhead($start, $rules) => 'api.booking.too_soon',
+            ! $availability->isWithinAdvanceHorizon($start, $rules) => 'api.booking.too_far_ahead',
             ! $availability->isWithinBusinessHours($space, $start, $end, $rules) => 'api.reception.outside_business_hours',
             ! $availability->isValidGranularity($start, $rules) => 'api.booking.invalid_start_time',
             ! $availability->isLongEnough($start, $end, $rules) => 'api.booking.duration_too_short',
+            ! $availability->isShortEnough($start, $end, $rules) => 'api.booking.duration_too_long',
             ! $availability->matchesDurationGranularity($start, $end, $rules) => 'api.booking.duration_invalid_granularity',
-            $availability->overlapCount($existing, $start, $end) >= $rules->concurrencyCeiling => 'api.booking.slot_unavailable',
+            $availability->exceedsCeiling($existing, $start, $end, $rules) => 'api.booking.slot_unavailable',
             $availability->violatesBuffer($existing, $start, $end, $rules) => 'api.booking.buffer_conflict',
             default => null,
         };

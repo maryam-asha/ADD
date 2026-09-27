@@ -20,6 +20,8 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -532,5 +534,82 @@ class BookingCreationServiceTest extends TestCase
 
         $this->assertSame(BookingStatus::Confirmed, $booking->status);
         $this->assertSame(0, NotificationLog::count());
+    }
+
+    // ------------------------------------------------------------------
+    // Peak concurrency, booking window, maximum duration
+    // ------------------------------------------------------------------
+
+    /**
+     * Seats taken 09–10 and 11–12 never coexist, so a 09–12 booking on a
+     * capacity-2 co_space always has a free seat. Counting every booking
+     * the window touches used to refuse it.
+     */
+    public function test_a_long_co_space_booking_is_accepted_when_no_single_moment_reaches_capacity(): void
+    {
+        $space = $this->coSpace(['capacity' => 2]);
+        $this->creations->create($space, User::factory()->create(), ...$this->slot(9));
+        $this->creations->create($space, User::factory()->create(), ...$this->slot(11));
+
+        $booking = $this->creations->create($space, User::factory()->create(), ...$this->slot(9, 180));
+
+        $this->assertInstanceOf(Booking::class, $booking);
+    }
+
+    public function test_a_long_co_space_booking_is_refused_when_one_moment_inside_it_is_full(): void
+    {
+        $space = $this->coSpace(['capacity' => 2]);
+        $this->creations->create($space, User::factory()->create(), ...$this->slot(11));
+        $this->creations->create($space, User::factory()->create(), ...$this->slot(11));
+
+        try {
+            $this->creations->create($space, User::factory()->create(), ...$this->slot(9, 180));
+            $this->fail('Expected a ReceptionActionException: 11–12 is already at capacity.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.slot_unavailable', $e->messageKey);
+        }
+    }
+
+    public function test_creation_fails_when_duration_exceeds_the_maximum(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
+        $space = $this->openSpace();
+
+        try {
+            $this->creations->create($space, User::factory()->create(), ...$this->slot(10, 180));
+            $this->fail('Expected a ReceptionActionException for a duration above the maximum.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.duration_too_long', $e->messageKey);
+        }
+    }
+
+    public function test_creation_fails_inside_the_minimum_notice(): void
+    {
+        app(SettingService::class)->set('booking.min_advance_minutes', 120, SettingValueType::Int);
+        $space = $this->openSpace();
+
+        try {
+            // Now is 08:00; 09:00 is only an hour away.
+            $this->creations->create($space, User::factory()->create(), ...$this->slot(9));
+            $this->fail('Expected a ReceptionActionException for a start inside the minimum notice.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.too_soon', $e->messageKey);
+        }
+
+        $this->assertInstanceOf(Booking::class, $this->creations->create($space, User::factory()->create(), ...$this->slot(10)));
+    }
+
+    public function test_creation_fails_beyond_the_advance_horizon(): void
+    {
+        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        $space = $this->openSpace();
+        $start = Carbon::parse('2026-08-31 10:00', 'Asia/Damascus');
+
+        try {
+            $this->creations->create($space, User::factory()->create(), $start, $start->copy()->addHour());
+            $this->fail('Expected a ReceptionActionException for a start beyond the advance horizon.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.too_far_ahead', $e->messageKey);
+        }
     }
 }

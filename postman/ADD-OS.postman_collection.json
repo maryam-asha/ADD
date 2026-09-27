@@ -1223,10 +1223,16 @@
                                             "key": "to",
                                             "value": "2026-09-30",
                                             "description": "Optional local date (Y-m-d). Max 62 days from `from`, else 422."
+                                        },
+                                        {
+                                            "key": "duration",
+                                            "value": "120",
+                                            "description": "Optional booking length in minutes (duration-first flow). With it, a day is `available` only if some start can hold a booking this long; a day whose free gaps are all shorter reads `full`. Must be a length the space accepts (see rules.duration_options_minutes), else 422 on `duration`. Echoed as meta.duration_minutes.",
+                                            "disabled": true
                                         }
                                     ]
                                 },
-                                "description": "Day states for a date range: available | closed | full | past. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots, so it shows no banner. Also returns the branch-hours card, the legend and the rules block. Range capped at 62 days."
+                                "description": "Day states for a date range: available | closed | full | past | out_of_range. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots (for the requested `duration`, when given), so it shows no banner. `out_of_range` is a day beyond booking.max_advance_days — open, not yet bookable, no banner. Also returns the branch-hours card, the legend and the rules block, which carries min/max_duration_minutes, min_advance_minutes, max_advance_days (null = no limit) and duration_options_minutes (the lengths this space accepts). Range capped at 62 days."
                             }
                         },
                         {
@@ -1273,10 +1279,71 @@
                                             "key": "date",
                                             "value": "2026-09-24",
                                             "description": "Required local date (Y-m-d)."
+                                        },
+                                        {
+                                            "key": "duration",
+                                            "value": "120",
+                                            "description": "Optional. Enable for the duration-first shape — see the next request.",
+                                            "disabled": true
                                         }
                                     ]
                                 },
-                                "description": "The time-slot grid for one date. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past — plus `is_available` and a translated `reason`. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
+                                "description": "The time-slot grid for one date. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
+                            }
+                        },
+                        {
+                            "name": "Day Slots for a Duration — Duration First",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability/slots?date=2026-09-24&duration=120",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "availability",
+                                        "slots"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "date",
+                                            "value": "2026-09-24",
+                                            "description": "Required local date (Y-m-d)."
+                                        },
+                                        {
+                                            "key": "duration",
+                                            "value": "120",
+                                            "description": "Booking length in minutes, picked from rules.duration_options_minutes. A length the space does not accept (below min, above max, off granularity) is a 422 on `duration` with the same message POST bookings would return."
+                                        }
+                                    ]
+                                },
+                                "description": "Duration → start time → confirm. Each slot is a whole bookable window: start_at/end_at span the full duration, stepping by the space's granularity, and each carries duration_minutes, points and amount_usd. A start whose window would run past closing is not listed at all; one that is taken, in a buffer or too soon stays listed with its state and reason so the app can grey it out. Pick an available slot and POST bookings with its start_at/end_at — that call still re-checks everything under a lock, so a slot can be lost between listing and booking. meta.duration_minutes echoes the request."
                             }
                         },
                         {
@@ -1326,7 +1393,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Powers the duration selector, computed end time, price and running total. The ladder comes from the booking.duration_options_minutes setting (seeded 60/90/120/180 = 1h/1.5h/2h/3h). An option that would run past closing, overlap a booking or break the space's granularity is returned with available:false and a stated reason rather than being hidden, so the app greys the chip out and can say why."
+                                "description": "Powers the duration selector, computed end time, price and running total. The ladder comes from the booking.duration_options_minutes setting (seeded 60/90/120/180 = 1h/1.5h/2h/3h). An option that would run past closing, overlap a booking, break the space's granularity, exceed booking.max_duration_minutes, or start too soon / too far ahead is returned with available:false and a stated reason rather than being hidden, so the app greys the chip out and can say why. This is the start-first flow; for duration-first use Day Slots for a Duration."
                             }
                         }
                     ]
@@ -1981,6 +2048,54 @@
                                     ]
                                 },
                                 "description": "422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting."
+                            }
+                        },
+                        {
+                            "name": "Create Booking — Error: Outside the Booking Window / Too Long",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2027-06-01 10:00\",\n  \"end_at\": \"2027-06-01 18:00\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings"
+                                    ]
+                                },
+                                "description": "Three rules, all OFF by default (setting = 0 means no limit), so this request only fails once an admin sets them via Settings:\n• booking.max_advance_days → 422 api.booking.too_far_ahead (start date beyond today + N local days)\n• booking.min_advance_minutes → 422 api.booking.too_soon (start closer to now than N minutes)\n• booking.max_duration_minutes → 422 api.booking.duration_too_long (also enforced on extension, against the booking's total length)\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon / duration_too_long) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range."
                             }
                         }
                     ]
@@ -7849,6 +7964,12 @@
                                             "key": "date",
                                             "value": "2026-09-24",
                                             "description": "Required local date (Y-m-d)."
+                                        },
+                                        {
+                                            "key": "duration",
+                                            "value": "120",
+                                            "description": "Optional booking length in minutes. With it, each slot is a whole window of that length, priced — the same duration-first shape as the member route.",
+                                            "disabled": true
                                         }
                                     ]
                                 },

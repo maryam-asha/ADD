@@ -30,6 +30,7 @@ class SpaceAvailabilityController extends Controller
             $request->validated('from'),
             $request->validated('to'),
             app()->getLocale(),
+            $request->duration(),
         ));
     }
 
@@ -42,6 +43,7 @@ class SpaceAvailabilityController extends Controller
             $space,
             $request->validated('date'),
             app()->getLocale(),
+            $request->duration(),
         ));
     }
 

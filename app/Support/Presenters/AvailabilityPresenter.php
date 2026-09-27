@@ -2,6 +2,7 @@
 
 namespace App\Support\Presenters;
 
+use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\ValueObjects\DayAvailability;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
@@ -107,14 +108,7 @@ class AvailabilityPresenter
      */
     public function slotCounts(array $slots): array
     {
-        $counts = [
-            'available' => 0,
-            'booked' => 0,
-            'outside_hours' => 0,
-            'buffer' => 0,
-            'at_capacity' => 0,
-            'past' => 0,
-        ];
+        $counts = array_fill_keys(array_column(SlotState::cases(), 'value'), 0);
 
         foreach ($slots as $slot) {
             $counts[$slot->state->value]++;
@@ -184,13 +178,21 @@ class AvailabilityPresenter
      * own inputs, including the two lang keys that were written for this
      * screen and had no consumer until now.
      *
+     * @param  list<int>  $durationOptions
      * @return array<string, mixed>
      */
-    public function rules(SpaceBookingRules $rules, string $locale, int $maxSelectableDates): array
+    public function rules(SpaceBookingRules $rules, string $locale, int $maxSelectableDates, array $durationOptions = []): array
     {
         return [
             'granularity_minutes' => $rules->granularityMinutes,
             'min_duration_minutes' => $rules->minDurationMinutes,
+            // Null means no ceiling / no horizon.
+            'max_duration_minutes' => $rules->maxDurationMinutes,
+            'min_advance_minutes' => $rules->minAdvanceMinutes,
+            'max_advance_days' => $rules->maxAdvanceDays,
+            // Only lengths this space accepts: the chips a duration-first
+            // picker shows before any start time is chosen.
+            'duration_options_minutes' => $durationOptions,
             'buffer_minutes' => $rules->bufferMinutes,
             'cancellation_window_minutes' => $rules->cancellationWindowMinutes,
             'requires_approval' => $rules->requiresApproval,

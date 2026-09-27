@@ -13,6 +13,8 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -217,6 +219,24 @@ class BookingExtensionServiceTest extends TestCase
             $this->assertSame('api.booking.extension_conflict', $e->messageKey);
         }
 
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+    }
+
+    public function test_extension_fails_when_the_extended_booking_would_exceed_the_maximum_duration(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
+        $booking = $this->checkedInBooking();
+
+        // 60 already booked + 90 more = 150, above the 120 ceiling — even
+        // though 90 on its own is a legal length.
+        try {
+            $this->extensions->extend($booking, 90);
+            $this->fail('Expected a ReceptionActionException for exceeding the maximum duration.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.duration_too_long', $e->messageKey);
+        }
+
+        $this->extensions->extend($booking->fresh(), 60);
         $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
     }
 }

@@ -26,6 +26,12 @@ final readonly class SpaceBookingRules
         public ?int $capacity,
         public int $concurrencyCeiling,
         public string $timezone,
+        // Null means "no ceiling" / "no horizon". A zero in the settings
+        // table reads the same way, so an admin clearing the value does
+        // not accidentally forbid every booking.
+        public ?int $maxDurationMinutes = null,
+        public int $minAdvanceMinutes = 0,
+        public ?int $maxAdvanceDays = null,
     ) {}
 
     /**

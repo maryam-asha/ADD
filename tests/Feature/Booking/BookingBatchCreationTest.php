@@ -13,6 +13,8 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -280,5 +282,25 @@ class BookingBatchCreationTest extends TestCase
         $this->postJson('/api/v1/member/bookings/batch', [
             'windows' => [$this->window($space, '2026-08-17')],
         ])->assertUnauthorized();
+    }
+
+    public function test_a_window_longer_than_the_maximum_fails_the_batch_naming_its_index(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'windows' => [
+                $this->window($space, '2026-08-17', 10, 120),
+                $this->window($space, '2026-08-18', 10, 180),
+            ],
+        ]);
+
+        $response->assertStatus(422)
+            ->assertJsonPath('errors.0.index', 1)
+            ->assertJsonPath('errors.0.reason', 'duration_too_long');
+
+        $this->assertSame(0, Booking::count());
     }
 }

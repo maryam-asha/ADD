@@ -20,6 +20,8 @@ enum SlotState: string
     case Buffer = 'buffer';
     case AtCapacity = 'at_capacity';
     case Past = 'past';
+    case TooSoon = 'too_soon';
+    case TooFarAhead = 'too_far_ahead';
 
     /**
      * The message key the write path uses for this same condition.
@@ -36,6 +38,8 @@ enum SlotState: string
             self::Buffer => 'api.booking.buffer_conflict',
             self::AtCapacity => 'api.booking.space_at_capacity',
             self::Past => 'api.booking.slot_in_past',
+            self::TooSoon => 'api.booking.too_soon',
+            self::TooFarAhead => 'api.booking.too_far_ahead',
         };
     }
 

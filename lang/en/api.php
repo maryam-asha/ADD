@@ -188,6 +188,10 @@ return [
     'booking' => [
         'invalid_start_time' => "The start time does not match this space's slot granularity.",
         'duration_too_short' => 'The booking duration is shorter than the minimum allowed.',
+        'duration_too_long' => 'The booking duration is longer than the maximum allowed.',
+        'too_soon' => 'This time is too soon to book. Please choose a later start.',
+        'too_far_ahead' => 'This date is too far ahead to book yet.',
+        'duration_not_offered' => 'This duration is not available for this space.',
         'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
         'slot_unavailable' => 'This space is not available for the requested time.',
         'buffer_conflict' => 'This booking is too close to another booking on this space.',

@@ -14,6 +14,8 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -486,5 +488,26 @@ class MemberBookingLifecycleTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.status_label', 'قيد المراجعة')
             ->assertJsonPath('data.request_status.steps.0.label', 'تم الإرسال');
+    }
+
+    public function test_a_window_beyond_the_advance_horizon_is_previewed_with_the_message_the_post_would_return(): void
+    {
+        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        $window = [
+            'space_id' => $space->id,
+            'start_at' => '2026-08-31 14:00',
+            'end_at' => '2026-08-31 15:00',
+        ];
+
+        $previewReason = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', $window)
+            ->assertOk()->json('data.unavailable_reason');
+
+        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window)
+            ->assertStatus(422)->json('message');
+
+        $this->assertSame(__('api.booking.too_far_ahead', [], 'en'), $postMessage);
+        $this->assertSame($postMessage, $previewReason);
     }
 }

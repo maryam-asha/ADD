@@ -10,6 +10,7 @@ use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -466,5 +467,164 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->assertForbidden();
         $this->getJson("/api/v1/admin/spaces/{$space->id}/availability/quote?start_at=2026-08-17 10:00")
             ->assertForbidden();
+    }
+
+    // ------------------------------------------------------------------
+    // Duration first: the app picks a length, then sees where it fits
+    // ------------------------------------------------------------------
+
+    public function test_slots_for_a_duration_are_whole_bookable_windows_each_priced(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        $this->book($space, 10);
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=120");
+
+        $response->assertOk()
+            ->assertJsonPath('meta.duration_minutes', 120)
+            ->assertJsonPath('data.0.start_time', '08:00')
+            ->assertJsonPath('data.0.end_time', '10:00')
+            ->assertJsonPath('data.0.is_available', true)
+            ->assertJsonPath('data.0.duration_minutes', 120)
+            ->assertJsonPath('data.0.points', 200)
+            // 09:00–11:00 runs into the 10:00 booking.
+            ->assertJsonPath('data.1.start_time', '09:00')
+            ->assertJsonPath('data.1.state', 'booked')
+            ->assertJsonPath('data.1.reason', __('api.booking.slot_unavailable', [], 'en'));
+
+        // The last start that still ends by 20:00.
+        $this->assertSame('18:00', collect($response->json('data'))->last()['start_time']);
+    }
+
+    public function test_slots_without_a_duration_keep_their_cell_shape_and_carry_no_price(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17");
+
+        $response->assertOk()
+            ->assertJsonPath('meta.duration_minutes', null)
+            ->assertJsonPath('data.0.end_time', '09:00')
+            ->assertJsonMissingPath('data.0.points');
+    }
+
+    public function test_a_duration_this_space_does_not_accept_is_a_validation_error(): void
+    {
+        $this->actingAsMember();
+        // 60-minute granularity: 90 minutes is not a legal length here.
+        $space = $this->openSpace();
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=90")
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['duration']);
+    }
+
+    public function test_a_duration_above_the_maximum_is_a_validation_error(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 120);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=180")
+            ->assertStatus(422)
+            ->assertJsonPath('errors.duration.0', __('api.booking.duration_too_long', [], 'en'));
+    }
+
+    public function test_the_month_for_a_duration_marks_a_day_full_when_no_gap_is_long_enough(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        // Free: 08–10, 11–13, 14–16, 17–20. Nothing holds four hours.
+        $this->book($space, 10);
+        $this->book($space, 13);
+        $this->book($space, 16);
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17&duration=240")
+            ->assertOk()
+            ->assertJsonPath('data.0.state', 'full')
+            ->assertJsonPath('meta.duration_minutes', 240);
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17&duration=180")
+            ->assertOk()
+            ->assertJsonPath('data.0.state', 'available');
+    }
+
+    public function test_days_beyond_the_advance_horizon_are_out_of_range_and_not_selectable(): void
+    {
+        app(SettingService::class)->set('booking.max_advance_days', 7);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-24&to=2026-08-25");
+
+        $response->assertOk()
+            ->assertJsonPath('data.0.state', 'available')
+            ->assertJsonPath('data.1.state', 'out_of_range')
+            ->assertJsonPath('data.1.is_selectable', false)
+            ->assertJsonPath('data.1.closed_banner', null);
+    }
+
+    public function test_the_rules_block_carries_every_duration_and_window_constraint(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 180);
+        app(SettingService::class)->set('booking.min_advance_minutes', 30);
+        app(SettingService::class)->set('booking.max_advance_days', 30);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertOk()
+            ->assertJsonPath('rules.min_duration_minutes', 60)
+            ->assertJsonPath('rules.max_duration_minutes', 180)
+            ->assertJsonPath('rules.min_advance_minutes', 30)
+            ->assertJsonPath('rules.max_advance_days', 30)
+            // 90 is not a legal length at 60-minute granularity, so the
+            // ladder offers only what this space accepts.
+            ->assertJsonPath('rules.duration_options_minutes', [60, 120, 180]);
+    }
+
+    public function test_a_quote_option_above_the_maximum_is_unavailable_with_that_reason(): void
+    {
+        app(SettingService::class)->set('booking.max_duration_minutes', 120);
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/quote?start_at=2026-08-17 10:00");
+
+        $response->assertOk()
+            ->assertJsonPath('durations.3.minutes', 180)
+            ->assertJsonPath('durations.3.available', false)
+            ->assertJsonPath('durations.3.reason', __('api.booking.duration_too_long', [], 'en'));
+    }
+
+    public function test_the_admin_and_member_duration_slot_grids_are_byte_identical(): void
+    {
+        $space = $this->openSpace();
+        $this->book($space, 14);
+
+        $this->actingAsMember();
+        $asMember = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=120")
+            ->assertOk()
+            ->json();
+
+        $this->actingAsOperations();
+        $asOperations = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=120")
+            ->assertOk()
+            ->json();
+
+        $this->assertSame($asMember, $asOperations);
     }
 }

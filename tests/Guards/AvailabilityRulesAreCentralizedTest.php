@@ -132,7 +132,11 @@ class AvailabilityRulesAreCentralizedTest extends TestCase
             'isValidGranularity',
             'isLongEnough',
             'matchesDurationGranularity',
+            'isShortEnough',
+            'isFarEnoughAhead',
+            'isWithinAdvanceHorizon',
             'overlapCount',
+            'exceedsCeiling',
             'violatesBuffer',
         ] as $predicate) {
             $this->assertStringContainsString(
