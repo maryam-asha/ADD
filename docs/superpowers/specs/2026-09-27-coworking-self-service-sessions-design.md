@@ -256,10 +256,17 @@ revoking it from the dashboard and pairing the kiosk again.
 
 1. Resolve the kiosk: from `qr_value` via `KioskCodeVerifier`, or from the
    `scan_ticket`.
-2. **Open session already?** If the member has an open coworking session
+2. **Pre-checks**, before any open-session / booking / coverage step, so a
+   member is never asked to accept a paid session that would then be
+   refused:
+   - The kiosk's space is not an active `co_space` → **422**
+     `api.coworking.unavailable`.
+   - Outside business hours → **422** `api.reception.outside_business_hours`
+     (the existing key).
+3. **Open session already?** If the member has an open coworking session
    (a checked-in, not checked-out booking or walk-in on any `co_space`),
    return it with 200. Idempotent — the app just shows the timer.
-3. **Booking mode.** If the member has a booking today on the kiosk's space
+4. **Booking mode.** If the member has a booking today on the kiosk's space
    with no `checked_in_at` — `ArrivalRequestMatcher`'s existing rule (today
    in the branch's timezone, `blocking()` status, not yet ended), given a new
    optional `?Space` argument that narrows it to that one space; the arrival
@@ -271,7 +278,7 @@ revoking it from the dashboard and pairing the kiosk again.
    - `pending` → 409 `api.coworking.booking_pending_approval`. No fallback
      to a walk-in, for the same reason `kiosk-display.md` refuses one: it
      would route around the approval guard.
-4. **Walk-in mode.** Evaluate coverage (below).
+5. **Walk-in mode.** Evaluate coverage (below).
    - `covered` → start through `WalkInCapacityService::start()` with
      `started_via = scan`, `kiosk_id`; 201.
    - not covered and no `accept_uncovered` → **422**
@@ -282,9 +289,12 @@ revoking it from the dashboard and pairing the kiosk again.
      is **re-evaluated** (it may have changed, e.g. a renewal in between),
      then start with `accepted_uncovered = true`; 201.
 
-Business hours, capacity (with its row lock) and membership stamping all stay
-inside `WalkInCapacityService::start()` — unchanged rules, one code path for
-reception and scan.
+Business hours and space-type are still enforced authoritatively inside
+`WalkInCapacityService::start()` / `BookingCheckInService`, under the row
+lock — step 2's pre-check only saves a pointless confirmation round-trip; it
+is not a replacement for that check. Capacity (with its row lock) and
+membership stamping still live only inside `WalkInCapacityService::start()`
+— unchanged rules, one code path for reception and scan.
 
 ### Scan ticket
 
@@ -316,7 +326,9 @@ Reasons, checked in this order (first match wins):
 The evaluator reads through the existing `MembershipResolver` and
 `PlanHourCoverageService`; it does not re-implement either. The existing
 reception walk-in response's `plan_applies`/`outside_plan_window` notice is
-derived from it too, so reception and scan can never disagree.
+left exactly as it is — untouched. Instead, every walk-in, reception or scan,
+stores this evaluator's `coverage_snapshot` at start, so the reception list
+shows the same plan picture for both paths.
 
 ### Timer — `GET member/coworking-sessions/current`
 
