@@ -128,6 +128,7 @@ return [
         'exchange_rate_suggestion_not_pending' => 'يمكن رفض الاقتراح المعلّق فقط.',
         'role_updated' => 'تم تحديث الدور.',
         'inquiry_updated' => 'تم تحديث الاستفسار.',
+        'kiosk_updated' => 'تم تحديث الكشك.',
     ],
 
     'public' => [
@@ -267,6 +268,34 @@ return [
         'space_id_required' => 'يجب تحديد مساحة لتأكيد طلب وصول غير مطابق لحجز.',
         'arrival_request_confirmed' => 'تم تأكيد الوصول.',
         'arrival_request_rejected' => 'تم رفض طلب الوصول.',
+        'not_a_coworking_space' => 'لا يمكن ربط الكشك إلا بمساحة عمل مشتركة.',
+        'invalid_pairing_code' => 'رمز الاقتران غير صالح أو منتهي الصلاحية.',
+        'secret_revoked' => 'تم إلغاء اقتران الكشك. يجب اقترانه من جديد لاستخدامه.',
+    ],
+
+    'coworking' => [
+        'invalid_code' => 'هذا الرمز غير صالح. امسح الرمز الظاهر حالياً على الكشك.',
+        'ticket_expired' => 'انتهت مهلة التأكيد. امسح رمز الكشك من جديد.',
+        'unavailable' => 'جلسات العمل المشترك غير متاحة على هذا الكشك حالياً.',
+        'confirmation_required' => 'باقتك لن تغطي هذه الجلسة (:reason). سيتم احتسابها بسعر :rate نقطة للساعة.',
+        'booking_pending_approval' => 'حجزك بانتظار الموافقة. يرجى مراجعة الاستقبال.',
+        'no_open_session' => 'لا توجد لديك جلسة فعّالة.',
+        'end_request_not_pending' => 'طلب الإنهاء هذا لم يعد قيد الانتظار.',
+        'end_request_cancelled' => 'تم سحب طلب الإنهاء.',
+        'session_ended' => 'تم إنهاء الجلسة.',
+        'reasons' => [
+            'no_plan' => 'لا توجد لديك باقة فعّالة',
+            'plan_expired' => 'انتهت صلاحية باقتك',
+            'plan_without_hours' => 'باقتك لا تتضمن ساعات عمل مشترك',
+            'hours_exhausted' => 'نفدت ساعات باقتك',
+            'outside_window' => 'الوقت الحالي خارج أوقات باقتك',
+        ],
+        'report' => [
+            'time_so_far' => 'الوقت حتى الآن',
+            'time_from_plan' => 'وقت مغطى من باقتك',
+            'time_charged' => 'وقت مدفوع',
+            'unit_hour' => 'ساعة',
+        ],
     ],
 
     'notification' => [

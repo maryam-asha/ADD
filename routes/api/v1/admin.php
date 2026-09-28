@@ -28,6 +28,7 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
+use App\Http\Controllers\Api\V1\Admin\KioskController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
@@ -368,6 +369,11 @@ Route::middleware('role:admin')->group(function () {
     Route::get('service-requests', [AdminServiceRequestController::class, 'index']);
     Route::get('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'show']);
     Route::patch('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'update']);
+
+    // Kiosk devices that start self-service coworking sessions
+    // (docs/decisions/coworking-self-service-sessions.md). Admin-only: a
+    // kiosk's pairing is a credential.
+    Route::apiResource('kiosks', KioskController::class);
 });
 
 /*

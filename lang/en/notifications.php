@@ -152,4 +152,11 @@ return [
         ],
     ],
 
+    'coworking' => [
+        'session_ended' => [
+            'title' => 'Session Ended',
+            'body' => 'Your session at :space has ended. Tap to see the report.',
+        ],
+    ],
+
 ];

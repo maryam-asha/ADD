@@ -128,6 +128,7 @@ return [
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
         'role_updated' => 'Role updated.',
         'inquiry_updated' => 'Inquiry updated.',
+        'kiosk_updated' => 'Kiosk updated.',
     ],
 
     'public' => [
@@ -268,6 +269,34 @@ return [
         'space_id_required' => 'A space is required to confirm an unmatched arrival request.',
         'arrival_request_confirmed' => 'Arrival confirmed.',
         'arrival_request_rejected' => 'Arrival request rejected.',
+        'not_a_coworking_space' => 'A kiosk can only serve a coworking space.',
+        'invalid_pairing_code' => 'This pairing code is invalid or has expired.',
+        'secret_revoked' => 'The kiosk has been unpaired. Pair it again to use it.',
+    ],
+
+    'coworking' => [
+        'invalid_code' => 'This code is not valid. Scan the code currently shown on the kiosk.',
+        'ticket_expired' => 'This confirmation has expired. Scan the kiosk code again.',
+        'unavailable' => 'Coworking sessions are not available at this kiosk right now.',
+        'confirmation_required' => 'Your plan will not cover this session (:reason). It will be billed at :rate points per hour.',
+        'booking_pending_approval' => 'Your booking is awaiting approval. Please see reception.',
+        'no_open_session' => 'You have no active session.',
+        'end_request_not_pending' => 'This end request is no longer pending.',
+        'end_request_cancelled' => 'End request withdrawn.',
+        'session_ended' => 'Session ended.',
+        'reasons' => [
+            'no_plan' => 'you have no active plan',
+            'plan_expired' => 'your plan has expired',
+            'plan_without_hours' => 'your plan does not include coworking hours',
+            'hours_exhausted' => "your plan's hours are used up",
+            'outside_window' => "it is outside your plan's hours",
+        ],
+        'report' => [
+            'time_so_far' => 'Time so far',
+            'time_from_plan' => 'Time covered by your plan',
+            'time_charged' => 'Charged time',
+            'unit_hour' => 'hour',
+        ],
     ],
 
     'notification' => [
