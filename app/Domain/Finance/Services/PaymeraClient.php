@@ -162,8 +162,19 @@ class PaymeraClient
         $errorCode = (int) $body['ErrorCode'];
         $errorMessage = (string) ($body['ErrorMessage'] ?? 'unknown Paymera error');
 
-        if ($errorCode === self::ERROR_UNAUTHORIZED) {
-            $this->log('error', 'unauthorized', ['path' => $path, 'error_message' => $errorMessage]);
+        // Verified against the live test gateway (2026-09-27): a credential
+        // fault does NOT always come back as the documented ErrorCode 1. An
+        // empty or malformed key answers `{"ErrorCode":100,"ErrorMessage":
+        // "Invalid API key format"}` — the generic failure code, with the
+        // real cause only in the message. Treating that as an ordinary
+        // vendor error told the operator "try again", which is useless
+        // advice for a key that will never work until someone edits .env.
+        if ($errorCode === self::ERROR_UNAUTHORIZED || $this->looksLikeCredentialFault($errorMessage)) {
+            $this->log('error', 'unauthorized', [
+                'path' => $path,
+                'error_code' => $errorCode,
+                'error_message' => $errorMessage,
+            ]);
 
             throw PaymeraUnauthorizedException::make();
         }
@@ -181,6 +192,30 @@ class PaymeraClient
         $data = $body['Data'] ?? [];
 
         return is_array($data) ? $data : [];
+    }
+
+    /**
+     * Whether a non-zero ErrorCode's message is really about our
+     * credentials rather than the payment.
+     *
+     * Deliberately narrow: it matches phrases naming the API key or
+     * authorization, not the word "invalid" on its own, so a genuinely
+     * declined payment is never mistaken for a configuration fault. The
+     * distinction matters because the two need opposite responses — retry
+     * later versus fix .env and redeploy.
+     */
+    private function looksLikeCredentialFault(string $errorMessage): bool
+    {
+        $needles = ['api key', 'apikey', 'unauthorized', 'unauthorised', 'not authorized', 'invalid key'];
+        $message = strtolower($errorMessage);
+
+        foreach ($needles as $needle) {
+            if (str_contains($message, $needle)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function request(bool $retry): PendingRequest

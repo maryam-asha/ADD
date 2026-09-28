@@ -166,6 +166,59 @@ class PaymeraPaymentTest extends TestCase
     // 2. Unauthorized (ErrorCode 1)
     // ---------------------------------------------------------------
 
+    /**
+     * Verified against the live test gateway on 2026-09-27: a bad or empty
+     * API key does NOT come back as the documented ErrorCode 1. It answers
+     * ErrorCode 100 — the generic failure code — with the real cause only
+     * in ErrorMessage ("Invalid API key format").
+     *
+     * That must still read as a configuration fault (503, "try shortly"),
+     * not as the generic 502 "could not start", because the two need
+     * opposite responses: one needs someone to fix .env, the other is worth
+     * retrying.
+     */
+    public function test_a_credential_fault_reported_as_error_code_100_is_still_treated_as_unauthorized(): void
+    {
+        $this->member();
+
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Invalid API key format',
+                'ErrorCode' => 100,
+            ]),
+        ]);
+
+        $this->postJson('/api/v1/member/payments', [
+            'purpose' => PaymentPurpose::WalletTopUp->value,
+            'amount' => '10.00',
+        ])->assertStatus(503);
+
+        $this->assertSame(PaymentStatus::Failed, Payment::first()->status);
+    }
+
+    /**
+     * The counterpart: a genuine payment-side failure with the same
+     * ErrorCode 100 must NOT be mistaken for a credential problem, or a
+     * real outage would be reported as a misconfiguration.
+     */
+    public function test_a_genuine_vendor_failure_is_not_mistaken_for_a_credential_fault(): void
+    {
+        $this->member();
+
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Error, some info are missing',
+                'ErrorCode' => 100,
+            ]),
+        ]);
+
+        // 502, not 503 — this one is worth retrying.
+        $this->postJson('/api/v1/member/payments', [
+            'purpose' => PaymentPurpose::WalletTopUp->value,
+            'amount' => '10.00',
+        ])->assertStatus(502);
+    }
+
     public function test_error_code_one_surfaces_as_a_service_unavailable_and_not_a_declined_card(): void
     {
         $this->member();

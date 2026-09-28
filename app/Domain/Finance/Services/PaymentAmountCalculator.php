@@ -2,6 +2,8 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Exceptions\PaymentPricingException;
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Membership\Models\Plan;
 use InvalidArgumentException;
 
@@ -107,6 +109,45 @@ class PaymentAmountCalculator
     }
 
     /**
+     * A gateway minor-unit amount as a decimal string in the currency it
+     * was actually charged in — 250000 minor SYP units becomes "2500.00".
+     *
+     * This, not minorToUsd(), is what belongs in a ledger row's
+     * `payment_amount` when `payment_currency` names the charged currency.
+     * Writing the USD value next to a "SYP" label makes the pair a lie.
+     */
+    public function minorToCharged(int $amountMinor): string
+    {
+        $factor = bcpow('10', (string) $this->exponent(), 0);
+
+        return bcdiv((string) $amountMinor, $factor, 2);
+    }
+
+    /**
+     * The base-currency-to-charged-currency rate this payment was priced
+     * at, or null when the charge is already in the base currency and no
+     * conversion happened.
+     *
+     * Recorded on the ledger row so a historical credit can be re-derived
+     * later, when the live rate has long since moved — the same reason
+     * WalletTopUpController stores `exchange_rate_to_base` for cash taken
+     * in a foreign currency.
+     */
+    public function appliedExchangeRate(): ?string
+    {
+        $base = $this->currency->baseCurrencyCode();
+        $target = $this->currencyCode();
+
+        if ($target === $base) {
+            return null;
+        }
+
+        $rate = ExchangeRate::current($target);
+
+        return $rate !== null ? (string) $rate->rate_to_base : null;
+    }
+
+    /**
      * The currency the card is actually charged in.
      */
     public function currencyCode(): string
@@ -131,9 +172,7 @@ class PaymentAmountCalculator
         $converted = $this->currency->convert((float) $usd, $base, $target);
 
         if ($converted === null) {
-            throw new InvalidArgumentException(
-                "No active exchange rate from {$base} to {$target}; cannot price a card payment."
-            );
+            throw PaymentPricingException::missingExchangeRate($base, $target);
         }
 
         return number_format($converted, 4, '.', '');
@@ -151,9 +190,7 @@ class PaymentAmountCalculator
         $converted = $this->currency->convert((float) $charged, $source, $base);
 
         if ($converted === null) {
-            throw new InvalidArgumentException(
-                "No active exchange rate from {$source} to {$base}; cannot price a card payment."
-            );
+            throw PaymentPricingException::missingExchangeRate($source, $base);
         }
 
         return number_format($converted, 4, '.', '');

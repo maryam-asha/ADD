@@ -101,6 +101,13 @@ class StartPaymentRequest extends FormRequest
         } catch (\InvalidArgumentException) {
             $validator->errors()->add('amount', __('api.wallet.amount_below_one_point'));
         }
+
+        // PaymentPricingException is deliberately NOT caught here. It means
+        // the charge currency has no exchange rate — a misconfiguration on
+        // our side, not something wrong with the amount the member typed.
+        // Reporting it as a validation error on `amount` would tell them to
+        // fix input that is perfectly valid. It propagates instead, and
+        // bootstrap/app.php renders it as a 503.
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Services\Otp\Drivers;
 
 use App\Services\Otp\OtpProvider;
 use Illuminate\Http\Client\ConnectionException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -38,12 +39,17 @@ class HalaSenderOtpProvider implements OtpProvider
             $response = Http::baseUrl(config('services.hala_sender.base_url'))
                 ->withHeaders(['X-ApiKey' => config('services.hala_sender.api_key')])
                 ->acceptJson()
-                ->timeout(10)
-                // The gateway intermittently times out or answers 400
-                // "Something went wrong ... check your devices" and then
-                // succeeds moments later — one retry covers that. throw: false
-                // so a final failure lands in the check below, not an exception.
-                ->retry(2, 1000, throw: false)
+                ->connectTimeout(5)
+                // The gateway sends synchronously and has been seen taking
+                // well over 10s to answer from production. 20s gives it room
+                // while staying under a typical 30s PHP execution limit.
+                ->timeout(20)
+                // It also intermittently answers 400 "Something went wrong ...
+                // check your devices" and succeeds moments later, so an error
+                // *response* gets one retry. A timeout does not: that would
+                // double the wait, and the first send may still land.
+                // throw: false so a final failure reaches the check below.
+                ->retry(2, 1000, fn ($e) => $e instanceof RequestException, throw: false)
                 ->post('/whatsapp/messages/send', $payload);
         } catch (ConnectionException $e) {
             Log::error('[HalaSenderOtpProvider] connection failed', ['error' => $e->getMessage()]);

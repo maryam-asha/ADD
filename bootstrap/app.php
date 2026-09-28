@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -9,6 +10,7 @@ use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Exceptions\ThrottleRequestsException;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use Laravel\Sanctum\Http\Middleware\CheckAbilities;
 use Laravel\Sanctum\Http\Middleware\CheckForAnyAbility;
@@ -143,6 +145,23 @@ return Application::configure(basePath: dirname(__DIR__))
         $exceptions->render(fn (NotFoundHttpException $e) => response()->json([
             'message' => __('api.system.not_found'),
         ], 404));
+
+        // A card payment that cannot be priced at all — in practice, a
+        // charge currency (PAYMERA_CURRENCY) with no active exchange rate
+        // against the base currency. Handled here rather than only in
+        // PaymentController because the pricing runs inside
+        // StartPaymentRequest's validation too, which is *before* any
+        // controller try/catch can see it; without this the member got a
+        // raw 500. It is not a validation error — the member's input is
+        // fine, our configuration is not — so it must not surface as a 422
+        // against the amount they typed.
+        $exceptions->render(function (PaymentPricingException $e) {
+            Log::channel('paymera')->alert('[Paymera] payment could not be priced', [
+                'error' => $e->getMessage(),
+            ]);
+
+            return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
+        });
 
         // Registered last: Throwable matches everything, so an earlier match
         // above always wins. Returning null in debug mode defers to Laravel's
