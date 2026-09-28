@@ -109,6 +109,7 @@ class BookingCalendarService
                 $this->openWeekdays($periodsByDate),
                 $this->availability->rulesFor($spaces->first()),
                 $locale,
+                $this->businessHours->upcomingClosures($branch),
             ),
             'resources' => $resources,
             'totals' => $this->totals($resources, $bookings),

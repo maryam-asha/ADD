@@ -235,4 +235,98 @@ class BusinessHoursServiceTest extends TestCase
 
         $this->assertTrue($this->service->isWithinBusinessHours($instant, $branch));
     }
+
+    // ---------------------------------------------------------------
+    // Upcoming closures — what a date picker must refuse ahead of time
+    // ---------------------------------------------------------------
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private function exception(Branch $branch, string $date, array $attributes = []): BusinessHourException
+    {
+        return BusinessHourException::factory()->create(array_merge([
+            'branch_id' => $branch->id,
+            'date' => $date,
+            'is_closed' => true,
+            'open_time' => null,
+            'close_time' => null,
+            'reason' => null,
+        ], $attributes));
+    }
+
+    public function test_upcoming_closures_are_the_branchs_closed_days_from_today_on_in_date_order(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));
+        $branch = Branch::factory()->create();
+
+        $this->exception($branch, '2026-09-01', ['reason' => 'Independence day']);
+        $this->exception($branch, '2026-08-17', ['reason' => 'Maintenance']);
+        $this->exception($branch, '2026-08-20');
+
+        $this->assertSame([
+            ['date' => '2026-08-17', 'reason' => 'Maintenance'],
+            ['date' => '2026-08-20', 'reason' => null],
+            ['date' => '2026-09-01', 'reason' => 'Independence day'],
+        ], $this->service->upcomingClosures($branch));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_a_closure_already_past_is_not_upcoming(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));
+        $branch = Branch::factory()->create();
+        $this->exception($branch, '2026-08-16');
+
+        $this->assertSame([], $this->service->upcomingClosures($branch));
+
+        Carbon::setTestNow();
+    }
+
+    /**
+     * A shortened day is still open — only an all-day closure makes a date
+     * unbookable, so only those are listed.
+     */
+    public function test_an_exception_that_only_changes_the_hours_is_not_a_closure(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));
+        $branch = Branch::factory()->create();
+        $this->exception($branch, '2026-08-20', ['is_closed' => false, 'open_time' => '10:00', 'close_time' => '14:00']);
+
+        $this->assertSame([], $this->service->upcomingClosures($branch));
+
+        Carbon::setTestNow();
+    }
+
+    public function test_another_branchs_closures_are_not_listed(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));
+        $branch = Branch::factory()->create();
+        $this->exception(Branch::factory()->create(), '2026-08-20');
+
+        $this->assertSame([], $this->service->upcomingClosures($branch));
+
+        Carbon::setTestNow();
+    }
+
+    /**
+     * "Today" is the district's: at 22:30 UTC on the 16th it is already
+     * 01:30 on the 17th in Damascus, so a closure on the 16th is past and one
+     * on the 17th is today.
+     */
+    public function test_today_is_the_districts_today_not_utcs(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-08-16 22:30:00', 'UTC'));
+        $branch = Branch::factory()->create();
+        $this->exception($branch, '2026-08-16');
+        $this->exception($branch, '2026-08-17');
+
+        $this->assertSame(
+            ['2026-08-17'],
+            array_column($this->service->upcomingClosures($branch), 'date'),
+        );
+
+        Carbon::setTestNow();
+    }
 }

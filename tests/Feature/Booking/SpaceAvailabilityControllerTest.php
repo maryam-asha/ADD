@@ -89,6 +89,46 @@ class SpaceAvailabilityControllerTest extends TestCase
         ]);
     }
 
+    /**
+     * The admin slots body, renamed the way the member route presents it:
+     * the slot list under `slots` rather than `data`, every other key and
+     * its position unchanged.
+     *
+     * @param  array<string, mixed>  $adminBody
+     * @return array<string, mixed>
+     */
+    private function inMemberShape(array $adminBody): array
+    {
+        $shaped = [];
+
+        foreach ($adminBody as $key => $value) {
+            $shaped[$key === 'data' ? 'slots' : $key] = $value;
+        }
+
+        return $shaped;
+    }
+
+    /**
+     * The member app reads one object: everything about the day inside
+     * `data`, with the slot list under `slots`.
+     */
+    public function test_the_member_day_response_is_one_data_object_with_the_slots_inside(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+
+        $response = $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertOk();
+
+        $this->assertSame(['data'], array_keys($response->json()));
+        $this->assertSame(
+            ['date', 'state', 'closed_banner', 'branch_hours', 'rules', 'legend', 'slots', 'counts', 'meta'],
+            array_keys($response->json('data')),
+        );
+        $this->assertCount(12, $response->json('data.slots'));
+    }
+
     public function test_a_member_sees_a_month_of_day_states_for_a_space(): void
     {
         $this->actingAsMember();
@@ -155,6 +195,35 @@ class SpaceAvailabilityControllerTest extends TestCase
         $this->assertStringContainsString('closed on this date', $response->json('data.0.closed_banner.text'));
     }
 
+    /**
+     * The same closure list the operations calendar carries, so the app's
+     * date picker can grey out a holiday in a month it has not loaded yet.
+     */
+    public function test_the_hours_card_lists_upcoming_closures_on_both_the_month_and_the_day(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        BusinessHourException::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'date' => '2026-10-06',
+            'is_closed' => true,
+            'open_time' => null,
+            'close_time' => null,
+            'reason' => 'Public holiday',
+        ]);
+        $expected = [['date' => '2026-10-06', 'reason' => 'Public holiday']];
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-23")
+            ->assertOk()
+            ->assertJsonPath('branch_hours.upcoming_closures', $expected);
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
+            ->assertOk()
+            ->assertJsonPath('data.branch_hours.upcoming_closures', $expected);
+    }
+
     public function test_a_weekday_with_no_schedule_is_closed_with_no_reason_to_give(): void
     {
         // Saturday has no BusinessHour rows at all. That is closed, but
@@ -199,11 +268,11 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17");
 
         $response->assertOk()
-            ->assertJsonPath('state', 'available')
-            ->assertJsonPath('counts.total', 12)
-            ->assertJsonPath('meta.granularity_minutes', 60);
+            ->assertJsonPath('data.state', 'available')
+            ->assertJsonPath('data.counts.total', 12)
+            ->assertJsonPath('data.meta.granularity_minutes', 60);
 
-        $byLabel = collect($response->json('data'))->keyBy('label');
+        $byLabel = collect($response->json('data.slots'))->keyBy('label');
 
         $this->assertSame('booked', $byLabel['10:00 AM']['state']);
         $this->assertFalse($byLabel['10:00 AM']['is_available']);
@@ -225,7 +294,7 @@ class SpaceAvailabilityControllerTest extends TestCase
         $chipReason = collect(
             $this->withHeader('lang', 'en')
                 ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
-                ->json('data')
+                ->json('data.slots')
         )->firstWhere('label', '02:00 PM')['reason'];
 
         $postMessage = $this->withHeader('lang', 'en')
@@ -305,7 +374,7 @@ class SpaceAvailabilityControllerTest extends TestCase
         $slots = fn () => collect(
             $this->withHeader('lang', 'en')
                 ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
-                ->json('data')
+                ->json('data.slots')
         )->firstWhere('label', '10:00 AM');
 
         $this->assertSame('available', $slots()['state'], 'One of two desks taken is still bookable.');
@@ -429,7 +498,9 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->assertOk()
             ->json();
 
-        $this->assertSame($asMember, $asOperations);
+        // The member route wraps the same payload in `data` and names the
+        // slot list `slots`; that envelope is the only permitted difference.
+        $this->assertSame($asMember['data'], $this->inMemberShape($asOperations));
     }
 
     public function test_operations_reads_the_duration_ladder_with_each_option_priced(): void
@@ -483,19 +554,19 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17&duration=120");
 
         $response->assertOk()
-            ->assertJsonPath('meta.duration_minutes', 120)
-            ->assertJsonPath('data.0.start_time', '08:00')
-            ->assertJsonPath('data.0.end_time', '10:00')
-            ->assertJsonPath('data.0.is_available', true)
-            ->assertJsonPath('data.0.duration_minutes', 120)
-            ->assertJsonPath('data.0.points', 200)
+            ->assertJsonPath('data.meta.duration_minutes', 120)
+            ->assertJsonPath('data.slots.0.start_time', '08:00')
+            ->assertJsonPath('data.slots.0.end_time', '10:00')
+            ->assertJsonPath('data.slots.0.is_available', true)
+            ->assertJsonPath('data.slots.0.duration_minutes', 120)
+            ->assertJsonPath('data.slots.0.points', 200)
             // 09:00–11:00 runs into the 10:00 booking.
-            ->assertJsonPath('data.1.start_time', '09:00')
-            ->assertJsonPath('data.1.state', 'booked')
-            ->assertJsonPath('data.1.reason', __('api.booking.slot_unavailable', [], 'en'));
+            ->assertJsonPath('data.slots.1.start_time', '09:00')
+            ->assertJsonPath('data.slots.1.state', 'booked')
+            ->assertJsonPath('data.slots.1.reason', __('api.booking.slot_unavailable', [], 'en'));
 
         // The last start that still ends by 20:00.
-        $this->assertSame('18:00', collect($response->json('data'))->last()['start_time']);
+        $this->assertSame('18:00', collect($response->json('data.slots'))->last()['start_time']);
     }
 
     public function test_slots_without_a_duration_keep_their_cell_shape_and_carry_no_price(): void
@@ -507,9 +578,9 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17");
 
         $response->assertOk()
-            ->assertJsonPath('meta.duration_minutes', null)
-            ->assertJsonPath('data.0.end_time', '09:00')
-            ->assertJsonMissingPath('data.0.points');
+            ->assertJsonPath('data.meta.duration_minutes', null)
+            ->assertJsonPath('data.slots.0.end_time', '09:00')
+            ->assertJsonMissingPath('data.slots.0.points');
     }
 
     public function test_a_duration_this_space_does_not_accept_is_a_validation_error(): void
@@ -584,13 +655,13 @@ class SpaceAvailabilityControllerTest extends TestCase
         $this->withHeader('lang', 'en')
             ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
             ->assertOk()
-            ->assertJsonPath('rules.min_duration_minutes', 60)
-            ->assertJsonPath('rules.max_duration_minutes', 180)
-            ->assertJsonPath('rules.min_advance_minutes', 30)
-            ->assertJsonPath('rules.max_advance_days', 30)
+            ->assertJsonPath('data.rules.min_duration_minutes', 60)
+            ->assertJsonPath('data.rules.max_duration_minutes', 180)
+            ->assertJsonPath('data.rules.min_advance_minutes', 30)
+            ->assertJsonPath('data.rules.max_advance_days', 30)
             // 90 is not a legal length at 60-minute granularity, so the
             // ladder offers only what this space accepts.
-            ->assertJsonPath('rules.duration_options_minutes', [60, 120, 180]);
+            ->assertJsonPath('data.rules.duration_options_minutes', [60, 120, 180]);
     }
 
     public function test_a_quote_option_above_the_maximum_is_unavailable_with_that_reason(): void
@@ -625,6 +696,8 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->assertOk()
             ->json();
 
-        $this->assertSame($asMember, $asOperations);
+        // The member route wraps the same payload in `data` and names the
+        // slot list `slots`; that envelope is the only permitted difference.
+        $this->assertSame($asMember['data'], $this->inMemberShape($asOperations));
     }
 }

@@ -34,17 +34,34 @@ class SpaceAvailabilityController extends Controller
         ));
     }
 
+    /**
+     * One object for the member app: everything about the day inside `data`,
+     * with the slot list under `slots` rather than a nested `data`.
+     *
+     * Only the envelope differs from the admin route, which returns the
+     * service's payload as-is because the dashboard reads it in that shape;
+     * SpaceAvailabilityControllerTest asserts the two carry identical content.
+     */
     public function day(
         AvailabilitySlotsRequest $request,
         Space $space,
         AvailabilityBrowseService $availability,
     ): JsonResponse {
-        return response()->json($availability->day(
+        $day = $availability->day(
             $space,
             $request->validated('date'),
             app()->getLocale(),
             $request->duration(),
-        ));
+        );
+
+        // Renamed in place so every other key keeps its position.
+        $data = [];
+
+        foreach ($day as $key => $value) {
+            $data[$key === 'data' ? 'slots' : $key] = $value;
+        }
+
+        return response()->json(['data' => $data]);
     }
 
     public function quote(

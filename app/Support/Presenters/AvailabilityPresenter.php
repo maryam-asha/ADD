@@ -125,8 +125,14 @@ class AvailabilityPresenter
      * `periods` here are today's; `open_weekdays` describes the weekly
      * shape, which is what the "Sunday – Thursday" line summarises.
      *
+     * `upcoming_closures` is every all-day closure from today on
+     * (BusinessHoursService::upcomingClosures()), not just those in the
+     * range being shown, so a date picker can refuse a holiday in a month it
+     * has not loaded.
+     *
      * @param  array<int, array{open_time: string, close_time: string}>  $periods
      * @param  list<string>  $openWeekdays
+     * @param  list<array{date: string, reason: string|null}>  $upcomingClosures
      * @return array<string, mixed>
      */
     public function branchHours(
@@ -135,6 +141,7 @@ class AvailabilityPresenter
         array $openWeekdays,
         SpaceBookingRules $rules,
         string $locale,
+        array $upcomingClosures = [],
     ): array {
         $openTime = $periods === [] ? null : $periods[0]['open_time'];
         $closeTime = $periods === [] ? null : end($periods)['close_time'];
@@ -153,6 +160,7 @@ class AvailabilityPresenter
             'periods' => $periods,
             'days_label' => $this->weekdayRangeLabel($openWeekdays),
             'open_weekdays' => $openWeekdays,
+            'upcoming_closures' => $upcomingClosures,
             'timezone' => $rules->timezone,
             'timezone_label' => $this->timezoneLabel($rules->timezone),
             'timezone_note' => __('api.booking.timezone_note', [

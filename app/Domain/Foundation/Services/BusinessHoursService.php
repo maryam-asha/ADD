@@ -132,6 +132,41 @@ class BusinessHoursService
         return $resolved;
     }
 
+    /**
+     * The branch's all-day closures from today on, in date order, in one
+     * query.
+     *
+     * For a date picker that must refuse a closed day before anyone picks
+     * it, in whatever month the user navigates to — which is why this is
+     * not bounded by any calendar range. Only `is_closed` rows: an exception
+     * that shortens a day leaves it open, and bookable. A weekday with no
+     * schedule at all is also closed but is not listed here; that is the
+     * weekly shape, which `open_weekdays` already describes.
+     *
+     * "Today" is the district's today, so a closure is not dropped a few
+     * hours early by a UTC date that has not rolled over yet.
+     *
+     * @return list<array{date: string, reason: string|null}>
+     */
+    public function upcomingClosures(Branch $branch): array
+    {
+        $today = $this->toLocal(Carbon::now())->toDateString();
+
+        return BusinessHourException::query()
+            ->where('branch_id', $branch->id)
+            ->where('is_closed', true)
+            // whereDate for the same reason periodsForRange() uses it.
+            ->whereDate('date', '>=', $today)
+            ->orderBy('date')
+            ->get(['date', 'reason'])
+            ->map(fn (BusinessHourException $exception) => [
+                'date' => Carbon::parse($exception->date)->toDateString(),
+                'reason' => $exception->reason,
+            ])
+            ->values()
+            ->all();
+    }
+
     private function toLocal(CarbonInterface $instant): CarbonInterface
     {
         return $instant->clone()->setTimezone(

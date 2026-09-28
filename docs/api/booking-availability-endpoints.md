@@ -41,6 +41,7 @@ The month grid. `from`/`to` are local dates (`Y-m-d`), default = current month,
     "periods": [{ "open_time": "08:00", "close_time": "20:00" }],
     "days_label": "Sunday – Thursday",
     "open_weekdays": ["sunday","monday","tuesday","wednesday","thursday"],
+    "upcoming_closures": [ { "date": "2026-10-06", "reason": "Public holiday" } ],
     "timezone": "Asia/Damascus",
     "timezone_label": "GMT+3",
     "timezone_note": "All times shown in your local time (GMT+3)"
@@ -99,43 +100,70 @@ A `full` day must **not** be shown as closed — it is open, just sold out.
 `reason` is `null` for a weekday with no schedule (nothing to explain); it is
 only non-null when an explicit business-hour exception supplied one.
 
+`branch_hours.upcoming_closures` lists **every** all-day closure from today on
+(not just those in `from`–`to`), so the date picker can grey out a holiday in a
+month it has not loaded. A day with shortened hours is not listed — it is open.
+
 > `timezone_label` is **computed per request**, not stored. Damascus observes
 > DST, so hard-coding "GMT+3" is wrong for part of the year — render this field.
 
-### `GET .../availability/slots?date=2026-08-17`
+### `GET .../availability/slots?date=2026-08-17[&duration=120]`
 
-The time-chip grid for one date.
+The time-chip grid for one date. **Everything is inside one `data` object, and
+the chip list is `data.slots`** (changed 2026-09-28; it used to be the
+top-level fields with the chips under a top-level `data` array).
 
 ```json
 {
-  "date": { "date": "2026-08-17", "day": "17", "weekday": "MON", "month": "AUG",
-            "date_formatted": "August 17, 2026", "state": "available",
-            "is_selectable": true, "available_slot_count": 11, "total_slot_count": 12 },
-  "state": "available",
-  "closed_banner": null,
-  "branch_hours": { "...same as above..." },
-  "rules": { "...same as above..." },
-  "legend": [ "...same as above..." ],
-  "data": [
-    { "start_at": "2026-08-17T08:00:00+03:00", "end_at": "2026-08-17T09:00:00+03:00",
-      "label": "08:00 AM", "start_time": "08:00", "end_time": "09:00",
-      "state": "available", "is_available": true, "reason": null },
-    { "start_at": "2026-08-17T14:00:00+03:00", "end_at": "2026-08-17T15:00:00+03:00",
-      "label": "02:00 PM", "start_time": "14:00", "end_time": "15:00",
-      "state": "booked", "is_available": false,
-      "reason": "This space is not available for the requested time." }
-  ],
-  "counts": { "available": 11, "booked": 1, "outside_hours": 0,
-              "buffer": 0, "at_capacity": 0, "past": 0, "total": 12 },
-  "meta": { "granularity_minutes": 60, "timezone": "Asia/Damascus" }
+  "data": {
+    "date": { "date": "2026-08-17", "day": "17", "weekday": "MON", "month": "AUG",
+              "date_formatted": "August 17, 2026", "state": "available",
+              "is_selectable": true, "available_slot_count": 11, "total_slot_count": 12 },
+    "state": "available",
+    "closed_banner": null,
+    "branch_hours": { "...same as above, including upcoming_closures..." },
+    "rules": { "...same as above..." },
+    "legend": [ "...same as above..." ],
+    "slots": [
+      { "start_at": "2026-08-17T08:00:00+03:00", "end_at": "2026-08-17T10:00:00+03:00",
+        "label": "08:00 AM", "start_time": "08:00", "end_time": "10:00",
+        "state": "available", "is_available": true, "reason": null,
+        "duration_minutes": 120, "points": 240, "amount_usd": "24.00" },
+      { "start_at": "2026-08-17T14:00:00+03:00", "end_at": "2026-08-17T16:00:00+03:00",
+        "label": "02:00 PM", "start_time": "14:00", "end_time": "16:00",
+        "state": "booked", "is_available": false,
+        "reason": "This space is not available for the requested time.",
+        "duration_minutes": 120, "points": 240, "amount_usd": "24.00" }
+    ],
+    "counts": { "available": 9, "booked": 2, "outside_hours": 0, "buffer": 0,
+                "at_capacity": 0, "past": 0, "too_soon": 0, "too_far_ahead": 0, "total": 11 },
+    "meta": { "granularity_minutes": 60, "timezone": "Asia/Damascus", "duration_minutes": 120 }
+  }
 }
 ```
 
+**`duration` (optional, minutes) — the duration-first flow.** Pick a length
+from `rules.duration_options_minutes` (the lengths this space accepts), then ask
+for the day with it: each slot is then the **whole booking** — `end_time` is
+where it ends, and it carries `points` / `amount_usd` — stepping by the space's
+granularity, and a start that cannot hold the full length before closing is not
+listed. Post `start_at`/`end_at` straight from the chosen slot. A length the
+space refuses is a `422` on `duration` with the same sentence `POST /bookings`
+would give. Without `duration`, each slot is one granularity-sized cell with no
+price (the example above is the duration form).
+
 **Slot `state`:** `available` · `booked` · `outside_hours` · `buffer` ·
-`at_capacity` (shared space at its seat ceiling) · `past`.
+`at_capacity` (shared space at its seat ceiling) · `past` · `too_soon`
+(inside the minimum notice) · `too_far_ahead` (beyond the booking horizon).
+The last two only occur once `booking.min_advance_minutes` /
+`booking.max_advance_days` are set; both are off by default.
 
 Slots are generated **only inside open periods**, so a day that closes for lunch
 simply has no chips across the gap — do not render an empty range there.
+
+> The admin twin, `GET /api/v1/admin/spaces/{space}/availability/slots`, returns
+> the same content **without** the envelope (top-level fields, chips under
+> `data`) — the dashboard reads that shape.
 
 ### `GET .../availability/quote?start_at=2026-08-17 10:00`
 
@@ -460,6 +488,9 @@ have refused, and cannot back-date either.
 | 422 | `duration_too_short` | below the minimum duration |
 | 422 | `duration_invalid_granularity` | duration not a valid step above the minimum |
 | 422 | `start_in_the_past` | start is before now |
+| 422 | `duration_too_long` | above `booking.max_duration_minutes` (off by default) |
+| 422 | `too_soon` | inside `booking.min_advance_minutes` of now (off by default) |
+| 422 | `too_far_ahead` | beyond `booking.max_advance_days` (off by default) |
 | 422 | `cancellation_window_passed` | too late to cancel |
 | 422 | `wallet_choice_required` | several eligible wallets; body carries `wallet_options` |
 | 409 | `already_checked_in` / `already_cancelled` | state conflict |

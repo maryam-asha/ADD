@@ -159,6 +159,37 @@ class AdminBookingCalendarTest extends TestCase
     }
 
     /**
+     * The desk's date picker navigates freely, so the closures it must refuse
+     * cannot be limited to the range this response covers: a holiday next
+     * month is listed while the calendar shows this week. Past closures, and
+     * exceptions that only shorten a day, are not.
+     */
+    public function test_branch_hours_lists_every_upcoming_closure_beyond_the_range_shown(): void
+    {
+        $this->actingAsOperations();
+        $this->space();
+
+        foreach ([
+            ['date' => '2026-08-10', 'is_closed' => true, 'reason' => 'Already past'],
+            ['date' => '2026-08-20', 'is_closed' => false, 'open_time' => '10:00', 'close_time' => '14:00', 'reason' => 'Short day'],
+            ['date' => '2026-09-15', 'is_closed' => true, 'reason' => 'Public holiday'],
+        ] as $attributes) {
+            BusinessHourException::factory()->create(array_merge([
+                'branch_id' => $this->branch->id,
+                'open_time' => null,
+                'close_time' => null,
+            ], $attributes));
+        }
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=week&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('branch_hours.upcoming_closures', [
+                ['date' => '2026-09-15', 'reason' => 'Public holiday'],
+            ]);
+    }
+
+    /**
      * 08:00-20:00 is 720 open minutes; a 3-hour booking is 180 of them,
      * which is 25%.
      */

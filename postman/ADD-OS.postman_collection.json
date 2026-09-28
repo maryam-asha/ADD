@@ -1232,7 +1232,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Day states for a date range: available | closed | full | past | out_of_range. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots (for the requested `duration`, when given), so it shows no banner. `out_of_range` is a day beyond booking.max_advance_days — open, not yet bookable, no banner. Also returns the branch-hours card, the legend and the rules block, which carries min/max_duration_minutes, min_advance_minutes, max_advance_days (null = no limit) and duration_options_minutes (the lengths this space accepts). Range capped at 62 days."
+                                "description": "Day states for a date range: available | closed | full | past | out_of_range. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots (for the requested `duration`, when given), so it shows no banner. `out_of_range` is a day beyond booking.max_advance_days — open, not yet bookable, no banner. Also returns the branch-hours card (whose `upcoming_closures` lists every all-day closure from today on as [{date, reason}], beyond the requested range, so the date picker can grey out a holiday in a month not yet loaded — the day slots response carries the same list), the legend and the rules block, which carries min/max_duration_minutes, min_advance_minutes, max_advance_days (null = no limit) and duration_options_minutes (the lengths this space accepts). Range capped at 62 days."
                             }
                         },
                         {
@@ -1288,7 +1288,7 @@
                                         }
                                     ]
                                 },
-                                "description": "The time-slot grid for one date. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
+                                "description": "The time-slot grid for one date. Response shape: ONE `data` object — {data: {date, state, closed_banner, branch_hours, rules, legend, slots, counts, meta}} — with the chips under `data.slots` (the admin twin returns the same content without the envelope, chips under top-level `data`). Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
                             }
                         },
                         {
@@ -1343,7 +1343,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Duration → start time → confirm. Each slot is a whole bookable window: start_at/end_at span the full duration, stepping by the space's granularity, and each carries duration_minutes, points and amount_usd. A start whose window would run past closing is not listed at all; one that is taken, in a buffer or too soon stays listed with its state and reason so the app can grey it out. Pick an available slot and POST bookings with its start_at/end_at — that call still re-checks everything under a lock, so a slot can be lost between listing and booking. meta.duration_minutes echoes the request."
+                                "description": "Duration → start time → confirm. Same envelope as Day Slots: everything under `data`, the chips under `data.slots`, the requested length echoed as data.meta.duration_minutes. Each slot is a whole bookable window: start_at/end_at span the full duration, stepping by the space's granularity, and each carries duration_minutes, points and amount_usd. A start whose window would run past closing is not listed at all; one that is taken, in a buffer or too soon stays listed with its state and reason so the app can grey it out. Pick an available slot and POST bookings with its start_at/end_at — that call still re-checks everything under a lock, so a slot can be lost between listing and booking. data.meta.duration_minutes echoes the request."
                             }
                         },
                         {
@@ -7764,7 +7764,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Spaces as rows, days as cells. Each cell carries its open periods, its bookings (with the member, payment state and check-in) and its occupancy. Occupancy is booked minutes over open minutes, clipped to the open window so a booking running past closing cannot report more minutes than the day has; a multi-occupant space is measured against its concurrency ceiling rather than reading 2000% full. Loaded in a bounded number of queries — it does not query per space or per day."
+                                "description": "Spaces as rows, days as cells. Each cell carries its open periods, its bookings (with the member, payment state and check-in) and its occupancy. Occupancy is booked minutes over open minutes, clipped to the open window so a booking running past closing cannot report more minutes than the day has; a multi-occupant space is measured against its concurrency ceiling rather than reading 2000% full. Loaded in a bounded number of queries — it does not query per space or per day. `branch_hours.upcoming_closures` lists every all-day closure (business_hour_exceptions with is_closed = true) from today on as [{date, reason}], in date order and NOT limited to the range shown — so the booking form's date picker can refuse a holiday in a month the calendar has not loaded. Past closures and exceptions that only shorten a day are not listed."
                             }
                         },
                         {
