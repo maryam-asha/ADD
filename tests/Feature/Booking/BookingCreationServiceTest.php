@@ -10,6 +10,7 @@ use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
@@ -570,22 +571,9 @@ class BookingCreationServiceTest extends TestCase
         }
     }
 
-    public function test_creation_fails_when_duration_exceeds_the_maximum(): void
-    {
-        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
-        $space = $this->openSpace();
-
-        try {
-            $this->creations->create($space, User::factory()->create(), ...$this->slot(10, 180));
-            $this->fail('Expected a ReceptionActionException for a duration above the maximum.');
-        } catch (ReceptionActionException $e) {
-            $this->assertSame('api.booking.duration_too_long', $e->messageKey);
-        }
-    }
-
     public function test_creation_fails_inside_the_minimum_notice(): void
     {
-        app(SettingService::class)->set('booking.min_advance_minutes', 120, SettingValueType::Int);
+        app(SettingService::class)->set('booking.min_notice_minutes', 120, SettingValueType::Int);
         $space = $this->openSpace();
 
         try {
@@ -601,7 +589,7 @@ class BookingCreationServiceTest extends TestCase
 
     public function test_creation_fails_beyond_the_advance_horizon(): void
     {
-        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        app(SettingService::class)->set('booking.max_days_ahead', 7, SettingValueType::Int);
         $space = $this->openSpace();
         $start = Carbon::parse('2026-08-31 10:00', 'Asia/Damascus');
 
@@ -611,5 +599,27 @@ class BookingCreationServiceTest extends TestCase
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.booking.too_far_ahead', $e->messageKey);
         }
+    }
+
+    /**
+     * The read side already hides a non-active space (list, details and
+     * availability all leave it out or 404). The write side must agree, or a
+     * screen opened before the space went into maintenance — or a direct
+     * call — could still book it.
+     */
+    public function test_creation_is_refused_on_a_space_that_is_not_active(): void
+    {
+        foreach ([OperationalStatus::Maintenance, OperationalStatus::Retired] as $status) {
+            $space = $this->openSpace(['status' => $status]);
+
+            try {
+                $this->creations->create($space, User::factory()->create(), ...$this->slot(10));
+                $this->fail("Expected a ReceptionActionException for a {$status->value} space.");
+            } catch (ReceptionActionException $e) {
+                $this->assertSame('api.booking.space_not_bookable', $e->messageKey);
+            }
+        }
+
+        $this->assertSame(0, Booking::count());
     }
 }

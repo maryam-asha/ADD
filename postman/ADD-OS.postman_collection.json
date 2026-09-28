@@ -170,6 +170,31 @@
             "key": "member_user_id",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "payment_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "paymera_redirect_url",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "resource_type_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "space_type",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "plan_id",
+            "value": "",
+            "type": "string"
         }
     ],
     "event": [
@@ -1070,7 +1095,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner (e.g. 8:00 AM - 10:00 PM)\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination (meta) — `data` is an object holding `working_hours_banner` and the `spaces` array"
+                                "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner — the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here — they set up the booking calendar, so they come with Get Space Details → data.booking.upcoming_closures. hours/periods are TODAY's only — show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination (meta) — `data` is an object holding `working_hours_banner` and the `spaces` array"
                             },
                             "response": []
                         },
@@ -1112,7 +1137,7 @@
                                         "{{space_id}}"
                                     ]
                                 },
-                                "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)"
+                                "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)\n- `booking`: this space's own setup for the booking screen, sent once here — `upcoming_closures` (every date from today on that the branch is closed all day, as ISO-8601 date-times at local midnight with NO offset, e.g. \"2026-09-30T00:00:00\", to pass straight to DateTime.parse: without an offset it parses as local time, so the 30th stays the 30th on any device — with +03:00 a device in another timezone would move it to the 29th), and `rules` (granularity; min_duration_minutes = the shortest booking LENGTH, with no maximum; min_notice_minutes = the minimum NOTICE before a booking's start, 0 = none — slots inside it are not sent; max_days_ahead = how many days ahead a booking may be made, null = no limit — grey out later dates. The member picks a run of consecutive slots at least min_duration_minutes long; there is no list of lengths). No legend — the app draws its own. The slots endpoint then carries only what changes per date; call it again on each date change. The indicative price of a run of slots is details.price.hourly_rate_points × hours. The branch's week (today's hours and `schedule`) is NOT here — they are the same for every space and come once with the spaces list, in `working_hours_banner`."
                             },
                             "response": [
                                 {
@@ -1165,7 +1190,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"badge\": \"OPEN SPACE\",\n    \"title\": \"Hot Desk\",\n    \"subtitle\": \"Open Workspace\",\n    \"description\": \"Flexible workspace in a collaborative shared environment. Ideal for freelancers and remote professionals.\",\n    \"image_url\": null,\n    \"quick_features\": [\n      {\n        \"key\": \"seat\",\n        \"label\": \"1 Seat\",\n        \"icon\": \"user\"\n      },\n      {\n        \"key\": \"wifi\",\n        \"label\": \"Wi-Fi\",\n        \"icon\": \"wifi\"\n      },\n      {\n        \"key\": \"power\",\n        \"label\": \"Power\",\n        \"icon\": \"zap\"\n      },\n      {\n        \"key\": \"area_type\",\n        \"label\": \"Open Area\",\n        \"icon\": \"grid\"\n      }\n    ],\n    \"details\": {\n      \"price\": {\n        \"starting_from\": true,\n        \"hourly_rate\": 3.0,\n        \"currency\": \"USD\",\n        \"currency_symbol\": \"$\",\n        \"formatted\": \" / hour\"\n      },\n      \"capacity\": {\n        \"count\": 1,\n        \"formatted\": \"1 person\"\n      },\n      \"location\": {\n        \"branch\": \"Aleppo Digital District\",\n        \"building\": \"Main Hub\",\n        \"floor\": \"Ground Floor\",\n        \"zone\": \"Open Zone A\",\n        \"formatted\": \"Aleppo Digital District - Ground Floor\"\n      },\n      \"working_hours\": {\n        \"formatted\": \"8:00 AM â€“ 10:00 PM\",\n        \"open_time\": \"08:00\",\n        \"close_time\": \"22:00\",\n        \"is_open\": true\n      },\n      \"status\": \"active\",\n      \"status_label\": \"ظ†ط´ط·\"\n    },\n    \"amenities\": [\n      {\n        \"key\": \"wifi\",\n        \"name\": \"High-Speed Wi-Fi\",\n        \"icon\": \"wifi\"\n      },\n      {\n        \"key\": \"power\",\n        \"name\": \"Power Outlets\",\n        \"icon\": \"zap\"\n      },\n      {\n        \"key\": \"chairs\",\n        \"name\": \"Ergonomic Chairs\",\n        \"icon\": \"check-circle\"\n      },\n      {\n        \"key\": \"printing\",\n        \"name\": \"Printing Access\",\n        \"icon\": \"printer\"\n      },\n      {\n        \"key\": \"locker\",\n        \"name\": \"Locker (Add-on)\",\n        \"icon\": \"lock\"\n      },\n      {\n        \"key\": \"cafe\",\n        \"name\": \"Cafe Access\",\n        \"icon\": \"coffee\"\n      }\n    ],\n    \"cta\": {\n      \"space_id\": 1,\n      \"button_text\": \"Book This Space\",\n      \"can_book\": true\n    }\n  }\n}"
+                                    "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"badge\": \"OPEN SPACE\",\n    \"title\": \"Hot Desk\",\n    \"subtitle\": \"Open Workspace\",\n    \"description\": \"Flexible workspace in a collaborative shared environment. Ideal for freelancers and remote professionals.\",\n    \"image_url\": null,\n    \"quick_features\": [\n      {\n        \"key\": \"seat\",\n        \"label\": \"1 Seat\",\n        \"icon\": \"user\"\n      },\n      {\n        \"key\": \"wifi\",\n        \"label\": \"Wi-Fi\",\n        \"icon\": \"wifi\"\n      },\n      {\n        \"key\": \"power\",\n        \"label\": \"Power\",\n        \"icon\": \"zap\"\n      },\n      {\n        \"key\": \"area_type\",\n        \"label\": \"Open Area\",\n        \"icon\": \"grid\"\n      }\n    ],\n    \"details\": {\n      \"price\": {\n        \"starting_from\": true,\n        \"hourly_rate\": 3.0,\n        \"currency\": \"USD\",\n        \"currency_symbol\": \"$\",\n        \"formatted\": \" / hour\"\n      },\n      \"capacity\": {\n        \"count\": 1,\n        \"formatted\": \"1 person\"\n      },\n      \"location\": {\n        \"branch\": \"Aleppo Digital District\",\n        \"building\": \"Main Hub\",\n        \"floor\": \"Ground Floor\",\n        \"zone\": \"Open Zone A\",\n        \"formatted\": \"Aleppo Digital District - Ground Floor\"\n      },\n      \"working_hours\": {\n        \"formatted\": \"8:00 AM â€“ 10:00 PM\",\n        \"open_time\": \"08:00\",\n        \"close_time\": \"22:00\",\n        \"is_open\": true\n      },\n      \"status\": \"active\",\n      \"status_label\": \"ظ†ط´ط·\"\n    },\n    \"amenities\": [\n      {\n        \"key\": \"wifi\",\n        \"name\": \"High-Speed Wi-Fi\",\n        \"icon\": \"wifi\"\n      },\n      {\n        \"key\": \"power\",\n        \"name\": \"Power Outlets\",\n        \"icon\": \"zap\"\n      },\n      {\n        \"key\": \"chairs\",\n        \"name\": \"Ergonomic Chairs\",\n        \"icon\": \"check-circle\"\n      },\n      {\n        \"key\": \"printing\",\n        \"name\": \"Printing Access\",\n        \"icon\": \"printer\"\n      },\n      {\n        \"key\": \"locker\",\n        \"name\": \"Locker (Add-on)\",\n        \"icon\": \"lock\"\n      },\n      {\n        \"key\": \"cafe\",\n        \"name\": \"Cafe Access\",\n        \"icon\": \"coffee\"\n      }\n    ],\n    \"cta\": {\n      \"space_id\": 1,\n      \"button_text\": \"Book This Space\",\n      \"can_book\": true\n    },\n    \"booking\": {\n      \"rules\": {\n        \"granularity_minutes\": 60,\n        \"min_duration_minutes\": 60,\n        \"min_notice_minutes\": 60,\n        \"max_days_ahead\": null,\n        \"buffer_minutes\": 0,\n        \"cancellation_window_minutes\": 60,\n        \"requires_approval\": false,\n        \"approval_notice\": null,\n        \"max_selectable_dates\": 10\n      },\n      \"upcoming_closures\": [\"2026-09-30T00:00:00\", \"2026-10-06T00:00:00\"]\n    }\n  }\n}"
                                 }
                             ]
                         }
@@ -1232,7 +1257,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Day states for a date range: available | closed | full | past | out_of_range. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots (for the requested `duration`, when given), so it shows no banner. `out_of_range` is a day beyond booking.max_advance_days — open, not yet bookable, no banner. Also returns the branch-hours card (whose `upcoming_closures` lists every all-day closure from today on as [{date, reason}], beyond the requested range, so the date picker can grey out a holiday in a month not yet loaded — the day slots response carries the same list), the legend and the rules block, which carries min/max_duration_minutes, min_advance_minutes, max_advance_days (null = no limit) and duration_options_minutes (the lengths this space accepts). Range capped at 62 days."
+                                "description": "Day states for a date range: available | closed | full | past | out_of_range. A closed day carries `closed_banner` with its reason when a BusinessHourException gave one (a weekday with no schedule is closed with a null reason). A full day is OPEN but has no free slots, so it shows no banner. `out_of_range` is a day beyond booking.max_days_ahead — open, not yet bookable, no banner. Also returns the branch-hours card (whose `upcoming_closures` lists every all-day closure from today on as [{date, reason}], beyond the requested range, so the date picker can grey out a holiday in a month not yet loaded — the space details’ data.booking carries the same list) and the rules block (no legend — the app draws its own), which carries min_duration_minutes (no maximum), min_notice_minutes and max_days_ahead (null = no limit). No duration parameter. Range capped at 62 days."
                             }
                         },
                         {
@@ -1288,112 +1313,7 @@
                                         }
                                     ]
                                 },
-                                "description": "The time-slot grid for one date. Response shape: ONE `data` object — {data: {date, state, closed_banner, branch_hours, rules, legend, slots, counts, meta}} — with the chips under `data.slots` (the admin twin returns the same content without the envelope, chips under top-level `data`). Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
-                            }
-                        },
-                        {
-                            "name": "Day Slots for a Duration — Duration First",
-                            "request": {
-                                "method": "GET",
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{member_token}}"
-                                        }
-                                    ]
-                                },
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability/slots?date=2026-09-24&duration=120",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "spaces",
-                                        "{{space_id}}",
-                                        "availability",
-                                        "slots"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "date",
-                                            "value": "2026-09-24",
-                                            "description": "Required local date (Y-m-d)."
-                                        },
-                                        {
-                                            "key": "duration",
-                                            "value": "120",
-                                            "description": "Booking length in minutes, picked from rules.duration_options_minutes. A length the space does not accept (below min, above max, off granularity) is a 422 on `duration` with the same message POST bookings would return."
-                                        }
-                                    ]
-                                },
-                                "description": "Duration → start time → confirm. Same envelope as Day Slots: everything under `data`, the chips under `data.slots`, the requested length echoed as data.meta.duration_minutes. Each slot is a whole bookable window: start_at/end_at span the full duration, stepping by the space's granularity, and each carries duration_minutes, points and amount_usd. A start whose window would run past closing is not listed at all; one that is taken, in a buffer or too soon stays listed with its state and reason so the app can grey it out. Pick an available slot and POST bookings with its start_at/end_at — that call still re-checks everything under a lock, so a slot can be lost between listing and booking. data.meta.duration_minutes echoes the request."
-                            }
-                        },
-                        {
-                            "name": "Duration Quote — Options & Prices",
-                            "request": {
-                                "method": "GET",
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{member_token}}"
-                                        }
-                                    ]
-                                },
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}/availability/quote?start_at=2026-09-24 10:00",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "spaces",
-                                        "{{space_id}}",
-                                        "availability",
-                                        "quote"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "start_at",
-                                            "value": "2026-09-24 10:00",
-                                            "description": "Required. Local wall-clock time; a bare value means local, an explicit offset is honoured."
-                                        }
-                                    ]
-                                },
-                                "description": "Powers the duration selector, computed end time, price and running total. The ladder comes from the booking.duration_options_minutes setting (seeded 60/90/120/180 = 1h/1.5h/2h/3h). An option that would run past closing, overlap a booking, break the space's granularity, exceed booking.max_duration_minutes, or start too soon / too far ahead is returned with available:false and a stated reason rather than being hidden, so the app greys the chip out and can say why. This is the start-first flow; for duration-first use Day Slots for a Duration."
+                                "description": "The time-slot grid for one date. Response shape: ONE `data` object carrying only what changes per date — {data: {date, state, closed_banner, slots, counts, meta}} — chips under `data.slots`, and `data.date` is just the requested date (Y-m-d), echoed so a stale response can be dropped when dates are tapped quickly. Each slot carries only {start_time, end_time, label, state, is_available} — no reason: grey a chip by its state, which for a member is available | booked (taken, every seat taken, inside a buffer, outside hours or beyond the horizon). A slot whose time to be booked has gone — already started, or inside the minimum notice (rules.min_notice_minutes, an hour by default) — is not sent at all: today at 14:00 the list starts at 15:00. Only available is bookable, is_available is exactly state == available, and counts is {available, booked, total}. The admin twin keeps all eight states; Each slot is one of the space's own cells (data.meta.granularity_minutes long); there is no duration parameter. To book, the member picks a start slot and an end slot: the run must be unbroken (every slot available, each start_time equal to the previous end_time) and at least rules.min_duration_minutes long — there is no maximum; post start_at = \"{date} {first.start_time}\", end_at = \"{date} {last.end_time}\". data.meta is {granularity_minutes, timezone}. The indicative price is the details' hourly_rate_points × hours — the amount actually charged, after discount and VAT, is what bookings/preview returns. The calendar setup is NOT here: the branch's week comes once from the spaces list's working_hours_banner, and this space's rules and upcoming_closures (local-midnight date-times) from Get Space Details → data.booking; then call this again on each date change. The admin twin returns the full payload without the envelope, chips under top-level `data`. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
                             }
                         }
                     ]
@@ -2095,7 +2015,7 @@
                                         "bookings"
                                     ]
                                 },
-                                "description": "Three rules, all OFF by default (setting = 0 means no limit), so this request only fails once an admin sets them via Settings:\n• booking.max_advance_days → 422 api.booking.too_far_ahead (start date beyond today + N local days)\n• booking.min_advance_minutes → 422 api.booking.too_soon (start closer to now than N minutes)\n• booking.max_duration_minutes → 422 api.booking.duration_too_long (also enforced on extension, against the booking's total length)\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon / duration_too_long) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range."
+                                "description": "The booking window, two rules (a booking's length has no maximum):\n• booking.max_days_ahead → 422 api.booking.too_far_ahead (start date beyond today + N local days). 0 = no limit, the default.\n• booking.min_notice_minutes → 422 api.booking.too_soon (start closer to now than N minutes). Seeded at 60; 0 turns it off.\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range.\n\nAlso 422 api.booking.space_not_bookable when the space is under maintenance or retired (e.g. taken out of service after the booking screen opened) — on create, on bookings/batch (per-window reason space_not_bookable) and on bookings/preview (as unavailable_reason). The read endpoints 404 such a space."
                             }
                         }
                     ]
@@ -4917,6 +4837,290 @@
                             }
                         ]
                     }
+                },
+                {
+                    "name": "Card Payments (Paymera)",
+                    "description": "Card payment through Paymera eGate. The app calls Start Payment, opens redirect_url in a WebView, waits for navigation to a URL containing /api/v1/paymera/callback/, then polls Get Payment Status. The app never calls Paymera directly and never decides the outcome itself — get-payment-status on the server is the only trustworthy source. See docs/paymera-mobile-api.md.",
+                    "item": [
+                        {
+                            "name": "Start Payment — Wallet Top-up",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "// Store the new payment id so \"Get Payment Status\" can follow on.",
+                                            "if (pm.response.code === 201) {",
+                                            "    const body = pm.response.json();",
+                                            "    pm.collectionVariables.set('payment_id', body.data.payment.id);",
+                                            "    pm.collectionVariables.set('paymera_redirect_url', body.data.redirect_url);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"purpose\": \"wallet_top_up\",\n  \"amount\": \"1470000\",\n  \"lang\": \"ar\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/payments",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "payments"
+                                    ]
+                                },
+                                "description": "Opens a card payment that tops up the member's wallet. `amount` is in MAJOR units of the charged currency (SYP) — no minor units, separators or currency symbol. An amount worth less than one whole point is rejected with 422, the same rule the reception till applies.\n\nReturns 201 with data.payment and data.redirect_url. Open redirect_url in a WebView.\n\n503 = gateway unavailable (our misconfiguration, e.g. no active USD->SYP exchange rate). 502 = could not start. Neither is a declined card — nothing was charged."
+                            }
+                        },
+                        {
+                            "name": "Start Payment — Buy a Plan",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "// Store the new payment id so \"Get Payment Status\" can follow on.",
+                                            "if (pm.response.code === 201) {",
+                                            "    const body = pm.response.json();",
+                                            "    pm.collectionVariables.set('payment_id', body.data.payment.id);",
+                                            "    pm.collectionVariables.set('paymera_redirect_url', body.data.redirect_url);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"purpose\": \"plan_purchase\",\n  \"plan_id\": 1,\n  \"lang\": \"ar\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/payments",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "payments"
+                                    ]
+                                },
+                                "description": "Buys a plan by card. Do NOT send `amount` — the price is read from plans.price_points in the database and any amount in the request is ignored outright, so a client can never name its own price.\n\nThe plan must be active and publicly listable; anything else is a 422 on plan_id.\n\nOn success the points are credited AND the membership is activated. If activation fails after the charge (plan withdrawn or repriced mid-payment), status becomes needs_review with membership_id null and the member KEEPS the points — that is not a failed payment."
+                            }
+                        },
+                        {
+                            "name": "Get Payment Status",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/payments/{{payment_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "payments",
+                                        "{{payment_id}}"
+                                    ]
+                                },
+                                "description": "Poll this after the WebView closes. The server re-syncs with the gateway on every read; the call is locked and idempotent, so polling cannot double-credit.\n\nNOTE the shape differs from the create response: the payment is at `data` here, not `data.payment`.\n\nstatus: pending (keep polling) | accepted (success) | failed | canceled | expired | needs_review (NOT a failure — money taken, needs support) | reversed.\n\nMoney is amount_minor + currency_exponent: value = amount_minor / 10^currency_exponent. Never parse it as a float.\n\nA member may only read their own payments; anyone else's is a 404, not a 403, so ids cannot be probed."
+                            }
+                        },
+                        {
+                            "name": "List My Payments",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/payments",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "payments"
+                                    ]
+                                },
+                                "description": "The member's own card payments, newest first, 20 per page. Returns {data: [...], meta: {current_page, last_page, total}}."
+                            }
+                        },
+                        {
+                            "name": "Admin — List Payments",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/payments?status=needs_review",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "payments"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "status",
+                                            "value": "needs_review"
+                                        }
+                                    ]
+                                },
+                                "description": "Operations view of the payment ledger. Filters: status, user_id, per_page (max 100). status=needs_review is the one operations lives in — those are the payments with money on the line.\n\nAdmins additionally see gateway_payment_id, terminal_id, review_reason, wallet_transaction_id, check_attempts and the reversal columns, none of which reach a member."
+                            }
+                        },
+                        {
+                            "name": "Admin — Reverse a Payment",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/payments/{{payment_id}}/reverse",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "payments",
+                                        "{{payment_id}}",
+                                        "reverse"
+                                    ]
+                                },
+                                "description": "Reverses an accepted payment at the bank and claws the points back with a compensating debit (the original credit stays in the member's history).\n\nRequires the `payments.reverse` permission, NOT just an admin role — run `php artisan permissions:sync` after deploying or nobody, admin included, can call this.\n\nOnly an `accepted` payment can be reversed; anything else is 422. If the gateway refuses, the payment stays accepted and the points are untouched (502).\n\nReturns a message, not the resource, per this repo's update-endpoint convention."
+                            }
+                        },
+                        {
+                            "name": "Admin — Get Payment",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/payments/{{payment_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "payments",
+                                        "{{payment_id}}"
+                                    ]
+                                },
+                                "description": "One payment with its user, plan, wallet transaction and reversal actor loaded. Admins additionally see gateway_payment_id, terminal_id, review_reason, check_attempts and the reversal columns, none of which reach a member."
+                            }
+                        }
+                    ]
                 }
             ]
         },
@@ -9341,6 +9545,126 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "Get Wallet Balance",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reception/wallet-balance?user_id={{member_user_id}}&currency=SYP",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reception",
+                                        "wallet-balance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "user_id",
+                                            "value": "{{member_user_id}}"
+                                        },
+                                        {
+                                            "key": "currency",
+                                            "value": "SYP"
+                                        }
+                                    ]
+                                },
+                                "description": "The owner's point balance plus its value in the requested currency, for the top-up dialog and the receipt view. Exactly one of user_id / company_id. Every currency figure is derived from the stored point count, so a receipt can never claim a value the wallet does not hold."
+                            }
+                        },
+                        {
+                            "name": "Preview a Wallet Top-up",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reception/wallet-top-ups/preview",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reception",
+                                        "wallet-top-ups",
+                                        "preview"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"user_id\": 2,\n  \"amount\": \"150000\",\n  \"currency\": \"SYP\",\n  \"payment_method\": \"cash\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "What a given cash amount would credit, without writing anything. Exists so the top-up dialog can show a live point preview without reimplementing the rounding rules client-side — credits floor, so the member is never credited more than the cash covers."
+                            }
+                        },
+                        {
+                            "name": "Record a Resource Consumption",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reception/resource-consumptions",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reception",
+                                        "resource-consumptions"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"user_id\": 2,\n  \"resource_type_id\": 1,\n  \"quantity\": 10,\n  \"note\": \"Printing at reception\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Draws down a member's or company's natural-unit resource quota (printing pages, meeting-room hours). Exactly one of user_id / company_id. Refused with 422 when the remaining quota cannot cover the quantity."
+                            }
                         }
                     ]
                 },
@@ -13231,6 +13555,60 @@
                                 },
                                 "description": "Delete an event."
                             }
+                        },
+                        {
+                            "name": "List Event Rooms",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/rooms",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "rooms"
+                                    ]
+                                },
+                                "description": "Spaces bookable as event rooms — the picker source when creating an event."
+                            }
+                        },
+                        {
+                            "name": "List Event Statuses",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/events/statuses",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "events",
+                                        "statuses"
+                                    ]
+                                },
+                                "description": "The event status vocabulary, for filter dropdowns."
+                            }
                         }
                     ]
                 },
@@ -15041,6 +15419,308 @@
                         }
                     ],
                     "description": "جميع الطلبات مرئية لكل موظف (Operations / Admin).\nيمكن تحديد فرع معين عبر ?branch_id= لعرض طلبات فرع محدد فقط."
+                },
+                {
+                    "name": "Resource Types",
+                    "description": "The catalog of consumable resource types (printing pages, meeting-room hours, ...) that plan grants and reception consumptions are denominated in. The URL segment is `resource-types`, not `resources` — that name belongs to the physical Resource model in the spatial hierarchy.",
+                    "item": [
+                        {
+                            "name": "List Resource Types",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/resource-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "resource-types"
+                                    ]
+                                },
+                                "description": "Every resource type, ordered. Unpaginated — this is a small bounded table."
+                            }
+                        },
+                        {
+                            "name": "Get Resource Type",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/resource-types/{{resource_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "resource-types",
+                                        "{{resource_type_id}}"
+                                    ]
+                                },
+                                "description": "A single resource type by id."
+                            }
+                        },
+                        {
+                            "name": "Create Resource Type",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/resource-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "resource-types"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"طباعة\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"صفحة\"\n  },\n  \"slug\": \"printing\",\n  \"icon\": \"printer\",\n  \"order\": 1,\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "`name` and `unit_label` are translatable JSON columns — send both en and ar. `slug` is optional and must be unique; `unit_label` is the natural unit a grant is counted in, which is what keeps quotas explicit about what they measure."
+                            }
+                        },
+                        {
+                            "name": "Update Resource Type",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/resource-types/{{resource_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "resource-types",
+                                        "{{resource_type_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"طباعة\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"صفحة\"\n  },\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "PATCH works identically. Returns a message, not the resource, per this repo's update-endpoint convention."
+                            }
+                        },
+                        {
+                            "name": "Delete Resource Type",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/resource-types/{{resource_type_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "resource-types",
+                                        "{{resource_type_id}}"
+                                    ]
+                                },
+                                "description": "Removes a resource type. Refused if plan grants or consumptions still reference it."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Amenities",
+                    "description": "Amenities are a fixed enum (AmenityType), not free text: wifi, power_outlet, printing, ergonomic_chairs, locker, cafe_access, ac, stage.",
+                    "item": [
+                        {
+                            "name": "List Space Type Amenities",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/space-type-amenities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "space-type-amenities"
+                                    ]
+                                },
+                                "description": "The default amenity set configured per space type."
+                            }
+                        },
+                        {
+                            "name": "Update Space Type Amenities",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/space-type-amenities/{{space_type}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "space-type-amenities",
+                                        "{{space_type}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"amenities\": [\n    \"wifi\",\n    \"power_outlet\",\n    \"ac\"\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Replaces the whole amenity set for this space type. `amenities` is `present`, not `required`: send an empty array to clear them all. The path parameter is the space type value, e.g. `meeting_room`."
+                            }
+                        },
+                        {
+                            "name": "Update Space Amenities",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/amenities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "amenities"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"amenities\": [\n    \"wifi\",\n    \"locker\"\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Overrides amenities for one specific space. Same `present` rule — an empty array turns every amenity off for that space."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Memberships",
+                    "item": [
+                        {
+                            "name": "Activate a Membership",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/memberships",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "memberships"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"plan_id\": 1,\n  \"user_id\": 2\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Operations activates a plan for a member or company without charging their wallet — the arrangement was paid for outside the app (docs/decisions/plan-access-windows.md). This is how private plans reach the staff they were negotiated for.\n\nExactly one of user_id / company_id. Plan balances are still granted on this path, same as a self-service purchase."
+                            }
+                        }
+                    ]
                 }
             ]
         },
@@ -15486,6 +16166,33 @@
                             ]
                         },
                         "description": "Lightweight content storage for front-door website pages (S7-BE-01)."
+                    }
+                },
+                {
+                    "name": "Get Event Registration Form",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/events/{{event_id}}/registration-form",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "events",
+                                "{{event_id}}",
+                                "registration-form"
+                            ]
+                        },
+                        "description": "The custom registration fields for one event, so the client can render the form before the member signs up. Public — the marketing site shows it too."
                     }
                 }
             ]

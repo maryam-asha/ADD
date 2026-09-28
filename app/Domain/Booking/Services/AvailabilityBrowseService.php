@@ -8,9 +8,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
-use App\Domain\Foundation\Enums\DayOfWeek;
-use App\Domain\Foundation\Enums\OperationalStatus;
-use App\Domain\Foundation\Models\BusinessHour;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Settings\Services\SettingService;
@@ -53,37 +51,26 @@ class AvailabilityBrowseService
     ) {}
 
     /**
-     * The month grid: one entry per date with its state and, when closed,
-     * its banner.
+     * The member's month grid: one entry per date with its state and, when
+     * closed, its banner. Judged on the space's own cells — the member picks
+     * consecutive cells rather than a length first, so there is no duration.
      *
      * @return array<string, mixed>
      */
-    public function calendar(Space $space, ?string $from, ?string $to, string $locale, ?int $durationMinutes = null): array
+    public function calendar(Space $space, ?string $from, ?string $to, string $locale): array
     {
         $space = $this->assertBookable($space);
         $rules = $this->availability->rulesFor($space);
-        $this->assertAcceptedDuration($durationMinutes, $rules, $locale);
         $branch = $space->building->branch;
 
         [$start, $end] = $this->resolveRange($from, $to, $rules->timezone);
 
-        $days = $this->availability->daysInRange($space, $start, $end, $rules, $durationMinutes);
-
-        $today = CarbonImmutable::now($rules->timezone)->startOfDay();
-        $todayPeriods = $this->businessHours->periodsFor($today, $branch);
+        $days = $this->availability->daysInRange($space, $start, $end, $rules);
 
         return [
             'space' => $this->spaceSummary($space, $locale),
-            'branch_hours' => $this->presenter->branchHours(
-                $branch,
-                $todayPeriods,
-                $this->openWeekdays($branch->id),
-                $rules,
-                $locale,
-                $this->businessHours->upcomingClosures($branch),
-            ),
-            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES, $this->acceptedDurationOptions($rules)),
-            'legend' => $this->presenter->legend($locale),
+            ...$this->setup($space, $this->todayPeriods($branch, $rules), $rules, $locale),
+            'rules' => $this->memberRules($rules, $locale),
             'data' => array_map(fn ($day) => [
                 ...$this->presenter->day($day),
                 'closed_banner' => $this->presenter->closedBanner($day, $branch, $locale),
@@ -93,17 +80,57 @@ class AvailabilityBrowseService
                 'to' => $end->format('Y-m-d'),
                 'timezone' => $rules->timezone,
                 'total' => count($days),
-                'duration_minutes' => $durationMinutes,
             ],
+        ];
+    }
+
+    /**
+     * What this space's booking calendar is set up with and that does not
+     * change with the date: its booking rules (the member's, without the
+     * duration ladder) and the dates it must refuse.
+     *
+     * The member app reads this once, with the space details, and then asks
+     * `day(withSetup: false)` only for what does change. The branch's week
+     * is not here: it is the same for every space, so the member app reads
+     * it once from the spaces list's `working_hours_banner`. The rules come
+     * from the same builder the month and day responses use, and the
+     * closures from the same BusinessHoursService call as the desk's card,
+     * so none of them can disagree.
+     *
+     * `upcoming_closures` is every all-day closure from today on as ISO-8601
+     * date-times at local midnight with no offset ("2026-09-30T00:00:00") —
+     * no reason, which the member calendar does not show. The app passes
+     * each straight to DateTime.parse, which reads an offset-less value as
+     * local time, so the 30th stays the 30th on any device. With an offset
+     * ("…T00:00:00+03:00") a device set to UTC would move it to the 29th and
+     * grey out the wrong day.
+     *
+     * @return array{rules: array<string, mixed>, upcoming_closures: list<string>}
+     */
+    public function bookingSetup(Space $space, string $locale): array
+    {
+        $space = $this->assertBookable($space);
+
+        return [
+            'rules' => $this->memberRules($this->availability->rulesFor($space), $locale),
+            'upcoming_closures' => array_map(
+                fn (string $date) => "{$date}T00:00:00",
+                array_column($this->businessHours->upcomingClosures($space->building->branch), 'date'),
+            ),
         ];
     }
 
     /**
      * One day's chips.
      *
+     * `withSetup: false` leaves out `branch_hours` and `rules` —
+     * and the queries behind them — for a caller that already holds them from
+     * bookingSetup(), such as the member app re-asking on every date or
+     * duration change.
+     *
      * @return array<string, mixed>
      */
-    public function day(Space $space, string $date, string $locale, ?int $durationMinutes = null): array
+    public function day(Space $space, string $date, string $locale, ?int $durationMinutes = null, bool $withSetup = true): array
     {
         $space = $this->assertBookable($space);
         $rules = $this->availability->rulesFor($space);
@@ -123,16 +150,9 @@ class AvailabilityBrowseService
             'date' => $this->presenter->day($day),
             'state' => $day->state->value,
             'closed_banner' => $this->presenter->closedBanner($day, $branch, $locale),
-            'branch_hours' => $this->presenter->branchHours(
-                $branch,
-                $day->periods,
-                $this->openWeekdays($branch->id),
-                $rules,
-                $locale,
-                $this->businessHours->upcomingClosures($branch),
-            ),
-            'rules' => $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES, $this->acceptedDurationOptions($rules)),
-            'legend' => $this->presenter->legend($locale),
+            // The day's own periods here, not today's: this card describes
+            // the date being looked at.
+            ...($withSetup ? $this->setup($space, $day->periods, $rules, $locale) : []),
             'data' => $durationMinutes === null
                 ? $this->presenter->slots($slots, $locale)
                 : array_map(fn (SlotAvailability $slot) => [
@@ -144,6 +164,13 @@ class AvailabilityBrowseService
                 'granularity_minutes' => $rules->granularityMinutes,
                 'timezone' => $rules->timezone,
                 'duration_minutes' => $durationMinutes,
+                // Indicative, for the requested length: the rate is flat, so
+                // every slot costs the same and one figure says it. The
+                // amount actually charged (plan discount, VAT) is the
+                // preview's to state.
+                'price' => $durationMinutes === null ? null : [
+                    'points' => $this->pointsFor($space, $durationMinutes),
+                ],
             ],
         ];
     }
@@ -236,7 +263,6 @@ class AvailabilityBrowseService
         // A configured option that does not fit this space's granularity is
         // returned disabled rather than silently offered.
         $fitsRules = $this->availability->isValidDuration($startUtc, $endUtc, $rules);
-        $tooLong = ! $this->availability->isShortEnough($startUtc, $endUtc, $rules);
         $points = $this->pointsFor($space, $minutes);
         $reasonKey = $state->reasonKey();
 
@@ -250,7 +276,6 @@ class AvailabilityBrowseService
             'available' => $state->isBookable() && $fitsRules,
             'reason' => match (true) {
                 ! $state->isBookable() => __($reasonKey, [], $locale),
-                $tooLong => __('api.booking.duration_too_long', [], $locale),
                 ! $fitsRules => __('api.booking.duration_invalid_granularity', [], $locale),
                 default => null,
             },
@@ -271,6 +296,63 @@ class AvailabilityBrowseService
         }
 
         return (int) ceil($rate * $minutes / 60);
+    }
+
+    /**
+     * `branch_hours` and `rules` together — the month and admin day
+     * responses, which still carry the branch's hours.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods  the periods the hours card describes
+     * @return array{branch_hours: array<string, mixed>, rules: array<string, mixed>}
+     */
+    private function setup(Space $space, array $periods, SpaceBookingRules $rules, string $locale): array
+    {
+        $branch = $space->building->branch;
+
+        return [
+            'branch_hours' => $this->presenter->branchHours(
+                $branch,
+                $periods,
+                $this->businessHours->weeklySchedule($branch),
+                $rules,
+                $locale,
+                $this->businessHours->upcomingClosures($branch),
+            ),
+            'rules' => $this->rulesBlock($rules, $locale),
+        ];
+    }
+
+    /**
+     * The one builder for `rules`, wherever it appears — the space details,
+     * the month calendar and the desk's day grid.
+     *
+     * @return array<string, mixed>
+     */
+    private function rulesBlock(SpaceBookingRules $rules, string $locale): array
+    {
+        return $this->presenter->rules($rules, $locale, self::MAX_SELECTABLE_DATES, $this->acceptedDurationOptions($rules));
+    }
+
+    /**
+     * `rules` as the member app gets them: without `duration_options_minutes`.
+     * The member picks a start cell and an end cell on the space's own
+     * granularity, at least `min_duration_minutes` long and with no ceiling,
+     * so there is no ladder of lengths to offer. The desk keeps the ladder —
+     * the dashboard's picker is duration-first.
+     *
+     * @return array<string, mixed>
+     */
+    private function memberRules(SpaceBookingRules $rules, string $locale): array
+    {
+        return array_diff_key($this->rulesBlock($rules, $locale), ['duration_options_minutes' => true]);
+    }
+
+    /**
+     * @return array<int, array{open_time: string, close_time: string}>
+     */
+    private function todayPeriods(Branch $branch, SpaceBookingRules $rules): array
+    {
+        return $this->businessHours->periodsFor(CarbonImmutable::now($rules->timezone)->startOfDay(), $branch);
     }
 
     /**
@@ -306,7 +388,6 @@ class AvailabilityBrowseService
 
         $key = match (true) {
             $minutes < $rules->minDurationMinutes => 'api.booking.duration_too_short',
-            $rules->maxDurationMinutes !== null && $minutes > $rules->maxDurationMinutes => 'api.booking.duration_too_long',
             default => 'api.booking.duration_invalid_granularity',
         };
 
@@ -352,25 +433,6 @@ class AvailabilityBrowseService
     }
 
     /**
-     * Which weekdays the branch has any schedule for — the "Sunday –
-     * Thursday" line on the hours card.
-     *
-     * @return list<string>
-     */
-    private function openWeekdays(int $branchId): array
-    {
-        return BusinessHour::query()
-            ->where('branch_id', $branchId)
-            ->get(['day_of_week'])
-            ->map(fn (BusinessHour $hour) => $hour->day_of_week instanceof DayOfWeek
-                ? $hour->day_of_week->value
-                : (string) $hour->day_of_week)
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}
      */
     private function resolveRange(?string $from, ?string $to, string $timezone): array
@@ -397,7 +459,7 @@ class AvailabilityBrowseService
      */
     private function assertBookable(Space $space): Space
     {
-        if ($space->status !== OperationalStatus::Active) {
+        if (! $this->availability->acceptsBookings($space)) {
             throw new NotFoundHttpException(__('api.system.not_found'));
         }
 

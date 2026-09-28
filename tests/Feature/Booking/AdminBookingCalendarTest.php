@@ -120,6 +120,23 @@ class AdminBookingCalendarTest extends TestCase
             ->assertJsonPath('resources.0.days.0.date', '2026-08-17');
     }
 
+    /**
+     * The branch's open days come from its weekly schedule, not from the
+     * days in view: a one-day view used to report that one weekday as the
+     * whole week.
+     */
+    public function test_the_open_weekdays_are_the_whole_weeks_even_in_the_day_view(): void
+    {
+        $this->actingAsOperations();
+        $this->space();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=day&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('branch_hours.open_weekdays', ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'])
+            ->assertJsonPath('branch_hours.days_label', 'Sunday – Thursday');
+    }
+
     public function test_a_booking_appears_on_its_day_with_the_member_who_made_it(): void
     {
         $this->actingAsOperations();

@@ -237,6 +237,40 @@ class BusinessHoursServiceTest extends TestCase
     }
 
     // ---------------------------------------------------------------
+    // Weekly schedule — each weekday's own hours
+    // ---------------------------------------------------------------
+
+    public function test_the_weekly_schedule_gives_each_weekday_its_own_periods_in_order(): void
+    {
+        $branch = Branch::factory()->create();
+
+        foreach ([
+            [DayOfWeek::Monday, '14:00', '18:00'],
+            [DayOfWeek::Monday, '08:00', '12:00'],
+            [DayOfWeek::Sunday, '02:00', '20:00'],
+        ] as [$day, $open, $close]) {
+            BusinessHour::factory()->create([
+                'branch_id' => $branch->id,
+                'day_of_week' => $day,
+                'open_time' => $open,
+                'close_time' => $close,
+            ]);
+        }
+
+        $schedule = $this->service->weeklySchedule($branch);
+
+        $this->assertSame([['open_time' => '02:00', 'close_time' => '20:00']], $schedule['sunday']);
+        // A split day keeps both periods, earliest first.
+        $this->assertSame([
+            ['open_time' => '08:00', 'close_time' => '12:00'],
+            ['open_time' => '14:00', 'close_time' => '18:00'],
+        ], $schedule['monday']);
+        // A weekday with no rows is closed: present, with no periods.
+        $this->assertSame([], $schedule['friday']);
+        $this->assertCount(7, $schedule);
+    }
+
+    // ---------------------------------------------------------------
     // Upcoming closures — what a date picker must refuse ahead of time
     // ---------------------------------------------------------------
 

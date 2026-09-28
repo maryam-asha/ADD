@@ -120,6 +120,14 @@ class BookingBatchCreationService
 
             foreach ($normalized as $window) {
                 $space = $locked[$window['space_id']];
+
+                // Off the locked row, as in BookingCreationService.
+                if (! $this->availability->acceptsBookings($space)) {
+                    $failures[] = $this->failure($window, 'api.booking.space_not_bookable');
+
+                    continue;
+                }
+
                 $rules = $this->availability->rulesFor($space);
 
                 // One fetch per space covering its whole requested span.
@@ -278,7 +286,6 @@ class BookingBatchCreationService
                 ! $this->availability->isWithinBusinessHours($space, $window['start'], $window['end'], $rules) => 'api.reception.outside_business_hours',
                 ! $this->availability->isValidGranularity($window['start'], $rules) => 'api.booking.invalid_start_time',
                 ! $this->availability->isLongEnough($window['start'], $window['end'], $rules) => 'api.booking.duration_too_short',
-                ! $this->availability->isShortEnough($window['start'], $window['end'], $rules) => 'api.booking.duration_too_long',
                 ! $this->availability->matchesDurationGranularity($window['start'], $window['end'], $rules) => 'api.booking.duration_invalid_granularity',
                 default => null,
             };

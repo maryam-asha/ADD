@@ -8,13 +8,11 @@ use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Foundation\Models\Branch;
 use App\Support\Time\LocalTime;
-use Carbon\Carbon;
-use Carbon\CarbonImmutable;
 
 /**
  * Turns the availability value objects into the JSON the calendar screens
  * draw: the month grid, the slot chips, the branch-hours card, the closed
- * banner and the legend.
+ * banner.
  *
  * Date and time formatting deliberately matches EventDatePresenter's
  * dialect ("SEP", "10", "THU", "September 10, 2026", "04:00 AM") so the
@@ -27,7 +25,10 @@ use Carbon\CarbonImmutable;
  */
 class AvailabilityPresenter
 {
-    public function __construct(private readonly LocalTime $time) {}
+    public function __construct(
+        private readonly LocalTime $time,
+        private readonly BranchHoursPresenter $hours,
+    ) {}
 
     /**
      * @return array<string, mixed>
@@ -120,71 +121,70 @@ class AvailabilityPresenter
     }
 
     /**
-     * The "Main Branch Hours · 8:00 AM – 8:00 PM · Sunday – Thursday" card.
+     * The branch-hours card.
      *
-     * `periods` here are today's; `open_weekdays` describes the weekly
-     * shape, which is what the "Sunday – Thursday" line summarises.
+     * Two different things live here, and the field names say which:
+     *
+     * - `hours` / `open_time` / `close_time` / `periods` are **one date's** —
+     *   today's, or the date a day response is for.
+     * - `schedule`, `open_weekdays` and `days_label` are **the ordinary week**,
+     *   from the weekly schedule. A branch keeps different hours on different
+     *   days, so `schedule` groups the days that share hours, each with its
+     *   own — the way the dashboard's business-hours page groups them. Read
+     *   together, one date's hours and "Saturday – Friday" used to say "every
+     *   day, 08:00–22:00" of a week where Sunday and Friday differ.
      *
      * `upcoming_closures` is every all-day closure from today on
      * (BusinessHoursService::upcomingClosures()), not just those in the
      * range being shown, so a date picker can refuse a holiday in a month it
      * has not loaded.
      *
-     * @param  array<int, array{open_time: string, close_time: string}>  $periods
-     * @param  list<string>  $openWeekdays
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods  one date's
+     * @param  array<string, list<array{open_time: string, close_time: string}>>  $weeklySchedule  BusinessHoursService::weeklySchedule()
      * @param  list<array{date: string, reason: string|null}>  $upcomingClosures
      * @return array<string, mixed>
      */
     public function branchHours(
         Branch $branch,
         array $periods,
-        array $openWeekdays,
+        array $weeklySchedule,
         SpaceBookingRules $rules,
         string $locale,
         array $upcomingClosures = [],
     ): array {
         $openTime = $periods === [] ? null : $periods[0]['open_time'];
         $closeTime = $periods === [] ? null : end($periods)['close_time'];
+        $week = $this->hours->week($weeklySchedule, $rules->timezone, $locale);
 
         return [
             'title' => __('api.booking.branch_hours_title', [
                 'branch' => $this->branchName($branch, $locale),
             ], $locale),
-            'hours' => $openTime === null ? null : sprintf(
-                '%s – %s',
-                Carbon::parse($openTime, $rules->timezone)->format('g:i A'),
-                Carbon::parse($closeTime, $rules->timezone)->format('g:i A'),
-            ),
+            'hours' => $openTime === null ? null : $this->hours->hoursLabel($periods, $rules->timezone),
             'open_time' => $openTime,
             'close_time' => $closeTime,
             'periods' => $periods,
-            'days_label' => $this->weekdayRangeLabel($openWeekdays),
-            'open_weekdays' => $openWeekdays,
+            'schedule' => $week['schedule'],
+            'days_label' => $week['days_label'],
+            'open_weekdays' => $week['open_weekdays'],
             'upcoming_closures' => $upcomingClosures,
             'timezone' => $rules->timezone,
-            'timezone_label' => $this->timezoneLabel($rules->timezone),
+            'timezone_label' => $this->hours->timezoneLabel($rules->timezone),
             'timezone_note' => __('api.booking.timezone_note', [
-                'offset' => $this->timezoneLabel($rules->timezone),
+                'offset' => $this->hours->timezoneLabel($rules->timezone),
             ], $locale),
         ];
     }
 
     /**
-     * @return list<array<string, string>>
-     */
-    public function legend(string $locale): array
-    {
-        return [
-            ['key' => 'available', 'label' => __('api.booking.legend.available', [], $locale), 'style' => 'solid'],
-            ['key' => 'booked', 'label' => __('api.booking.legend.booked', [], $locale), 'style' => 'muted'],
-            ['key' => 'outside_hours', 'label' => __('api.booking.legend.outside_hours', [], $locale), 'style' => 'dashed'],
-        ];
-    }
-
-    /**
      * The rules block the app needs to render its notices and constrain its
-     * own inputs, including the two lang keys that were written for this
-     * screen and had no consumer until now.
+     * own inputs.
+     *
+     * No legend and no "greyed-out slots" note anywhere: the app draws both
+     * from the three slot states in its own copy. No concurrency ceiling
+     * either — it decides `booked` on the server and means nothing to the
+     * app (the desk's calendar still shows it per space, where it scales
+     * occupancy).
      *
      * @param  list<int>  $durationOptions
      * @return array<string, mixed>
@@ -195,9 +195,8 @@ class AvailabilityPresenter
             'granularity_minutes' => $rules->granularityMinutes,
             'min_duration_minutes' => $rules->minDurationMinutes,
             // Null means no ceiling / no horizon.
-            'max_duration_minutes' => $rules->maxDurationMinutes,
-            'min_advance_minutes' => $rules->minAdvanceMinutes,
-            'max_advance_days' => $rules->maxAdvanceDays,
+            'min_notice_minutes' => $rules->minNoticeMinutes,
+            'max_days_ahead' => $rules->maxDaysAhead,
             // Only lengths this space accepts: the chips a duration-first
             // picker shows before any start time is chosen.
             'duration_options_minutes' => $durationOptions,
@@ -207,12 +206,6 @@ class AvailabilityPresenter
             'approval_notice' => $rules->requiresApproval
                 ? __('api.space.requires_approval_notice', [], $locale)
                 : null,
-            'min_duration_note' => __('api.space.min_duration_note', [
-                'granularity' => $rules->granularityMinutes,
-                'min_duration' => $this->durationLabel($rules->minDurationMinutes),
-            ], $locale),
-            'slots_note' => __('api.booking.slots_greyed_note', [], $locale),
-            'concurrency_ceiling' => $rules->concurrencyCeiling,
             'max_selectable_dates' => $maxSelectableDates,
         ];
     }
@@ -225,65 +218,6 @@ class AvailabilityPresenter
         $hours = $minutes / 60;
 
         return rtrim(rtrim(number_format($hours, 1), '0'), '.').'h';
-    }
-
-    /**
-     * Derived at request time, never stored: Damascus observes DST, so a
-     * hardcoded "GMT+3" would be wrong for part of the year.
-     */
-    public function timezoneLabel(string $timezone): string
-    {
-        $offset = CarbonImmutable::now($timezone)->format('P');
-        [$hours, $minutes] = explode(':', $offset);
-
-        $sign = str_starts_with($hours, '-') ? '-' : '+';
-        $hour = (int) ltrim($hours, '+-');
-
-        return $minutes === '00'
-            ? sprintf('GMT%s%d', $sign, $hour)
-            : sprintf('GMT%s%d:%s', $sign, $hour, $minutes);
-    }
-
-    /**
-     * Collapses the open weekdays into "Sunday – Thursday" when they form
-     * one unbroken run, and falls back to a comma list when they do not —
-     * a branch open Sunday, Tuesday and Thursday must not be described as
-     * "Sunday – Thursday".
-     *
-     * @param  list<string>  $openWeekdays
-     */
-    private function weekdayRangeLabel(array $openWeekdays): ?string
-    {
-        if ($openWeekdays === []) {
-            return null;
-        }
-
-        $order = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        $indexes = array_values(array_filter(array_map(
-            fn (string $day) => array_search($day, $order, true),
-            $openWeekdays
-        ), fn ($index) => $index !== false));
-
-        sort($indexes);
-
-        $label = fn (int $index) => ucfirst($order[$index]);
-
-        // Every name was unrecognised. Returning null costs the caller a
-        // days label; reading past the end of an empty array costs it the
-        // whole response.
-        if ($indexes === []) {
-            return null;
-        }
-
-        if (count($indexes) === 1) {
-            return $label($indexes[0]);
-        }
-
-        $isContiguous = count($indexes) - 1 === $indexes[count($indexes) - 1] - $indexes[0];
-
-        return $isContiguous
-            ? sprintf('%s – %s', $label($indexes[0]), $label($indexes[count($indexes) - 1]))
-            : implode(', ', array_map($label, $indexes));
     }
 
     private function branchName(Branch $branch, string $locale): string

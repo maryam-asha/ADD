@@ -133,6 +133,42 @@ class BusinessHoursService
     }
 
     /**
+     * The branch's weekly schedule: every weekday, with its own periods
+     * (earliest first; none means closed that weekday), in one query.
+     *
+     * The shape of an ordinary week, for a card that says which days keep
+     * which hours. It is not what any given date resolves to — an exception
+     * replaces a weekday's hours on its date — so anything about one date
+     * still goes through periodsFor()/periodsForRange().
+     *
+     * @return array<string, list<array{open_time: string, close_time: string}>> keyed by DayOfWeek value
+     */
+    public function weeklySchedule(Branch $branch): array
+    {
+        $rows = BusinessHour::query()
+            ->where('branch_id', $branch->id)
+            ->orderBy('open_time')
+            ->get(['day_of_week', 'open_time', 'close_time'])
+            ->groupBy(fn (BusinessHour $businessHour) => $businessHour->day_of_week instanceof DayOfWeek
+                ? $businessHour->day_of_week->value
+                : (string) $businessHour->day_of_week);
+
+        $schedule = [];
+
+        foreach (DayOfWeek::cases() as $day) {
+            $schedule[$day->value] = ($rows->get($day->value) ?? collect())
+                ->map(fn (BusinessHour $businessHour) => [
+                    'open_time' => $businessHour->open_time,
+                    'close_time' => $businessHour->close_time,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $schedule;
+    }
+
+    /**
      * The branch's all-day closures from today on, in date order, in one
      * query.
      *

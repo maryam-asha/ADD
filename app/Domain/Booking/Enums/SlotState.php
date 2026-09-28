@@ -47,4 +47,32 @@ enum SlotState: string
     {
         return $this === self::Available;
     }
+
+    /**
+     * The state as the member app shows it: one of three.
+     *
+     * The desk keeps all eight — "every seat is taken" and "one booking holds
+     * the room" are different facts to an operator — but to a member a slot
+     * is bookable, taken, or its time to be booked has gone. `too_soon` is the
+     * last kind: like a slot that has started, waiting never brings it back.
+     */
+    public function forMember(): self
+    {
+        return match ($this) {
+            self::Available => self::Available,
+            self::Past, self::TooSoon => self::Past,
+            self::Booked, self::AtCapacity, self::Buffer, self::OutsideHours, self::TooFarAhead => self::Booked,
+        };
+    }
+
+    /**
+     * The states a member slot is sent with, in the order `counts` lists them.
+     * `past` is not one: those slots are left out of the member list.
+     *
+     * @return list<self>
+     */
+    public static function memberStates(): array
+    {
+        return [self::Available, self::Booked];
+    }
 }

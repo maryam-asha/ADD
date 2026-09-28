@@ -1,6 +1,6 @@
 # Booking & Availability — API reference
 
-The 15 endpoints added by the availability and calendar work. Every shape
+The 14 endpoints added by the availability and calendar work. Every shape
 below is copied from a real response, not paraphrased.
 
 **Conventions used throughout**
@@ -51,16 +51,8 @@ The month grid. `from`/`to` are local dates (`Y-m-d`), default = current month,
     "cancellation_window_minutes": 60,
     "requires_approval": true,
     "approval_notice": "Your request will be reviewed by operations before confirmation.",
-    "min_duration_note": "60-min start slots • Min. 1h",
-    "slots_note": "Greyed-out slots are already booked.",
-    "concurrency_ceiling": 1,
     "max_selectable_dates": 10
   },
-  "legend": [
-    { "key": "available",     "label": "Available",     "style": "solid"  },
-    { "key": "booked",        "label": "Booked",        "style": "muted"  },
-    { "key": "outside_hours", "label": "Outside hours", "style": "dashed" }
-  ],
   "data": [
     {
       "date": "2026-08-17", "day": "17", "weekday": "MON", "month": "AUG",
@@ -107,94 +99,201 @@ month it has not loaded. A day with shortened hours is not listed — it is open
 > `timezone_label` is **computed per request**, not stored. Damascus observes
 > DST, so hard-coding "GMT+3" is wrong for part of the year — render this field.
 
-### `GET .../availability/slots?date=2026-08-17[&duration=120]`
+### `GET .../availability/slots?date=2026-08-17`
 
-The time-chip grid for one date. **Everything is inside one `data` object, and
-the chip list is `data.slots`** (changed 2026-09-28; it used to be the
-top-level fields with the chips under a top-level `data` array).
+The time-chip grid for one date — **only what changes with the date**, in one
+`data` object, the chips under `data.slots` (changed 2026-09-28). The calendar's
+setup is **not** here. The branch's hours come once from the spaces list's
+`data.working_hours_banner`. This space's `rules` and closures come from the space
+details' `data.booking`. Both are described below. Call this endpoint again on
+every date change.
 
 ```json
 {
   "data": {
-    "date": { "date": "2026-08-17", "day": "17", "weekday": "MON", "month": "AUG",
-              "date_formatted": "August 17, 2026", "state": "available",
-              "is_selectable": true, "available_slot_count": 11, "total_slot_count": 12 },
+    "date": "2026-08-17",
     "state": "available",
     "closed_banner": null,
-    "branch_hours": { "...same as above, including upcoming_closures..." },
-    "rules": { "...same as above..." },
-    "legend": [ "...same as above..." ],
     "slots": [
-      { "start_at": "2026-08-17T08:00:00+03:00", "end_at": "2026-08-17T10:00:00+03:00",
-        "label": "08:00 AM", "start_time": "08:00", "end_time": "10:00",
-        "state": "available", "is_available": true, "reason": null,
-        "duration_minutes": 120, "points": 240, "amount_usd": "24.00" },
-      { "start_at": "2026-08-17T14:00:00+03:00", "end_at": "2026-08-17T16:00:00+03:00",
-        "label": "02:00 PM", "start_time": "14:00", "end_time": "16:00",
-        "state": "booked", "is_available": false,
-        "reason": "This space is not available for the requested time.",
-        "duration_minutes": 120, "points": 240, "amount_usd": "24.00" }
+      { "start_time": "15:00", "end_time": "16:00", "label": "03:00 PM",
+        "state": "available", "is_available": true },
+      { "start_time": "16:00", "end_time": "17:00", "label": "04:00 PM",
+        "state": "booked", "is_available": false }
     ],
-    "counts": { "available": 9, "booked": 2, "outside_hours": 0, "buffer": 0,
-                "at_capacity": 0, "past": 0, "too_soon": 0, "too_far_ahead": 0, "total": 11 },
-    "meta": { "granularity_minutes": 60, "timezone": "Asia/Damascus", "duration_minutes": 120 }
+    "counts": { "available": 4, "booked": 1, "total": 5 },
+    "meta": { "granularity_minutes": 60, "timezone": "Asia/Damascus" }
   }
 }
 ```
 
-**`duration` (optional, minutes) — the duration-first flow.** Pick a length
-from `rules.duration_options_minutes` (the lengths this space accepts), then ask
-for the day with it: each slot is then the **whole booking** — `end_time` is
-where it ends, and it carries `points` / `amount_usd` — stepping by the space's
-granularity, and a start that cannot hold the full length before closing is not
-listed. Post `start_at`/`end_at` straight from the chosen slot. A length the
-space refuses is a `422` on `duration` with the same sentence `POST /bookings`
-would give. Without `duration`, each slot is one granularity-sized cell with no
-price (the example above is the duration form).
+**`date` is just the requested date**, echoed so a response that arrives after
+the member has already tapped another date can be recognised and dropped. The
+day's name, month and formatted label are the app's to render; the day's
+`state` (`available | closed | full | past | out_of_range`) and slot counts are
+in `state` and `counts`. Keep `state`: `full` depends on other members'
+bookings and cannot be worked out from the setup.
 
-**Slot `state`:** `available` · `booked` · `outside_hours` · `buffer` ·
-`at_capacity` (shared space at its seat ceiling) · `past` · `too_soon`
-(inside the minimum notice) · `too_far_ahead` (beyond the booking horizon).
-The last two only occur once `booking.min_advance_minutes` /
-`booking.max_advance_days` are set; both are off by default.
+**Each slot is one of the space's own cells**, `meta.granularity_minutes` long
+(changed 2026-09-28: there is no `duration` parameter any more).
+A slot carries only its own fields: `start_time`, `end_time`, `label`, `state`,
+`is_available`. There is no `reason`: grey a chip by its `state`.
+
+**Picking a booking = picking a run of cells.** The member taps a start cell
+and an end cell; the booking runs from the first cell's `start_time` to the
+last cell's `end_time`. Before sending it, the app keeps the run:
+
+- **unbroken** — every cell in it `available`, and each cell's `start_time`
+  equal to the previous one's `end_time` (a lunch break leaves a gap);
+- **at least `rules.min_duration_minutes`** long. There is no maximum: a
+  member may book as long as the day's open cells allow.
+
+Post `start_at = "{date} {first.start_time}"`,
+`end_at = "{date} {last.end_time}"` (local time). The indicative price is the
+space details' `data.details.price.hourly_rate_points` × hours; the amount
+actually charged, after the plan discount and VAT, is what
+`POST /bookings/preview` returns — show that on the summary. The server re-checks the whole window (a buffer next to another
+booking, for one), and a refusal arrives as the POST's own translated 422
+`message`.
+**Slot `state` — `available` or `booked`.** Only `available` is bookable, and
+`is_available` is exactly `state === "available"`. `counts` is
+`{available, booked, total}`, over the slots sent.
+
+**A slot whose time to be booked has gone is not sent at all** (changed
+2026-09-28): one that has already started, or that starts inside the minimum
+notice (`rules.min_notice_minutes`, an hour by default). Today at 14:00 with an
+hour's notice, the list starts at 15:00 — there is nothing to grey out before
+it. A day whose every start has gone comes back with an empty `slots`.
+
+| state | meaning | covers |
+|---|---|---|
+| `available` | bookable | — |
+| `booked` | cannot be booked | taken by another booking (a room, office or hall); every seat taken (a co-working space); too close to a neighbouring booking (a space with a buffer); outside hours or beyond the booking horizon |
+
+> The admin twin keeps the full eight (`available`, `booked`, `at_capacity`,
+> `buffer`, `outside_hours`, `past`, `too_soon`, `too_far_ahead`) — "every seat
+> is taken" and "one booking holds the room" are different facts to the desk.
 
 Slots are generated **only inside open periods**, so a day that closes for lunch
 simply has no chips across the gap — do not render an empty range there.
 
 > The admin twin, `GET /api/v1/admin/spaces/{space}/availability/slots`, returns
 > the same content **without** the envelope (top-level fields, chips under
-> `data`) — the dashboard reads that shape.
+> `data`) **and with** `branch_hours` / `rules` for that date — the
+> dashboard reads that shape.
 
-### `GET .../availability/quote?start_at=2026-08-17 10:00`
+### `GET /api/v1/member/spaces` — `working_hours_banner`, the branch's hours
 
-Feeds the duration selector, computed end time, price and running total.
+The branch's hours are the same for every space, so they come **once, with the
+spaces list**, not in each space's details. Besides the fields it always had
+(`text`, `hours`, `open_time`, `close_time`, `is_open` — today's), the banner
+carries the branch's week. The upcoming closures are **not** here: they set up
+the booking calendar, so they come with the space details (below).
+
+**The response is one `data` object** (changed 2026-09-28):
+`{data: {working_hours_banner, spaces, meta}}` — the list is `data.spaces`, the
+banner `data.working_hours_banner`, the paging `data.meta`.
 
 ```json
 {
-  "start_at": "2026-08-17T10:00:00+03:00",
-  "start_time": "10:00 AM",
-  "hourly_rate_points": 120,
-  "hourly_rate_usd": "12.00",
-  "durations": [
-    { "minutes": 60,  "label": "1h",   "end_at": "2026-08-17T11:00:00+03:00",
-      "end_time": "11:00 AM", "points": 120, "amount_usd": "12.00",
-      "available": true,  "reason": null },
-    { "minutes": 90,  "label": "1.5h", "end_at": "2026-08-17T11:30:00+03:00",
-      "end_time": "11:30 AM", "points": 180, "amount_usd": "18.00",
-      "available": false,
-      "reason": "The booking duration must be a multiple of this space's slot granularity above the minimum." },
-    { "minutes": 120, "label": "2h",   "...": "..." },
-    { "minutes": 180, "label": "3h",   "...": "..." }
-  ],
-  "meta": { "min_duration_minutes": 60, "granularity_minutes": 60, "timezone": "Asia/Damascus" }
+  "data": {
+    "working_hours_banner": {
+      "text": "...", "hours": "8:00 AM – 10:00 PM",
+      "open_time": "08:00", "close_time": "22:00", "is_open": true,
+      "title": "Main Branch Hours",
+      "periods": [ { "open_time": "08:00", "close_time": "22:00" } ],
+      "schedule": [
+        { "days": ["saturday","monday","tuesday","wednesday","thursday"],
+          "days_label": "Saturday, Monday – Thursday",
+          "periods": [ { "open_time": "08:00", "close_time": "22:00" } ],
+          "hours": "8:00 AM – 10:00 PM" },
+        { "days": ["sunday"], "days_label": "Sunday",
+          "periods": [ { "open_time": "02:00", "close_time": "20:00" } ],
+          "hours": "2:00 AM – 8:00 PM" },
+        { "days": ["friday"], "days_label": "Friday",
+          "periods": [ { "open_time": "14:00", "close_time": "22:00" } ],
+          "hours": "2:00 PM – 10:00 PM" }
+      ],
+      "days_label": "Saturday – Friday",
+      "open_weekdays": ["saturday","sunday","monday","tuesday","wednesday","thursday","friday"],
+      "timezone": "Asia/Damascus", "timezone_label": "GMT+3",
+      "timezone_note": "All times shown in your local time (GMT+3)"
+    },
+    "spaces": [ "...spaces..." ],
+    "meta": { "...": "..." }
+  }
 }
 ```
 
-The ladder is configurable (`booking.duration_options_minutes`, seeded
-`[60,90,120,180]`). An option is **returned disabled with a reason rather than
-hidden** — grey the chip out and show the reason. The example above is a space
-with 60-minute granularity, so 1.5h cannot be booked there.
+**Two different things live here:**
 
+- `hours` / `open_time` / `close_time` / `periods` / `is_open` are **today's**
+  hours only. Never show them as the whole week's: a branch can keep different
+  hours on different days.
+- `schedule` is **the ordinary week**, days grouped by the hours they share,
+  each group with its own `periods` and `hours`, in week order from Saturday
+  (the same grouping the dashboard's business-hours page shows).
+  `open_weekdays` / `days_label` are the open days of that week. A weekday with
+  no group is closed. For a given weekday's hours, find the group whose `days`
+  contains it. `days_label` and each group's `days_label` are translated
+  ("السبت، الاثنين – الخميس").
+- A single date can still differ from its weekday: an exception may close it
+  (the details' `booking.upcoming_closures`) or change its hours. The slots
+  for that date are always the authority.
+
+Keep the banner from the list and use it on the booking screen: the hours card
+from `schedule`, and the closed weekdays in the picker from `open_weekdays`.
+
+### `GET /api/v1/member/spaces/{space}` — `data.booking`, this space's setup
+
+The space details carry, beside the existing fields, what the booking screen
+needs **about this space**. The branch's hours are not repeated here — they are
+in the list's `data.working_hours_banner` above.
+
+```json
+{
+  "data": {
+    "id": 1, "title": "Meeting Room A", "...": "...every existing details field...",
+    "booking": {
+      "rules": {
+        "granularity_minutes": 60, "min_duration_minutes": 60,
+        "min_notice_minutes": 60, "max_days_ahead": null,
+        "buffer_minutes": 0, "cancellation_window_minutes": 60,
+        "requires_approval": false, "approval_notice": null,
+        "max_selectable_dates": 10
+      },
+      "upcoming_closures": ["2026-09-30T00:00:00", "2026-10-06T00:00:00"]
+    }
+  }
+}
+```
+
+No legend: the app draws its own from the two slot states.
+
+**`rules` — the length and the booking window** (renamed 2026-09-28 from
+`min_advance_minutes` / `max_advance_days`; `max_duration_minutes` removed):
+
+| field | what it limits | example | what the app does |
+|---|---|---|---|
+| `min_duration_minutes` | the **length** of a booking: none may be shorter. There is no maximum | `60` — a 30-minute booking is refused | keep the selected run at least this long |
+| `min_notice_minutes` | the **notice**: a booking must be made at least this long before it starts | `60` (the seeded default) — at 14:00, the earliest bookable start is 15:00 | nothing to enforce: slots inside the notice are not sent. Show it as a hint if wanted. `0` = no notice |
+| `max_days_ahead` | **how many days ahead** a booking may be made | `30` — on 1 October, nothing after 31 October | grey out later dates; the month marks them `out_of_range`. `null` = no limit |
+
+There is no list of lengths to offer: the member picks a run of cells at least
+`min_duration_minutes` long.
+
+**`upcoming_closures`** is every date from today on on which the branch is
+closed all day (a business-hour exception), in order. Grey these out in the
+date picker, in any month, before any slots call. Each is an ISO-8601
+date-time at **local midnight with no offset**, to pass straight to
+`DateTime.parse` (JSON has no date type; every date in this API travels as an
+ISO-8601 string). Without an offset it parses as local time, so the 30th is
+the 30th on any device. With `+03:00`, a device in another timezone would
+move it to the 29th. A day that is only shortened is not listed, since it is
+open. The closure's reason is not included.
+
+> **No member quote** (removed 2026-09-28). The ladder of lengths from a chosen
+> start served the duration-first picker, which the member app no longer has.
+> The desk keeps its twin, `GET /api/v1/admin/spaces/{space}/availability/quote`.
 ---
 
 ## 2. Member — bookings
@@ -488,9 +587,9 @@ have refused, and cannot back-date either.
 | 422 | `duration_too_short` | below the minimum duration |
 | 422 | `duration_invalid_granularity` | duration not a valid step above the minimum |
 | 422 | `start_in_the_past` | start is before now |
-| 422 | `duration_too_long` | above `booking.max_duration_minutes` (off by default) |
-| 422 | `too_soon` | inside `booking.min_advance_minutes` of now (off by default) |
-| 422 | `too_far_ahead` | beyond `booking.max_advance_days` (off by default) |
+| 422 | `too_soon` | inside `booking.min_notice_minutes` of now (an hour by default) |
+| 422 | `too_far_ahead` | beyond `booking.max_days_ahead` (off by default) |
+| 422 | `space_not_bookable` | the space is under maintenance or retired — e.g. it was taken out of service after the booking screen opened. The read endpoints 404 such a space; show the message and leave the booking flow. |
 | 422 | `cancellation_window_passed` | too late to cancel |
 | 422 | `wallet_choice_required` | several eligible wallets; body carries `wallet_options` |
 | 409 | `already_checked_in` / `already_cancelled` | state conflict |

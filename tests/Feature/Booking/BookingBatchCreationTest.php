@@ -5,6 +5,7 @@ namespace Tests\Feature\Booking;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -13,8 +14,6 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
-use App\Domain\Settings\Enums\SettingValueType;
-use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -284,22 +283,22 @@ class BookingBatchCreationTest extends TestCase
         ])->assertUnauthorized();
     }
 
-    public function test_a_window_longer_than_the_maximum_fails_the_batch_naming_its_index(): void
+    public function test_a_window_on_a_space_that_is_not_active_fails_the_batch(): void
     {
-        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
         $this->actingAsMember();
-        $space = $this->openSpace();
+        $open = $this->openSpace();
+        $closed = $this->openSpace(['status' => OperationalStatus::Maintenance]);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
             'windows' => [
-                $this->window($space, '2026-08-17', 10, 120),
-                $this->window($space, '2026-08-18', 10, 180),
+                $this->window($open, '2026-08-17'),
+                $this->window($closed, '2026-08-17'),
             ],
         ]);
 
         $response->assertStatus(422)
             ->assertJsonPath('errors.0.index', 1)
-            ->assertJsonPath('errors.0.reason', 'duration_too_long');
+            ->assertJsonPath('errors.0.reason', 'space_not_bookable');
 
         $this->assertSame(0, Booking::count());
     }

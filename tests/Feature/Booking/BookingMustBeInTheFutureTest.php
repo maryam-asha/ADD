@@ -34,6 +34,9 @@ class BookingMustBeInTheFutureTest extends TestCase
         parent::setUp();
         $this->seed(RoleSeeder::class);
         $this->seed(SettingSeeder::class);
+        // The seeded hour of notice is off here: these tests pin other rules
+        // at a fixed "now", and the notice is tested on its own.
+        app(SettingService::class)->set('booking.min_notice_minutes', 0);
         $this->creations = app(BookingCreationService::class);
         // 2026-08-17 is a Monday.
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'));

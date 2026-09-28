@@ -185,12 +185,24 @@ return [
         'resource_quota_insufficient' => 'The requested quantity exceeds what remains of this resource quota.',
     ],
 
+    // Weekday names, for labels built from the weekly schedule
+    // ("Saturday, Monday – Thursday").
+    'weekdays' => [
+        'saturday' => 'Saturday',
+        'sunday' => 'Sunday',
+        'monday' => 'Monday',
+        'tuesday' => 'Tuesday',
+        'wednesday' => 'Wednesday',
+        'thursday' => 'Thursday',
+        'friday' => 'Friday',
+    ],
+
     'booking' => [
         'invalid_start_time' => "The start time does not match this space's slot granularity.",
         'duration_too_short' => 'The booking duration is shorter than the minimum allowed.',
-        'duration_too_long' => 'The booking duration is longer than the maximum allowed.',
         'too_soon' => 'This time is too soon to book. Please choose a later start.',
         'too_far_ahead' => 'This date is too far ahead to book yet.',
+        'space_not_bookable' => 'This space is not available for booking right now.',
         'duration_not_offered' => 'This duration is not available for this space.',
         'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
         'slot_unavailable' => 'This space is not available for the requested time.',
@@ -217,12 +229,6 @@ return [
         'choose_another_day' => 'Choose another day.',
         'branch_hours_title' => ':branch Hours',
         'timezone_note' => 'All times shown in your local time (:offset)',
-        'slots_greyed_note' => 'Greyed-out slots are already booked.',
-        'legend' => [
-            'available' => 'Available',
-            'booked' => 'Booked',
-            'outside_hours' => 'Outside hours',
-        ],
         'range_too_long' => 'The requested date range is too long. Request at most :days days.',
 
         // Member booking lifecycle: list, detail, cancellation, preview.
@@ -328,7 +334,6 @@ return [
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
-        'min_duration_note' => ':granularity-min start slots • Min. :min_duration',
         'book_this_space' => 'Book This Space',
         'person' => ':count person',
         'people' => ':count people',

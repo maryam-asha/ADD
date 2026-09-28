@@ -104,9 +104,9 @@ class BookingCalendarService
             'branch_hours' => $this->presenter->branchHours(
                 $branch,
                 $periodsByDate[$anchor->format('Y-m-d')] ?? [],
-                // Weekday names, not the dates keying $periodsByDate — the
-                // label describes the weekly shape ("Sunday – Thursday").
-                $this->openWeekdays($periodsByDate),
+                // The ordinary week, from the schedule itself — not the days
+                // in view, which in a day view named one weekday as the week.
+                $this->businessHours->weeklySchedule($branch),
                 $this->availability->rulesFor($spaces->first()),
                 $locale,
                 $this->businessHours->upcomingClosures($branch),
@@ -277,23 +277,6 @@ class BookingCalendarService
                 ->map(fn (Collection $rows) => $rows->count())
                 ->all(),
         ];
-    }
-
-    /**
-     * The distinct weekdays the branch was open on across this range.
-     *
-     * @param  array<string, array<int, array{open_time: string, close_time: string}>>  $periodsByDate
-     * @return list<string>
-     */
-    private function openWeekdays(array $periodsByDate): array
-    {
-        return collect($periodsByDate)
-            ->filter(fn (array $periods) => $periods !== [])
-            ->keys()
-            ->map(fn (string $date) => strtolower(CarbonImmutable::parse($date)->format('l')))
-            ->unique()
-            ->values()
-            ->all();
     }
 
     /**

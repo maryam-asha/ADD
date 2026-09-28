@@ -20,7 +20,7 @@ enum DayState: string
     case Closed = 'closed';
     case Full = 'full';
     case Past = 'past';
-    // Beyond booking.max_advance_days: open, but not yet bookable.
+    // Beyond booking.max_days_ahead: open, but not yet bookable.
     case OutOfRange = 'out_of_range';
 
     /**

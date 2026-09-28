@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -492,7 +493,7 @@ class MemberBookingLifecycleTest extends TestCase
 
     public function test_a_window_beyond_the_advance_horizon_is_previewed_with_the_message_the_post_would_return(): void
     {
-        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        app(SettingService::class)->set('booking.max_days_ahead', 7, SettingValueType::Int);
         $this->actingAsMember();
         $space = $this->openSpace();
         $window = [
@@ -508,6 +509,26 @@ class MemberBookingLifecycleTest extends TestCase
             ->assertStatus(422)->json('message');
 
         $this->assertSame(__('api.booking.too_far_ahead', [], 'en'), $postMessage);
+        $this->assertSame($postMessage, $previewReason);
+    }
+
+    public function test_a_space_that_is_not_active_is_previewed_with_the_message_the_post_would_return(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace(['status' => OperationalStatus::Maintenance]);
+        $window = [
+            'space_id' => $space->id,
+            'start_at' => '2026-08-17 14:00',
+            'end_at' => '2026-08-17 15:00',
+        ];
+
+        $previewReason = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', $window)
+            ->assertOk()->json('data.unavailable_reason');
+
+        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window)
+            ->assertStatus(422)->json('message');
+
+        $this->assertSame(__('api.booking.space_not_bookable', [], 'en'), $postMessage);
         $this->assertSame($postMessage, $previewReason);
     }
 }

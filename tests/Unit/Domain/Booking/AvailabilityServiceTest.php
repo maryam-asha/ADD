@@ -489,7 +489,7 @@ class AvailabilityServiceTest extends TestCase
 
     public function test_slots_inside_the_minimum_notice_are_too_soon(): void
     {
-        app(SettingService::class)->set('booking.min_advance_minutes', 120, SettingValueType::Int);
+        app(SettingService::class)->set('booking.min_notice_minutes', 120, SettingValueType::Int);
         $space = $this->openSpace();
 
         $slots = $this->availability->slotsForDay($space, $this->monday());
@@ -500,7 +500,7 @@ class AvailabilityServiceTest extends TestCase
 
     public function test_days_past_the_advance_window_are_out_of_range(): void
     {
-        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        app(SettingService::class)->set('booking.max_days_ahead', 7, SettingValueType::Int);
         $space = $this->openSpace();
         $nextMonday = $this->monday()->copy()->addWeek();
         $mondayAfter = $this->monday()->copy()->addWeeks(2);
@@ -509,23 +509,16 @@ class AvailabilityServiceTest extends TestCase
         $this->assertSame(DayState::OutOfRange, $this->availability->daysInRange($space, $mondayAfter, $mondayAfter)[0]->state);
     }
 
-    public function test_a_duration_above_the_maximum_is_not_a_valid_duration(): void
-    {
-        app(SettingService::class)->set('booking.max_duration_minutes', 180, SettingValueType::Int);
-        $rules = $this->availability->rulesFor($this->openSpace());
-        $start = $this->monday()->copy()->setTime(8, 0);
-
-        $this->assertTrue($this->availability->isShortEnough($start, $start->copy()->addMinutes(180), $rules));
-        $this->assertFalse($this->availability->isShortEnough($start, $start->copy()->addMinutes(240), $rules));
-        $this->assertFalse($this->availability->isValidDurationInMinutes(240, $rules));
-    }
-
-    public function test_no_maximum_duration_is_the_default(): void
+    /**
+     * A booking's length has no ceiling: a whole day is as valid as an hour,
+     * so long as it keeps to the minimum and the granularity.
+     */
+    public function test_a_booking_length_has_no_ceiling(): void
     {
         $rules = $this->availability->rulesFor($this->openSpace());
         $start = $this->monday()->copy()->setTime(8, 0);
 
-        $this->assertNull($rules->maxDurationMinutes);
-        $this->assertTrue($this->availability->isShortEnough($start, $start->copy()->addMinutes(720), $rules));
+        $this->assertTrue($this->availability->isValidDuration($start, $start->copy()->addMinutes(720), $rules));
+        $this->assertTrue($this->availability->isValidDurationInMinutes(720, $rules));
     }
 }

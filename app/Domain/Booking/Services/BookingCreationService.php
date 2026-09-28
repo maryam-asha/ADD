@@ -75,6 +75,10 @@ class BookingCreationService
         return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
+            // Read off the locked row, so a space put into maintenance while
+            // this request was in flight is refused rather than booked.
+            $this->assertAcceptsBookings($locked);
+
             // Re-read inside the lock. Nothing the calendar computed is
             // reused here — the read path is advisory, and only these
             // freshly-read rows decide whether the slot is actually free.
@@ -232,8 +236,8 @@ class BookingCreationService
     }
 
     /**
-     * The booking window: at least `min_advance_minutes` of notice, and no
-     * further out than `max_advance_days`. Both default to off.
+     * The booking window: at least `min_notice_minutes` of notice, and no
+     * further out than `max_days_ahead`. Both default to off.
      */
     private function assertWithinBookingWindow(CarbonInterface $start, SpaceBookingRules $rules): void
     {
@@ -243,6 +247,13 @@ class BookingCreationService
 
         if (! $this->availability->isWithinAdvanceHorizon($start, $rules)) {
             throw new ReceptionActionException('api.booking.too_far_ahead');
+        }
+    }
+
+    private function assertAcceptsBookings(Space $space): void
+    {
+        if (! $this->availability->acceptsBookings($space)) {
+            throw new ReceptionActionException('api.booking.space_not_bookable');
         }
     }
 
@@ -264,10 +275,6 @@ class BookingCreationService
     {
         if (! $this->availability->isLongEnough($start, $end, $rules)) {
             throw new ReceptionActionException('api.booking.duration_too_short');
-        }
-
-        if (! $this->availability->isShortEnough($start, $end, $rules)) {
-            throw new ReceptionActionException('api.booking.duration_too_long');
         }
 
         if (! $this->availability->matchesDurationGranularity($start, $end, $rules)) {

@@ -39,12 +39,12 @@ class SettingSeeder extends Seeder
         // already gone. Off by default; the flag exists so reception can be
         // given a back-dating override later without a code change.
         $settings->setDefault('booking.allow_past_bookings', false, SettingValueType::Bool);
-        // The booking window and length ceiling. Zero means "no limit" for
-        // all three, so seeding them changes nothing until an admin sets a
-        // value — they are seeded only so the settings API can edit them.
-        $settings->setDefault('booking.max_duration_minutes', 0, SettingValueType::Int);
-        $settings->setDefault('booking.min_advance_minutes', 0, SettingValueType::Int);
-        $settings->setDefault('booking.max_advance_days', 0, SettingValueType::Int);
+        // The booking window; a booking's length has no ceiling. The notice
+        // starts at an hour: a member books at least 60 minutes before the
+        // start (0 turns it off). How many days ahead is unlimited (0) until
+        // an admin sets a value.
+        $settings->setDefault('booking.min_notice_minutes', 60, SettingValueType::Int);
+        $settings->setDefault('booking.max_days_ahead', 0, SettingValueType::Int);
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);

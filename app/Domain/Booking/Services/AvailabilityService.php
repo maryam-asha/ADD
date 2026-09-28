@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\ValueObjects\DayAvailability;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\BusinessHourException;
@@ -69,9 +70,8 @@ class AvailabilityService
             capacity: $space->capacity,
             concurrencyCeiling: $this->concurrencyCeilingFor($space),
             timezone: (string) $this->settings->get('app.timezone', 'Asia/Damascus'),
-            maxDurationMinutes: $this->positiveOrNull($this->settings->get('booking.max_duration_minutes')),
-            minAdvanceMinutes: max(0, (int) $this->settings->get('booking.min_advance_minutes', 0)),
-            maxAdvanceDays: $this->positiveOrNull($this->settings->get('booking.max_advance_days')),
+            minNoticeMinutes: max(0, (int) $this->settings->get('booking.min_notice_minutes', 0)),
+            maxDaysAhead: $this->positiveOrNull($this->settings->get('booking.max_days_ahead')),
         );
     }
 
@@ -105,6 +105,21 @@ class AvailabilityService
     // ---------------------------------------------------------------
     // Stateless predicates — no DB, safe to call per slot
     // ---------------------------------------------------------------
+
+    /**
+     * Whether the space takes bookings at all. Only an active space does: one
+     * under maintenance or retired disappears from every booking surface
+     * (PRD §5.6).
+     *
+     * One definition for both sides: the read path 404s on it (the member
+     * list, details and availability never show such a space) and the write
+     * path refuses on it — without the second, a screen opened just before a
+     * space went into maintenance, or a direct call, could still book it.
+     */
+    public function acceptsBookings(Space $space): bool
+    {
+        return $space->status === OperationalStatus::Active;
+    }
 
     /**
      * A window must fall entirely inside ONE open period of the branch's
@@ -197,20 +212,9 @@ class AvailabilityService
         return ($duration - $rules->minDurationMinutes) % $rules->granularityMinutes === 0;
     }
 
-    /**
-     * The ceiling counterpart of isLongEnough(). No maximum configured
-     * means any length the day can hold.
-     */
-    public function isShortEnough(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): bool
-    {
-        return $rules->maxDurationMinutes === null
-            || (int) $start->diffInMinutes($end) <= $rules->maxDurationMinutes;
-    }
-
     public function isValidDuration(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): bool
     {
         return $this->isLongEnough($start, $end, $rules)
-            && $this->isShortEnough($start, $end, $rules)
             && $this->matchesDurationGranularity($start, $end, $rules);
     }
 
@@ -223,12 +227,11 @@ class AvailabilityService
     public function isValidDurationInMinutes(int $minutes, SpaceBookingRules $rules): bool
     {
         return $minutes >= $rules->minDurationMinutes
-            && ($rules->maxDurationMinutes === null || $minutes <= $rules->maxDurationMinutes)
             && ($minutes - $rules->minDurationMinutes) % $rules->granularityMinutes === 0;
     }
 
     /**
-     * The minimum notice: a start closer to now than `min_advance_minutes`
+     * The minimum notice: a start closer to now than `min_notice_minutes`
      * cannot be booked.
      *
      * Zero (the default) means there is no notice rule at all — not "must
@@ -238,13 +241,13 @@ class AvailabilityService
      */
     public function isFarEnoughAhead(CarbonInterface $start, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->minAdvanceMinutes === 0) {
+        if ($rules->minNoticeMinutes === 0) {
             return true;
         }
 
         $now ??= CarbonImmutable::now('UTC');
 
-        return $start->greaterThanOrEqualTo($now->copy()->addMinutes($rules->minAdvanceMinutes));
+        return $start->greaterThanOrEqualTo($now->copy()->addMinutes($rules->minNoticeMinutes));
     }
 
     /**
@@ -255,7 +258,7 @@ class AvailabilityService
      */
     public function isWithinAdvanceHorizon(CarbonInterface $start, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->maxAdvanceDays === null) {
+        if ($rules->maxDaysAhead === null) {
             return true;
         }
 
@@ -264,14 +267,14 @@ class AvailabilityService
 
     private function isDateBeyondHorizon(CarbonInterface $localDate, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->maxAdvanceDays === null) {
+        if ($rules->maxDaysAhead === null) {
             return false;
         }
 
         $lastDate = ($now ?? CarbonImmutable::now('UTC'))
             ->copy()
             ->setTimezone($rules->timezone)
-            ->addDays($rules->maxAdvanceDays)
+            ->addDays($rules->maxDaysAhead)
             ->format('Y-m-d');
 
         return $localDate->format('Y-m-d') > $lastDate;

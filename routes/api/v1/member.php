@@ -39,15 +39,14 @@ Route::get('spaces', [SpaceController::class, 'index']);
 Route::get('spaces/{space}', [SpaceController::class, 'show']);
 
 // docs/decisions/booking-availability-and-calendar.md — the read side of
-// the booking rules: which days are open, which slots are free on a day,
-// and what each duration would cost from a chosen start. Read-only and
-// advisory; none of these hold a slot, so POST bookings still re-checks
-// under a row lock. Each slot's `reason` is the very message that endpoint
-// would return for the same window, because both go through
-// AvailabilityService.
+// the booking rules: which days are open and which of the space's cells are
+// free on a day. Read-only and advisory; neither holds a slot, so POST
+// bookings still re-checks under a row lock, through the same
+// AvailabilityService. There is no member quote: the member picks a start
+// and an end cell rather than a length from a ladder (the desk keeps its
+// quote in admin.php).
 Route::get('spaces/{space}/availability', [SpaceAvailabilityController::class, 'month']);
 Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::class, 'day']);
-Route::get('spaces/{space}/availability/quote', [SpaceAvailabilityController::class, 'quote']);
 
 // docs/decisions/booking-creation-approval-extension.md — member-facing
 // booking creation with slot granularity/buffer/approval rules.
