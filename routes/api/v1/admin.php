@@ -29,6 +29,7 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
+use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
@@ -374,6 +375,8 @@ Route::middleware('role:admin')->group(function () {
     // (docs/decisions/coworking-self-service-sessions.md). Admin-only: a
     // kiosk's pairing is a credential.
     Route::apiResource('kiosks', KioskController::class);
+    Route::post('kiosks/{kiosk}/pairing-code', [KioskPairingController::class, 'issue']);
+    Route::delete('kiosks/{kiosk}/secret', [KioskPairingController::class, 'revoke']);
 });
 
 /*

@@ -2,6 +2,8 @@
 
 namespace Tests\Support;
 
+use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
@@ -48,6 +50,16 @@ trait InteractsWithCoworking
     protected function actingAsAdmin(): User
     {
         return $this->actingAsRole('admin');
+    }
+
+    /** @return array{0: Kiosk, 1: string} the paired kiosk and its plain secret */
+    protected function pairedKiosk(Space $space): array
+    {
+        $pairings = app(KioskPairingService::class);
+        $kiosk = Kiosk::factory()->create(['space_id' => $space->id]);
+        $pairing = $pairings->pair($pairings->issueCode($kiosk)->code);
+
+        return [$pairing->kiosk->fresh(), $pairing->secret];
     }
 
     private function actingAsRole(string $role): User
