@@ -19,8 +19,9 @@ use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 /**
- * Assembles the three member-facing availability responses: the month
- * grid, one day's slots, and the price/duration quote for a chosen start.
+ * Assembles the availability responses: a space's booking setup (for the
+ * member's space details), one day's slots (member and desk), and the desk's
+ * price/duration quote for a chosen start.
  *
  * All rule evaluation belongs to AvailabilityService; this class only
  * arranges the results and hands them to AvailabilityPresenter. Keeping
@@ -29,13 +30,6 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
  */
 class AvailabilityBrowseService
 {
-    /**
-     * A month view plus a little either side. Bounded because the query
-     * cost is linear in days and an unbounded range is a cheap way to
-     * make the server do a lot of work.
-     */
-    public const MAX_CALENDAR_DAYS = 62;
-
     /**
      * How many dates the multi-select strip may carry into one batch —
      * the same cap the batch endpoint validates against.
@@ -51,40 +45,6 @@ class AvailabilityBrowseService
     ) {}
 
     /**
-     * The member's month grid: one entry per date with its state and, when
-     * closed, its banner. Judged on the space's own cells — the member picks
-     * consecutive cells rather than a length first, so there is no duration.
-     *
-     * @return array<string, mixed>
-     */
-    public function calendar(Space $space, ?string $from, ?string $to, string $locale): array
-    {
-        $space = $this->assertBookable($space);
-        $rules = $this->availability->rulesFor($space);
-        $branch = $space->building->branch;
-
-        [$start, $end] = $this->resolveRange($from, $to, $rules->timezone);
-
-        $days = $this->availability->daysInRange($space, $start, $end, $rules);
-
-        return [
-            'space' => $this->spaceSummary($space, $locale),
-            ...$this->setup($space, $this->todayPeriods($branch, $rules), $rules, $locale),
-            'rules' => $this->memberRules($rules, $locale),
-            'data' => array_map(fn ($day) => [
-                ...$this->presenter->day($day),
-                'closed_banner' => $this->presenter->closedBanner($day, $branch, $locale),
-            ], $days),
-            'meta' => [
-                'from' => $start->format('Y-m-d'),
-                'to' => $end->format('Y-m-d'),
-                'timezone' => $rules->timezone,
-                'total' => count($days),
-            ],
-        ];
-    }
-
-    /**
      * What this space's booking calendar is set up with and that does not
      * change with the date: its booking rules (the member's, without the
      * duration ladder) and the dates it must refuse.
@@ -93,7 +53,7 @@ class AvailabilityBrowseService
      * `day(withSetup: false)` only for what does change. The branch's week
      * is not here: it is the same for every space, so the member app reads
      * it once from the spaces list's `working_hours_banner`. The rules come
-     * from the same builder the month and day responses use, and the
+     * from the same builder the desk's day response uses, and the
      * closures from the same BusinessHoursService call as the desk's card,
      * so none of them can disagree.
      *
@@ -139,8 +99,8 @@ class AvailabilityBrowseService
 
         $localDate = CarbonImmutable::parse($date, $rules->timezone)->startOfDay();
 
-        // Reuse the month projection for one day so the chip states and the
-        // grid cell can never disagree about the same date.
+        // The day's state comes from the same per-day projection the desk's
+        // calendar uses, so the chips and the grid cell can never disagree.
         $day = $this->availability->daysInRange($space, $localDate, $localDate, $rules, $durationMinutes)[0];
         $slots = $day->state === DayState::Closed
             ? []
@@ -299,8 +259,8 @@ class AvailabilityBrowseService
     }
 
     /**
-     * `branch_hours` and `rules` together — the month and admin day
-     * responses, which still carry the branch's hours.
+     * `branch_hours` and `rules` together — the desk's day response, which
+     * still carries the branch's hours.
      *
      * @param  array<int, array{open_time: string, close_time: string}>  $periods  the periods the hours card describes
      * @return array{branch_hours: array<string, mixed>, rules: array<string, mixed>}
@@ -323,8 +283,8 @@ class AvailabilityBrowseService
     }
 
     /**
-     * The one builder for `rules`, wherever it appears — the space details,
-     * the month calendar and the desk's day grid.
+     * The one builder for `rules`, wherever it appears — the space details
+     * and the desk's day grid.
      *
      * @return array<string, mixed>
      */
@@ -345,14 +305,6 @@ class AvailabilityBrowseService
     private function memberRules(SpaceBookingRules $rules, string $locale): array
     {
         return array_diff_key($this->rulesBlock($rules, $locale), ['duration_options_minutes' => true]);
-    }
-
-    /**
-     * @return array<int, array{open_time: string, close_time: string}>
-     */
-    private function todayPeriods(Branch $branch, SpaceBookingRules $rules): array
-    {
-        return $this->businessHours->periodsFor(CarbonImmutable::now($rules->timezone)->startOfDay(), $branch);
     }
 
     /**
@@ -433,26 +385,6 @@ class AvailabilityBrowseService
     }
 
     /**
-     * @return array{0: CarbonImmutable, 1: CarbonImmutable}
-     */
-    private function resolveRange(?string $from, ?string $to, string $timezone): array
-    {
-        $start = $from !== null
-            ? CarbonImmutable::parse($from, $timezone)->startOfDay()
-            : CarbonImmutable::now($timezone)->startOfMonth();
-
-        $end = $to !== null
-            ? CarbonImmutable::parse($to, $timezone)->startOfDay()
-            : $start->endOfMonth()->startOfDay();
-
-        if ($end->lessThan($start)) {
-            $end = $start;
-        }
-
-        return [$start, $end];
-    }
-
-    /**
      * A non-active space disappears from booking surfaces entirely
      * (PRD §5.6) — 404 rather than an empty calendar, so the app does not
      * render a bookable-looking screen for a retired room.
@@ -464,19 +396,5 @@ class AvailabilityBrowseService
         }
 
         return $space->loadMissing(['building.branch']);
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function spaceSummary(Space $space, string $locale): array
-    {
-        return [
-            'id' => $space->id,
-            'title' => $space->translate('name', $locale),
-            'space_type' => $space->space_type->value,
-            'capacity' => $space->capacity,
-            'main_image' => $space->main_image,
-        ];
     }
 }

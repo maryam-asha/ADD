@@ -189,32 +189,29 @@ class SpaceAvailabilityControllerTest extends TestCase
         $this->assertSame('2026-08-17', $response->json('data.date'));
     }
 
-    public function test_a_member_sees_a_month_of_day_states_for_a_space(): void
+    /**
+     * There is no member month calendar: the app builds its calendar from
+     * the setup it already holds — open weekdays from the spaces list, the
+     * closures and the booking window from the space details — and learns a
+     * day's slots, and whether it is full, from the day endpoint.
+     */
+    public function test_there_is_no_member_month_calendar(): void
     {
         $this->actingAsMember();
         $space = $this->openSpace();
 
-        $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-23");
-
-        $response->assertOk()
-            ->assertJsonPath('meta.total', 7)
-            ->assertJsonPath('meta.timezone', 'Asia/Damascus')
-            ->assertJsonPath('data.0.date', '2026-08-17')
-            ->assertJsonPath('data.0.weekday', 'MON')
-            ->assertJsonPath('data.0.month', 'AUG')
-            ->assertJsonPath('data.0.state', 'available')
-            ->assertJsonPath('data.0.is_selectable', true)
-            ->assertJsonPath('space.title', 'Meeting Room A');
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-23")
+            ->assertNotFound();
     }
 
     public function test_the_branch_hours_card_carries_the_weekday_range_and_a_derived_timezone_label(): void
     {
-        $this->actingAsMember();
+        $this->actingAsOperations();
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-18");
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17");
 
         $response->assertOk()
             ->assertJsonPath('branch_hours.hours', '8:00 AM – 8:00 PM')
@@ -244,24 +241,23 @@ class SpaceAvailabilityControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-19&to=2026-08-19");
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-19");
 
         $response->assertOk()
-            ->assertJsonPath('data.0.state', 'closed')
-            ->assertJsonPath('data.0.is_selectable', false)
-            ->assertJsonPath('data.0.closed_banner.reason', 'Public holiday')
-            ->assertJsonPath('data.0.closed_banner.severity', 'error');
+            ->assertJsonPath('data.state', 'closed')
+            ->assertJsonPath('data.slots', [])
+            ->assertJsonPath('data.closed_banner.reason', 'Public holiday')
+            ->assertJsonPath('data.closed_banner.severity', 'error');
 
-        $this->assertStringContainsString('closed on this date', $response->json('data.0.closed_banner.text'));
+        $this->assertStringContainsString('closed on this date', $response->json('data.closed_banner.text'));
     }
 
     /**
-     * The same closure list the operations calendar carries, so the app's
-     * date picker can grey out a holiday in a month it has not loaded yet.
+     * The desk's hours card and the member's space details list the same
+     * closures: the desk with each reason, the member as the dates alone.
      */
-    public function test_the_hours_card_lists_upcoming_closures_on_both_the_month_and_the_day(): void
+    public function test_the_desk_and_the_member_see_the_same_upcoming_closures(): void
     {
-        $this->actingAsMember();
         $space = $this->openSpace();
         BusinessHourException::factory()->create([
             'branch_id' => $space->building->branch_id,
@@ -271,15 +267,14 @@ class SpaceAvailabilityControllerTest extends TestCase
             'close_time' => null,
             'reason' => 'Public holiday',
         ]);
-        $expected = [['date' => '2026-10-06', 'reason' => 'Public holiday']];
 
+        $this->actingAsOperations();
         $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-23")
+            ->getJson("/api/v1/admin/spaces/{$space->id}/availability/slots?date=2026-08-17")
             ->assertOk()
-            ->assertJsonPath('branch_hours.upcoming_closures', $expected);
+            ->assertJsonPath('branch_hours.upcoming_closures', [['date' => '2026-10-06', 'reason' => 'Public holiday']]);
 
-        // The space details, which set up the booking calendar: the dates
-        // alone, plain `Y-m-d`.
+        $this->actingAsMember();
         $this->withHeader('lang', 'en')
             ->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
@@ -295,11 +290,11 @@ class SpaceAvailabilityControllerTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-22&to=2026-08-22");
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-22");
 
         $response->assertOk()
-            ->assertJsonPath('data.0.state', 'closed')
-            ->assertJsonPath('data.0.closed_banner.reason', null);
+            ->assertJsonPath('data.state', 'closed')
+            ->assertJsonPath('data.closed_banner.reason', null);
     }
 
     public function test_a_day_whose_every_slot_is_taken_is_full_not_closed(): void
@@ -309,15 +304,15 @@ class SpaceAvailabilityControllerTest extends TestCase
         $this->book($space, 8, 12 * 60);
 
         $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17");
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17");
 
         $response->assertOk()
-            ->assertJsonPath('data.0.state', 'full')
-            ->assertJsonPath('data.0.available_slot_count', 0)
+            ->assertJsonPath('data.state', 'full')
+            ->assertJsonPath('data.counts.available', 0)
             // A full day is open, so it must not show the closed banner.
-            ->assertJsonPath('data.0.closed_banner', null);
+            ->assertJsonPath('data.closed_banner', null);
 
-        $this->assertGreaterThan(0, $response->json('data.0.total_slot_count'));
+        $this->assertGreaterThan(0, $response->json('data.counts.total'));
     }
 
     public function test_slots_for_a_day_return_available_booked_and_past_states(): void
@@ -576,22 +571,11 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->assertJsonPath('data.working_hours_banner.days_label', 'السبت – الجمعة');
     }
 
-    public function test_the_calendar_rejects_a_range_longer_than_the_cap(): void
-    {
-        $this->actingAsMember();
-        $space = $this->openSpace();
-
-        $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-01&to=2026-12-31")
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('to');
-    }
-
     public function test_the_availability_endpoints_are_closed_to_an_unauthenticated_caller(): void
     {
         $space = $this->openSpace();
 
-        $this->getJson("/api/v1/member/spaces/{$space->id}/availability")->assertUnauthorized();
+        $this->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")->assertUnauthorized();
     }
 
     public function test_a_non_active_space_is_not_found(): void
@@ -600,13 +584,13 @@ class SpaceAvailabilityControllerTest extends TestCase
         $space = $this->openSpace(['status' => OperationalStatus::Maintenance]);
 
         $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17")
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-17")
             ->assertNotFound();
     }
 
     /**
      * No response carries a legend any more — the app draws its own from the
-     * three slot states — so what stays localised here is the closed banner.
+     * slot states — so what stays localised here is the closed banner.
      */
     public function test_the_arabic_locale_returns_an_arabic_closed_banner_and_no_legend(): void
     {
@@ -622,13 +606,13 @@ class SpaceAvailabilityControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'ar')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-19&to=2026-08-19");
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date=2026-08-19");
 
         $response->assertOk()
-            ->assertJsonMissingPath('legend')
-            ->assertJsonPath('data.0.closed_banner.reason', 'عطلة رسمية');
+            ->assertJsonMissingPath('data.legend')
+            ->assertJsonPath('data.closed_banner.reason', 'عطلة رسمية');
 
-        $this->assertStringContainsString('مغلق', $response->json('data.0.closed_banner.text'));
+        $this->assertStringContainsString('مغلق', $response->json('data.closed_banner.text'));
 
         // Nor the desk's slot grid.
         $this->actingAsOperations();
@@ -644,15 +628,15 @@ class SpaceAvailabilityControllerTest extends TestCase
         $space = $this->openSpace(['requires_approval' => true]);
 
         $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17");
+            ->getJson("/api/v1/member/spaces/{$space->id}");
 
         $response->assertOk()
-            ->assertJsonPath('rules.requires_approval', true)
-            ->assertJsonPath('rules.max_selectable_dates', 10);
+            ->assertJsonPath('data.booking.rules.requires_approval', true)
+            ->assertJsonPath('data.booking.rules.max_selectable_dates', 10);
 
-        $this->assertNotNull($response->json('rules.approval_notice'));
+        $this->assertNotNull($response->json('data.booking.rules.approval_notice'));
         // No ready-made note: the app words the minimum from min_duration_minutes.
-        $this->assertArrayNotHasKey('min_duration_note', $response->json('rules'));
+        $this->assertArrayNotHasKey('min_duration_note', $response->json('data.booking.rules'));
     }
 
     /**
@@ -837,31 +821,24 @@ class SpaceAvailabilityControllerTest extends TestCase
             ->json('data');
         $this->assertSame($slots(''), $slots('&duration=120'));
 
-        $month = fn (string $query) => $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17{$query}")
-            ->assertOk()
-            ->json();
-        $this->assertSame($month(''), $month('&duration=120'));
-        $this->assertArrayNotHasKey('duration_minutes', $month('')['meta']);
-
         $this->getJson("/api/v1/member/spaces/{$space->id}/availability/quote?start_at=2026-08-17 10:00")
             ->assertNotFound();
     }
 
-    public function test_days_beyond_the_advance_horizon_are_out_of_range_and_not_selectable(): void
+    public function test_days_beyond_the_advance_horizon_are_out_of_range(): void
     {
         app(SettingService::class)->set('booking.max_days_ahead', 7);
         $this->actingAsMember();
         $space = $this->openSpace();
 
-        $response = $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-24&to=2026-08-25");
+        $day = fn (string $date) => $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/member/spaces/{$space->id}/availability/slots?date={$date}")
+            ->assertOk();
 
-        $response->assertOk()
-            ->assertJsonPath('data.0.state', 'available')
-            ->assertJsonPath('data.1.state', 'out_of_range')
-            ->assertJsonPath('data.1.is_selectable', false)
-            ->assertJsonPath('data.1.closed_banner', null);
+        $day('2026-08-24')->assertJsonPath('data.state', 'available');
+        $day('2026-08-25')
+            ->assertJsonPath('data.state', 'out_of_range')
+            ->assertJsonPath('data.closed_banner', null);
     }
 
     public function test_the_rules_block_carries_the_minimum_length_and_the_booking_window(): void
@@ -883,13 +860,6 @@ class SpaceAvailabilityControllerTest extends TestCase
             // No ladder of lengths: the member picks a start and an end cell,
             // at least min_duration_minutes long.
             ->assertJsonMissingPath('data.booking.rules.duration_options_minutes');
-
-        $this->withHeader('lang', 'en')
-            ->getJson("/api/v1/member/spaces/{$space->id}/availability?from=2026-08-17&to=2026-08-17")
-            ->assertOk()
-            ->assertJsonPath('rules.max_days_ahead', 30)
-            ->assertJsonMissingPath('rules.max_duration_minutes')
-            ->assertJsonMissingPath('rules.duration_options_minutes');
     }
 
     /**

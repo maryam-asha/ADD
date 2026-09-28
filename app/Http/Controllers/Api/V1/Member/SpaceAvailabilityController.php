@@ -6,7 +6,6 @@ use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Services\AvailabilityBrowseService;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Member\Booking\AvailabilityCalendarRequest;
 use App\Http\Requests\Member\Booking\AvailabilityDayRequest;
 use Illuminate\Http\JsonResponse;
 
@@ -27,19 +26,6 @@ class SpaceAvailabilityController extends Controller
      * keeps the reason for the desk.
      */
     private const SLOT_FIELDS = ['start_time', 'end_time', 'label', 'state', 'is_available'];
-
-    public function month(
-        AvailabilityCalendarRequest $request,
-        Space $space,
-        AvailabilityBrowseService $availability,
-    ): JsonResponse {
-        return response()->json($availability->calendar(
-            $space,
-            $request->validated('from'),
-            $request->validated('to'),
-            app()->getLocale(),
-        ));
-    }
 
     /**
      * Only what changes with the date, in one object:

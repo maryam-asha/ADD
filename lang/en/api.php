@@ -229,7 +229,6 @@ return [
         'choose_another_day' => 'Choose another day.',
         'branch_hours_title' => ':branch Hours',
         'timezone_note' => 'All times shown in your local time (:offset)',
-        'range_too_long' => 'The requested date range is too long. Request at most :days days.',
 
         // Member booking lifecycle: list, detail, cancellation, preview.
         'cancelled' => 'Booking cancelled.',

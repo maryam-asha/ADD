@@ -186,10 +186,8 @@ class MemberServiceUnifiedContractTest extends TestCase
             ])
             ->assertJsonCount(2, 'data.registration_form');
 
-        // Also test request-form alias
-        $aliasResponse = $this->getJson("/api/v1/member/services/{$service->id}/request-form");
-        $aliasResponse->assertStatus(200)
-            ->assertJsonCount(2, 'data.registration_form');
+        // One URL per endpoint: the old request-form alias is gone.
+        $this->getJson("/api/v1/member/services/{$service->id}/request-form")->assertNotFound();
     }
 
     public function test_coming_soon_service_sets_proper_status_and_can_request(): void
@@ -228,9 +226,9 @@ class MemberServiceUnifiedContractTest extends TestCase
         $this->assertSame(1, $firstAxis['services_count']);
         $this->assertArrayNotHasKey('service_types', $firstAxis, 'Axes endpoint must only return axes without service_types');
 
-        // Test alias /services/categories
-        $aliasResponse = $this->getJson('/api/v1/member/services/categories');
-        $aliasResponse->assertStatus(200);
+        // One URL per endpoint: the old services/categories alias is gone.
+        // It now reads as a service slug, and no service has that slug.
+        $this->getJson('/api/v1/member/services/categories')->assertNotFound();
     }
 
     public function test_member_can_fetch_services_for_a_specific_axis_separately(): void

@@ -10,8 +10,11 @@ use Illuminate\Foundation\Http\FormRequest;
  * there is no `duration` — AvailabilitySlotsRequest keeps it for the desk,
  * whose picker is duration-first.
  *
- * A calendar date, not an instant — see AvailabilityCalendarRequest for
- * why this does not run through InterpretsLocalTimes.
+ * A calendar date, not an instant: a day is drawn in the district's own
+ * dates, so this deliberately does NOT go through InterpretsLocalTimes
+ * (which pins wall-clock times to a timezone before comparison).
+ * tests/Guards/UserSuppliedTimesAreInterpretedLocallyTest only covers
+ * typed date-times.
  */
 class AvailabilityDayRequest extends FormRequest
 {

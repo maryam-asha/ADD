@@ -1,6 +1,6 @@
 # Booking & Availability — API reference
 
-The 14 endpoints added by the availability and calendar work. Every shape
+The 13 endpoints added by the availability and calendar work. Every shape
 below is copied from a real response, not paraphrased.
 
 **Conventions used throughout**
@@ -26,79 +26,23 @@ re-checks under a row lock. The payoff of both paths sharing one engine is that
 a slot's `reason` is the *exact* message `POST /bookings` would return for that
 same window.
 
-### `GET /api/v1/member/spaces/{space}/availability`
+### Building the calendar — no month endpoint
 
-The month grid. `from`/`to` are local dates (`Y-m-d`), default = current month,
-**max 62 days** (else `422`).
+There is **no member month calendar** (removed 2026-09-28). The app builds the
+date picker from the setup it already holds, and asks the server only for the
+date the member taps:
 
-```json
-{
-  "space": { "id": 1, "title": "Meeting Room A", "space_type": "room", "capacity": 6, "main_image": null },
-  "branch_hours": {
-    "title": "Main Branch Hours",
-    "hours": "8:00 AM – 8:00 PM",
-    "open_time": "08:00", "close_time": "20:00",
-    "periods": [{ "open_time": "08:00", "close_time": "20:00" }],
-    "days_label": "Sunday – Thursday",
-    "open_weekdays": ["sunday","monday","tuesday","wednesday","thursday"],
-    "upcoming_closures": [ { "date": "2026-10-06", "reason": "Public holiday" } ],
-    "timezone": "Asia/Damascus",
-    "timezone_label": "GMT+3",
-    "timezone_note": "All times shown in your local time (GMT+3)"
-  },
-  "rules": {
-    "granularity_minutes": 60, "min_duration_minutes": 60, "buffer_minutes": 0,
-    "cancellation_window_minutes": 60,
-    "requires_approval": true,
-    "approval_notice": "Your request will be reviewed by operations before confirmation.",
-    "max_selectable_dates": 10
-  },
-  "data": [
-    {
-      "date": "2026-08-17", "day": "17", "weekday": "MON", "month": "AUG",
-      "date_formatted": "August 17, 2026",
-      "state": "available", "is_selectable": true,
-      "available_slot_count": 11, "total_slot_count": 12,
-      "closed_banner": null
-    }
-  ],
-  "meta": { "from": "2026-08-17", "to": "2026-08-19", "timezone": "Asia/Damascus", "total": 3 }
-}
-```
+| a date is… | when | from |
+|---|---|---|
+| past | before today | the device's date |
+| closed | its weekday is not in `open_weekdays`, or it is in `upcoming_closures` | the spaces list's `data.working_hours_banner.open_weekdays`; the space details' `data.booking.upcoming_closures` |
+| beyond the window | more than `max_days_ahead` days from today (`null` = no limit) | the space details' `data.booking.rules` |
+| otherwise | tappable | — |
 
-**`state` is one of `available | closed | full | past`.** The distinction that
-matters most:
-
-| state | meaning | `closed_banner` | tappable |
-|---|---|---|---|
-| `available` | open, has free slots | `null` | yes |
-| `full` | **open**, every slot taken | `null` | no |
-| `closed` | branch not open that day | present | no |
-| `past` | date has gone | `null` | no |
-
-A `full` day must **not** be shown as closed — it is open, just sold out.
-
-`closed_banner`, when present:
-
-```json
-{
-  "text": "Main Branch is closed on this date.",
-  "hint": "Choose another day.",
-  "reason": "Public holiday",
-  "severity": "error"
-}
-```
-
-`reason` is `null` for a weekday with no schedule (nothing to explain); it is
-only non-null when an explicit business-hour exception supplied one.
-
-`branch_hours.upcoming_closures` lists **every** all-day closure from today on
-(not just those in `from`–`to`), so the date picker can grey out a holiday in a
-month it has not loaded. A day with shortened hours is not listed — it is open.
-
-> `timezone_label` is **computed per request**, not stored. Damascus observes
-> DST, so hard-coding "GMT+3" is wrong for part of the year — render this field.
-
+Tapping a date calls the day endpoint below, whose `data.state` is the
+authority for that date: a day can still turn out `full` (every slot taken by
+other members), or be closed or shortened by an exception the setup did not
+cover.
 ### `GET .../availability/slots?date=2026-08-17`
 
 The time-chip grid for one date — **only what changes with the date**, in one
@@ -133,6 +77,31 @@ day's name, month and formatted label are the app's to render; the day's
 in `state` and `counts`. Keep `state`: `full` depends on other members'
 bookings and cannot be worked out from the setup.
 
+**The day's `state`** — the authority for the tapped date:
+
+| state | meaning | `closed_banner` |
+|---|---|---|
+| `available` | open, has free slots | `null` |
+| `full` | **open**, every slot taken | `null` |
+| `closed` | branch not open that day; `slots` is empty | present |
+| `past` | the date has gone | `null` |
+| `out_of_range` | beyond `max_days_ahead` | `null` |
+
+A `full` day must **not** be shown as closed — it is open, just sold out.
+
+`closed_banner`, when present:
+
+```json
+{
+  "text": "Main Branch is closed on this date.",
+  "hint": "Choose another day.",
+  "reason": "Public holiday",
+  "severity": "error"
+}
+```
+
+`reason` is `null` for a weekday with no schedule (nothing to explain); it is
+only non-null when an explicit business-hour exception supplied one.
 **Each slot is one of the space's own cells**, `meta.granularity_minutes` long
 (changed 2026-09-28: there is no `duration` parameter any more).
 A slot carries only its own fields: `start_time`, `end_time`, `label`, `state`,
@@ -276,7 +245,7 @@ No legend: the app draws its own from the two slot states.
 |---|---|---|---|
 | `min_duration_minutes` | the **length** of a booking: none may be shorter. There is no maximum | `60` — a 30-minute booking is refused | keep the selected run at least this long |
 | `min_notice_minutes` | the **notice**: a booking must be made at least this long before it starts | `60` (the seeded default) — at 14:00, the earliest bookable start is 15:00 | nothing to enforce: slots inside the notice are not sent. Show it as a hint if wanted. `0` = no notice |
-| `max_days_ahead` | **how many days ahead** a booking may be made | `30` — on 1 October, nothing after 31 October | grey out later dates; the month marks them `out_of_range`. `null` = no limit |
+| `max_days_ahead` | **how many days ahead** a booking may be made | `30` — on 1 October, nothing after 31 October | grey out later dates; the day endpoint marks them `out_of_range`. `null` = no limit |
 
 There is no list of lengths to offer: the member picks a run of cells at least
 `min_duration_minutes` long.

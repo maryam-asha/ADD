@@ -5,7 +5,7 @@ namespace App\Http\Requests\Member\Booking;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * A calendar date, not an instant — see AvailabilityCalendarRequest for
+ * A calendar date, not an instant — see AvailabilityDayRequest for
  * why these do not run through InterpretsLocalTimes.
  */
 class AvailabilitySlotsRequest extends FormRequest
