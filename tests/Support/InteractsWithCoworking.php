@@ -8,6 +8,7 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Support\Security\Totp;
 use Laravel\Sanctum\Sanctum;
 
 /**
@@ -60,6 +61,12 @@ trait InteractsWithCoworking
         $pairing = $pairings->pair($pairings->issueCode($kiosk)->code);
 
         return [$pairing->kiosk->fresh(), $pairing->secret];
+    }
+
+    /** The QR value the kiosk would show $offsetSeconds from now. */
+    protected function qrFor(Kiosk $kiosk, string $secret, int $offsetSeconds = 0): string
+    {
+        return Kiosk::QR_PREFIX.':'.$kiosk->id.':'.app(Totp::class)->codeAt($secret, now()->getTimestamp() + $offsetSeconds);
     }
 
     private function actingAsRole(string $role): User
