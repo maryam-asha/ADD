@@ -7,6 +7,7 @@ use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
@@ -31,6 +32,8 @@ class Booking extends Model
         'payment_state',
         'payment_source',
         'checked_in_at',
+        'checked_in_via',
+        'kiosk_id',
         'checked_out_at',
         'termination_source',
         'amount_owed',
@@ -54,6 +57,7 @@ class Booking extends Model
             'payment_state' => PaymentState::class,
             'payment_source' => PaymentSource::class,
             'checked_in_at' => 'datetime',
+            'checked_in_via' => SessionStartSource::class,
             'checked_out_at' => 'datetime',
             'termination_source' => TerminationSource::class,
             'amount_owed' => 'decimal:2',
@@ -105,5 +109,21 @@ class Booking extends Model
     {
         return $this->hasMany(AccessGrant::class, 'source_id')
             ->where('source_type', AccessSourceType::Booking);
+    }
+
+    public function kiosk(): BelongsTo
+    {
+        return $this->belongsTo(Kiosk::class);
+    }
+
+    public function coworkingType(): string
+    {
+        return 'booking';
+    }
+
+    /** Bookings checked in before scan check-in existed have no value; reception did those. */
+    public function startSource(): SessionStartSource
+    {
+        return $this->checked_in_via ?? SessionStartSource::Reception;
     }
 }

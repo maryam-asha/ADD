@@ -4,14 +4,18 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\DataTransferObjects\WalkInStartResult;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Membership\Services\SessionCoverageEvaluator;
+use App\Domain\Membership\ValueObjects\SessionCoverage;
 use Illuminate\Support\Facades\DB;
 
 class WalkInCapacityService
@@ -20,6 +24,7 @@ class WalkInCapacityService
         private readonly BusinessHoursService $businessHours,
         private readonly MembershipResolver $memberships,
         private readonly PlanHourCoverageService $planHours,
+        private readonly SessionCoverageEvaluator $coverage,
     ) {}
 
     /**
@@ -33,9 +38,15 @@ class WalkInCapacityService
      * `capacity === null` is treated as unlimited: a space with no
      * configured capacity shouldn't block every walk-in.
      */
-    public function start(Space $space, User $member): WalkInStartResult
-    {
-        return DB::transaction(function () use ($space, $member) {
+    public function start(
+        Space $space,
+        User $member,
+        SessionStartSource $via = SessionStartSource::Reception,
+        ?Kiosk $kiosk = null,
+        bool $acceptedUncovered = false,
+        ?SessionCoverage $coverage = null,
+    ): WalkInStartResult {
+        return DB::transaction(function () use ($space, $member, $via, $kiosk, $acceptedUncovered, $coverage) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
             $branch = $locked->building->branch;
@@ -71,6 +82,14 @@ class WalkInCapacityService
                 'membership_id' => $membership?->id,
                 'checked_in_at' => now(),
                 'payment_state' => PaymentState::Unpaid,
+                'started_via' => $via,
+                'kiosk_id' => $kiosk?->id,
+                'accepted_uncovered' => $acceptedUncovered,
+                // Taken for every walk-in, reception or scan, so the reception
+                // list shows the same plan picture for both. A scan passes the
+                // coverage it already showed the member, so the snapshot is
+                // exactly what they agreed to.
+                'coverage_snapshot' => ($coverage ?? $this->coverage->evaluate($member, now()))->toArray(),
             ]);
 
             // A plan with an access window that isn't open right now does not

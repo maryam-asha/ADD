@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Models;
 
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
@@ -22,6 +23,10 @@ class WalkinSession extends Model
         'user_id',
         'membership_id',
         'checked_in_at',
+        'started_via',
+        'kiosk_id',
+        'accepted_uncovered',
+        'coverage_snapshot',
         'checked_out_at',
         'plan_covered_seconds',
         'payment_state',
@@ -46,6 +51,9 @@ class WalkinSession extends Model
             'plan_covered_seconds' => 'integer',
             'payment_method' => PaymentMethod::class,
             'paid_at' => 'datetime',
+            'started_via' => SessionStartSource::class,
+            'accepted_uncovered' => 'boolean',
+            'coverage_snapshot' => 'array',
         ];
     }
 
@@ -68,5 +76,20 @@ class WalkinSession extends Model
     public function membership(): BelongsTo
     {
         return $this->belongsTo(Membership::class);
+    }
+
+    public function kiosk(): BelongsTo
+    {
+        return $this->belongsTo(Kiosk::class);
+    }
+
+    public function coworkingType(): string
+    {
+        return 'walkin';
+    }
+
+    public function startSource(): SessionStartSource
+    {
+        return $this->started_via ?? SessionStartSource::Reception;
     }
 }

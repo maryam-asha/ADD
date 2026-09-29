@@ -13,6 +13,7 @@ use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
@@ -105,8 +106,10 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
             'payment_method' => PaymentMethod::class,
+            'checked_in_via' => SessionStartSource::class,
         ],
         WalkinSession::class => [
+            'started_via' => SessionStartSource::class,
             'payment_state' => PaymentState::class,
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
