@@ -9,12 +9,12 @@ use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingApprovalService;
 use App\Domain\Booking\Services\BookingCancellationService;
+use App\Domain\Booking\Services\BookingCheckInService;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Http\Controllers\Controller;
@@ -88,31 +88,13 @@ class BookingReceptionController extends Controller
         return PendingApprovalBookingResource::collection($bookings);
     }
 
-    public function checkIn(Booking $booking, BusinessHoursService $businessHours): JsonResponse
+    public function checkIn(Booking $booking, BookingCheckInService $checkIns): JsonResponse
     {
-        if ($booking->status === BookingStatus::Cancelled) {
-            return response()->json(['message' => __('api.reception.already_cancelled')], 409);
+        try {
+            $checkIns->checkIn($booking);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
-
-        if ($booking->status === BookingStatus::Pending) {
-            return response()->json(['message' => __('api.booking.check_in_requires_approval')], 409);
-        }
-
-        if ($booking->status === BookingStatus::Rejected) {
-            return response()->json(['message' => __('api.booking.check_in_rejected')], 409);
-        }
-
-        if ($booking->checked_in_at !== null) {
-            return response()->json(['message' => __('api.reception.already_checked_in')], 409);
-        }
-
-        $branch = $booking->space->building->branch;
-
-        if (! $businessHours->isWithinBusinessHours(now(), $branch)) {
-            return response()->json(['message' => __('api.reception.outside_business_hours')], 422);
-        }
-
-        $booking->forceFill(['checked_in_at' => now()])->save();
 
         $this->logSensitiveAction('booking_checked_in', $booking);
 

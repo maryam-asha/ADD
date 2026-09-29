@@ -4,9 +4,10 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\ArrivalRequest;
+use App\Domain\Booking\Services\BookingCheckInService;
 use App\Domain\Booking\Services\WalkInCapacityService;
-use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StoreWalkInSessionRequest;
 use App\Http\Resources\ArrivalRequestResource;
@@ -30,21 +31,20 @@ class ArrivalRequestController extends Controller
         return ArrivalRequestResource::collection($requests);
     }
 
-    public function confirm(Request $request, ArrivalRequest $arrivalRequest): JsonResponse
+    public function confirm(Request $request, ArrivalRequest $arrivalRequest, BookingCheckInService $checkIns): JsonResponse
     {
         if ($arrivalRequest->status !== ArrivalRequestStatus::Pending) {
             return response()->json(['message' => __('api.kiosk.arrival_request_not_pending')], 409);
         }
 
         if ($arrivalRequest->matched_booking_id !== null) {
-            $response = app(BookingReceptionController::class)->checkIn(
-                $arrivalRequest->matchedBooking,
-                app(BusinessHoursService::class)
-            );
-
-            if ($response->getStatusCode() >= 400) {
-                return $response;
+            try {
+                $checkIns->checkIn($arrivalRequest->matchedBooking);
+            } catch (ReceptionActionException $e) {
+                return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
             }
+
+            $this->logSensitiveAction('booking_checked_in', $arrivalRequest->matchedBooking);
 
             $confirmedSpaceId = $arrivalRequest->matchedBooking->space_id;
         } else {
