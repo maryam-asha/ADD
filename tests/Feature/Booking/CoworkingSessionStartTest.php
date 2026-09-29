@@ -359,6 +359,33 @@ class CoworkingSessionStartTest extends TestCase
             ->assertJsonPath('data.coverage.covered_until', Carbon::parse('2026-08-17 20:00', 'Asia/Damascus')->utc()->toIso8601String());
     }
 
+    public function test_scanning_is_throttled_at_ten_a_minute(): void
+    {
+        $this->actingAsMember();
+
+        foreach (range(1, 10) as $attempt) {
+            $this->scan()->assertStatus(422);
+        }
+
+        $this->scan()->assertStatus(429);
+    }
+
+    /**
+     * Without a key prefix, every plain `throttle:` a member hits counts
+     * against one per-user key, so ten door unlocks would lock them out of
+     * scanning in too.
+     */
+    public function test_the_scan_throttle_has_its_own_bucket(): void
+    {
+        $this->actingAsMember();
+
+        foreach (range(1, 10) as $attempt) {
+            $this->postJson('/api/v1/member/access/unlock', []);
+        }
+
+        $this->scan()->assertStatus(422)->assertJsonPath('reason', 'no_plan');
+    }
+
     public function test_only_members_can_start_sessions(): void
     {
         $this->actingAsOperations();

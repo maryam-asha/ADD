@@ -156,4 +156,18 @@ class KioskPairingTest extends TestCase
 
         $this->pair('WRONGONE')->assertStatus(429);
     }
+
+    /**
+     * Without a key prefix, every plain `throttle:` on an unauthenticated
+     * route counts against one per-IP key, so a kiosk sharing a network
+     * with members refreshing their tokens would be locked out of pairing.
+     */
+    public function test_the_pairing_throttle_has_its_own_bucket(): void
+    {
+        foreach (range(1, 5) as $attempt) {
+            $this->postJson('/api/v1/auth/refresh', []);
+        }
+
+        $this->pair('WRONGONE')->assertStatus(422);
+    }
 }

@@ -82,8 +82,10 @@ Route::post('access/unlock', [AccessUnlockController::class, 'unlock'])->middlew
 
 // Self-service coworking sessions (docs/decisions/coworking-self-service-sessions.md):
 // scan the kiosk's rotating code to start, read the running session for the
-// timer. Static segments are declared before any {type}/{id} wildcard.
-Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])->middleware('throttle:10,1');
+// timer. Static segments are declared before any {type}/{id} wildcard. The
+// throttle's third argument is a key prefix: without it the scan would share
+// one per-user bucket with access/unlock.
+Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])->middleware('throttle:10,1,coworking-scan');
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
 Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
 Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);
