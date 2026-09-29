@@ -35,7 +35,7 @@ Reception sees the scan on its usual poll of `GET admin/reception/sessions/activ
 (about every 15 s; nothing is pushed): `ActiveReceptionSessionResource` now
 carries `started_via`, a `member` block (id, name, phone, avatar, company),
 `plan` (the coverage snapshot taken at start), `accepted_uncovered` and any
-pending `end_request`.
+pending `end_request`; the exact row shape is under "Reception list JSON" below.
 
 Schema: `kiosks`, `session_end_requests`; `walkin_sessions.started_via` /
 `kiosk_id` / `accepted_uncovered` / `coverage_snapshot`;
@@ -44,6 +44,62 @@ Schema: `kiosks`, `session_end_requests`; `walkin_sessions.started_via` /
 are new `MorphMapServiceProvider` aliases, shipped with the `activity_log`
 rewrite migration `2026_09_28_100300` (precedent `2026_09_27_100005`); `User`
 is still never aliased.
+
+### Reception list JSON
+
+One row of `GET admin/reception/sessions/active`
+(`ReceptionSessionsController::active()` → `ActiveReceptionSessionResource`),
+as it is returned today. The same shape for both kinds of row:
+
+```json
+{"data": [
+  {"id": 12, "type": "walkin", "space_id": 1, "space_type": "co_space",
+   "user_id": 7, "user_name": "Lina Haddad",
+   "checked_in_at": "2026-08-17T07:00:00.000000Z", "is_overdue": false,
+   "started_via": "scan",
+   "member": {"id": 7, "name": "Lina Haddad", "phone": "+963932171249",
+              "avatar_url": null, "company": null},
+   "plan": {"status": "covered", "reason": null,
+            "plan": {"id": 1, "name": "Day pass"},
+            "hours_total": 40, "hours_remaining": 40,
+            "window": {"start": "08:00", "end": "20:00"},
+            "covered_until": "2026-08-17T17:00:00+00:00"},
+   "accepted_uncovered": false,
+   "end_request": {"id": 3, "status": "pending",
+                   "requested_at": "2026-08-17T07:00:00+00:00",
+                   "resolved_at": null, "checked_out_at": null}}
+]}
+```
+
+- `type` is `walkin` or `booking`; `started_via` is `scan` or `reception` (a
+  row from before this feature, with no source recorded, reads `reception`);
+  `space_type` is the space's `SpaceType` value.
+- `member.avatar_url` comes from the member's personal profile and
+  `member.company` is the legal name of their first company; both may be null.
+- `plan` is the stored `coverage_snapshot` rendered by
+  `SessionCoverageResource`, with exactly the keys of `SessionCoverage::toArray()`:
+  `status` (`covered` / `not_covered`), `reason` (null when covered, else one
+  of the reasons under "Coverage: the reasons"), `plan` (`{id, name}` with the
+  name in the reader's language, or null), `hours_total`, `hours_remaining`
+  (as at the start: plan hours are only spent at closure), `window`
+  (`{start, end}`, or null for a plan without an access window) and
+  `covered_until` (null when not covered). The whole `plan` block is `null` for
+  every booking and for a walk-in with no snapshot (a row from before
+  `coverage_snapshot` existed).
+- `accepted_uncovered` is always `false` for a booking.
+- `end_request` is only a **pending** request (so `status` is always
+  `pending` and `resolved_at` / `checked_out_at` are null here), rendered by
+  `SessionEndRequestResource`; `null` when there is none.
+- Every timestamp is UTC ISO-8601, in two spellings: `checked_in_at` is
+  Carbon's JSON form (microseconds, `Z`), `plan.covered_until` and the
+  `end_request` timestamps are `toIso8601String()` (`+00:00`); `window` holds
+  local `H:i` wall-clock times. Whole-number hours arrive as JSON integers.
+
+This differs from the names in the design spec's §3: its `coverage_status` is
+`plan.status`, `hours_remaining_at_start` is `plan.hours_remaining`,
+`profile_image` is `member.avatar_url`, the plan name sits at `plan.plan.name`,
+`end_request` carries the full resource rather than `{id, requested_at}`, and a
+booking gets `plan: null`, with no plan name shown.
 
 ## Relationship to `kiosk-display.md`
 
@@ -80,7 +136,10 @@ assumption recorded in `kiosk-display.md`.
   still matches. Issuing a new code replaces any unused one.
 - **Pair.** `POST /api/v1/kiosk/pair` (`routes/api/v1/kiosk.php`,
   `KioskPairController`), unauthenticated because the code is the proof,
-  `throttle:5,1`. In one transaction, under a row lock on the kiosk, it finds
+  `throttle:5,1,kiosk-pair` (the third argument is a key prefix: without it
+  every plainly throttled unauthenticated route shares one per-IP bucket, and a
+  kiosk on the members' network could be locked out of pairing by their token
+  refreshes). In one transaction, under a row lock on the kiosk, it finds
   the kiosk by hash, requires the code unexpired and the kiosk `is_active`,
   generates a fresh secret (`Totp::generateSecret()`, 160 random bits as 32
   Base32 characters), stores it encrypted, clears the code (**single use**) and
@@ -159,7 +218,10 @@ life the backend gets from a kiosk after pairing). Anything else is 422
 
 `CoworkingSessionService::start()`. Body is `{qr_value}` (first call) or
 `{scan_ticket, accept_uncovered: true}` (the confirmation call); the Form
-Request requires exactly one of them. `throttle:10,1`.
+Request requires exactly one of them. `throttle:10,1,coworking-scan`: the
+third argument is a key prefix, giving the scan its own per-member bucket
+(without it the scan shared one with `access/unlock`, so ten door unlocks
+locked a member out of scanning).
 
 ### The order of checks
 
@@ -176,7 +238,8 @@ Request requires exactly one of them. `throttle:10,1`.
    with an open coworking session (a checked-in, not checked-out walk-in, or
    confirmed booking, on any `co_space`) gets it back with **200**. Idempotent:
    the app just shows the timer.
-5. **Today's booking.** See "Booking mode" below.
+5. **Today's booking**, if it starts within 15 minutes. See "Booking mode"
+   below.
 6. **Coverage**, then 7. **walk-in.**
 
 Capacity, business hours and the membership stamp still live only inside
@@ -185,20 +248,56 @@ and the scan share one code path, so they cannot disagree
 (`BookingReceptionController::checkIn()` and `ArrivalRequestController::confirm()`
 were refactored onto `BookingCheckInService` with their tests untouched).
 
+### One open coworking session per member
+
+Every member endpoint reads "the" open session, so there is at most one, on
+every path that starts one. The query is
+`OpenCoworkingSessionLocator::for()` (a checked-in, not checked-out walk-in, or
+confirmed booking, on any `co_space`); `CoworkingSessionService::openSessionFor()`
+delegates to it. It is its own class because `CoworkingSessionService` depends
+on both services that start sessions, which need the same query.
+
+- **The scan** returns the open session with **200** (step 4 above), before
+  either service is reached.
+- **The reception paths** refuse a second one with **409**
+  `api.reception.member_already_in_session`: `POST admin/reception/walk-ins`
+  (`WalkInCapacityService::start()`, checked inside its transaction right after
+  the space row lock), arrival-request confirmation (the same service for an
+  unmatched request, `BookingCheckInService` for a matched booking) and the desk
+  booking check-in (`BookingCheckInService::checkIn()`, checked after its status
+  and already-checked-in guards).
+- Only a start on a **`co_space`** is refused. Rooms, business spaces and event
+  halls are not coworking sessions: a member in one can still take a room.
+
 ### Booking mode
 
 `ArrivalRequestMatcher::matchBookingFor()` (today in the branch's timezone, a
 blocking status, not yet ended, not yet checked in), given a new optional
 `?Space` that narrows it to the kiosk's own space; the arrival flow still calls
-it without one.
+it without one. It returns the **earliest** such booking, however far off it
+starts, so the scan uses it only if it starts within
+`CoworkingSessionService::EARLY_CHECK_IN_MINUTES` (**15**) of now
+(`start_at <= now + 15 min`, which includes a booking already under way). The
+matcher itself is unchanged; the window is applied in `CoworkingSessionService`.
 
-- `confirmed`: checked in through `BookingCheckInService` with
-  `checked_in_via = scan` and `kiosk_id`; **201**. No coverage check. A
+Outside that window the scan treats the member as having **no booking** and
+carries on to coverage and a walk-in. A member who scans at 09:00 with an
+18:00 booking gets a walk-in, covered by the plan or confirmed as paid, not a
+check-in billed from 09:00 at the booking's rate. The booking stays unchecked;
+while that walk-in is open, a later scan returns the walk-in and a desk
+check-in of the booking gets the one-session 409, so it can be checked in once
+the walk-in is closed.
+
+- `confirmed` (within the window): checked in through `BookingCheckInService`
+  with `checked_in_via = scan` and `kiosk_id`; **201**. No coverage check. A
   booking's price and plan discount were fixed at creation, and bookings are
   deliberately excluded from plan-hour coverage (`plan-access-windows.md`).
-- `pending`: **409** `api.coworking.booking_pending_approval`. **No walk-in
-  fallback**, for the reason `kiosk-display.md` refuses one: starting a walk-in
-  on the same space would route around the approval guard.
+- `pending` (within the window): **409** `api.coworking.booking_pending_approval`.
+  **No walk-in fallback**, for the reason `kiosk-display.md` refuses one:
+  starting a walk-in on the same space at the booking's time would route around
+  the approval guard. A pending booking **outside** the window blocks nothing:
+  the member gets the walk-in path like anyone else, since that stay is not the
+  booking's.
 
 ### Coverage: the reasons
 
@@ -295,7 +394,9 @@ is what lets the reception list show the same plan picture for both paths.
   own checkout uses.
 - Marks the request `confirmed` with resolver, time and the close time used
   (`checked_out_at`), in the same transaction as the closure, so a closure that
-  refuses undoes the mark too; logs `session_end_confirmed`; notifies the member
+  refuses undoes the mark too; logs `session_end_confirmed` with
+  `end_request_id` and `amount_owed` (the amount the desk checkouts'
+  `walkin_session_checked_out` / `booking_checked_out` entries carry); notifies the member
   through `NotificationService::sendToUser()` (template
   `coworking.session_ended`, `extraData` carrying the session type and id so the
   app opens the report). Responds with a message only (`api.coworking.session_ended`).
@@ -313,6 +414,19 @@ closure cannot leave an orphan pending request.
 `end_request_not_pending` if it already resolved), so a withdrawal racing a
 confirmation cannot turn `confirmed` into `cancelled`.
 
+**Every closure locks and re-reads the session.** `SessionClosureService::closeOut()`
+does what `autoClose()` does: inside a transaction it locks the session row,
+re-reads it, and only then checks it is still open and applies the entered-time
+checks, closing the **locked** copy; afterwards it refreshes the caller's
+instance, so the desk controllers still audit the real `amount_owed` from it.
+A desk checkout (`WalkInSessionController::checkOut()`,
+`BookingReceptionController::checkOut()`, whose route-bound instance may be
+stale), a confirmed end request and the overdue job can therefore race on one
+session and exactly one closes it: the others get 409
+`api.reception.already_checked_out`, the plan hours are spent once and
+`amount_owed` is written once. Inside `SessionEndService::confirm()` the
+session row is already locked, so taking the lock again changes nothing.
+
 ### The statuses, and the other ways a session closes
 
 `pending`, `confirmed`, `cancelled`, `superseded`. There is at most one pending
@@ -328,7 +442,10 @@ row per session (enforced in the service, under the lock).
   `autoClose()` runs no closing check, and a press at 20:03 that the job only
   sees at 20:05 must not be billed the extra minutes. The request becomes
   `superseded`. The member pressed end; billing them until closing would be
-  wrong.
+  wrong. A session that `autoClose()` refuses under its lock (closed at the
+  desk or by a confirmation between the job's read and the lock) is reported
+  (`report()`) and skipped with a warning naming it (`Skipped walkin #12: ...`);
+  the run carries on with the rest.
 
 Payment is unchanged: reception collects any remainder through the existing
 `settle-payment`, and a fully plan-covered walk-in is marked paid at closure.
@@ -417,20 +534,14 @@ types these fields as decimals must accept integers too.
   deferred: the main working tree has uncommitted edits to
   `postman/ADD-OS.postman_collection.json`, so it is updated after those land.
 
-Known limitations, recorded so they are not rediscovered (the first two are
-pre-existing, and only more reachable now):
+Known limitations, recorded so they are not rediscovered:
 
-- **Desk checkout can race a member-confirmed or auto close.** The desk
-  endpoints (`WalkInSessionController::checkOut()`,
-  `BookingReceptionController::checkOut()`) call `closeOut()` without locking
-  the session, unlike `autoClose()` and `SessionEndService::confirm()`, so a desk
-  checkout can race a member-confirmed or an auto close of the same session and
-  both can pass the "still open" check. Pre-existing.
-- **`CloseOverdueReceptionSessions` does not catch a `ReceptionActionException`
-  per session.** One session closed concurrently between the command's read and
-  `autoClose()`'s locked re-read aborts the rest of that run (the next run picks
-  up the remainder). Pre-existing, and more reachable now that members and
-  reception close sessions outside the schedule.
+- **The one-session rule is a check, not a lock on the member.** Only the scan
+  locks the member's `users` row. `WalkInCapacityService::start()` checks under
+  the space's row lock and `BookingCheckInService::checkIn()` under none, so two
+  starts for the same member landing at the same instant on *different*
+  coworking spaces through different paths could both pass. Reaching it takes
+  reception and the member (or two receptionists) acting on one person at once.
 - **Report `points` are recomputed from the space's current rate.** Closure
   stores only `amount_owed`, so a rate change after a session closed makes a
   `charge` line's `points` differ from what was billed at the time; the
@@ -455,7 +566,7 @@ Coverage, all in-memory SQLite, with the clock set in UTC:
   a hash, the secret delivered once with its parameters, single use, one answer
   for expired / wrong / inactive-kiosk, lowercase-with-separators accepted, a
   new code replacing the unused one, every pairing rotating the secret,
-  revocation, admin-only, throttle.
+  revocation, admin-only, throttle and its own throttle bucket.
 - `tests/Feature/Booking/KioskCodeVerifierTest.php`: accepted at ±1 step and
   refused two steps away, another kiosk's code, inactive or revoked kiosks,
   malformed values, the same code serving several members, `last_used_at`.
@@ -469,11 +580,22 @@ Coverage, all in-memory SQLite, with the clock set in UTC:
   its kiosk; a pending booking is refused with the existing key.
 - `tests/Feature/Booking/CoworkingSessionStartTest.php`: covered, each refusal,
   ticket rules (expiry, another member's, tampered, kiosk revoked since),
-  re-evaluation on accept, booking mode, pending booking, open session,
-  business hours, capacity, rate-less space.
+  re-evaluation on accept, booking mode, pending booking, a booking later today
+  (confirmed or pending) leaving the walk-in path open, open session, business
+  hours, capacity, rate-less space, the throttle and its own bucket.
+- `tests/Feature/Booking/OneOpenCoworkingSessionTest.php`: the desk walk-in,
+  arrival confirmation and desk booking check-in refused for a member already
+  in a coworking session; a room walk-in and a room booking unaffected.
 - `tests/Feature/Booking/CoworkingSessionEndTest.php`: request, idempotence,
   withdrawal, confirm defaults and override, refusal rolls back, direct checkout
-  and auto-close superseding, auto-close never past closing.
+  and auto-close superseding, auto-close never past closing, the confirmation's
+  audited `amount_owed`.
+- `tests/Feature/Booking/SessionClosureLockingTest.php`: a stale instance
+  cannot close a session twice (plan hours spent once), the caller's instance
+  reflects the closure, the desk checkouts still audit `amount_owed`.
+- `tests/Feature/Booking/CloseOverdueReceptionSessionsCommandTest.php`: among
+  the existing auto-close cases, a session closed at the desk between the job's
+  read and its lock is skipped and reported while the run closes the next one.
 - `tests/Feature/Booking/ResourceConsumptionSessionLinkTest.php`: printing
   during an open session and the closure's plan hours link to the session;
   printing with no open session and company-owned consumption do not.
