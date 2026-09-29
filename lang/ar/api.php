@@ -184,6 +184,7 @@ return [
         'no_active_membership' => 'لا يوجد اشتراك فعّال لهذا العضو أو الشركة.',
         'resource_grant_not_found' => 'الباقة الحالية لا تمنح حصة لهذا النوع من الموارد.',
         'resource_quota_insufficient' => 'الكمية المطلوبة تتجاوز المتبقي من حصة هذا المورد.',
+        'member_already_in_session' => 'لدى هذا العضو جلسة عمل مشترك فعّالة بالفعل.',
     ],
 
     'booking' => [

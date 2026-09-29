@@ -184,6 +184,7 @@ return [
         'no_active_membership' => 'This member or company has no active membership.',
         'resource_grant_not_found' => 'The active plan does not grant a quota for this resource type.',
         'resource_quota_insufficient' => 'The requested quantity exceeds what remains of this resource quota.',
+        'member_already_in_session' => 'This member already has an active coworking session.',
     ],
 
     'booking' => [

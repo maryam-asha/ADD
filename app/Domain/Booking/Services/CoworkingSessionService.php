@@ -35,6 +35,7 @@ class CoworkingSessionService
         private readonly SessionCoverageEvaluator $coverage,
         private readonly WalkInCapacityService $walkIns,
         private readonly BusinessHoursService $businessHours,
+        private readonly OpenCoworkingSessionLocator $openSessions,
     ) {}
 
     /**
@@ -124,21 +125,6 @@ class CoworkingSessionService
     /** The member's checked-in, not yet checked-out session on a coworking space, if any. */
     public function openSessionFor(User $member): Booking|WalkinSession|null
     {
-        $onCoworking = fn ($query) => $query->where('space_type', SpaceType::CoSpace);
-
-        return WalkinSession::query()
-            ->where('user_id', $member->id)
-            ->whereNull('checked_out_at')
-            ->whereHas('space', $onCoworking)
-            ->latest('checked_in_at')
-            ->first()
-            ?? Booking::query()
-                ->where('user_id', $member->id)
-                ->where('status', BookingStatus::Confirmed)
-                ->whereNotNull('checked_in_at')
-                ->whereNull('checked_out_at')
-                ->whereHas('space', $onCoworking)
-                ->latest('checked_in_at')
-                ->first();
+        return $this->openSessions->for($member);
     }
 }

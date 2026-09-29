@@ -9,6 +9,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
@@ -25,6 +26,7 @@ class WalkInCapacityService
         private readonly MembershipResolver $memberships,
         private readonly PlanHourCoverageService $planHours,
         private readonly SessionCoverageEvaluator $coverage,
+        private readonly OpenCoworkingSessionLocator $openSessions,
     ) {}
 
     /**
@@ -48,6 +50,14 @@ class WalkInCapacityService
     ): WalkInStartResult {
         return DB::transaction(function () use ($space, $member, $via, $kiosk, $acceptedUncovered, $coverage) {
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
+
+            // At most one open coworking session per member, whichever path
+            // starts it (docs/decisions/coworking-self-service-sessions.md);
+            // the scan returns the open one before it ever gets here. Rooms
+            // and the other space types are not coworking sessions.
+            if ($locked->space_type === SpaceType::CoSpace && $this->openSessions->for($member) !== null) {
+                throw new ReceptionActionException('api.reception.member_already_in_session', 409);
+            }
 
             $branch = $locked->building->branch;
 

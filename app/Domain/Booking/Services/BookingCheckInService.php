@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
 
 /**
@@ -17,7 +18,10 @@ use App\Domain\Foundation\Services\BusinessHoursService;
  */
 class BookingCheckInService
 {
-    public function __construct(private readonly BusinessHoursService $businessHours) {}
+    public function __construct(
+        private readonly BusinessHoursService $businessHours,
+        private readonly OpenCoworkingSessionLocator $openSessions,
+    ) {}
 
     public function checkIn(Booking $booking, SessionStartSource $via = SessionStartSource::Reception, ?Kiosk $kiosk = null): void
     {
@@ -35,6 +39,14 @@ class BookingCheckInService
 
         if ($booking->checked_in_at !== null) {
             throw new ReceptionActionException('api.reception.already_checked_in', 409);
+        }
+
+        // At most one open coworking session per member, as for walk-ins
+        // (WalkInCapacityService::start()); the scan returns the open one
+        // before it ever gets here. Rooms and the other space types are not
+        // coworking sessions.
+        if ($booking->space->space_type === SpaceType::CoSpace && $this->openSessions->for($booking->user) !== null) {
+            throw new ReceptionActionException('api.reception.member_already_in_session', 409);
         }
 
         if (! $this->businessHours->isWithinBusinessHours(now(), $booking->space->building->branch)) {
