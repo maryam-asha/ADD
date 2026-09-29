@@ -24,10 +24,10 @@ class ReceptionSessionsController extends Controller
 
         $bookings = Booking::where('status', BookingStatus::Confirmed)
             ->whereNotNull('checked_in_at')->whereNull('checked_out_at')
-            ->with('space.building.branch', 'user')->get();
+            ->with('space.building.branch', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
 
         $walkins = WalkinSession::whereNotNull('checked_in_at')->whereNull('checked_out_at')
-            ->with('space.building.branch', 'user')->get();
+            ->with('space.building.branch', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
 
         $bookings->each(function (Booking $booking) use ($closures, $now): void {
             $booking->type = 'booking';
