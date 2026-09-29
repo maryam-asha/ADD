@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\SessionClosureService;
@@ -68,9 +69,17 @@ class CloseOverdueReceptionSessions extends Command
         // job only sees at 20:05 must not be billed for the extra minutes.
         $pending = $session->pendingEndRequest()->first();
 
-        $closures->autoClose(
-            $session,
-            $pending !== null && $pending->requested_at->lessThan($closingInstant) ? $pending->requested_at : $closingInstant,
-        );
+        try {
+            $closures->autoClose(
+                $session,
+                $pending !== null && $pending->requested_at->lessThan($closingInstant) ? $pending->requested_at : $closingInstant,
+            );
+        } catch (ReceptionActionException $e) {
+            // Refused under autoClose()'s lock — typically closed at the desk
+            // or by a confirmed end request since this run read the page.
+            // One such session must not abort the rest of the run.
+            report($e);
+            $this->warn("Skipped {$session->coworkingType()} #{$session->id}: {$e->messageKey}");
+        }
     }
 }
