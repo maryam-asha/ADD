@@ -15,6 +15,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -240,6 +241,75 @@ class DedicatedDeskAssignmentTest extends TestCase
             'user_id' => ($member ?? $this->member())->id,
             'seat_desk_ids' => [$desk->id],
         ])->assertCreated()->json('data.id');
+    }
+
+    private function hoursPlan(?string $from, ?string $to): Plan
+    {
+        return Plan::factory()->dedicatedDesk()->create(['access_window_start' => $from, 'access_window_end' => $to]);
+    }
+
+    /** @param  list<int>  $deskIds */
+    private function sell(Plan $plan, array $deskIds): TestResponse
+    {
+        return $this->postJson('/api/v1/admin/memberships', [
+            'plan_id' => $plan->id, 'user_id' => $this->member()->id, 'seat_desk_ids' => $deskIds,
+        ]);
+    }
+
+    /**
+     * A desk is its owner's only inside their plan's hours and dates, so a
+     * morning plan and an evening plan can share one.
+     */
+    public function test_plans_whose_hours_do_not_meet_share_a_desk(): void
+    {
+        $desk = $this->desk();
+
+        $this->sell($this->hoursPlan('08:00', '14:00'), [$desk->id])->assertCreated();
+        $this->sell($this->hoursPlan('16:00', '22:00'), [$desk->id])->assertCreated();
+
+        $this->assertDatabaseCount('membership_seat_desk', 2);
+    }
+
+    public function test_plans_whose_hours_meet_do_not_share_a_desk(): void
+    {
+        $desk = $this->desk();
+        $this->desk(); // a second seat, so the pool is not what refuses
+
+        $this->sell($this->hoursPlan('08:00', '14:00'), [$desk->id])->assertCreated();
+        $this->sell($this->hoursPlan('12:00', '18:00'), [$desk->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('seat_desk_ids');
+    }
+
+    /** A plan with no hours holds its desk all day, so it meets any other. */
+    public function test_an_all_day_plan_shares_its_desk_with_nobody(): void
+    {
+        $desk = $this->desk();
+        $this->desk();
+
+        $this->sell($this->hoursPlan('20:00', '00:00'), [$desk->id])->assertCreated();
+        $this->sell($this->hoursPlan(null, null), [$desk->id])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('seat_desk_ids');
+    }
+
+    /** What the pickers offer: desks free during the hours of the plan being sold or tied. */
+    public function test_the_desk_list_offers_the_desks_free_for_a_plans_hours(): void
+    {
+        $desk = $this->desk();
+        $this->desk();
+        $morning = $this->sell($this->hoursPlan('08:00', '14:00'), [$desk->id])->json('data.id');
+        $evening = $this->hoursPlan('16:00', '22:00');
+        $allDay = $this->hoursPlan(null, null);
+
+        $this->getJson("/api/v1/admin/seats-desks?branch_id={$this->branch->id}&free_for_plan={$evening->id}")
+            ->assertOk()->assertJsonCount(2, 'data');
+        $this->getJson("/api/v1/admin/seats-desks?branch_id={$this->branch->id}&free_for_plan={$allDay->id}")
+            ->assertOk()->assertJsonCount(1, 'data');
+
+        // A subscription's own desk is free for it.
+        $this->getJson("/api/v1/admin/seats-desks?branch_id={$this->branch->id}&free_for_membership={$morning}")
+            ->assertOk()->assertJsonCount(2, 'data');
     }
 
     /** Deleting the co_space would take its held desks with it, from under their subscriptions. */

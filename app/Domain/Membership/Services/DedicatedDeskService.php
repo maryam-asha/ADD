@@ -9,6 +9,9 @@ use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Exceptions\DeskAssignmentRefusedException;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Facades\DB;
@@ -18,8 +21,10 @@ use Illuminate\Support\Facades\DB;
  * one place that says which subscription holds a desk
  * (docs/decisions/coworking-seat-pool.md).
  *
- * A desk is held by an active subscription until its period ends; an ended
- * one keeps its `membership_seat_desk` row as history and frees the desk.
+ * A desk is held by an active subscription between its dates and, when its
+ * plan has hours, only inside them — so two subscriptions whose hours never
+ * meet may share one. An ended subscription keeps its `membership_seat_desk`
+ * row as history and frees the desk.
  * Only staff tie desks, at activation or later. The seat itself is already
  * counted in the branch's pool by the subscription — tying a desk only says
  * which one, so nothing here touches the pool.
@@ -32,8 +37,8 @@ class DedicatedDeskService
      * Replaces the subscription's desks with $deskIds (none unties them all).
      * Refused when the plan is not a Dedicated Desk plan, when there are more
      * desks than the subscription holds seats, when a desk is not in a
-     * co_space of its branch, or when another active subscription whose
-     * period overlaps this one holds a desk.
+     * co_space of its branch, or when another live subscription holds a desk
+     * at some moment this one would (takenDeskIds).
      *
      * Locks the branch row — the one every seat decision locks — so two staff
      * cannot hand the same desk out at once.
@@ -115,19 +120,87 @@ class DedicatedDeskService
             throw new DeskAssignmentRefusedException('api.membership.desks_outside_branch');
         }
 
-        $taken = DB::table('membership_seat_desk')
-            ->join('memberships', 'memberships.id', '=', 'membership_seat_desk.membership_id')
-            ->whereIn('membership_seat_desk.seat_desk_id', $deskIds)
-            ->where('memberships.id', '!=', $membership->id)
-            ->where('memberships.status', MembershipStatus::Active->value)
-            ->where('memberships.current_period_end', '>', $membership->current_period_start)
-            ->where('memberships.current_period_start', '<', $membership->current_period_end)
-            ->where('memberships.current_period_end', '>=', now())
-            ->exists();
+        $taken = $this->takenDeskIds(
+            $membership->plan,
+            $membership->current_period_start,
+            $membership->current_period_end,
+            $membership->id,
+            $deskIds,
+        );
 
-        if ($taken) {
+        if ($taken !== []) {
             throw new DeskAssignmentRefusedException('api.membership.desk_taken');
         }
+    }
+
+    /**
+     * The desks — among $deskIds, or any when null — that another live
+     * subscription holds at some moment $plan would hold one over
+     * [$start, $end). A desk is held only between its subscription's dates
+     * and, when its plan has hours, only inside them; so a morning plan and
+     * an evening plan share a desk, and a plan with no hours shares it with
+     * nobody. The hours rule is Plan::windowSegments(), the one the seat pool
+     * uses.
+     *
+     * @param  list<int>|null  $deskIds
+     * @return list<int>
+     */
+    public function takenDeskIds(
+        Plan $plan,
+        CarbonInterface $start,
+        CarbonInterface $end,
+        ?int $exceptMembershipId = null,
+        ?array $deskIds = null,
+    ): array {
+        $holders = Membership::query()
+            ->with(['plan', 'seatDesks' => fn ($q) => $q->select('seats_desks.id')])
+            ->where('status', MembershipStatus::Active->value)
+            ->where('current_period_end', '>=', now())
+            ->where('current_period_end', '>', $start)
+            ->where('current_period_start', '<', $end)
+            ->when($exceptMembershipId !== null, fn (Builder $q) => $q->whereKeyNot($exceptMembershipId))
+            ->whereHas('seatDesks', fn (Builder $q) => $q->when(
+                $deskIds !== null,
+                fn (Builder $d) => $d->whereIn('seats_desks.id', $deskIds),
+            ))
+            ->get();
+
+        $taken = [];
+
+        foreach ($holders as $holder) {
+            $from = max(CarbonImmutable::instance($start), CarbonImmutable::instance($holder->current_period_start));
+            $to = min(CarbonImmutable::instance($end), CarbonImmutable::instance($holder->current_period_end));
+
+            if ($this->segmentsMeet($plan->windowSegments($from, $to), $holder->plan->windowSegments($from, $to))) {
+                array_push($taken, ...$holder->seatDesks->pluck('id')->all());
+            }
+        }
+
+        $taken = array_values(array_unique($taken));
+
+        return $deskIds === null ? $taken : array_values(array_intersect($taken, $deskIds));
+    }
+
+    /**
+     * Whether two chronological lists of [start, end) stretches share any
+     * moment — a walk down both at once.
+     *
+     * @param  list<array{0: CarbonImmutable, 1: CarbonImmutable}>  $a
+     * @param  list<array{0: CarbonImmutable, 1: CarbonImmutable}>  $b
+     */
+    private function segmentsMeet(array $a, array $b): bool
+    {
+        [$i, $j] = [0, 0];
+
+        while ($i < count($a) && $j < count($b)) {
+            if ($a[$i][0]->lessThan($b[$j][1]) && $b[$j][0]->lessThan($a[$i][1])) {
+                return true;
+            }
+
+            $a[$i][1]->lessThanOrEqualTo($b[$j][1]) ? $i++ : $j++;
+        }
+
+        return false;
     }
 
     /** Rows tying `seats_desks.id` of the outer query to a live subscription. */

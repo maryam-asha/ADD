@@ -11639,10 +11639,20 @@
                                                     "key": "free",
                                                     "value": "1",
                                                     "disabled": true
+                                                },
+                                                {
+                                                    "key": "free_for_plan",
+                                                    "value": "{{plan_id}}",
+                                                    "disabled": true
+                                                },
+                                                {
+                                                    "key": "free_for_membership",
+                                                    "value": "{{membership_id}}",
+                                                    "disabled": true
                                                 }
                                             ]
                                         },
-                                        "description": "Every seat of a co_space is a desk, and a co_space's capacity is its number of desks (docs/decisions/coworking-seat-pool.md).\n\nEach row: id, space_id, code (unique in the branch, what the QR carries and a member is told), label, qr_point_id, membership_id (the live Dedicated Desk subscription holding it, or null).\n\nFilters: ?space_id=, ?branch_id=, ?free=1 (only desks no subscription holds now — what the dashboard offers when tying a desk)."
+                                        "description": "Every seat of a co_space is a desk, and a co_space's capacity is its number of desks (docs/decisions/coworking-seat-pool.md).\n\nEach row: id, space_id, code (unique in the branch, what the QR carries and a member is told), label, qr_point_id, membership_id (the live Dedicated Desk subscription holding it, or null).\n\nFilters: ?space_id=, ?branch_id=, ?free=1 (only desks no subscription holds now — what the dashboard offers when tying a desk).\n\n?free_for_plan= / ?free_for_membership= leave the desks free during that plan's (sold now) or subscription's hours and dates. A desk is held only inside its plan's hours, so a morning plan and an evening plan may share one; a plan with no hours shares it with nobody."
                                     }
                                 },
                                 {

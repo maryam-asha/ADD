@@ -379,7 +379,7 @@ return [
         'desks_need_dedicated_plan' => 'Only a Dedicated Desk subscription is tied to desks.',
         'desks_exceed_seats' => 'A subscription gets no more desks than the seats it holds.',
         'desks_outside_branch' => 'Every desk must be in a co-working space of the subscription\'s branch.',
-        'desk_taken' => 'A desk is already held by another subscription during this period.',
+        'desk_taken' => 'A desk is already held by another subscription during some of these hours and dates.',
         'seat_pool_full' => 'Every co-working seat in this branch is already taken for part of this plan\'s period, so it cannot be subscribed to now.',
     ],
 

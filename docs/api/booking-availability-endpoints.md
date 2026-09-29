@@ -667,7 +667,11 @@ one from another type, is a `422` on `space_type`.
   unique within the branch) and `label`.
 - `GET /api/v1/admin/seats-desks?branch_id=&free=1` returns each desk with
   `code` and `membership_id`, the live subscription holding it or `null`.
-  `free=1` keeps only the desks nobody holds.
+  `free=1` keeps only the desks nobody holds. `free_for_plan={plan}` keeps the
+  desks free during that plan's hours over a period sold now, and
+  `free_for_membership={membership}` those free during that subscription's
+  hours and dates (its own desks included): a desk is held only inside its
+  plan's hours, so a morning and an evening plan may share one.
 - `POST /api/v1/admin/memberships` takes `seat_desk_ids` for a Dedicated Desk
   plan, and its response carries `desks: [{id, code, label}]`.
 - `PUT /api/v1/admin/memberships/{membership}/desks` `{"seat_desk_ids": [4]}`
@@ -678,7 +682,8 @@ Both refuse with a `422` on `seat_desk_ids` when:
 - the plan is not a Dedicated Desk plan;
 - there are more desks than the subscription's `seats`;
 - a desk is not in a co_space of the subscription's branch;
-- another live subscription holds a desk over an overlapping period.
+- another live subscription holds a desk at some moment this one would: their
+  dates overlap and their plans' hours meet.
 
 Deleting a desk a live subscription holds, or deleting its co_space, gives a
 `422` with `{message}`; moving it to another space is a `422` on `space_id`. A

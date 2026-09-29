@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Foundation\Models\SeatDesk;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Http\Requests\Admin\StoreSeatDeskRequest;
 use App\Http\Requests\Admin\UpdateSeatDeskRequest;
@@ -15,8 +17,10 @@ use Illuminate\Http\Response;
 /**
  * A co_space's desks. Adding, moving or removing one recounts its space's
  * capacity (SeatDesk). Every desk comes back with the Dedicated Desk
- * subscription holding it now, if any, and `?free=1` leaves only the
- * unheld ones — what the dashboard offers when tying a desk
+ * subscription holding it now, if any. `?free=1` leaves only desks nobody
+ * holds; `?free_for_plan=` and `?free_for_membership=` leave the desks free
+ * during that plan's or subscription's hours and dates — what the dashboard
+ * offers when tying a desk
  * (docs/decisions/coworking-seat-pool.md).
  */
 class SeatDeskController extends AdminResourceController
@@ -50,9 +54,42 @@ class SeatDeskController extends AdminResourceController
                 fn (Builder $q) => $q->whereHas('space.building', fn (Builder $b) => $b->where('branch_id', $request->query('branch_id')))
             )
             ->when($request->boolean('free'), fn (Builder $q) => $this->desks->whereFree($q))
+            ->when($request->filled('free_for_plan'), fn (Builder $q) => $q->whereKeyNot($this->takenForPlan($request->integer('free_for_plan'))))
+            ->when($request->filled('free_for_membership'), fn (Builder $q) => $q->whereKeyNot($this->takenForMembership($request->integer('free_for_membership'))))
             ->orderBy('seats_desks.id');
 
         $this->desks->withHolder($query);
+    }
+
+    /**
+     * Desks another subscription holds at some moment a subscription to this
+     * plan, sold now, would — what the activation form leaves out.
+     *
+     * @return list<int>
+     */
+    private function takenForPlan(int $planId): array
+    {
+        $plan = Plan::findOrFail($planId);
+
+        return $this->desks->takenDeskIds($plan, now(), now()->addDays($plan->duration_days));
+    }
+
+    /**
+     * Desks another subscription holds at some moment this one does — what
+     * tying its desks leaves out; its own count as free for it.
+     *
+     * @return list<int>
+     */
+    private function takenForMembership(int $membershipId): array
+    {
+        $membership = Membership::with('plan')->findOrFail($membershipId);
+
+        return $this->desks->takenDeskIds(
+            $membership->plan,
+            $membership->current_period_start,
+            $membership->current_period_end,
+            $membership->id,
+        );
     }
 
     public function show(int $id): SeatDeskResource

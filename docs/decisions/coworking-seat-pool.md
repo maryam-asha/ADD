@@ -166,6 +166,12 @@ a desk is now a seat.
   Only staff tie desks: at activation (`seat_desk_ids`) or later (`PUT
   admin/memberships/{membership}/desks`), which is how a plan bought in the app
   gets its desk.
+- **A desk is its owner's only inside their plan's hours and dates**
+  (product owner, 2026-10-01). Two subscriptions conflict over a desk only
+  when their dates overlap *and* their plans' hours meet within that overlap
+  (`DedicatedDeskService::takenDeskIds`, built on `Plan::windowSegments`, the
+  same rule the pool uses). So a morning plan and an evening plan may share a
+  desk, and a plan with no hours shares it with nobody.
 - **`DedicatedDeskService` is the one place** that ties desks and says who holds
   one. It refuses a non-Dedicated plan, more desks than seats, a desk outside a
   co_space of the subscription's branch, and a desk held by another active
