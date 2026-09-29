@@ -6,6 +6,7 @@ use App\Domain\Identity\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * One row per unit of a PlanResourceGrant actually consumed — the
@@ -45,5 +46,11 @@ class ResourceConsumption extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id');
+    }
+
+    /** The coworking session this was used during, if any — a Booking or a WalkinSession. */
+    public function sessionable(): MorphTo
+    {
+        return $this->morphTo();
     }
 }

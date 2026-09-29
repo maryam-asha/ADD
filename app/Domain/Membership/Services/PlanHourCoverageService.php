@@ -80,13 +80,17 @@ class PlanHourCoverageService
             return 0;
         }
 
-        $this->quotas->consume(
+        $consumption = $this->quotas->consume(
             $grant,
             $membership,
             round($seconds / 3600, 2),
             $session->user,
             "Walk-in session #{$session->id}",
         );
+
+        // A structured link to the session it paid for; the note was the only
+        // link before.
+        $consumption->sessionable()->associate($session)->save();
 
         return $seconds;
     }

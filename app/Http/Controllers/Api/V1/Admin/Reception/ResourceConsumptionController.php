@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\InsufficientResourceQuotaException;
@@ -27,6 +28,7 @@ class ResourceConsumptionController extends Controller
         StoreResourceConsumptionRequest $request,
         MembershipResolver $resolver,
         ResourceQuotaService $quota,
+        CoworkingSessionService $sessions,
     ): JsonResponse {
         [$ownerType, $ownerId] = $request->validated('company_id')
             ? [OwnerType::Company, (int) $request->validated('company_id')]
@@ -58,6 +60,16 @@ class ResourceConsumptionController extends Controller
             );
         } catch (InsufficientResourceQuotaException) {
             abort(422, __('api.reception.resource_quota_insufficient'));
+        }
+
+        // Printing or internet used during an open coworking session belongs
+        // on that session's report (docs/decisions/coworking-self-service-sessions.md).
+        if ($ownerType === OwnerType::User) {
+            $open = $sessions->openSessionFor(User::findOrFail($ownerId));
+
+            if ($open !== null) {
+                $consumption->sessionable()->associate($open)->save();
+            }
         }
 
         $this->logSensitiveAction('resource_consumption_recorded', $consumption, [
