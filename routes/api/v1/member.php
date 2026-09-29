@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
+use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
@@ -78,6 +79,12 @@ Route::post('arrival-requests', [ArrivalRequestController::class, 'store']);
 // device, checks for an active access_grants row, and calls
 // TTLockClient::remoteUnlock() server-side.
 Route::post('access/unlock', [AccessUnlockController::class, 'unlock'])->middleware('throttle:10,1');
+
+// Self-service coworking sessions (docs/decisions/coworking-self-service-sessions.md):
+// scan the kiosk's rotating code to start, read the running session for the
+// timer. Static segments are declared before any {type}/{id} wildcard.
+Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])->middleware('throttle:10,1');
+Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

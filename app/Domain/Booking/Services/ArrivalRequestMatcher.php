@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use Carbon\CarbonInterface;
 
@@ -16,7 +17,7 @@ use Carbon\CarbonInterface;
  */
 class ArrivalRequestMatcher
 {
-    public function matchBookingFor(User $member, Branch $branch, CarbonInterface $now): ?Booking
+    public function matchBookingFor(User $member, Branch $branch, CarbonInterface $now, ?Space $space = null): ?Booking
     {
         $timezone = $branch->timezone;
         $localNow = $now->copy()->setTimezone($timezone);
@@ -30,6 +31,9 @@ class ArrivalRequestMatcher
             ->whereBetween('start_at', [$startOfDayUtc, $endOfDayUtc])
             ->where('end_at', '>=', $now)
             ->whereHas('space.building', fn ($query) => $query->where('branch_id', $branch->id))
+            // The kiosk scan looks only at its own coworking space; the
+            // arrival flow keeps matching across the whole branch.
+            ->when($space !== null, fn ($query) => $query->where('space_id', $space->id))
             ->orderBy('start_at')
             ->first();
     }
