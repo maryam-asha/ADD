@@ -177,6 +177,19 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertSame(SessionEndRequestStatus::Superseded, SessionEndRequest::sole()->status);
     }
 
+    public function test_auto_close_never_bills_past_closing_time_even_for_a_late_request(): void
+    {
+        [, $session] = $this->memberInSession();
+        $this->requestEnd();
+        SessionEndRequest::sole()->forceFill(['requested_at' => Carbon::parse('2026-08-17 20:30:00', 'Asia/Damascus')->utc()])->save();
+        Carbon::setTestNow(Carbon::parse('2026-08-17 20:45:00', 'Asia/Damascus')->utc());
+
+        $this->artisan('reception:close-overdue-sessions')->assertExitCode(0);
+
+        $this->assertTrue($session->fresh()->checked_out_at->equalTo(Carbon::parse('2026-08-17 20:00:00', 'Asia/Damascus')));
+        $this->assertSame(SessionEndRequestStatus::Superseded, SessionEndRequest::sole()->status);
+    }
+
     public function test_a_member_cannot_confirm(): void
     {
         $this->memberInSession();

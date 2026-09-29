@@ -60,10 +60,17 @@ class CloseOverdueReceptionSessions extends Command
             return;
         }
 
+        $closingInstant = $now->copy()->setTimeFromTimeString($closingTime);
+
         // The member pressed "end" and reception never confirmed: bill to
-        // that moment, not to closing time.
+        // that moment, not to closing time — but never past closing, since
+        // autoClose() runs no closing check and a press at 20:03 that this
+        // job only sees at 20:05 must not be billed for the extra minutes.
         $pending = $session->pendingEndRequest()->first();
 
-        $closures->autoClose($session, $pending?->requested_at ?? $now->copy()->setTimeFromTimeString($closingTime));
+        $closures->autoClose(
+            $session,
+            $pending !== null && $pending->requested_at->lessThan($closingInstant) ? $pending->requested_at : $closingInstant,
+        );
     }
 }
