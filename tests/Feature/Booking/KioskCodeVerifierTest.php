@@ -58,6 +58,8 @@ class KioskCodeVerifierTest extends TestCase
 
         $this->assertRefused($this->qrFor($kiosk, $secret, 60));
         $this->assertRefused($this->qrFor($kiosk, $secret, -60));
+
+        $this->assertNull($kiosk->fresh()->last_used_at);
     }
 
     public function test_another_kiosks_code_is_refused(): void
@@ -79,6 +81,9 @@ class KioskCodeVerifierTest extends TestCase
 
         $this->assertRefused($this->qrFor($inactive, $secretI));
         $this->assertRefused($this->qrFor($revoked, $secretR));
+
+        $this->assertNull($inactive->fresh()->last_used_at);
+        $this->assertNull($revoked->fresh()->last_used_at);
     }
 
     public function test_malformed_values_are_refused(): void
