@@ -79,17 +79,6 @@ Schedule::command('access:revoke-grants-on-booking-cancellation')->everyFiveMinu
 Schedule::command('events:expire-pending-registrations')->hourly()->withoutOverlapping();
 
 /*
- * Booking availability (docs/decisions/booking-availability-and-calendar.md)
- * — `space_capacity_slots` is derived from `bookings` and written inside the
- * same locked transaction, so it should never drift. This nightly rebuild is
- * the safety net for the cases a transaction cannot cover: a restored
- * backup, a manual SQL fix, a future writer that forgets the synchronizer.
- * Drift can only ever stale a calendar cell, never oversell a slot — the
- * ceiling is still enforced by counting `bookings` under a row lock.
- */
-Schedule::command('booking:reconcile-capacity-slots')->dailyAt('03:30')->withoutOverlapping();
-
-/*
  * Card payments (docs/paymera.md) — the backstop under the callback and the
  * trigger. A payment can be left pending by a closed browser, a lost trigger
  * request or a queue worker that was down; without this sweep it would stay

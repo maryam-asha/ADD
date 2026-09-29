@@ -6,6 +6,9 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -13,7 +16,6 @@ use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -27,7 +29,6 @@ class BookingExtensionService
 {
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly MembershipResolver $membershipResolver,
@@ -43,6 +44,16 @@ class BookingExtensionService
                 throw new ReceptionActionException('api.reception.not_checked_in');
             }
 
+            $space = Space::query()->whereKey($lockedBooking->space_id)->with('building')->firstOrFail();
+            $usesPool = $this->availability->usesBranchPool($space);
+
+            if ($usesPool) {
+                // Booking, then branch, then space: the order every path that
+                // touches the co-working pool takes
+                // (docs/decisions/coworking-seat-pool.md).
+                Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+            }
+
             $space = Space::query()->whereKey($lockedBooking->space_id)->lockForUpdate()->firstOrFail();
 
             $rules = $this->availability->rulesFor($space);
@@ -54,21 +65,45 @@ class BookingExtensionService
             $previousEnd = $lockedBooking->end_at->copy();
             $newEndAt = $lockedBooking->end_at->copy()->addMinutes($additionalMinutes);
 
-            // The interval being added is what must be free — the booking's
-            // own rows are excluded by ignoreBookingId rather than by a
-            // separate query shape, so this is the same overlap predicate
-            // the calendar and BookingCreationService use.
-            $existing = $this->availability->blockingBookings($space, $previousEnd, $newEndAt, $rules);
+            if ($usesPool) {
+                // A co_space's seat for the added stretch comes from its
+                // branch's pool, with the booking counted on its member's
+                // subscription as it is everywhere else.
+                $timeline = $this->availability->poolTimeline(
+                    $space,
+                    $previousEnd,
+                    $newEndAt,
+                    PoolDemand::presence($previousEnd, $newEndAt, $lockedBooking->user, ignoreBookingId: $lockedBooking->id),
+                );
 
-            $conflicts = $existing
-                ->reject(fn (Booking $row) => $row->getKey() === $lockedBooking->getKey())
-                ->filter(fn (Booking $row) => $row->start_at < $newEndAt && $row->end_at > $previousEnd)
-                ->sortBy('start_at');
+                if ($this->availability->exceedsPool($timeline, $previousEnd, $newEndAt)) {
+                    throw new ReceptionActionException('api.booking.extension_conflict', 422, [
+                        'latest_end_at' => $timeline->firstShortfall()?->toIso8601String(),
+                    ]);
+                }
+            } else {
+                // The interval being added is what must be free — the
+                // booking's own rows are excluded by ignoreBookingId rather
+                // than by a separate query shape, so this is the same overlap
+                // predicate the calendar and BookingCreationService use.
+                $existing = $this->availability->blockingBookings($space, $previousEnd, $newEndAt, $rules);
 
-            if ($conflicts->isNotEmpty()) {
-                throw new ReceptionActionException('api.booking.extension_conflict', 422, [
-                    'latest_end_at' => $conflicts->first()->start_at->toIso8601String(),
-                ]);
+                $conflicts = $existing
+                    ->reject(fn (Booking $row) => $row->getKey() === $lockedBooking->getKey())
+                    ->filter(fn (Booking $row) => $row->start_at < $newEndAt && $row->end_at > $previousEnd)
+                    ->map(fn (Booking $row) => $row->start_at);
+
+                // A room lent to co-working from some point on stops there too.
+                $lent = $this->availability->blockingCoworkingWindows($space, $previousEnd, $newEndAt)
+                    ->map(fn (SpaceCoworkingWindow $window) => $window->starts_at->greaterThan($previousEnd) ? $window->starts_at : $previousEnd);
+
+                $stops = $conflicts->concat($lent)->sort()->values();
+
+                if ($stops->isNotEmpty()) {
+                    throw new ReceptionActionException('api.booking.extension_conflict', 422, [
+                        'latest_end_at' => $stops->first()->toIso8601String(),
+                    ]);
+                }
             }
 
             $oldPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $lockedBooking->end_at);
@@ -115,16 +150,6 @@ class BookingExtensionService
                 'end_at' => $newEndAt,
                 'payment_state' => $paymentState,
             ])->save();
-
-            // Still inside this method's Space lock, so the counter follows
-            // the window it is derived from.
-            $this->capacitySlots->move(
-                $lockedBooking,
-                $space,
-                CarbonImmutable::instance($lockedBooking->start_at),
-                CarbonImmutable::instance($previousEnd),
-                $rules,
-            );
         });
     }
 }

@@ -6,6 +6,7 @@ use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Services\AvailabilityService;
 use App\Domain\Booking\ValueObjects\DayAvailability;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
@@ -14,6 +15,7 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
@@ -211,6 +213,57 @@ class AvailabilityServiceTest extends TestCase
 
         $slots = $this->availability->slotsForDay($space->fresh(['building.branch']), $this->monday());
         $this->assertSame(SlotState::AtCapacity, $this->stateAt($slots, 10));
+    }
+
+    // ---------------------------------------------------------------
+    // A co_space draws on its branch's seat pool
+    // (docs/decisions/coworking-seat-pool.md)
+    // ---------------------------------------------------------------
+
+    /** A subscription holds a seat all day, so one booking fills a two-seat pool. */
+    public function test_a_co_space_is_full_when_subscriptions_and_bookings_fill_the_branch_pool(): void
+    {
+        $space = $this->openSpace(['space_type' => SpaceType::CoSpace, 'capacity' => 2, 'is_lockable' => false]);
+        Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+        $this->book($space, 10);
+
+        $slots = $this->availability->slotsForDay($space, $this->monday());
+
+        $this->assertSame(SlotState::AtCapacity, $this->stateAt($slots, 10));
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 11));
+    }
+
+    /** Two co_spaces in one branch are one pool: a seat free in either will do. */
+    public function test_the_co_spaces_of_a_branch_share_one_pool(): void
+    {
+        $space = $this->openSpace(['space_type' => SpaceType::CoSpace, 'capacity' => 1, 'is_lockable' => false]);
+        $other = Space::factory()->create(['building_id' => $space->building_id, 'capacity' => 1]);
+        $this->book($other, 10);
+
+        $this->assertSame(SlotState::Available, $this->stateAt($this->availability->slotsForDay($space, $this->monday()), 10));
+
+        $this->book($space, 10);
+
+        $this->assertSame(SlotState::AtCapacity, $this->stateAt($this->availability->slotsForDay($space, $this->monday()), 10));
+    }
+
+    /** A room lent to co-working takes no room bookings while it is lent. */
+    public function test_a_room_lent_to_co_working_is_not_bookable_meanwhile(): void
+    {
+        $space = $this->openSpace();
+        SpaceCoworkingWindow::factory()->create([
+            'space_id' => $space->id,
+            'starts_at' => $this->monday()->copy()->setTime(14, 0)->utc(),
+            'ends_at' => $this->monday()->copy()->setTime(16, 0)->utc(),
+        ]);
+
+        $slots = $this->availability->slotsForDay($space, $this->monday());
+
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 13));
+        $this->assertSame(SlotState::CoworkingMode, $this->stateAt($slots, 14));
+        $this->assertSame(SlotState::CoworkingMode, $this->stateAt($slots, 15));
+        $this->assertSame(SlotState::Available, $this->stateAt($slots, 16));
+        $this->assertSame(SlotState::Booked, SlotState::CoworkingMode->forMember());
     }
 
     public function test_a_room_is_booked_at_the_very_first_overlap(): void

@@ -23,6 +23,9 @@ enum SlotState: string
     case Past = 'past';
     case TooSoon = 'too_soon';
     case TooFarAhead = 'too_far_ahead';
+    // A room lent to co-working for this stretch: its seats are in the
+    // branch's pool, so it takes no room booking meanwhile.
+    case CoworkingMode = 'coworking_mode';
 
     public function isBookable(): bool
     {
@@ -52,7 +55,7 @@ enum SlotState: string
         return match ($this) {
             self::Available => self::Available,
             self::Past, self::TooSoon => self::Past,
-            self::Booked, self::AtCapacity, self::Buffer, self::OutsideHours, self::TooFarAhead => self::Booked,
+            self::Booked, self::AtCapacity, self::Buffer, self::OutsideHours, self::TooFarAhead, self::CoworkingMode => self::Booked,
         };
     }
 

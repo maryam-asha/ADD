@@ -21,6 +21,7 @@ class WalkinSession extends Model
         'space_id',
         'user_id',
         'membership_id',
+        'seat_covered',
         'checked_in_at',
         'checked_out_at',
         'plan_covered_seconds',
@@ -44,6 +45,7 @@ class WalkinSession extends Model
             'termination_source' => TerminationSource::class,
             'amount_owed' => 'decimal:2',
             'plan_covered_seconds' => 'integer',
+            'seat_covered' => 'boolean',
             'payment_method' => PaymentMethod::class,
             'paid_at' => 'datetime',
         ];

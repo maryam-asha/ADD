@@ -2,7 +2,9 @@
 
 namespace Tests\Feature\Foundation;
 
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Building;
+use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Foundation\Models\Zone;
@@ -61,6 +63,84 @@ class SpaceControllerTest extends TestCase
         $this->assertDatabaseHas('spaces', ['building_id' => $building->id, 'status' => 'active']);
     }
 
+    /**
+     * A co_space's capacity is the number of its desks, kept by the desks
+     * themselves — it is never typed in (docs/decisions/coworking-seat-pool.md).
+     */
+    public function test_a_co_space_capacity_is_its_desks_not_a_typed_number(): void
+    {
+        $this->actingAsAdmin();
+        $building = Building::factory()->create();
+        $coSpace = fn (?int $capacity) => $this->postJson('/api/v1/admin/spaces', [
+            'building_id' => $building->id,
+            'name' => ['ar' => 'مساحة العمل', 'en' => 'Co-working'],
+            'space_type' => 'co_space',
+            'is_lockable' => false,
+            'capacity' => $capacity,
+        ]);
+
+        $coSpace(16)->assertStatus(422)->assertJsonValidationErrors('capacity');
+        $id = $coSpace(null)->assertCreated()->assertJsonPath('data.capacity', 0)->json('data.id');
+
+        SeatDesk::factory()->count(3)->create(['space_id' => $id]);
+        $this->assertSame(3, Space::find($id)->capacity);
+    }
+
+    /** A room turned into a co_space takes its desks' count, not its old seats. */
+    public function test_a_space_turned_into_a_co_space_counts_its_desks(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->create(['space_type' => 'room', 'capacity' => 12]);
+
+        $this->putJson("/api/v1/admin/spaces/{$space->id}", [
+            'building_id' => $space->building_id,
+            'name' => ['ar' => 'مساحة', 'en' => 'Space'],
+            'space_type' => 'co_space',
+            'is_lockable' => false,
+        ])->assertOk();
+
+        $this->assertSame(0, $space->fresh()->capacity);
+    }
+
+    /**
+     * A branch's co-working seats are the desks of its one co_space, so a
+     * second one is refused — by creation or by turning a room into one.
+     * Another branch may have its own.
+     */
+    public function test_a_branch_has_one_co_space_at_most(): void
+    {
+        $this->actingAsAdmin();
+        $existing = Space::factory()->create();
+        $sameBranch = Building::factory()->create(['branch_id' => $existing->building->branch_id]);
+        $coSpaceIn = fn (Building $building) => $this->withHeader('lang', 'en')->postJson('/api/v1/admin/spaces', [
+            'building_id' => $building->id,
+            'name' => ['ar' => 'مساحة', 'en' => 'Co-working'],
+            'space_type' => 'co_space',
+            'is_lockable' => false,
+        ]);
+
+        $coSpaceIn($sameBranch)
+            ->assertStatus(422)
+            ->assertJsonPath('errors.space_type.0', 'This branch already has a co-working space; add desks to it instead.');
+        $coSpaceIn(Building::factory()->create())->assertCreated();
+
+        $room = Space::factory()->ofType(SpaceType::Room)->create(['building_id' => $sameBranch->id]);
+        $this->putJson("/api/v1/admin/spaces/{$room->id}", [
+            'building_id' => $sameBranch->id,
+            'name' => ['ar' => 'غرفة', 'en' => 'Room'],
+            'space_type' => 'co_space',
+            'is_lockable' => false,
+        ])->assertStatus(422)->assertJsonValidationErrors('space_type');
+
+        // The co_space itself is edited freely.
+        $this->putJson("/api/v1/admin/spaces/{$existing->id}", [
+            'building_id' => $existing->building_id,
+            'name' => ['ar' => 'مساحة', 'en' => 'Co-working'],
+            'space_type' => 'co_space',
+            'is_lockable' => false,
+        ])->assertOk();
+    }
+
     public function test_index_can_be_filtered_by_building_id_and_zone_id(): void
     {
         $admin = $this->actingAsAdmin();
@@ -94,7 +174,7 @@ class SpaceControllerTest extends TestCase
     public function test_admin_can_update_structural_fields_without_touching_status(): void
     {
         $this->actingAsAdmin();
-        $space = Space::factory()->create(['capacity' => 4]);
+        $space = Space::factory()->ofType(SpaceType::Room)->create(['capacity' => 4]);
 
         $response = $this->withHeader('lang', 'en')->putJson("/api/v1/admin/spaces/{$space->id}", [
             'building_id' => $space->building_id,

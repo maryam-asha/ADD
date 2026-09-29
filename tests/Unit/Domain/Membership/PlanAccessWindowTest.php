@@ -5,6 +5,7 @@ namespace Tests\Unit\Domain\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -143,6 +144,87 @@ class PlanAccessWindowTest extends TestCase
             $this->localToUtc('2026-09-24 23:00'),
             $this->localToUtc('2026-09-24 21:00'),
         ));
+    }
+
+    // ------------------------------------------------------------------
+    // windowSegments(): the same window as a list of UTC intervals, so the
+    // co-working seat pool can hold a seat only while the plan is open.
+    // ------------------------------------------------------------------
+
+    /**
+     * @param  list<array{0: CarbonInterface, 1: CarbonInterface}>  $segments
+     * @return list<array{0: string, 1: string}>
+     */
+    private function local(array $segments): array
+    {
+        $timezone = app(SettingService::class)->get('app.timezone', 'Asia/Damascus');
+
+        return array_map(fn (array $segment) => [
+            $segment[0]->clone()->setTimezone($timezone)->format('Y-m-d H:i'),
+            $segment[1]->clone()->setTimezone($timezone)->format('Y-m-d H:i'),
+        ], $segments);
+    }
+
+    /** No window is open all day: the whole range is one segment. */
+    public function test_a_plan_without_a_window_is_one_segment_over_the_whole_range(): void
+    {
+        $plan = Plan::factory()->create();
+
+        $this->assertSame(
+            [['2026-09-24 12:00', '2026-09-26 12:00']],
+            $this->local($plan->windowSegments($this->localToUtc('2026-09-24 12:00'), $this->localToUtc('2026-09-26 12:00'))),
+        );
+    }
+
+    public function test_each_day_contributes_its_window_clipped_to_the_range(): void
+    {
+        $plan = Plan::factory()->evening()->create();
+
+        $this->assertSame(
+            [
+                ['2026-09-24 20:00', '2026-09-25 00:00'],
+                ['2026-09-25 20:00', '2026-09-25 22:00'],
+            ],
+            $this->local($plan->windowSegments($this->localToUtc('2026-09-24 12:00'), $this->localToUtc('2026-09-25 22:00'))),
+        );
+    }
+
+    /** 22:00–02:00 is one stretch across midnight, not two touching pieces. */
+    public function test_a_wrapping_window_is_one_segment_across_midnight(): void
+    {
+        $plan = Plan::factory()->create([
+            'access_window_start' => '22:00',
+            'access_window_end' => '02:00',
+        ]);
+
+        $this->assertSame(
+            [['2026-09-24 22:00', '2026-09-25 02:00']],
+            $this->local($plan->windowSegments($this->localToUtc('2026-09-24 12:00'), $this->localToUtc('2026-09-25 12:00'))),
+        );
+    }
+
+    public function test_the_segments_sum_to_the_overlap(): void
+    {
+        $plan = Plan::factory()->evening()->create();
+        $from = $this->localToUtc('2026-09-24 12:00');
+        $to = $this->localToUtc('2026-09-26 12:00');
+
+        $sum = array_sum(array_map(
+            fn (array $segment) => (int) $segment[0]->diffInSeconds($segment[1]),
+            $plan->windowSegments($from, $to),
+        ));
+
+        $this->assertSame($plan->windowOverlap($from, $to), $sum);
+    }
+
+    public function test_a_malformed_window_has_no_segments(): void
+    {
+        $plan = Plan::factory()->create([
+            'access_window_start' => '99:99',
+            'access_window_end' => '00:00',
+        ]);
+
+        $this->assertSame([], $plan->windowSegments($this->localToUtc('2026-09-24 12:00'), $this->localToUtc('2026-09-25 12:00')));
     }
 
     public function test_a_malformed_window_covers_nothing_rather_than_throwing(): void

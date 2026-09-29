@@ -12,6 +12,7 @@ use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
@@ -270,6 +271,27 @@ class AdminBookingCalendarTest extends TestCase
             ->assertOk()
             ->assertJsonPath('resources.0.space.concurrency_ceiling', 4)
             ->assertJsonPath('resources.0.days.0.occupancy.percent', 25);
+    }
+
+    /**
+     * A co_space's occupancy is its branch's pool's: two subscriptions
+     * holding seats all day fill half of four seats before any booking
+     * (docs/decisions/coworking-seat-pool.md).
+     */
+    public function test_a_co_spaces_occupancy_counts_the_seats_subscriptions_hold(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->space(['space_type' => SpaceType::CoSpace, 'is_lockable' => false, 'capacity' => 4]);
+        Membership::factory()->count(2)->create([
+            'branch_id' => $space->building->branch_id,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(10),
+        ]);
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=day&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('resources.0.days.0.occupancy.percent', 50);
     }
 
     public function test_a_booking_running_past_closing_is_clipped_to_the_open_window(): void

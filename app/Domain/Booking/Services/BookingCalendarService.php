@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\PoolTimeline;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
@@ -82,6 +83,13 @@ class BookingCalendarService
         // hours belong to the branch, not the space.
         $periodsByDate = $this->businessHours->periodsForRange($from, $to, $branch);
 
+        // A co_space's seats are its branch's pool, so its occupancy is the
+        // pool's — read once for the range, whatever the number of rows
+        // (docs/decisions/coworking-seat-pool.md).
+        $pool = $spaces->contains(fn (Space $space) => $this->availability->usesBranchPool($space))
+            ? $this->availability->poolTimeline($spaces->first(fn (Space $space) => $this->availability->usesBranchPool($space)), $from->utc(), $to->addDay()->utc())
+            : null;
+
         $resources = $spaces
             ->map(fn (Space $space) => $this->resourceRow(
                 $space,
@@ -90,6 +98,7 @@ class BookingCalendarService
                 $from,
                 $to,
                 $locale,
+                $this->availability->usesBranchPool($space) ? $pool : null,
             ))
             ->values()
             ->all();
@@ -149,6 +158,7 @@ class BookingCalendarService
         CarbonImmutable $from,
         CarbonImmutable $to,
         string $locale,
+        ?PoolTimeline $pool = null,
     ): array {
         $rules = $this->availability->rulesFor($space);
         $days = [];
@@ -176,7 +186,9 @@ class BookingCalendarService
                 'day' => $date->format('d'),
                 'state' => $periods === [] ? 'closed' : 'open',
                 'periods' => $periods,
-                'occupancy' => $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
+                'occupancy' => $pool !== null
+                    ? $this->poolOccupancy($pool, $periods, $date)
+                    : $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
                 'bookings' => $onThisDay->map(fn (Booking $booking) => $this->bookingCell($booking, $locale))->all(),
             ];
         }
@@ -242,6 +254,46 @@ class BookingCalendarService
             'percent' => $capacityMinutes === 0
                 ? 0
                 : (int) min(100, round($bookedMinutes / $capacityMinutes * 100)),
+        ];
+    }
+
+    /**
+     * How much of the co-working pool's open day is taken: seat-minutes
+     * held or occupied over seat-minutes open, inside the day's open
+     * periods. Subscriptions holding seats, bookings and the walk-ins inside
+     * now all count, as they do for every pool decision.
+     *
+     * `booked_minutes` / `open_minutes` keep their names for the grid, as
+     * seat-minutes here.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods
+     * @return array<string, int>
+     */
+    private function poolOccupancy(PoolTimeline $pool, array $periods, CarbonImmutable $date): array
+    {
+        $taken = 0;
+        $open = 0;
+
+        foreach ($periods as $period) {
+            $periodStart = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['open_time'], $date->timezone)->utc();
+            $periodEnd = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['close_time'], $date->timezone)->utc();
+
+            foreach ($pool->segments() as $segment) {
+                $start = max($segment['start'], $periodStart);
+                $end = min($segment['end'], $periodEnd);
+
+                if ($start->lessThan($end)) {
+                    $minutes = (int) $start->diffInMinutes($end);
+                    $open += $minutes * $segment['capacity'];
+                    $taken += $minutes * min($segment['usage'], $segment['capacity']);
+                }
+            }
+        }
+
+        return [
+            'booked_minutes' => $taken,
+            'open_minutes' => $open,
+            'percent' => $open === 0 ? 0 : (int) min(100, round($taken / $open * 100)),
         ];
     }
 

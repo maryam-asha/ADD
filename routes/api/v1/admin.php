@@ -18,6 +18,8 @@ use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
+use App\Http\Controllers\Api\V1\Admin\CoworkingPoolController;
+use App\Http\Controllers\Api\V1\Admin\CoworkingWindowController;
 use App\Http\Controllers\Api\V1\Admin\CurrencyController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
@@ -250,6 +252,15 @@ Route::get('calendar/occupancy', [BookingCalendarController::class, 'occupancy']
 // no quote: the desk picks a run of cells, like the member app.
 Route::get('spaces/{space}/availability/slots', [BookingCalendarController::class, 'slots']);
 
+// The branch's co-working seat pool (docs/decisions/coworking-seat-pool.md):
+// its seats taken and free over time, and the rooms lent to co-working when
+// the co-working space is overloaded.
+Route::get('branches/{branch}/coworking-pool', [CoworkingPoolController::class, 'show']);
+Route::get('spaces/{space}/coworking-windows', [CoworkingWindowController::class, 'index']);
+Route::post('spaces/{space}/coworking-windows', [CoworkingWindowController::class, 'store']);
+Route::patch('coworking-windows/{coworkingWindow}', [CoworkingWindowController::class, 'update']);
+Route::delete('coworking-windows/{coworkingWindow}', [CoworkingWindowController::class, 'destroy']);
+
 // Reception Operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
 // — check-in, check-out, cancellation and payment settlement for bookings.
 // No narrower role gate than the file's own admin|operations group: both do
@@ -318,7 +329,9 @@ Route::middleware('role:admin')->group(function () {
     // Activating a plan for someone with no wallet debit is a money-adjacent
     // grant, so it sits with the other admin-only actions rather than in the
     // shared admin|operations block above.
+    Route::get('memberships', [MembershipController::class, 'index']);
     Route::post('memberships', [MembershipController::class, 'store']);
+    Route::put('memberships/{membership}/desks', [MembershipController::class, 'assignDesks']);
 
     Route::post('users', [UserController::class, 'store']);
     Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update']);

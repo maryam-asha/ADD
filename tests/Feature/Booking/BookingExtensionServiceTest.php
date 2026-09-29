@@ -6,6 +6,7 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -123,6 +124,68 @@ class BookingExtensionServiceTest extends TestCase
         }
 
         $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')));
+    }
+
+    // ------------------------------------------------------------------
+    // The co-working seat pool (docs/decisions/coworking-seat-pool.md)
+    // ------------------------------------------------------------------
+
+    private function checkedInCoSpaceBooking(int $capacity): Booking
+    {
+        $space = Space::factory()->create(['capacity' => $capacity, 'hourly_rate_points' => 100, 'slot_granularity_minutes' => 30]);
+
+        return $this->checkedInBooking(['space_id' => $space->id]);
+    }
+
+    /** Another member's seat next hour does not end this one's: there are seats to spare. */
+    public function test_a_co_space_booking_extends_while_the_pool_has_a_seat(): void
+    {
+        $booking = $this->checkedInCoSpaceBooking(2);
+        Booking::factory()->create([
+            'space_id' => $booking->space_id,
+            'start_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        $this->extensions->extend($booking, 60);
+
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+    }
+
+    public function test_a_co_space_extension_stops_where_the_pool_runs_out(): void
+    {
+        $booking = $this->checkedInCoSpaceBooking(1);
+        Booking::factory()->create([
+            'space_id' => $booking->space_id,
+            'start_at' => Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:30:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        try {
+            $this->extensions->extend($booking, 60);
+            $this->fail('Expected an extension conflict.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.extension_conflict', $e->messageKey);
+            $this->assertSame('2026-08-17T08:30:00+00:00', $e->params['latest_end_at']);
+        }
+    }
+
+    public function test_a_room_extension_stops_where_the_room_is_lent_to_co_working(): void
+    {
+        $booking = $this->checkedInBooking();
+        SpaceCoworkingWindow::factory()->create([
+            'space_id' => $booking->space_id,
+            'starts_at' => Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus')->utc(),
+            'ends_at' => Carbon::parse('2026-08-17 15:00:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        try {
+            $this->extensions->extend($booking, 60);
+            $this->fail('Expected an extension conflict.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.extension_conflict', $e->messageKey);
+            $this->assertSame('2026-08-17T08:30:00+00:00', $e->params['latest_end_at']);
+        }
     }
 
     public function test_extension_debits_the_wallet_when_the_booking_was_paid_by_wallet(): void

@@ -97,7 +97,8 @@ class SpaceSeeder extends Seeder
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::Open,
                 'is_lockable' => false,
-                'capacity' => 1,
+                // Recounted from its desks below (SeatDesk).
+                'capacity' => 0,
                 'hourly_rate_points' => 30,
                 'cancellation_window_minutes' => 60,
                 'slot_granularity_minutes' => 60,
@@ -114,10 +115,10 @@ class SpaceSeeder extends Seeder
         ]);
 
         for ($i = 1; $i <= 10; $i++) {
-            SeatDesk::query()->firstOrCreate([
-                'space_id' => $hotDesk->id,
-                'label' => sprintf('Desk %02d', $i),
-            ]);
+            SeatDesk::query()->firstOrCreate(
+                ['space_id' => $hotDesk->id, 'code' => sprintf('D-%02d', $i)],
+                ['label' => sprintf('Desk %02d', $i)],
+            );
         }
 
         // --- Space 2: Meeting Room A ---

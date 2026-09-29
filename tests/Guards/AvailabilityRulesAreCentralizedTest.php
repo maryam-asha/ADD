@@ -29,19 +29,15 @@ class AvailabilityRulesAreCentralizedTest extends TestCase
     /**
      * Files allowed to contain these predicates.
      *
-     * AvailabilityService owns them. The two model scopes are the query
-     * builders the service composes, and are themselves the shared
-     * definition rather than a copy of it. CapacitySlotSynchronizer holds
-     * the derived counter and compares its own in-memory slot boundaries,
-     * never re-deciding whether a window is bookable.
+     * AvailabilityService owns them. The model scopes are the query
+     * builders the service composes — a booking's window and a room's
+     * co-working stretch — and are themselves the shared definition rather
+     * than a copy of it.
      */
     private const ALLOWLIST = [
         'app/Domain/Booking/Services/AvailabilityService.php',
         'app/Domain/Booking/Models/Booking.php',
-        'app/Domain/Booking/Models/SpaceCapacitySlot.php',
-        // Walks its own slot grid to place derived counter rows; it never
-        // decides whether a window is bookable.
-        'app/Domain/Booking/Services/CapacitySlotSynchronizer.php',
+        'app/Domain/Booking/Models/SpaceCoworkingWindow.php',
     ];
 
     /**
@@ -99,6 +95,25 @@ class AvailabilityRulesAreCentralizedTest extends TestCase
         );
     }
 
+    /**
+     * The same, for a room lent to co-working: whether a stretch touches a
+     * window is SpaceCoworkingWindow::scopeOverlapping() and
+     * AvailabilityService::isInCoworkingMode(), nowhere else.
+     */
+    public function test_the_co_working_window_overlap_appears_only_in_the_availability_service(): void
+    {
+        $offenders = $this->offendingFiles(
+            "/where\(\s*'starts_at'\s*,\s*'<'|where\(\s*'ends_at'\s*,\s*'>'\s*,\s*\\\$(?!now\b)/"
+        );
+
+        $this->assertSame(
+            [],
+            array_keys($offenders),
+            'Whether a stretch meets a room\'s co-working window is decided by SpaceCoworkingWindow::scopeOverlapping() '
+            .'and AvailabilityService alone.'
+        );
+    }
+
     public function test_the_blocking_status_set_appears_only_in_the_availability_service(): void
     {
         // whereIn('status', [Confirmed, Pending]) — which statuses hold a slot.
@@ -137,6 +152,10 @@ class AvailabilityRulesAreCentralizedTest extends TestCase
             'overlapCount',
             'exceedsCeiling',
             'violatesBuffer',
+            // The co-working seat pool (docs/decisions/coworking-seat-pool.md).
+            'usesBranchPool',
+            'exceedsPool',
+            'isInCoworkingMode',
         ] as $predicate) {
             $this->assertStringContainsString(
                 "function {$predicate}(",

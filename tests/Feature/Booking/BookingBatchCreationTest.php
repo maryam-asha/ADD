@@ -4,13 +4,16 @@ namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
@@ -135,6 +138,38 @@ class BookingBatchCreationTest extends TestCase
         // Only the pre-existing booking survives; none of the three were
         // created, not even the two that were individually fine.
         $this->assertSame(1, Booking::count());
+    }
+
+    /** A co_space date whose branch pool is held full by subscriptions fails the batch. */
+    public function test_a_co_space_date_with_no_seat_left_in_the_pool_fails_the_batch(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace(['space_type' => SpaceType::CoSpace, 'capacity' => 1, 'is_lockable' => false]);
+        Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'windows' => [$this->window($space, '2026-08-17')],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.0.reason', 'slot_unavailable');
+    }
+
+    public function test_a_room_lent_to_co_working_fails_the_batch(): void
+    {
+        $this->actingAsMember();
+        $space = $this->openSpace();
+        SpaceCoworkingWindow::factory()->create([
+            'space_id' => $space->id,
+            'starts_at' => Carbon::parse('2026-08-18 08:00', 'Asia/Damascus')->utc(),
+            'ends_at' => Carbon::parse('2026-08-18 20:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'windows' => [$this->window($space, '2026-08-17'), $this->window($space, '2026-08-18')],
+        ])
+            ->assertStatus(422)
+            ->assertJsonPath('errors.0.index', 1)
+            ->assertJsonPath('errors.0.reason', 'room_in_coworking_mode');
     }
 
     public function test_no_wallet_is_debited_when_a_batch_fails(): void

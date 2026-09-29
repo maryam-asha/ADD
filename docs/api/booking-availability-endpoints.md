@@ -511,9 +511,13 @@ filters.
 ```
 
 Day `state` here is `open | closed` (simpler than the member calendar's four).
-`occupancy.percent` is booked ÷ open minutes, **clipped to the open window**, and
-a multi-occupant space is measured against its `concurrency_ceiling` — so a hot
-desk with 20 seats never reads above 100%.
+`occupancy.percent` is booked ÷ open minutes, **clipped to the open window**.
+
+**A co_space's occupancy is its branch's pool's** (changed 2026-09-30,
+[coworking-seat-pool.md](../decisions/coworking-seat-pool.md)). It is seat-minutes
+taken ÷ seat-minutes open inside the day's open periods, counting subscriptions
+holding seats, bookings, and the walk-ins inside now. Every co_space row of a
+branch therefore shows the same figure.
 
 ### `GET /api/v1/admin/calendar/occupancy?...`
 
@@ -564,13 +568,144 @@ the same blocks the member sees, so the two surfaces can never disagree.
 member endpoint — reception cannot double-book a room the member endpoint would
 have refused, and cannot back-date either.
 
+### The co-working seat pool (added 2026-09-30)
+
+Co-working seats are counted **once per branch**, not per co_space
+([coworking-seat-pool.md](../decisions/coworking-seat-pool.md)):
+
+- **Seats open:** each active co_space's `capacity`, plus the seats of rooms
+  lent to co-working at that moment.
+- **Seats taken:**
+  - every active subscription holds its `seats` while its plan is open;
+  - each booking of a co_space takes one, unless the member's subscription
+    already holds their seat;
+  - each walk-in inside now takes one, on the same terms.
+
+A co_space booking, a walk-in and a subscription sale are each refused when no
+seat is left for them.
+
+#### `GET /api/v1/admin/branches/{branch}/coworking-pool?from=&to=`
+
+`from` / `to` are district wall-clock (`2026-10-05 08:00`). Leave them out for
+now until the end of today. At most 62 days are read.
+
+```json
+{
+  "data": {
+    "from": "2026-10-01T09:00:00+03:00", "to": "2026-10-02T00:00:00+03:00",
+    "capacity_now": 16, "usage_now": 11, "free_now": 5, "min_free": 2,
+    "segments": [
+      { "start": "2026-10-01T09:00:00+03:00", "end": "2026-10-01T14:00:00+03:00",
+        "capacity": 16, "usage": 11, "free": 5 },
+      { "start": "2026-10-01T14:00:00+03:00", "end": "2026-10-01T18:00:00+03:00",
+        "capacity": 22, "usage": 20, "free": 2 }
+    ]
+  }
+}
+```
+
+`min_free` is the fewest free seats anywhere in the range, and is negative
+when overbooked. Read it before selling a subscription or when deciding
+whether to lend a room.
+
+#### Lending a room to co-working
+
+- `GET /api/v1/admin/spaces/{space}/coworking-windows`: the room's stretches that
+  have not ended, soonest first.
+- `POST /api/v1/admin/spaces/{space}/coworking-windows`:
+  `{ "starts_at": "2026-10-01 14:00", "ends_at": "2026-10-01 18:00", "seats": 6 }`
+  returns `201` with `{ "data": { "id", "space_id", "starts_at", "ends_at", "seats" } }`.
+  - Only a room can be lent, for at most its `capacity` seats.
+  - Stretches of the same room may not overlap (validation, `starts_at`).
+  - It is refused when the room has a booking in the stretch
+    (`api.coworking.room_has_bookings`).
+- `PATCH /api/v1/admin/coworking-windows/{id}`: any of the three fields, plus
+  `override`. Returns `{ "message": ... }`.
+- `DELETE /api/v1/admin/coworking-windows/{id}?override=1`: returns
+  `{ "message": ... }`.
+
+Shrinking or taking back seats the pool is counting on is refused
+(`api.coworking.would_overbook`) unless `override` is sent.
+
+While a room is lent:
+
+- Its day cells are not available (`coworking_mode`, which reaches the member
+  app and the day grid as `booked`).
+- A booking of it is refused with `api.booking.room_in_coworking_mode`.
+- A walk-in to it takes a pool seat.
+
+#### `POST /api/v1/admin/memberships`: seats and branch
+
+New optional fields:
+
+- `branch_id`: the pool it holds seats in. Defaults to the company's branch,
+  else the member's home branch, else the default branch.
+- `seats`: a company only, default 1. A member's own subscription is always
+  exactly 1.
+- `override_capacity`: sell even when the pool is full. The override is
+  recorded in the audit log.
+
+When the pool has no room for the subscription over its period, the response
+is:
+
+```json
+{ "message": "Every co-working seat in this branch is already taken …",
+  "first_shortfall_at": "2026-10-03T20:00:00+00:00" }
+```
+
+The member purchase (`POST /api/v1/member/memberships`) gives the same `422`,
+and nothing is charged.
+
+#### Desks: a co_space's seats, and Dedicated Desk subscriptions
+
+A co_space's seats are its desks (`seats_desks`); its `capacity` is their
+count and is never sent to `POST|PUT admin/spaces` (a `422` on `capacity` if
+it is). A branch has one co_space at most: a second one, created or turned into
+one from another type, is a `422` on `space_type`.
+
+- `POST|PUT /api/v1/admin/seats-desks` take `space_id`, `code` (required,
+  unique within the branch) and `label`.
+- `GET /api/v1/admin/seats-desks?branch_id=&free=1` returns each desk with
+  `code` and `membership_id`, the live subscription holding it or `null`.
+  `free=1` keeps only the desks nobody holds.
+- `POST /api/v1/admin/memberships` takes `seat_desk_ids` for a Dedicated Desk
+  plan, and its response carries `desks: [{id, code, label}]`.
+- `PUT /api/v1/admin/memberships/{membership}/desks` `{"seat_desk_ids": [4]}`
+  replaces the subscription's desks and returns `{message}`.
+
+Both refuse with a `422` on `seat_desk_ids` when:
+
+- the plan is not a Dedicated Desk plan;
+- there are more desks than the subscription's `seats`;
+- a desk is not in a co_space of the subscription's branch;
+- another live subscription holds a desk over an overlapping period.
+
+Deleting a desk a live subscription holds, or deleting its co_space, gives a
+`422` with `{message}`; moving it to another space is a `422` on `space_id`. A
+co_space with desks cannot change type (a `422` on `space_type`).
+
+- `GET /api/v1/admin/memberships?dedicated=1&live=1&without_desk=1&branch_id=`
+  lists subscriptions newest first and paginated, each with
+  `owner: {type, id, name}` and `desks[]`. `without_desk=1` is how staff find a
+  Dedicated Desk plan bought in the app that is still owed its desk.
+- `GET /api/v1/member/memberships/current` carries `desks`: `[{code, label}]`
+  for a Dedicated Desk plan (empty until one is tied), `null` for any other.
+
+#### Reception's active sessions
+
+`GET /api/v1/admin/reception/sessions/active` rows now carry `seat_covered` and
+`membership_id`. `seat_covered` is `true` when the walk-in sits in a seat their
+subscription holds, and `false` when it took a free one. Both are `null` for a
+booking.
+
 ---
 
 ## 4. Error keys worth handling
 
 | HTTP | key | when |
 |---|---|---|
-| 422 | `slot_unavailable` | window overlaps an existing booking |
+| 422 | `slot_unavailable` | window overlaps an existing booking, or (a co_space) no co-working seat is left in the branch |
+| 422 | `room_in_coworking_mode` | the room is lent to co-working in that window |
 | 422 | `space_at_capacity` | shared space at its seat ceiling |
 | 422 | `buffer_conflict` | too close to a neighbouring booking |
 | 422 | `outside_business_hours` | outside the branch's open periods, or spans two days |

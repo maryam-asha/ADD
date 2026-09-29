@@ -32,12 +32,27 @@ class StoreAdminMembershipRequest extends FormRequest
             'plan_id' => ['required', 'integer', 'exists:plans,id'],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
             'company_id' => ['required_without:user_id', 'integer', 'exists:companies,id'],
+            // The branch whose co-working pool it holds seats in; the owner's
+            // when left out (docs/decisions/coworking-seat-pool.md).
+            'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
+            // A company buys as many seats as it needs; a member holds one.
+            'seats' => ['nullable', 'integer', 'min:1', 'max:1000'],
+            // Sell past a full pool, by arrangement — recorded in the audit log.
+            'override_capacity' => ['sometimes', 'boolean'],
+            // A Dedicated Desk subscription's desks, one per seat at most —
+            // DedicatedDeskService has the rest of the rule.
+            'seat_desk_ids' => ['sometimes', 'array'],
+            'seat_desk_ids.*' => ['integer', 'distinct', 'exists:seats_desks,id'],
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if ($this->filled('user_id') && $this->filled('seats') && (int) $this->input('seats') !== 1) {
+                $validator->errors()->add('seats', __('api.admin.membership_seats_user_owner'));
+            }
+
             $planId = $this->input('plan_id');
 
             if (! $planId) {

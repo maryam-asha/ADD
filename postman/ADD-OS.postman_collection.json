@@ -200,6 +200,10 @@
             "key": "callback_token",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "coworking_window_id",
+            "value": "1"
         }
     ],
     "event": [
@@ -2768,7 +2772,7 @@
                                         "current"
                                     ]
                                 },
-                                "description": "Returns the member's own active plan and this-cycle usage, for the \"My Subscription\" tab. `data` is `null` (still a 200) when the member has no active membership — a normal state, not an error.\n\n- `benefits`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration, not a fixed list.\n- `balances`: one entry per balance category the plan actually grants, with `granted`/`used`/`remaining`/`percentage_used` for the current billing cycle (`current_period_start` onward), plus ready-to-render `formatted_*` strings. Café/Printing are in USD; Meeting Rooms (`space_specific`) is in hours.\n- `current_period_start`/`current_period_end`, `billing_cycle_text`, `balance_rollover_notice`: for the \"Current cycle: ...\" header and the rollover warning shown under Plan Benefits.\n- `discounts`, `resources`: real plan_discounts / plan_resource_grants rows, `resources[].remaining` computed live per membership."
+                                "description": "Returns the member's own active plan and this-cycle usage, for the \"My Subscription\" tab. `data` is `null` (still a 200) when the member has no active membership — a normal state, not an error.\n\n- `benefits`: the four quick-glance badges (Café, Printing, Meeting, Discounts) — each reflects real plan configuration, not a fixed list.\n- `balances`: one entry per balance category the plan actually grants, with `granted`/`used`/`remaining`/`percentage_used` for the current billing cycle (`current_period_start` onward), plus ready-to-render `formatted_*` strings. Café/Printing are in USD; Meeting Rooms (`space_specific`) is in hours.\n- `current_period_start`/`current_period_end`, `billing_cycle_text`, `balance_rollover_notice`: for the \"Current cycle: ...\" header and the rollover warning shown under Plan Benefits.\n- `discounts`, `resources`: real plan_discounts / plan_resource_grants rows, `resources[].remaining` computed live per membership.\n\n`desks` (added 2026-10-01): for a Dedicated Desk plan, the desks tied to it as [{code, label}] — an empty list until staff tie one; null for any other plan."
                             },
                             "response": [
                                 {
@@ -8155,6 +8159,535 @@
                     ]
                 },
                 {
+                    "name": "Co-working Seat Pool",
+                    "description": "Co-working seats are counted once per branch: every active co_space's capacity plus rooms lent to co-working at that moment are open; every active subscription holds its seats while its plan is open, and each co_space booking and each walk-in inside now takes one — on the member's subscription when they hold one, so it is not counted twice. A co_space booking, a walk-in and a subscription sale are each refused when no seat is left for them. See docs/decisions/coworking-seat-pool.md.",
+                    "item": [
+                        {
+                            "name": "Seat Pool — Seats Open, Taken and Free",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/branches/{{branch_id}}/coworking-pool?",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "branches",
+                                        "{{branch_id}}",
+                                        "coworking-pool"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-10-01 09:00",
+                                            "description": "Optional district wall-clock start; now when left out.",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-10-01 20:00",
+                                            "description": "Optional district wall-clock end; the end of today when left out. At most 62 days after from.",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "The branch's co-working pool now and over the range: capacity_now, usage_now, free_now, min_free (the fewest free seats anywhere in the range — negative when overbooked) and segments [{start, end, capacity, usage, free}] in local ISO-8601. Read it before selling a subscription or deciding to lend a room. See docs/decisions/coworking-seat-pool.md."
+                            },
+                            "response": [
+                                {
+                                    "name": "The rest of today",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{admin_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/branches/{{branch_id}}/coworking-pool?",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "branches",
+                                                "{{branch_id}}",
+                                                "coworking-pool"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "from",
+                                                    "value": "2026-10-01 09:00",
+                                                    "description": "Optional district wall-clock start; now when left out.",
+                                                    "disabled": true
+                                                },
+                                                {
+                                                    "key": "to",
+                                                    "value": "2026-10-01 20:00",
+                                                    "description": "Optional district wall-clock end; the end of today when left out. At most 62 days after from.",
+                                                    "disabled": true
+                                                }
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n    \"data\": {\n        \"from\": \"2026-10-01T09:00:00+03:00\",\n        \"to\": \"2026-10-02T00:00:00+03:00\",\n        \"capacity_now\": 16,\n        \"usage_now\": 11,\n        \"free_now\": 5,\n        \"min_free\": 2,\n        \"segments\": [\n            {\n                \"start\": \"2026-10-01T09:00:00+03:00\",\n                \"end\": \"2026-10-01T14:00:00+03:00\",\n                \"capacity\": 16,\n                \"usage\": 11,\n                \"free\": 5\n            },\n            {\n                \"start\": \"2026-10-01T14:00:00+03:00\",\n                \"end\": \"2026-10-01T18:00:00+03:00\",\n                \"capacity\": 22,\n                \"usage\": 20,\n                \"free\": 2\n            }\n        ]\n    }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Lent Stretches of a Room",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/coworking-windows",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "coworking-windows"
+                                    ]
+                                },
+                                "description": "The room's co-working stretches that have not ended, soonest first: [{id, space_id, starts_at, ends_at, seats}], times in local ISO-8601. See docs/decisions/coworking-seat-pool.md."
+                            }
+                        },
+                        {
+                            "name": "Lend a Room to Co-working",
+                            "request": {
+                                "method": "POST",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/coworking-windows",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "spaces",
+                                        "{{space_id}}",
+                                        "coworking-windows"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"starts_at\": \"2026-10-01 14:00\",\n    \"ends_at\": \"2026-10-01 18:00\",\n    \"seats\": 6\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "While the co-working space is overloaded, a room's seats join the branch's pool for a stretch (district wall-clock times), and the room takes no room bookings meanwhile (its cells read coworking_mode → booked; a booking is refused with room_in_coworking_mode). Only a room, for at most its capacity; stretches of one room do not overlap (422 on starts_at). Refused when the room has a booking in the stretch. See docs/decisions/coworking-seat-pool.md."
+                            },
+                            "response": [
+                                {
+                                    "name": "Lent",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{admin_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/coworking-windows",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "spaces",
+                                                "{{space_id}}",
+                                                "coworking-windows"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"starts_at\": \"2026-10-01 14:00\",\n    \"ends_at\": \"2026-10-01 18:00\",\n    \"seats\": 6\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"space_id\": 2,\n        \"starts_at\": \"2026-10-01T14:00:00+03:00\",\n        \"ends_at\": \"2026-10-01T18:00:00+03:00\",\n        \"seats\": 6\n    }\n}"
+                                },
+                                {
+                                    "name": "The room has a booking then",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{admin_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/coworking-windows",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "spaces",
+                                                "{{space_id}}",
+                                                "coworking-windows"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"starts_at\": \"2026-10-01 14:00\",\n    \"ends_at\": \"2026-10-01 18:00\",\n    \"seats\": 6\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n    \"message\": \"This room has bookings in that stretch, so it cannot be lent to co-working then.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Change a Lent Stretch",
+                            "request": {
+                                "method": "PATCH",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coworking-windows/{{coworking_window_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coworking-windows",
+                                        "{{coworking_window_id}}"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"seats\": 4\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Any of starts_at, ends_at, seats; the rest are kept. Shrinking or shortening seats the pool is counting on is refused (would_overbook) unless override: true. Returns {message}. See docs/decisions/coworking-seat-pool.md."
+                            },
+                            "response": [
+                                {
+                                    "name": "Seats already counted on",
+                                    "originalRequest": {
+                                        "method": "PATCH",
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{admin_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/coworking-windows/{{coworking_window_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "coworking-windows",
+                                                "{{coworking_window_id}}"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"seats\": 4\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n    \"message\": \"Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Take a Room Back from Co-working",
+                            "request": {
+                                "method": "DELETE",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{admin_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coworking-windows/{{coworking_window_id}}?",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coworking-windows",
+                                        "{{coworking_window_id}}"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "override",
+                                            "value": "1",
+                                            "description": "Take the seats back even when the pool is counting on them.",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Ends the lent stretch; the room takes room bookings again. Refused (would_overbook) when the pool is counting on its seats, unless override=1. Returns {message}. See docs/decisions/coworking-seat-pool.md."
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "Reception Operations",
                     "description": "Check-in/check-out, payment settlement, cancellation, manual wallet top-up, and booking approval/extension (docs/decisions/reception-operations-scope.md, docs/decisions/booking-creation-approval-extension.md). Bookings are created via Member (App) > Bookings > Create Booking, which auto-captures {{booking_id}}; walk-ins are created via Start Walk-in Session below, which auto-captures {{walkin_session_id}}.",
                     "item": [
@@ -10627,7 +11160,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 20\n}",
+                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -10646,7 +11179,7 @@
                                                 "spaces"
                                             ]
                                         },
-                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one."
+                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one.\n\nA co_space takes no `capacity` (422 if sent): its capacity is the number of its desks, starting at 0 — add them under Seats & Desks. Other types send their capacity as before. A branch has one co_space at most: a second one (or turning another space into one via Update Space) is 422 on `space_type` — add desks to the existing one instead."
                                     }
                                 },
                                 {
@@ -11096,10 +11629,20 @@
                                                     "key": "space_id",
                                                     "value": "{{space_id}}",
                                                     "disabled": true
+                                                },
+                                                {
+                                                    "key": "branch_id",
+                                                    "value": "{{branch_id}}",
+                                                    "disabled": true
+                                                },
+                                                {
+                                                    "key": "free",
+                                                    "value": "1",
+                                                    "disabled": true
                                                 }
                                             ]
                                         },
-                                        "description": "Optional ?space_id= filter."
+                                        "description": "Every seat of a co_space is a desk, and a co_space's capacity is its number of desks (docs/decisions/coworking-seat-pool.md).\n\nEach row: id, space_id, code (unique in the branch, what the QR carries and a member is told), label, qr_point_id, membership_id (the live Dedicated Desk subscription holding it, or null).\n\nFilters: ?space_id=, ?branch_id=, ?free=1 (only desks no subscription holds now — what the dashboard offers when tying a desk)."
                                     }
                                 },
                                 {
@@ -11137,7 +11680,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"label\": \"D-12\"\n}",
+                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"code\": \"D-12\",\n  \"label\": \"Window desk\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -11155,7 +11698,8 @@
                                                 "admin",
                                                 "seats-desks"
                                             ]
-                                        }
+                                        },
+                                        "description": "Only inside a co_space. `code` is required and unique within the branch (422 on `code` otherwise). Adding a desk raises the co_space's capacity by one."
                                     }
                                 },
                                 {
@@ -11211,7 +11755,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"label\": \"D-99\"\n}",
+                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"code\": \"D-12\",\n  \"label\": \"Window desk\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -11231,7 +11775,7 @@
                                                 "{{seat_desk_id}}"
                                             ]
                                         },
-                                        "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                                        "description": "Returns `{\"message\": \"...\"}` on success, not the updated resource. Moving a desk to another co_space recounts both spaces' capacity."
                                     }
                                 },
                                 {
@@ -11263,7 +11807,7 @@
                                                 "{{seat_desk_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations)."
+                                        "description": "Admin-only (not operations). Lowers the co_space's capacity by one. A desk a live Dedicated Desk subscription holds is refused with 422 {message}; untie it first (PUT memberships/{id}/desks)."
                                     }
                                 }
                             ]
@@ -15852,6 +16396,57 @@
                     "name": "Memberships",
                     "item": [
                         {
+                            "name": "List Memberships",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/memberships?dedicated=1&live=1&without_desk=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "memberships"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "dedicated",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "live",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "without_desk",
+                                            "value": "1"
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "{{branch_id}}",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Subscriptions, newest first and paginated ({data, links, meta}). Each carries owner {type, id, name}, branch_id, seats and desks[] ({id, code, label}).\n\nFilters: dedicated=1 (Dedicated Desk plans only), live=1 (active and not ended), without_desk=1 (no desk tied yet — a Dedicated Desk plan bought in the app arrives this way; tie one with Assign Dedicated Desks), branch_id, per_page (max 100)."
+                            },
+                            "response": []
+                        },
+                        {
                             "name": "Activate a Membership",
                             "request": {
                                 "method": "POST",
@@ -15876,15 +16471,53 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_id\": 1,\n  \"user_id\": 2\n}",
+                                    "raw": "{\n  \"plan_id\": 1,\n  \"company_id\": 3,\n  \"seats\": 2,\n  \"branch_id\": null,\n  \"override_capacity\": false,\n  \"seat_desk_ids\": [4, 5]\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 },
-                                "description": "Operations activates a plan for a member or company without charging their wallet — the arrangement was paid for outside the app (docs/decisions/plan-access-windows.md). This is how private plans reach the staff they were negotiated for.\n\nExactly one of user_id / company_id. Plan balances are still granted on this path, same as a self-service purchase."
+                                "description": "Operations activates a plan for a member or company without charging their wallet — the arrangement was paid for outside the app (docs/decisions/plan-access-windows.md). This is how private plans reach the staff they were negotiated for.\n\nExactly one of user_id / company_id. Plan balances are still granted on this path, same as a self-service purchase.\n\nSeats (added 2026-09-30): a subscription holds `seats` seats in its branch's co-working pool for its whole period, while its plan is open. `seats` is for a company (default 1; a member's own is always 1). `branch_id` defaults to the company's branch, else the member's home branch, else the default branch. When the pool has no room over the period the answer is 422 {message: seat_pool_full, first_shortfall_at}; `override_capacity: true` sells anyway and is recorded in the audit log. See docs/decisions/coworking-seat-pool.md.\n\nDesks (added 2026-10-01): a Dedicated Desk plan (module slug dedicated_desk) may be tied to desks with `seat_desk_ids`, at most `seats` of them, each in a co_space of the subscription's branch and not held by another live subscription over the period — 422 on `seat_desk_ids` otherwise, and nothing is created. They can also be tied later with PUT memberships/{id}/desks. The response carries `desks[]` ({id, code, label}), plus `branch_id` and `seats`."
                             }
+                        },
+                        {
+                            "name": "Assign Dedicated Desks",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/memberships/{{membership_id}}/desks",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "memberships",
+                                        "{{membership_id}}",
+                                        "desks"
+                                    ]
+                                },
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"seat_desk_ids\": [4]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "description": "Ties a Dedicated Desk subscription to its desks, replacing any it had; [] unties them all. Staff only — this is how a Dedicated Desk plan bought in the app gets its desk.\n\nReturns {\"message\": \"Desks assigned.\"}. 422 on `seat_desk_ids` when the plan is not Dedicated Desk, when there are more desks than the subscription's seats, when a desk is outside a co_space of its branch, or when another live subscription holds a desk over an overlapping period."
+                            },
+                            "response": []
                         }
                     ]
                 },

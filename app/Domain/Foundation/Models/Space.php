@@ -74,6 +74,21 @@ class Space extends Model
         return $this->belongsTo(Building::class);
     }
 
+    /**
+     * Whether the branch already has a co_space other than $exceptId. A
+     * branch's co-working seats are the desks of its one co_space, and a
+     * retired one no longer counts (docs/decisions/coworking-seat-pool.md).
+     */
+    public static function branchHasCoSpace(int $branchId, ?int $exceptId = null): bool
+    {
+        return self::query()
+            ->where('space_type', SpaceType::CoSpace->value)
+            ->where('status', '!=', OperationalStatus::Retired->value)
+            ->whereHas('building', fn (Builder $q) => $q->where('branch_id', $branchId))
+            ->when($exceptId !== null, fn (Builder $q) => $q->whereKeyNot($exceptId))
+            ->exists();
+    }
+
     public function zone(): BelongsTo
     {
         return $this->belongsTo(Zone::class);

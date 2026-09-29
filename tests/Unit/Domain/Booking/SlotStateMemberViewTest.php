@@ -28,6 +28,7 @@ class SlotStateMemberViewTest extends TestCase
             'buffer' => SlotState::Booked,
             'outside_hours' => SlotState::Booked,
             'too_far_ahead' => SlotState::Booked,
+            'coworking_mode' => SlotState::Booked,
         ];
 
         // Every case is listed, so a state added later fails here until it

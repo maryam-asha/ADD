@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanModule;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -42,6 +43,17 @@ class PlanFactory extends Factory
         return $this->state(fn (array $attributes): array => [
             'access_window_start' => '20:00',
             'access_window_end' => '00:00',
+        ]);
+    }
+
+    /** A plan of the Dedicated Desk module, whose subscriptions get desks. */
+    public function dedicatedDesk(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'plan_module_id' => PlanModule::query()->firstOrCreate(
+                ['slug' => PlanModule::DEDICATED_DESK],
+                ['name' => ['en' => 'Dedicated Desk', 'ar' => 'مكتب مخصص'], 'order' => 2, 'is_active' => true],
+            )->id,
         ]);
     }
 

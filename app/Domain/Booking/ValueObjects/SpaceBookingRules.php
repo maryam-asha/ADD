@@ -32,6 +32,9 @@ final readonly class SpaceBookingRules
         // does not accidentally forbid every booking.
         public int $minNoticeMinutes = 0,
         public ?int $maxDaysAhead = null,
+        // A co_space draws on its branch's co-working seat pool rather than a
+        // ceiling of its own (docs/decisions/coworking-seat-pool.md).
+        public bool $usesBranchPool = false,
     ) {}
 
     /**
@@ -41,11 +44,11 @@ final readonly class SpaceBookingRules
      */
     public function bufferApplies(): bool
     {
-        return $this->bufferMinutes > 0 && $this->concurrencyCeiling === 1;
+        return $this->bufferMinutes > 0 && ! $this->usesBranchPool && $this->concurrencyCeiling === 1;
     }
 
     public function allowsConcurrentBookings(): bool
     {
-        return $this->concurrencyCeiling > 1;
+        return $this->usesBranchPool || $this->concurrencyCeiling > 1;
     }
 }

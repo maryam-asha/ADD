@@ -4,6 +4,7 @@ namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
 use App\Domain\Settings\Services\SettingService;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -90,66 +91,87 @@ class Plan extends Model
             return 0;
         }
 
-        $timezone = app(SettingService::class)->get('app.timezone', 'Asia/Damascus');
+        return array_sum(array_map(
+            fn (array $segment) => (int) $segment[0]->diffInSeconds($segment[1]),
+            $this->windowSegments($from, $to),
+        ));
+    }
 
-        $start = $from->clone()->setTimezone($timezone);
-        $end = $to->clone()->setTimezone($timezone);
+    /**
+     * The stretches of [$from, $to) during which this plan is open, as UTC
+     * intervals in order, each [start, end).
+     *
+     * The same window as windowOverlap() — which is their sum — for a caller
+     * that needs WHEN, not how long: the co-working seat pool holds a
+     * subscriber's seat only while their plan is open. A window that wraps
+     * midnight is one stretch across it (22:00–02:00 is one segment, not two
+     * touching ones).
+     *
+     * Unlike windowOverlap(), a plan with no window is open the whole time:
+     * the result is [$from, $to] itself. A malformed window is never open.
+     *
+     * @return list<array{0: CarbonImmutable, 1: CarbonImmutable}>
+     */
+    public function windowSegments(CarbonInterface $from, CarbonInterface $to): array
+    {
+        $rangeStart = CarbonImmutable::instance($from)->utc();
+        $rangeEnd = CarbonImmutable::instance($to)->utc();
 
-        if ($end->lessThanOrEqualTo($start)) {
-            return 0;
+        if ($rangeEnd->lessThanOrEqualTo($rangeStart)) {
+            return [];
+        }
+
+        if (! $this->hasAccessWindow()) {
+            return [[$rangeStart, $rangeEnd]];
         }
 
         $windowStart = $this->minutesSinceMidnight($this->access_window_start);
         $windowEnd = $this->minutesSinceMidnight($this->access_window_end);
 
         if ($windowStart === null || $windowEnd === null) {
-            return 0;
+            return [];
         }
 
-        // Each day contributes at most two segments: the wrap case splits the
-        // window into a tail on the previous day and a head on this one.
-        $segments = $windowEnd > $windowStart
+        $timezone = app(SettingService::class)->get('app.timezone', 'Asia/Damascus');
+
+        // Each day contributes at most two pieces: the wrap case splits the
+        // window into a head on this day and a tail on the next.
+        $pieces = $windowEnd > $windowStart
             ? [[$windowStart, $windowEnd]]
             : [[$windowStart, self::MINUTES_PER_DAY], [0, $windowEnd]];
 
-        $seconds = 0;
+        $segments = [];
 
         // Walk local calendar days, not 24-hour blocks: DST would make the
         // latter drift off midnight. Start a day early so a wrapped window's
         // tail from the previous day is counted too.
-        $cursor = $start->clone()->startOfDay()->subDay();
-        $limit = $end->clone()->startOfDay();
+        $cursor = $rangeStart->setTimezone($timezone)->startOfDay()->subDay();
+        $limit = $rangeEnd->setTimezone($timezone)->startOfDay();
 
         while ($cursor->lessThanOrEqualTo($limit)) {
-            foreach ($segments as [$segmentStart, $segmentEnd]) {
-                $seconds += $this->overlapSeconds(
-                    $start,
-                    $end,
-                    $cursor->clone()->addMinutes($segmentStart),
-                    $cursor->clone()->addMinutes($segmentEnd),
-                );
+            foreach ($pieces as [$pieceStart, $pieceEnd]) {
+                $start = max($rangeStart, $cursor->addMinutes($pieceStart)->utc());
+                $end = min($rangeEnd, $cursor->addMinutes($pieceEnd)->utc());
+
+                if ($end->lessThanOrEqualTo($start)) {
+                    continue;
+                }
+
+                // A piece starting where the last one ended — the two halves of
+                // a window across midnight — extends it.
+                $last = array_key_last($segments);
+
+                if ($last !== null && $segments[$last][1]->greaterThanOrEqualTo($start)) {
+                    $segments[$last][1] = max($segments[$last][1], $end);
+                } else {
+                    $segments[] = [$start, $end];
+                }
             }
 
-            $cursor->addDay();
+            $cursor = $cursor->addDay();
         }
 
-        return $seconds;
-    }
-
-    private function overlapSeconds(
-        CarbonInterface $start,
-        CarbonInterface $end,
-        CarbonInterface $segmentStart,
-        CarbonInterface $segmentEnd
-    ): int {
-        $from = $start->greaterThan($segmentStart) ? $start : $segmentStart;
-        $to = $end->lessThan($segmentEnd) ? $end : $segmentEnd;
-
-        if ($to->lessThanOrEqualTo($from)) {
-            return 0;
-        }
-
-        return (int) $from->diffInSeconds($to);
+        return $segments;
     }
 
     private function minutesSinceMidnight(string $time): ?int
@@ -166,6 +188,12 @@ class Plan extends Model
         }
 
         return ($hours * 60) + $minutes;
+    }
+
+    /** A Dedicated Desk plan ties its subscriptions to specific desks. */
+    public function isDedicatedDesk(): bool
+    {
+        return $this->planModule?->slug === PlanModule::DEDICATED_DESK;
     }
 
     public function planModule(): BelongsTo

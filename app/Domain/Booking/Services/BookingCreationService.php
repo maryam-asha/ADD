@@ -9,8 +9,10 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
@@ -37,7 +39,6 @@ class BookingCreationService
 {
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
@@ -73,6 +74,13 @@ class BookingCreationService
         $this->assertValidDuration($startAt, $endAt, $rules);
 
         return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note) {
+            if ($rules->usesBranchPool) {
+                // Every decision about a branch's co-working seats — bookings,
+                // walk-ins, subscriptions — is serialized on the branch row,
+                // taken before the space's (docs/decisions/coworking-seat-pool.md).
+                Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+            }
+
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
             // Read off the locked row, so a space put into maintenance while
@@ -84,8 +92,14 @@ class BookingCreationService
             // freshly-read rows decide whether the slot is actually free.
             $existing = $this->availability->blockingBookings($locked, $startAt, $endAt, $rules);
 
-            $this->assertSlotAvailable($existing, $startAt, $endAt, $rules);
-            $this->assertOccupancyLeavesRoom($locked, $startAt, $endAt);
+            if ($rules->usesBranchPool) {
+                $this->assertPoolHasRoom($locked, $member, $startAt, $endAt);
+            } else {
+                $this->assertSlotAvailable($existing, $startAt, $endAt, $rules);
+                $this->assertNotLentToCoworking($locked, $startAt, $endAt);
+                $this->assertOccupancyLeavesRoom($locked, $startAt, $endAt);
+            }
+
             $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
             $points = $this->amounts->forRange($locked, $startAt, $endAt);
@@ -124,11 +138,6 @@ class BookingCreationService
             if ($discount !== null && $paymentState === PaymentState::Paid) {
                 $this->discounts->redeem($discount, $membership, $booking, $points - $finalPoints);
             }
-
-            // Inside the same transaction and the same Space lock as the
-            // overlap check above, so the counter can never disagree with
-            // the rows it is derived from.
-            $this->capacitySlots->occupy($booking, $locked, $rules);
 
             if ($status === BookingStatus::Pending) {
                 $this->notifyOperationsOfPendingBooking($booking);
@@ -293,8 +302,35 @@ class BookingCreationService
     }
 
     /**
+     * A co_space booking needs a seat in its branch's co-working pool at
+     * every moment of the window, counted with everything already there —
+     * subscriptions, bookings, and the walk-ins inside now — and with this
+     * booking on its member's subscription when they hold one
+     * (docs/decisions/coworking-seat-pool.md).
+     */
+    private function assertPoolHasRoom(Space $space, User $member, CarbonInterface $start, CarbonInterface $end): void
+    {
+        $timeline = $this->availability->poolTimeline($space, $start, $end, PoolDemand::presence($start, $end, $member));
+
+        if ($this->availability->exceedsPool($timeline, $start, $end)) {
+            throw new ReceptionActionException('api.booking.slot_unavailable');
+        }
+    }
+
+    /** A room lent to co-working takes no room booking while it is lent. */
+    private function assertNotLentToCoworking(Space $space, CarbonInterface $start, CarbonInterface $end): void
+    {
+        $windows = $this->availability->blockingCoworkingWindows($space, $start, $end);
+
+        if ($this->availability->isInCoworkingMode($windows, $start, $end)) {
+            throw new ReceptionActionException('api.booking.room_in_coworking_mode');
+        }
+    }
+
+    /**
      * Present-moment physical-presence count, reusing
-     * WalkInCapacityService::start()'s exact counting logic.
+     * WalkInCapacityService::start()'s exact counting logic. A room's only:
+     * a co_space's walk-ins are in its branch's pool.
      *
      * Narrowed to windows that actually contain now(). It answers "is there
      * room in this space at this moment", which is the right question for

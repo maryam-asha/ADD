@@ -100,6 +100,27 @@ class ReceptionSessionsControllerTest extends TestCase
         $this->assertNull($rows->first(fn (array $row) => $row['type'] === 'booking' && $row['id'] === $pendingBooking->id));
     }
 
+    /**
+     * Whether a walk-in sits in a seat its subscription holds, or took a free
+     * one from the co-working pool (docs/decisions/coworking-seat-pool.md).
+     * A booking's seat is its booking, so it says neither.
+     */
+    public function test_a_walk_in_says_whether_its_subscription_seated_it(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->openSpace();
+        $walkin = WalkinSession::factory()->create(['space_id' => $space->id, 'seat_covered' => true]);
+        Booking::factory()->checkedIn()->create(['space_id' => $space->id, 'status' => BookingStatus::Confirmed]);
+
+        $rows = collect($this->getJson('/api/v1/admin/reception/sessions/active')->assertOk()->json('data'));
+
+        $walkinRow = $rows->firstWhere('type', 'walkin');
+        $this->assertSame($walkin->id, $walkinRow['id']);
+        $this->assertTrue($walkinRow['seat_covered']);
+        $this->assertArrayHasKey('membership_id', $walkinRow);
+        $this->assertNull($rows->firstWhere('type', 'booking')['seat_covered']);
+    }
+
     public function test_active_sessions_flags_a_session_past_branch_closing_time_as_overdue(): void
     {
         $this->actingAsOperations();

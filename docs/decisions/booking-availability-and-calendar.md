@@ -24,6 +24,11 @@ Answering the second question by writing the rules a second time would have been
 
 ### 1. A co_space's capacity is now a real concurrency ceiling
 
+> **Superseded 2026-09-30** by [coworking-seat-pool.md](coworking-seat-pool.md).
+> A co_space's seats are now its branch's co-working pool, and subscriptions,
+> bookings and walk-ins all count against it. A co_space with no capacity has 0
+> seats. The ceiling below still applies to rooms, where it is 1.
+
 Previously *any* overlapping booking refused the window, for every space type. A `co_space` with `capacity = 20` therefore refused the second member to book 10:00 while nineteen desks sat empty — which directly contradicts the PRD's "no overbooking in Co-Space — the capacity ceiling is strict," where the ceiling is plainly N, not 1.
 
 `AvailabilityService::concurrencyCeilingFor()` now returns `capacity` for `co_space` and `1` for every other type. Because `overlapCount(...) >= 1` is exactly equivalent to the old `exists()`, rooms, private offices and event halls are unchanged and no existing test needed editing.
@@ -41,6 +46,12 @@ It also made a correct forward-looking calendar impossible, since the read path 
 This is a deliberate loosening. `WalkInCapacityService` is untouched: present-moment is exactly right there.
 
 ## `space_capacity_slots`: built, as a derived source with double-checking
+
+> **Retired 2026-09-30** ([coworking-seat-pool.md](coworking-seat-pool.md)).
+> Nothing ever read it, and it counted a space rather than a branch's pool,
+> without subscriptions or walk-ins. Its writer, model and reconcile command
+> are removed. The table stays for one release so this change can be rolled
+> back, then a follow-up migration drops it.
 
 ERD v2.0 calls this table load-bearing for the strict no-overbooking ceiling; D.9 assumed its absence was an omission; three phases deferred it. The owner's call was to build it now rather than reverse D.9.
 

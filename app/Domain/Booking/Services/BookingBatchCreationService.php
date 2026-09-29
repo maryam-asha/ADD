@@ -9,8 +9,10 @@ use App\Domain\Booking\Exceptions\BatchUnavailableException;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
@@ -61,7 +63,6 @@ class BookingBatchCreationService
 
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
         private readonly PointConversionService $points,
@@ -97,6 +98,20 @@ class BookingBatchCreationService
             // deadlock.
             $spaceIds = collect($normalized)->pluck('space_id')->unique()->sort()->values();
 
+            // A co_space's seats are its branch's pool, so its branch is
+            // locked first — branches before spaces, each in ascending id
+            // order, the same order every other path takes
+            // (docs/decisions/coworking-seat-pool.md).
+            Space::query()
+                ->whereIn('id', $spaceIds)
+                ->with('building:id,branch_id')
+                ->get()
+                ->filter(fn (Space $space) => $this->availability->usesBranchPool($space))
+                ->map(fn (Space $space) => $space->building->branch_id)
+                ->unique()
+                ->sort()
+                ->each(fn (int $branchId) => Branch::query()->whereKey($branchId)->lockForUpdate()->first());
+
             $locked = $spaceIds
                 ->mapWithKeys(fn (int $id) => [
                     $id => Space::query()->whereKey($id)->lockForUpdate()->firstOrFail(),
@@ -129,6 +144,24 @@ class BookingBatchCreationService
                 }
 
                 $rules = $this->availability->rulesFor($space);
+
+                if ($rules->usesBranchPool) {
+                    $reasonKey = $this->poolFailure($space, $member, $window, $accepted);
+
+                    if ($reasonKey !== null) {
+                        $failures[] = $this->failure($window, $reasonKey);
+
+                        continue;
+                    }
+                } elseif ($this->availability->isInCoworkingMode(
+                    $this->availability->blockingCoworkingWindows($space, $window['start'], $window['end']),
+                    $window['start'],
+                    $window['end'],
+                )) {
+                    $failures[] = $this->failure($window, 'api.booking.room_in_coworking_mode');
+
+                    continue;
+                }
 
                 // One fetch per space covering its whole requested span.
                 $blocking[$space->id] ??= $this->spanFor($space, $normalized, $rules);
@@ -219,8 +252,6 @@ class BookingBatchCreationService
                     $this->discounts->redeem($row['discount'], $membership, $booking, $row['points_discounted']);
                 }
 
-                $this->capacitySlots->occupy($booking, $space, $this->availability->rulesFor($space));
-
                 if ($status === BookingStatus::Pending) {
                     $this->notifyOperations();
                 }
@@ -299,6 +330,35 @@ class BookingBatchCreationService
     }
 
     /**
+     * A co_space window needs a seat in its branch's pool. Two windows of
+     * the same batch on the same pool at once are one member in two seats,
+     * which no one needs, so the second is refused outright rather than
+     * counted.
+     *
+     * @param  array{index: int, space_id: int, start: CarbonImmutable, end: CarbonImmutable}  $window
+     * @param  list<array{space: Space, start: CarbonImmutable, end: CarbonImmutable}>  $accepted
+     */
+    private function poolFailure(Space $space, User $member, array $window, array $accepted): ?string
+    {
+        $samePoolAtOnce = collect($accepted)->contains(
+            fn (array $row) => $this->availability->usesBranchPool($row['space'])
+                && $row['space']->building->branch_id === $space->building->branch_id
+                && $row['start'] < $window['end'] && $row['end'] > $window['start']
+        );
+
+        $timeline = $this->availability->poolTimeline(
+            $space,
+            $window['start'],
+            $window['end'],
+            PoolDemand::presence($window['start'], $window['end'], $member),
+        );
+
+        return $samePoolAtOnce || $this->availability->exceedsPool($timeline, $window['start'], $window['end'])
+            ? 'api.booking.slot_unavailable'
+            : null;
+    }
+
+    /**
      * @param  Collection<int, Booking>  $candidates
      */
     private function contendedFailure(
@@ -307,7 +367,7 @@ class BookingBatchCreationService
         CarbonImmutable $end,
         SpaceBookingRules $rules,
     ): ?string {
-        if ($this->availability->exceedsCeiling($candidates, $start, $end, $rules)) {
+        if (! $rules->usesBranchPool && $this->availability->exceedsCeiling($candidates, $start, $end, $rules)) {
             return 'api.booking.slot_unavailable';
         }
 

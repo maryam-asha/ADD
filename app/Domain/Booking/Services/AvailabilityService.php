@@ -5,7 +5,10 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\ValueObjects\DayAvailability;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Booking\ValueObjects\PoolTimeline;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Foundation\Enums\OperationalStatus;
@@ -51,6 +54,7 @@ class AvailabilityService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
+        private readonly CoworkingPoolService $pool,
     ) {}
 
     /**
@@ -72,6 +76,7 @@ class AvailabilityService
             timezone: (string) $this->settings->get('app.timezone', 'Asia/Damascus'),
             minNoticeMinutes: max(0, (int) $this->settings->get('booking.min_notice_minutes', 0)),
             maxDaysAhead: $this->positiveOrNull($this->settings->get('booking.max_days_ahead')),
+            usesBranchPool: $this->usesBranchPool($space),
         );
     }
 
@@ -363,6 +368,87 @@ class AvailabilityService
     }
 
     // ---------------------------------------------------------------
+    // The branch's co-working seat pool (docs/decisions/coworking-seat-pool.md)
+    // ---------------------------------------------------------------
+
+    /**
+     * Whether the space's seats are its branch's co-working pool rather than
+     * a ceiling of its own. A co_space is; every other type is exclusive.
+     */
+    public function usesBranchPool(Space $space): bool
+    {
+        return $space->space_type === SpaceType::CoSpace;
+    }
+
+    /**
+     * Whether [$start, $end) has fewer than `$seats` free seats at some
+     * moment of the pool's timeline.
+     *
+     * The read path asks with a timeline of what already exists and one seat
+     * for the booking it is offering; the write path folds the new booking,
+     * walk-in or subscription into the timeline as its candidate and asks
+     * with none — "does anything overflow once it is in".
+     */
+    public function exceedsPool(PoolTimeline $timeline, CarbonInterface $start, CarbonInterface $end, int $seats = 0): bool
+    {
+        return $timeline->minFreeBetween($start, $end) < $seats;
+    }
+
+    /**
+     * Whether a room is lent to co-working at any moment of [$start, $end),
+     * and so takes no room booking then.
+     *
+     * @param  Collection<int, SpaceCoworkingWindow>  $windows
+     */
+    public function isInCoworkingMode(Collection $windows, CarbonInterface $start, CarbonInterface $end): bool
+    {
+        return $windows->contains(
+            fn (SpaceCoworkingWindow $window) => $window->starts_at < $end && $window->ends_at > $start
+        );
+    }
+
+    /**
+     * The one read of the pool for a space's booking decisions: its branch's
+     * timeline over the range, with the candidate folded in when given.
+     */
+    public function poolTimeline(Space $space, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate = null): PoolTimeline
+    {
+        return $this->pool->timeline($space->building->branch, $from, $to, $candidate);
+    }
+
+    /**
+     * The room's co-working windows touching the range, fetched once.
+     *
+     * @return Collection<int, SpaceCoworkingWindow>
+     */
+    public function blockingCoworkingWindows(Space $space, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return SpaceCoworkingWindow::query()
+            ->where('space_id', $space->id)
+            ->overlapping($from, $to)
+            ->get()
+            ->toBase();
+    }
+
+    /**
+     * What else contends for a space over the range, read once for the read
+     * path: the pool's timeline for a co_space, the co-working windows for any
+     * other space. Given values are kept, so a caller that already holds them
+     * — daysInRange() handing a month's to each day — costs nothing more.
+     *
+     * @param  Collection<int, SpaceCoworkingWindow>|null  $windows
+     * @return array{0: PoolTimeline|null, 1: Collection<int, SpaceCoworkingWindow>}
+     */
+    private function contention(Space $space, SpaceBookingRules $rules, CarbonInterface $from, CarbonInterface $to, ?PoolTimeline $pool = null, ?Collection $windows = null): array
+    {
+        if ($rules->usesBranchPool) {
+            return [$pool ?? $this->poolTimeline($space, $from, $to), $windows ?? new Collection];
+        }
+
+        return [null, $windows ?? $this->blockingCoworkingWindows($space, $from, $to)];
+    }
+
+    // ---------------------------------------------------------------
     // The one place blocking bookings are read from the database
     // ---------------------------------------------------------------
 
@@ -427,6 +513,8 @@ class AvailabilityService
         ?Collection $prefetched = null,
         ?array $periods = null,
         bool $eachCellAlone = false,
+        ?PoolTimeline $pool = null,
+        ?Collection $windows = null,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -441,6 +529,7 @@ class AvailabilityService
         }
 
         $existing = $prefetched ?? $this->blockingBookings($space, $dayStart->utc(), $dayEnd->utc(), $rules);
+        [$pool, $windows] = $this->contention($space, $rules, $dayStart->utc(), $dayEnd->utc(), $pool, $windows);
 
         $now = CarbonImmutable::now('UTC');
         $slots = [];
@@ -472,6 +561,8 @@ class AvailabilityService
                         $existing,
                         $rules,
                         $now,
+                        $pool,
+                        $windows,
                     ),
                 );
 
@@ -489,6 +580,7 @@ class AvailabilityService
      * neighbour's buffer.
      *
      * @param  Collection<int, Booking>  $existing
+     * @param  Collection<int, SpaceCoworkingWindow>  $windows
      */
     private function stateFor(
         CarbonInterface $start,
@@ -497,6 +589,8 @@ class AvailabilityService
         Collection $existing,
         SpaceBookingRules $rules,
         CarbonInterface $now,
+        ?PoolTimeline $pool,
+        Collection $windows,
     ): SlotState {
         if ($start->lessThan($now)) {
             return SlotState::Past;
@@ -514,7 +608,16 @@ class AvailabilityService
             return SlotState::OutsideHours;
         }
 
-        if ($this->exceedsCeiling($existing, $start, $end, $rules)) {
+        if ($this->isInCoworkingMode($windows, $start, $end)) {
+            return SlotState::CoworkingMode;
+        }
+
+        if ($pool !== null) {
+            // One more seat, for the booking this cell offers.
+            if ($this->exceedsPool($pool, $start, $end, 1)) {
+                return SlotState::AtCapacity;
+            }
+        } elseif ($this->exceedsCeiling($existing, $start, $end, $rules)) {
             return $rules->allowsConcurrentBookings()
                 ? SlotState::AtCapacity
                 : SlotState::Booked;
@@ -556,6 +659,7 @@ class AvailabilityService
         $reasonsByDate = $this->closureReasonsForRange($from, $to, $branch);
 
         $existing = $this->blockingBookings($space, $from->utc(), $to->addDay()->utc(), $rules);
+        [$pool, $windows] = $this->contention($space, $rules, $from->utc(), $to->addDay()->utc());
 
         $today = CarbonImmutable::now($rules->timezone)->startOfDay();
         $days = [];
@@ -603,7 +707,7 @@ class AvailabilityService
                 continue;
             }
 
-            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods);
+            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, pool: $pool, windows: $windows);
             $available = count(array_filter($slots, fn (SlotAvailability $slot) => $slot->isAvailable()));
 
             $days[] = new DayAvailability(
