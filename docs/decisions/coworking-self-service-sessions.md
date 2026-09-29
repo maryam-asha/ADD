@@ -274,8 +274,11 @@ is what lets the reception list show the same plan picture for both paths.
   pending request, **200** with the existing one (a double tap is harmless),
   422 `api.coworking.no_open_session` when nothing is open.
 - `DELETE member/coworking-sessions/current/end-request`: withdraws it, message
-  `api.coworking.end_request_cancelled`. **409** `api.coworking.end_request_not_pending`
-  if there is none or it has already resolved.
+  `api.coworking.end_request_cancelled`. Two refusals: **422**
+  `api.coworking.no_open_session` when the member has no open session (the normal
+  state once reception has confirmed or a desk checkout has closed it), and
+  **409** `api.coworking.end_request_not_pending` when the session is open but
+  has no pending request, or the request resolved in a race with the withdrawal.
 - `POST admin/reception/session-end-requests/{sessionEndRequest}/confirm`
   (`role:admin|operations`): optional `checked_out_at`, interpreted through
   `InterpretsLocalTimes` and at most now.
@@ -398,14 +401,18 @@ types these fields as decimals must accept integers too.
   `paid` for a wallet-prepaid booking, overrun cannot be collected and early
   departure is not refunded. The report shows a booking's stored values as they
   are.
-- **Permission coverage.** `KioskPairingController` and
-  `SessionEndRequestController` join the documented uncovered-controllers list in
-  `rbac-permission-pilot.md`: neither extends `AdminResourceController`, so
+- **Permission coverage.** Neither `KioskPairingController` nor
+  `SessionEndRequestController` extends `AdminResourceController`, so
   `permissions:sync` derives nothing for them and no `permission:` middleware can
   be wired to them (the kiosk routes sit behind `role:admin`, the end-request
-  confirmation behind `role:admin|operations`). `KioskController` does extend it,
-  so `kiosks.*` permissions are derived, but nothing enforces them yet, like
-  every admin resource except Branches.
+  confirmation behind `role:admin|operations`). `KioskPairingController` has no
+  permission coverage and is listed by `permissions:sync`'s uncovered-controllers
+  warning. `SessionEndRequestController` is in the `Reception/` group that check
+  skips by design (see "Explicitly not done here" in `rbac-permission-pilot.md`),
+  so it never appears in that warning. `rbac-permission-pilot.md`'s named list of
+  uncovered controllers was not updated for either. `KioskController` does extend
+  `AdminResourceController`, so `kiosks.*` permissions are derived, but nothing
+  enforces them yet, like every admin resource except Branches.
 - **The Postman collection.** The `Kiosks` and `Coworking sessions` folders are
   deferred: the main working tree has uncommitted edits to
   `postman/ADD-OS.postman_collection.json`, so it is updated after those land.
