@@ -9,11 +9,17 @@ use App\Domain\Identity\Models\User;
 use Carbon\CarbonInterface;
 
 /**
- * Matches an arrival request to the member's own booking for "today," where
- * "today" is resolved in the branch's local timezone
- * (docs/decisions/kiosk-display.md). This match is informational only — it
- * decides nothing on its own; reception's confirm action is the only place
- * that changes booking/session state.
+ * Finds the member's own booking for "today," where "today" is resolved in
+ * the branch's local timezone (docs/decisions/kiosk-display.md): the
+ * earliest one not yet ended and not yet checked in, however far off it
+ * starts.
+ *
+ * Two callers. For an arrival request the match is informational only —
+ * reception's confirm action is what changes booking/session state. For the
+ * kiosk scan (docs/decisions/coworking-self-service-sessions.md) it drives
+ * the check-in: CoworkingSessionService checks the matched booking in, but
+ * only once it starts within CoworkingSessionService::EARLY_CHECK_IN_MINUTES,
+ * a rule applied there, not here, so the arrival flow's matching is unchanged.
  */
 class ArrivalRequestMatcher
 {

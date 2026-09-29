@@ -226,11 +226,12 @@ class CoworkingSessionStartTest extends TestCase
     public function test_todays_coworking_booking_is_checked_in_instead_of_a_walk_in(): void
     {
         $member = $this->actingAsMember();
+        // Ten minutes out: inside the early check-in window.
         $booking = Booking::factory()->create([
             'user_id' => $member->id,
             'space_id' => $this->space->id,
-            'start_at' => Carbon::parse('2026-08-17 11:00', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 13:00', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
         ]);
 
         $this->scan()->assertCreated()->assertJsonPath('data.type', 'booking')->assertJsonPath('data.id', $booking->id);
@@ -248,11 +249,48 @@ class CoworkingSessionStartTest extends TestCase
         $booking = Booking::factory()->pending()->create([
             'user_id' => $member->id,
             'space_id' => $this->space->id,
-            'start_at' => Carbon::parse('2026-08-17 11:00', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 13:00', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
         ]);
 
         $this->scan()->assertStatus(409)->assertExactJson(['message' => 'Your booking is awaiting approval. Please see reception.']);
+        $this->assertNull($booking->fresh()->checked_in_at);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_booking_later_today_is_not_checked_in_early_and_a_walk_in_starts_instead(): void
+    {
+        $member = $this->actingAsMember();
+        $this->subscribe($member, $this->planWithHours(40));
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'space_id' => $this->space->id,
+            'start_at' => Carbon::parse('2026-08-17 18:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 19:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        $this->scan()
+            ->assertCreated()
+            ->assertJsonPath('data.type', 'walkin')
+            ->assertJsonPath('data.coverage.status', 'covered');
+
+        $this->assertNull($booking->fresh()->checked_in_at);
+        $this->assertSame(1, WalkinSession::count());
+    }
+
+    public function test_a_pending_booking_later_today_does_not_block_a_walk_in(): void
+    {
+        $member = $this->actingAsMember();
+        $booking = Booking::factory()->pending()->create([
+            'user_id' => $member->id,
+            'space_id' => $this->space->id,
+            'start_at' => Carbon::parse('2026-08-17 18:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 19:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        // The walk-in path: a member with no plan is asked to accept first.
+        $this->scan()->assertStatus(422)->assertJsonPath('reason', 'no_plan');
+
         $this->assertNull($booking->fresh()->checked_in_at);
         $this->assertSame(0, WalkinSession::count());
     }

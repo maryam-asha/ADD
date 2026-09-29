@@ -24,6 +24,9 @@ use Illuminate\Support\Facades\DB;
  */
 class CoworkingSessionService
 {
+    /** How long before its start a scan may check a booking in. */
+    public const EARLY_CHECK_IN_MINUTES = 15;
+
     public function __construct(
         private readonly KioskCodeVerifier $codes,
         private readonly ScanTicketService $tickets,
@@ -69,6 +72,16 @@ class CoworkingSessionService
             }
 
             $booking = $this->bookings->matchBookingFor($member, $space->building->branch, now(), $space);
+
+            // The matcher returns today's earliest booking that has not ended,
+            // however far off it starts. A scan well before it is not that
+            // booking's arrival — checking it in would bill every hour until
+            // then at the booking's rate — so it counts as no booking at all
+            // and the member goes down the walk-in path (a pending booking
+            // outside the window included).
+            if ($booking !== null && $booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
+                $booking = null;
+            }
 
             if ($booking !== null) {
                 // No fallback to a walk-in: that would route around approval
