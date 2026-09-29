@@ -98,12 +98,12 @@ class CoworkingSessionService
         });
     }
 
-    /** A session by the `type` segment of the report URLs — "walkin" or "booking". */
+    /** A session that started, by the `type` segment of the report URLs — "walkin" or "booking"; a booking never checked in is not one. */
     public function find(string $type, int $id): Booking|WalkinSession|null
     {
         return match ($type) {
             'walkin' => WalkinSession::find($id),
-            'booking' => Booking::find($id),
+            'booking' => Booking::query()->whereKey($id)->whereNotNull('checked_in_at')->first(),
             default => null,
         };
     }

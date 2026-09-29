@@ -146,6 +146,19 @@ class SessionReportTest extends TestCase
         $this->getJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/report")->assertNotFound();
     }
 
+    public function test_a_booking_that_never_started_has_no_report(): void
+    {
+        $member = $this->actingAsMember();
+        $booking = Booking::factory()->create(['user_id' => $member->id, 'space_id' => $this->space->id]);
+        $this->assertNull($booking->checked_in_at);
+
+        $this->getJson("/api/v1/member/coworking-sessions/booking/{$booking->id}/report")->assertNotFound();
+
+        $this->actingAsOperations();
+
+        $this->getJson("/api/v1/admin/reception/sessions/booking/{$booking->id}/report")->assertNotFound();
+    }
+
     public function test_reception_reads_any_report(): void
     {
         $session = $this->walkIn(User::factory()->create(), null, '09:00', '10:00');
