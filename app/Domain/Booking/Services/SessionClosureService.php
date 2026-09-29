@@ -35,23 +35,37 @@ class SessionClosureService
      * from the ACTUAL checked-in-to-checked-out duration, not the booking's
      * originally planned window — early departure or overrun is billed
      * correctly for both entity types uniformly.
+     *
+     * Locks and re-reads the row first, like autoClose(): the desk checkout,
+     * a member-confirmed end (SessionEndService::confirm(), which already
+     * holds this lock) and the overdue job can all reach the same session,
+     * and $session may be stale by then — deciding on its in-memory state
+     * would close it twice and spend the plan hours twice. $session is
+     * refreshed afterwards, so callers that read the result off it (the desk
+     * controllers audit amount_owed) still see it.
      */
     public function closeOut(Booking|WalkinSession $session, CarbonInterface $enteredTime): void
     {
-        $this->assertOpenForClosure($session);
+        DB::transaction(function () use ($session, $enteredTime) {
+            $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
-        if ($enteredTime->lt($session->checked_in_at)) {
-            throw new ReceptionActionException('api.reception.checkout_before_checkin');
-        }
+            $this->assertOpenForClosure($locked);
 
-        $branch = $session->space->building->branch;
-        $closingTime = $this->closingTimeFor($branch, $enteredTime);
+            if ($enteredTime->lt($locked->checked_in_at)) {
+                throw new ReceptionActionException('api.reception.checkout_before_checkin');
+            }
 
-        if ($closingTime === null || $this->localTimeOfDay($enteredTime) > $closingTime) {
-            throw new ReceptionActionException('api.reception.checkout_past_closing');
-        }
+            $branch = $locked->space->building->branch;
+            $closingTime = $this->closingTimeFor($branch, $enteredTime);
 
-        $this->finalizeClosure($session, $enteredTime, TerminationSource::Reception);
+            if ($closingTime === null || $this->localTimeOfDay($enteredTime) > $closingTime) {
+                throw new ReceptionActionException('api.reception.checkout_past_closing');
+            }
+
+            $this->finalizeClosure($locked, $enteredTime, TerminationSource::Reception);
+        });
+
+        $session->refresh();
     }
 
     /**
