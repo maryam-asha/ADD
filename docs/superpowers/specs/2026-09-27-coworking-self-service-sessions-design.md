@@ -315,7 +315,7 @@ Reasons, checked in this order (first match wins):
 |--------|---------|
 | `no_plan` | No active membership, and none ever held (personal or company). |
 | `plan_expired` | No active membership, but the member held one before. |
-| `plan_without_hours` | Active plan with no access window or no `space-hours` grant — `PlanHourCoverageService::grantFor()` returns null. |
+| `plan_without_hours` | Active plan with no access window or no `space-hours` grant — `PlanHourCoverageService::hourGrantFor()` returns null. |
 | `hours_exhausted` | The `space-hours` grant has 0 remaining. |
 | `outside_window` | Hours remain, but the plan's access window is closed right now. |
 

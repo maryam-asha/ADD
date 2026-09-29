@@ -36,6 +36,7 @@ minimal version that gets reworked later.
 - [event-approval-and-custom-forms.md](event-approval-and-custom-forms.md) — event approval (debit on approve, pending holds a seat), implicit identity on registration forms, and the shared form rule engine
 - [unified-forms.md](unified-forms.md) — one polymorphic form engine (`forms`/`form_fields`/`form_submissions`/`form_answers`) any model can own; reverses the per-domain form tables
 - [rbac-permission-pilot.md](rbac-permission-pilot.md) — dynamic roles + auto-derived `module.action` permissions replace `Gate::before`'s admin bypass and the coarse `role:admin|operations` check; Branches is the one pilot resource enforcing it today, inside D.8's existing flat-role constraints
+- [coworking-self-service-sessions.md](coworking-self-service-sessions.md) — scan-to-start coworking sessions with a TOTP kiosk, confirm-before-paid, member-requested end confirmed by reception, and the session report
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has

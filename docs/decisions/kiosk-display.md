@@ -45,6 +45,8 @@ built later, `ArrivalRequest` is not superseded by it — it solves a
 different problem (arrival signaling vs. desk/service identification) and
 can coexist unchanged.
 
+**Exception (2026-09-28):** a *rotating* TOTP code on the kiosk does start a coworking session directly, for `co_space` only — see [coworking-self-service-sessions.md](coworking-self-service-sessions.md). The static arrival QR described here is unchanged.
+
 ## Decision
 
 ### Banner (`announcements`)
@@ -218,7 +220,7 @@ a parameter. **Known follow-up, not built now:** if a second branch is
 ever added, both call sites need a real resolution strategy (kiosk device
 → branch mapping, most likely a `branch_id` column on a future `kiosks`
 registration record) before they'll behave correctly. Flagged here so it
-isn't silently assumed away later.
+isn't silently assumed away later. Kiosks are now rows (`kiosks.space_id`), so the scan path resolves its branch from the kiosk's space; the arrival flow still uses the single-branch assumption.
 
 ## Guard
 

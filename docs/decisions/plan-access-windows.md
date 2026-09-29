@@ -104,6 +104,21 @@ Only walk-ins get plan-window coverage. Bookings already have their own plan
 benefit in `PlanDiscountService`, applied at creation; stacking the two would
 discount the same hour twice.
 
+### Also evaluated at scan time
+
+When a member starts a coworking session by scanning the kiosk
+(`docs/decisions/coworking-self-service-sessions.md`),
+`SessionCoverageEvaluator` reads the same window and the same hour grant
+(`PlanHourCoverageService::hourGrantFor()`) *before* the session starts, so the
+member can be told, and asked to accept, when the plan will not cover it. The
+result is stored as `walkin_sessions.coverage_snapshot`, for every walk-in,
+reception's included. It is a prediction for display and consent only: it
+spends nothing and never changes what closure absorbs, which is still decided by
+`PlanHourCoverageService::coverableSeconds()` / `consume()` at checkout, as
+described above. Bookings stay excluded. The "No member-facing view of a running
+session" item under "Explicitly not done here" is superseded for `co_space`
+sessions started by scan.
+
 ### Private plans are assigned, never bought
 
 `is_public = false` removes a plan from the member catalogue, the public list,
