@@ -6,6 +6,7 @@ use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Services\PlanHourCoverageService;
@@ -107,6 +108,76 @@ class CoworkingSessionStartTest extends TestCase
         $this->accept($ticket)->assertOk()->assertJsonPath('data.id', $id);
 
         $this->assertSame(1, WalkinSession::count());
+    }
+
+    public function test_a_space_without_an_hourly_rate_still_asks_before_starting(): void
+    {
+        $this->actingAsMember();
+        $this->space->forceFill(['hourly_rate_points' => null])->save();
+
+        $response = $this->scan();
+
+        $response->assertStatus(422)
+            ->assertJsonPath('reason', 'no_plan')
+            ->assertJsonPath('hourly_rate_points', 0);
+        $this->assertNotEmpty($response->json('scan_ticket'));
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_ticket_for_a_kiosk_revoked_since_it_was_issued_is_refused(): void
+    {
+        $this->actingAsMember();
+        $ticket = $this->scan()->json('scan_ticket');
+        app(KioskPairingService::class)->revoke($this->kiosk);
+
+        $this->accept($ticket)
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'This code is not valid. Scan the code currently shown on the kiosk.']);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_ticket_for_a_kiosk_deactivated_since_it_was_issued_is_refused(): void
+    {
+        $this->actingAsMember();
+        $ticket = $this->scan()->json('scan_ticket');
+        $this->kiosk->update(['is_active' => false]);
+
+        $this->accept($ticket)
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'This code is not valid. Scan the code currently shown on the kiosk.']);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_tampered_ticket_is_treated_as_expired(): void
+    {
+        $this->actingAsMember();
+
+        $this->accept('not-a-ticket')
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'This confirmation has expired. Scan the kiosk code again.']);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_ticket_without_the_explicit_acceptance_is_refused(): void
+    {
+        $this->actingAsMember();
+        $ticket = $this->scan()->json('scan_ticket');
+
+        $this->scan(['scan_ticket' => $ticket])->assertStatus(422)->assertJsonValidationErrors('accept_uncovered');
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_code_and_a_ticket_together_are_refused(): void
+    {
+        $this->actingAsMember();
+        $ticket = $this->scan()->json('scan_ticket');
+
+        $this->scan([
+            'qr_value' => $this->qrFor($this->kiosk, $this->secret),
+            'scan_ticket' => $ticket,
+            'accept_uncovered' => true,
+        ])->assertStatus(422)->assertJsonValidationErrors('qr_value');
+        $this->assertSame(0, WalkinSession::count());
     }
 
     public function test_used_up_hours_are_explained_before_starting(): void

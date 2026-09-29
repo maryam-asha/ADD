@@ -88,7 +88,7 @@ class CoworkingSessionService
                 return CoworkingStartResult::confirmationRequired(
                     $coverage,
                     $this->tickets->issue($member, $kiosk),
-                    $space->hourly_rate_points,
+                    (int) ($space->hourly_rate_points ?? 0),
                 );
             }
 
