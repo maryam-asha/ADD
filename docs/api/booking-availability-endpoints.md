@@ -1,6 +1,6 @@
 # Booking & Availability — API reference
 
-The 13 endpoints added by the availability and calendar work. Every shape
+The 12 endpoints added by the availability and calendar work. Every shape
 below is copied from a real response, not paraphrased.
 
 **Conventions used throughout**
@@ -22,9 +22,9 @@ below is copied from a real response, not paraphrased.
 
 Read-only and **advisory**. Nothing here holds a slot: a member who lingers on
 the confirmation screen can still lose one, which is why `POST /bookings`
-re-checks under a row lock. The payoff of both paths sharing one engine is that
-a slot's `reason` is the *exact* message `POST /bookings` would return for that
-same window.
+re-checks under a row lock. Both paths share one engine, so a run the picker
+offers is a run the POST accepts, and a refusal still met is explained by the
+POST's own 422 message.
 
 ### Building the calendar — no month endpoint
 
@@ -59,10 +59,8 @@ every date change.
     "state": "available",
     "closed_banner": null,
     "slots": [
-      { "start_time": "15:00", "end_time": "16:00", "label": "03:00 PM",
-        "state": "available", "is_available": true },
-      { "start_time": "16:00", "end_time": "17:00", "label": "04:00 PM",
-        "state": "booked", "is_available": false }
+      { "start_time": "03:00 PM", "end_time": "04:00 PM", "state": "available", "is_available": true },
+      { "start_time": "04:00 PM", "end_time": "05:00 PM", "state": "booked", "is_available": false }
     ],
     "counts": { "available": 4, "booked": 1, "total": 5 },
     "meta": { "granularity_minutes": 60, "timezone": "Asia/Damascus" }
@@ -102,14 +100,27 @@ A `full` day must **not** be shown as closed — it is open, just sold out.
 
 `reason` is `null` for a weekday with no schedule (nothing to explain); it is
 only non-null when an explicit business-hour exception supplied one.
+
 **Each slot is one of the space's own cells**, `meta.granularity_minutes` long
 (changed 2026-09-28: there is no `duration` parameter any more).
-A slot carries only its own fields: `start_time`, `end_time`, `label`, `state`,
+A slot carries only its own fields: `start_time`, `end_time`, `state`,
 `is_available`. There is no `reason`: grey a chip by its `state`.
+
+**One time format, shown as sent** (changed 2026-09-29): `start_time` and
+`end_time` are 12-hour `hh:mm AM|PM` ("03:00 PM"), with AM/PM in Latin
+letters whatever the `lang`, and there is no `label` in another format beside
+them. Show the chip as `start_time` – `end_time` and post the same values
+back — `start_at = "2026-08-17 03:00 PM"` is accepted as-is — so nothing is
+converted on either side. The dashboard does the same. **Never compare two of
+these as text** to order them: "01:00 PM" sorts before "11:00 AM". Use the
+slots' order in the list.
 
 **Picking a booking = picking a run of cells.** The member taps a start cell
 and an end cell; the booking runs from the first cell's `start_time` to the
-last cell's `end_time`. Before sending it, the app keeps the run:
+last cell's `end_time`. Each cell is judged **on its own** — is this stretch
+free — so the half hour right before another booking is `available`: it can
+end a run even though no minimum-length booking could start there. Before
+sending it, the app keeps the run:
 
 - **unbroken** — every cell in it `available`, and each cell's `start_time`
   equal to the previous one's `end_time` (a lunch break leaves a gap);
@@ -120,9 +131,9 @@ Post `start_at = "{date} {first.start_time}"`,
 `end_at = "{date} {last.end_time}"` (local time). The indicative price is the
 space details' `data.details.price.hourly_rate_points` × hours; the amount
 actually charged, after the plan discount and VAT, is what
-`POST /bookings/preview` returns — show that on the summary. The server re-checks the whole window (a buffer next to another
-booking, for one), and a refusal arrives as the POST's own translated 422
-`message`.
+`POST /bookings/preview` returns — show that on the summary. The server
+re-checks the whole window (a buffer next to another booking, for one), and a
+refusal arrives as the POST's own translated 422 `message`.
 **Slot `state` — `available` or `booked`.** Only `available` is bookable, and
 `is_available` is exactly `state === "available"`. `counts` is
 `{available, booked, total}`, over the slots sent.
@@ -138,17 +149,18 @@ it. A day whose every start has gone comes back with an empty `slots`.
 | `available` | bookable | — |
 | `booked` | cannot be booked | taken by another booking (a room, office or hall); every seat taken (a co-working space); too close to a neighbouring booking (a space with a buffer); outside hours or beyond the booking horizon |
 
-> The admin twin keeps the full eight (`available`, `booked`, `at_capacity`,
-> `buffer`, `outside_hours`, `past`, `too_soon`, `too_far_ahead`) — "every seat
-> is taken" and "one booking holds the room" are different facts to the desk.
 
 Slots are generated **only inside open periods**, so a day that closes for lunch
 simply has no chips across the gap — do not render an empty range there.
 
-> The admin twin, `GET /api/v1/admin/spaces/{space}/availability/slots`, returns
-> the same content **without** the envelope (top-level fields, chips under
-> `data`) **and with** `branch_hours` / `rules` for that date — the
-> dashboard reads that shape.
+> **The desk reads the very same response** (changed 2026-09-29):
+> `GET /api/v1/admin/spaces/{space}/availability/slots` returns this body
+> byte for byte — the same envelope, the same four slot fields, the same two
+> states, no `reason`, no `rules`, no `branch_hours` — and a test asserts the
+> two are identical. Its setup comes once, with the admin calendar
+> (`booking_window.min_duration_minutes`, the window, `branch_hours`), the way
+> the app's comes once with the space details. It takes no `duration` either:
+> the desk picks a run of cells exactly as the app does.
 
 ### `GET /api/v1/member/spaces` — `working_hours_banner`, the branch's hours
 
@@ -158,9 +170,10 @@ spaces list**, not in each space's details. Besides the fields it always had
 carries the branch's week. The upcoming closures are **not** here: they set up
 the booking calendar, so they come with the space details (below).
 
-**The response is one `data` object** (changed 2026-09-28):
-`{data: {working_hours_banner, spaces, meta}}` — the list is `data.spaces`, the
-banner `data.working_hours_banner`, the paging `data.meta`.
+**The response is a `data` object and a top-level `meta`** (changed
+2026-09-28; `meta` moved out of `data` 2026-09-29):
+`{data: {working_hours_banner, spaces}, meta}` — the list is `data.spaces`, the
+banner `data.working_hours_banner`, the paging `meta`.
 
 ```json
 {
@@ -187,9 +200,9 @@ banner `data.working_hours_banner`, the paging `data.meta`.
       "timezone": "Asia/Damascus", "timezone_label": "GMT+3",
       "timezone_note": "All times shown in your local time (GMT+3)"
     },
-    "spaces": [ "...spaces..." ],
-    "meta": { "...": "..." }
-  }
+    "spaces": [ "...spaces..." ]
+  },
+  "meta": { "...": "..." }
 }
 ```
 
@@ -260,9 +273,9 @@ the 30th on any device. With `+03:00`, a device in another timezone would
 move it to the 29th. A day that is only shortened is not listed, since it is
 open. The closure's reason is not included.
 
-> **No member quote** (removed 2026-09-28). The ladder of lengths from a chosen
-> start served the duration-first picker, which the member app no longer has.
-> The desk keeps its twin, `GET /api/v1/admin/spaces/{space}/availability/quote`.
+> **No quote** (removed 2026-09-28, member and desk). The ladder of lengths
+> from a chosen start served the duration-first pickers, which neither the
+> app nor the dashboard has any more.
 ---
 
 ## 2. Member — bookings
@@ -454,12 +467,21 @@ Unchanged, pre-existing: `{ "additional_minutes": 60 }` → `{ "message": "Booki
 
 Spaces as rows, days as cells. `view` defaults to `week` (Sunday–Saturday);
 `date` is any date inside the period. Defaults to the default branch.
+`booking_window` (added 2026-09-28) is the desk's booking setup, read once, as
+the member app reads its rules once from the space details:
+`min_duration_minutes` (added 2026-09-29) is the shortest run the booking form
+accepts — the day's slots carry no rules — and `max_days_ahead` lets the date
+picker refuse a date beyond it before asking for slots. With
+`branch_hours.open_weekdays` and `upcoming_closures` it is the whole setup of
+the booking calendar. `null` with `branch_hours` when no space matched the
+filters.
 
 ```json
 {
   "view": "day",
   "range": { "from": "2026-08-17", "to": "2026-08-17", "timezone": "Asia/Damascus" },
   "branch_hours": { "...as member..." },
+  "booking_window": { "min_duration_minutes": 60, "min_notice_minutes": 60, "max_days_ahead": null },
   "resources": [
     {
       "space": { "id": 1, "title": "Meeting Room A", "space_type": "room",
@@ -579,7 +601,7 @@ All arrive as `{"message": "<translated sentence>"}`, already in the requested
    `available` are computed by the same code the write endpoints enforce.
 3. **Slots are not reservations.** Always handle a `422` on confirm even if the
    slot looked free seconds earlier.
-4. **Render `reason` verbatim** — it is already translated and matches what the
-   write endpoint would say.
+4. **Render the 422 `message` verbatim** — it is already translated and names
+   the rule the window broke.
 5. **Points vs money.** Compare and total using `points`; display
    `formatted`/`amount_usd`.

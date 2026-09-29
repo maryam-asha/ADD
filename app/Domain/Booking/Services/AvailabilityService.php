@@ -153,37 +153,6 @@ class AvailabilityService
     }
 
     /**
-     * The same question against periods already resolved for the day, so a
-     * day's worth of slots costs no further business-hours queries.
-     *
-     * @param  array<int, array{open_time: string, close_time: string}>  $periods
-     */
-    public function fitsWithinPeriods(
-        CarbonInterface $start,
-        CarbonInterface $end,
-        array $periods,
-        SpaceBookingRules $rules,
-    ): bool {
-        $localStart = $start->copy()->setTimezone($rules->timezone);
-        $localEnd = $end->copy()->setTimezone($rules->timezone);
-
-        if (! $localStart->isSameDay($localEnd)) {
-            return false;
-        }
-
-        $startTime = $localStart->format('H:i');
-        $endTime = $localEnd->format('H:i');
-
-        foreach ($periods as $period) {
-            if ($startTime >= $period['open_time'] && $endTime <= $period['close_time']) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
      * Starts land on the granularity grid measured from local midnight.
      */
     public function isValidGranularity(CarbonInterface $start, SpaceBookingRules $rules): bool
@@ -436,18 +405,17 @@ class AvailabilityService
      * Slots are generated across the day's open periods only; the grid the
      * app draws is the union of those, so a closed day yields none.
      *
-     * Two shapes, one set of predicates:
+     * Each slot is a granularity-sized cell of the grid. Two questions, one
+     * set of predicates:
      *
-     * - Without a duration, each slot is a granularity-sized cell of the
-     *   grid, but its state answers "can a booking START here" — the cell
-     *   is judged against the shortest legal booking from that start, not
-     *   against the cell alone. A green 10:30 cell that could not hold the
-     *   60-minute minimum before an 11:00 booking would only send the
-     *   member to a quote where every option is disabled.
-     * - With a duration, each slot is the whole booking window
-     *   (start → start + duration), stepping by the granularity. A start
-     *   whose window would run past the period's close is simply not
-     *   listed: no waiting makes it bookable, unlike a taken one.
+     * - By default a cell's state answers "can a booking START here": it is
+     *   judged against the shortest legal booking from that start. That is
+     *   what a day's availability counts — a day of scattered half-hours
+     *   with a 60-minute minimum is full.
+     * - `eachCellAlone` judges each cell on itself: "is this stretch free".
+     *   That is what a picker of runs needs — the 10:30 cell before an 11:00
+     *   booking cannot start a 60-minute booking, yet it is a valid last
+     *   cell of 10:00–11:00. The minimum then applies to the run.
      *
      * @param  Collection<int, Booking>|null  $prefetched
      * @return list<SlotAvailability>
@@ -458,7 +426,7 @@ class AvailabilityService
         ?SpaceBookingRules $rules = null,
         ?Collection $prefetched = null,
         ?array $periods = null,
-        ?int $durationMinutes = null,
+        bool $eachCellAlone = false,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -477,10 +445,9 @@ class AvailabilityService
         $now = CarbonImmutable::now('UTC');
         $slots = [];
 
-        // The length each start is judged by, and the length each listed
-        // slot spans.
-        $judgedMinutes = $durationMinutes ?? max($rules->granularityMinutes, $rules->minDurationMinutes);
-        $spanMinutes = $durationMinutes ?? $rules->granularityMinutes;
+        // The length each cell is judged by, and the length it spans.
+        $spanMinutes = $rules->granularityMinutes;
+        $judgedMinutes = $eachCellAlone ? $spanMinutes : max($spanMinutes, $rules->minDurationMinutes);
 
         foreach ($periods as $period) {
             $cursor = CarbonImmutable::parse(
@@ -567,9 +534,9 @@ class AvailabilityService
      * BusinessHoursService::periodsForRange(), and every space's bookings
      * in one — so a 31-day calendar costs three queries, not 93.
      *
-     * With a duration, "available" means at least one start can hold a
-     * booking that long — a day whose free gaps are all shorter reads as
-     * full for that duration, which is what the member will find on it.
+     * "Available" means at least one start can hold a booking of the
+     * minimum length — a day whose free gaps are all shorter reads as full,
+     * which is what the member will find on it.
      *
      * @return list<DayAvailability>
      */
@@ -578,7 +545,6 @@ class AvailabilityService
         CarbonInterface $fromLocalDate,
         CarbonInterface $toLocalDate,
         ?SpaceBookingRules $rules = null,
-        ?int $durationMinutes = null,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -637,7 +603,7 @@ class AvailabilityService
                 continue;
             }
 
-            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, $durationMinutes);
+            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods);
             $available = count(array_filter($slots, fn (SlotAvailability $slot) => $slot->isAvailable()));
 
             $days[] = new DayAvailability(

@@ -94,6 +94,8 @@ class BookingCalendarService
             ->values()
             ->all();
 
+        $rules = $this->availability->rulesFor($spaces->first());
+
         return [
             'view' => $view,
             'range' => [
@@ -107,10 +109,21 @@ class BookingCalendarService
                 // The ordinary week, from the schedule itself — not the days
                 // in view, which in a day view named one weekday as the week.
                 $this->businessHours->weeklySchedule($branch),
-                $this->availability->rulesFor($spaces->first()),
+                $rules,
                 $locale,
                 $this->businessHours->upcomingClosures($branch),
             ),
+            // The desk's booking setup, read once with the calendar as the
+            // member app reads its rules once from the space details: the
+            // shortest run the booking form accepts, and the window its date
+            // picker refuses dates beyond before asking for any slots. The
+            // day's slots carry none of it. All global settings, one block
+            // per response.
+            'booking_window' => [
+                'min_duration_minutes' => $rules->minDurationMinutes,
+                'min_notice_minutes' => $rules->minNoticeMinutes,
+                'max_days_ahead' => $rules->maxDaysAhead,
+            ],
             'resources' => $resources,
             'totals' => $this->totals($resources, $bookings),
             'meta' => [
@@ -324,6 +337,7 @@ class BookingCalendarService
             'view' => $view,
             'range' => ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'timezone' => $timezone],
             'branch_hours' => null,
+            'booking_window' => null,
             'resources' => [],
             'totals' => ['spaces' => 0, 'bookings' => 0, 'occupancy_percent' => 0, 'by_status' => []],
             'meta' => [

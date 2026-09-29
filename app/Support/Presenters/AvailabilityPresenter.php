@@ -10,43 +10,25 @@ use App\Domain\Foundation\Models\Branch;
 use App\Support\Time\LocalTime;
 
 /**
- * Turns the availability value objects into the JSON the calendar screens
- * draw: the month grid, the slot chips, the branch-hours card, the closed
- * banner.
+ * Turns the availability value objects into the JSON the booking screens
+ * draw: the slot chips, the branch-hours card, the closed banner, the rules.
  *
- * Date and time formatting deliberately matches EventDatePresenter's
- * dialect ("SEP", "10", "THU", "September 10, 2026", "04:00 AM") so the
- * bookings calendar and the events calendar read the same way in the app.
- *
- * Every slot's `reason` is the translated message for the key the write
- * path would throw for that same window, which is the visible payoff of
- * both paths sharing AvailabilityService: the greyed-out chip's tooltip
- * and the eventual 422 are the same sentence.
+ * Time formatting deliberately matches EventDatePresenter's dialect
+ * ("04:00 AM") so the bookings calendar and the events calendar read the
+ * same way in the app.
  */
 class AvailabilityPresenter
 {
+    /**
+     * A slot's `start_time` / `end_time`: "01:00 PM". The one format the
+     * member app and the dashboard both show and post back.
+     */
+    public const SLOT_TIME_FORMAT = 'h:i A';
+
     public function __construct(
         private readonly LocalTime $time,
         private readonly BranchHoursPresenter $hours,
     ) {}
-
-    /**
-     * @return array<string, mixed>
-     */
-    public function day(DayAvailability $day): array
-    {
-        return [
-            'date' => $day->date->format('Y-m-d'),
-            'day' => $day->date->format('d'),
-            'weekday' => strtoupper($day->date->format('D')),
-            'month' => strtoupper($day->date->format('M')),
-            'date_formatted' => $day->date->format('F j, Y'),
-            'state' => $day->state->value,
-            'is_selectable' => $day->isSelectable(),
-            'available_slot_count' => $day->availableSlotCount,
-            'total_slot_count' => $day->totalSlotCount,
-        ];
-    }
 
     /**
      * The red banner the mockup shows above the slot grid. Null unless the
@@ -77,47 +59,56 @@ class AvailabilityPresenter
      * @param  list<SlotAvailability>  $slots
      * @return list<array<string, mixed>>
      */
-    public function slots(array $slots, string $locale): array
+    public function slots(array $slots): array
     {
-        return array_map(fn (SlotAvailability $slot) => $this->slot($slot, $locale), $slots);
+        return array_map(fn (SlotAvailability $slot) => $this->slot($slot), $slots);
     }
 
     /**
-     * @return array<string, mixed>
+     * One cell, the same for the member app and the desk: its two times, its
+     * state and whether it can be picked — nothing else.
+     *
+     * The times are 12-hour `hh:mm AM|PM` and nothing else — no label in
+     * another format beside them — so the app and the dashboard show the very
+     * value they post back, and neither converts. AM/PM stays in Latin letters
+     * whatever the language: PHP's `A` is not translated, and a value posted
+     * back as "{date} {start_time}" has to parse. No instants: they are the
+     * day's `date` and these times, and a run's length is its cells ×
+     * `meta.granularity_minutes`.
+     *
+     * The state is one of the two a picker acts on — available or booked
+     * (SlotState::forMember()): a buffer, a full shared space or a date
+     * beyond the window all mean "not this cell". No `reason` either: a
+     * refusal still met is explained by the POST's own 422, in the same
+     * words the engine would have put on the chip.
+     *
+     * @return array{start_time: string, end_time: string, state: string, is_available: bool}
      */
-    public function slot(SlotAvailability $slot, string $locale): array
+    public function slot(SlotAvailability $slot): array
     {
-        $localStart = $this->time->toLocal($slot->startAt);
-        $localEnd = $this->time->toLocal($slot->endAt);
-        $reasonKey = $slot->reasonKey();
-
         return [
-            'start_at' => $localStart->toIso8601String(),
-            'end_at' => $localEnd->toIso8601String(),
-            'label' => $localStart->format('h:i A'),
-            'start_time' => $localStart->format('H:i'),
-            'end_time' => $localEnd->format('H:i'),
-            'state' => $slot->state->value,
+            'start_time' => $this->time->toLocal($slot->startAt)->format(self::SLOT_TIME_FORMAT),
+            'end_time' => $this->time->toLocal($slot->endAt)->format(self::SLOT_TIME_FORMAT),
+            'state' => $slot->state->forMember()->value,
             'is_available' => $slot->isAvailable(),
-            'reason' => $reasonKey === null ? null : __($reasonKey, [], $locale),
         ];
     }
 
     /**
+     * `{available, booked, total}` over the cells sent.
+     *
      * @param  list<SlotAvailability>  $slots
      * @return array<string, int>
      */
     public function slotCounts(array $slots): array
     {
-        $counts = array_fill_keys(array_column(SlotState::cases(), 'value'), 0);
+        $counts = array_fill_keys(array_column(SlotState::memberStates(), 'value'), 0);
 
         foreach ($slots as $slot) {
-            $counts[$slot->state->value]++;
+            $counts[$slot->state->forMember()->value]++;
         }
 
-        $counts['total'] = count($slots);
-
-        return $counts;
+        return [...$counts, 'total' => count($slots)];
     }
 
     /**
@@ -186,10 +177,12 @@ class AvailabilityPresenter
      * app (the desk's calendar still shows it per space, where it scales
      * occupancy).
      *
-     * @param  list<int>  $durationOptions
+     * No list of lengths: a booking is a run of cells at least
+     * `min_duration_minutes` long, with no ceiling.
+     *
      * @return array<string, mixed>
      */
-    public function rules(SpaceBookingRules $rules, string $locale, int $maxSelectableDates, array $durationOptions = []): array
+    public function rules(SpaceBookingRules $rules, string $locale, int $maxSelectableDates): array
     {
         return [
             'granularity_minutes' => $rules->granularityMinutes,
@@ -197,9 +190,6 @@ class AvailabilityPresenter
             // Null means no ceiling / no horizon.
             'min_notice_minutes' => $rules->minNoticeMinutes,
             'max_days_ahead' => $rules->maxDaysAhead,
-            // Only lengths this space accepts: the chips a duration-first
-            // picker shows before any start time is chosen.
-            'duration_options_minutes' => $durationOptions,
             'buffer_minutes' => $rules->bufferMinutes,
             'cancellation_window_minutes' => $rules->cancellationWindowMinutes,
             'requires_approval' => $rules->requiresApproval,

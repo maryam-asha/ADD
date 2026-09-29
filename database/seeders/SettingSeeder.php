@@ -22,14 +22,6 @@ class SettingSeeder extends Seeder
         $settings->setDefault('booking.min_duration_minutes', 60, SettingValueType::Int);
         $settings->setDefault('booking.overrun_grace_minutes', 10, SettingValueType::Int);
         $settings->setDefault('booking.buffer_minutes', 0, SettingValueType::Int);
-        // The duration chips the app offers after a start time is picked.
-        // Product-controlled rather than derived: min_duration + granularity
-        // would yield 60/90/120/150, and the fourth option is meant to be
-        // 3h. Every option is still re-validated against the space's own
-        // granularity before being offered as available, so a value that
-        // does not fit a space comes back disabled rather than silently
-        // bookable (docs/decisions/booking-availability-and-calendar.md).
-        $settings->setDefault('booking.duration_options_minutes', [60, 90, 120, 180], SettingValueType::Json);
         // Shown on the confirmation screen's price breakdown. Zero is a
         // decision, not a hardcoded literal — the arithmetic path handles a
         // non-zero rate even though it currently always evaluates to zero.

@@ -42,6 +42,14 @@ class SlotStateMemberViewTest extends TestCase
         }
     }
 
+    /** Exactly the states neither the member app nor the desk is sent. */
+    public function test_only_past_and_too_soon_are_gone(): void
+    {
+        $gone = array_values(array_filter(SlotState::cases(), fn (SlotState $state) => $state->isGone()));
+
+        $this->assertSame([SlotState::Past, SlotState::TooSoon], $gone);
+    }
+
     public function test_a_member_is_sent_only_available_and_booked(): void
     {
         $this->assertSame(

@@ -57,10 +57,10 @@ class BrowseSpacesTest extends TestCase
         $response = $this->getJson('/api/v1/member/spaces');
 
         $response->assertOk();
-        // One `data` object, like the details and the slots: the banner, the
-        // list as `spaces`, and the paging `meta`.
-        $this->assertSame(['working_hours_banner', 'spaces', 'meta'], array_keys($response->json('data')));
-        $this->assertSame(['data'], array_keys($response->json()));
+        // `data` holds the banner and the list as `spaces`; the paging `meta`
+        // sits beside it, describing the response rather than the branch.
+        $this->assertSame(['working_hours_banner', 'spaces'], array_keys($response->json('data')));
+        $this->assertSame(['data', 'meta'], array_keys($response->json()));
 
         $response->assertJsonStructure(['data' => [
             'working_hours_banner' => [
@@ -94,6 +94,7 @@ class BrowseSpacesTest extends TestCase
                     'main_image',
                 ],
             ],
+        ],
             'meta' => [
                 'current_page',
                 'from',
@@ -105,11 +106,11 @@ class BrowseSpacesTest extends TestCase
                 'space_type',
                 'branch_id',
             ],
-        ]]);
+        ]);
 
         $response->assertJsonPath('data.working_hours_banner.hours', '8:00 AM – 10:00 PM');
         $response->assertJsonPath('data.working_hours_banner.is_open', true);
-        $response->assertJsonPath('data.meta.total_results', 4);
+        $response->assertJsonPath('meta.total_results', 4);
     }
 
     /**
@@ -220,21 +221,21 @@ class BrowseSpacesTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonCount(2, 'data.spaces');
-        $response->assertJsonPath('data.meta.per_page', 2);
-        $response->assertJsonPath('data.meta.total', 4);
-        $response->assertJsonPath('data.meta.last_page', 2);
-        $response->assertJsonPath('data.meta.current_page', 1);
+        $response->assertJsonPath('meta.per_page', 2);
+        $response->assertJsonPath('meta.total', 4);
+        $response->assertJsonPath('meta.last_page', 2);
+        $response->assertJsonPath('meta.current_page', 1);
         // A next page exists — asserted through meta, since member
         // responses no longer carry a links block.
-        $this->assertLessThan($response->json('data.meta.last_page'), $response->json('data.meta.current_page'));
+        $this->assertLessThan($response->json('meta.last_page'), $response->json('meta.current_page'));
         $this->assertNull($response->json('links'));
 
         // Request second page
         $responsePage2 = $this->getJson('/api/v1/member/spaces?per_page=2&page=2');
         $responsePage2->assertOk();
         $responsePage2->assertJsonCount(2, 'data.spaces');
-        $responsePage2->assertJsonPath('data.meta.current_page', 2);
-        $this->assertGreaterThan(1, $responsePage2->json('data.meta.current_page'));
+        $responsePage2->assertJsonPath('meta.current_page', 2);
+        $this->assertGreaterThan(1, $responsePage2->json('meta.current_page'));
         $this->assertNull($responsePage2->json('links'));
     }
 
@@ -376,7 +377,7 @@ class BrowseSpacesTest extends TestCase
         $this->assertNotContains($maintenance->id, $ids);
         $this->assertNotContains($retired->id, $ids);
         // Only the four seeded active spaces are counted.
-        $response->assertJsonPath('data.meta.total', 4);
+        $response->assertJsonPath('meta.total', 4);
     }
 
     public function test_inactive_space_details_returns_404(): void

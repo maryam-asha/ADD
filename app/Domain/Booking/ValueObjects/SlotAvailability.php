@@ -25,12 +25,4 @@ final readonly class SlotAvailability
     {
         return $this->state->isBookable();
     }
-
-    /**
-     * The lang key for this slot's state, or null when it is bookable.
-     */
-    public function reasonKey(): ?string
-    {
-        return $this->state->reasonKey();
-    }
 }

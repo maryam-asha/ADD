@@ -1473,7 +1473,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner — the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here — they set up the booking calendar, so they come with Get Space Details → data.booking.upcoming_closures. hours/periods are TODAY's only — show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination (meta) — `data` is an object holding `working_hours_banner` and the `spaces` array"
+                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner — the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here — they set up the booking calendar, so they come with Get Space Details → data.booking.upcoming_closures. hours/periods are TODAY's only — show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination: a top-level `meta`, beside `data` — the response is {data: {working_hours_banner, spaces}, meta}"
                                     },
                                     "response": []
                                 },
@@ -1631,7 +1631,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "The time-slot grid for one date. Response shape: ONE `data` object carrying only what changes per date — {data: {date, state, closed_banner, slots, counts, meta}} — chips under `data.slots`, and `data.date` is just the requested date (Y-m-d), echoed so a stale response can be dropped when dates are tapped quickly. Each slot carries only {start_time, end_time, label, state, is_available} — no reason: grey a chip by its state, which for a member is available | booked (taken, every seat taken, inside a buffer, outside hours or beyond the horizon). A slot whose time to be booked has gone — already started, or inside the minimum notice (rules.min_notice_minutes, an hour by default) — is not sent at all: today at 14:00 the list starts at 15:00. Only available is bookable, is_available is exactly state == available, and counts is {available, booked, total}. The admin twin keeps all eight states; Each slot is one of the space's own cells (data.meta.granularity_minutes long); there is no duration parameter. To book, the member picks a start slot and an end slot: the run must be unbroken (every slot available, each start_time equal to the previous end_time) and at least rules.min_duration_minutes long — there is no maximum; post start_at = \"{date} {first.start_time}\", end_at = \"{date} {last.end_time}\". data.meta is {granularity_minutes, timezone}. The indicative price is the details' hourly_rate_points × hours — the amount actually charged, after discount and VAT, is what bookings/preview returns. The calendar setup is NOT here: the branch's week comes once from the spaces list's working_hours_banner, and this space's rules and upcoming_closures (local-midnight date-times) from Get Space Details → data.booking; then call this again on each date change. The admin twin returns the full payload without the envelope, chips under top-level `data`. Each chip carries a state — available, booked, outside_hours, buffer, at_capacity, past, too_soon, too_far_ahead — plus `is_available` and a translated `reason`. A chip is judged as a booking START: it is available only if the shortest legal booking from that time (max(granularity, min duration)) fits, so a cell just before a booking or just before closing is not offered. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap. `counts` summarises the grid."
+                                        "description": "The time-slot grid for one date. Response shape: ONE `data` object carrying only what changes per date — {data: {date, state, closed_banner, slots, counts, meta}} — chips under `data.slots`, and `data.date` is just the requested date (Y-m-d), echoed so a stale response can be dropped when dates are tapped quickly. Each slot carries only {start_time, end_time, state, is_available} — the times in 12-hour hh:mm AM|PM (e.g. 03:00 PM, AM/PM in Latin letters in every language), shown as-is and posted back as-is (start_at = \"{date} 03:00 PM\" is accepted); there is no label in another format — no reason: grey a chip by its state, which for a member is available | booked (taken, every seat taken, inside a buffer, outside hours or beyond the horizon). A slot whose time to be booked has gone — already started, or inside the minimum notice (rules.min_notice_minutes, an hour by default) — is not sent at all: today at 14:00 the list starts at 15:00. Only available is bookable, is_available is exactly state == available, and counts is {available, booked, total}. Each slot is one of the space's own cells (data.meta.granularity_minutes long); there is no duration parameter. To book, the member picks a start slot and an end slot: the run must be unbroken (every slot available, each start_time equal to the previous end_time) and at least rules.min_duration_minutes long — there is no maximum; post start_at = \"{date} {first.start_time}\", end_at = \"{date} {last.end_time}\". data.meta is {granularity_minutes, timezone}. The indicative price is the details' hourly_rate_points × hours — the amount actually charged, after discount and VAT, is what bookings/preview returns. The calendar setup is NOT here: the branch's week comes once from the spaces list's working_hours_banner, and this space's rules and upcoming_closures (local-midnight date-times) from Get Space Details → data.booking; then call this again on each date change. The desk's route returns this very body, byte for byte. Each chip is judged on its own — is this stretch free — so the cell right before another booking is available: it can end a run even though no minimum-length booking could start there. Slots are generated only inside the day's open periods, so a two-period day has no chips across the midday gap."
                                     }
                                 }
                             ]
@@ -7906,7 +7906,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Spaces as rows, days as cells. Each cell carries its open periods, its bookings (with the member, payment state and check-in) and its occupancy. Occupancy is booked minutes over open minutes, clipped to the open window so a booking running past closing cannot report more minutes than the day has; a multi-occupant space is measured against its concurrency ceiling rather than reading 2000% full. Loaded in a bounded number of queries — it does not query per space or per day. `branch_hours.upcoming_closures` lists every all-day closure (business_hour_exceptions with is_closed = true) from today on as [{date, reason}], in date order and NOT limited to the range shown — so the booking form's date picker can refuse a holiday in a month the calendar has not loaded. Past closures and exceptions that only shorten a day are not listed."
+                                "description": "Spaces as rows, days as cells. Each cell carries its open periods, its bookings (with the member, payment state and check-in) and its occupancy. Occupancy is booked minutes over open minutes, clipped to the open window so a booking running past closing cannot report more minutes than the day has; a multi-occupant space is measured against its concurrency ceiling rather than reading 2000% full. Loaded in a bounded number of queries — it does not query per space or per day. `branch_hours.upcoming_closures` lists every all-day closure (business_hour_exceptions with is_closed = true) from today on as [{date, reason}], in date order and NOT limited to the range shown — so the booking form's date picker can refuse a holiday in a month the calendar has not loaded. Past closures and exceptions that only shorten a day are not listed. `booking_window` {min_duration_minutes, min_notice_minutes, max_days_ahead} is the desk's booking setup, read once: the shortest run the booking form accepts (the day's slots carry no rules) and the window its date picker refuses dates beyond."
                             }
                         },
                         {
@@ -8106,66 +8106,10 @@
                                             "key": "date",
                                             "value": "2026-09-24",
                                             "description": "Required local date (Y-m-d)."
-                                        },
-                                        {
-                                            "key": "duration",
-                                            "value": "120",
-                                            "description": "Optional booking length in minutes. With it, each slot is a whole window of that length, priced — the same duration-first shape as the member route.",
-                                            "disabled": true
                                         }
                                     ]
                                 },
-                                "description": "The same slot grid the member app reads, served to operations so the desk's booking form can offer only the windows BookingCreationService will accept. Identical payload to the member route - the backend serves both from one AvailabilityBrowseService and asserts the two responses match."
-                            }
-                        },
-                        {
-                            "name": "Duration Quote for the Desk - Options & Prices",
-                            "request": {
-                                "method": "GET",
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{admin_token}}"
-                                        }
-                                    ]
-                                },
-                                "header": [
-                                    {
-                                        "key": "Accept",
-                                        "value": "application/json",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/spaces/{{space_id}}/availability/quote?start_at=2026-09-24 14:00",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "spaces",
-                                        "{{space_id}}",
-                                        "availability",
-                                        "quote"
-                                    ],
-                                    "query": [
-                                        {
-                                            "key": "start_at",
-                                            "value": "2026-09-24 14:00",
-                                            "description": "Required district wall-clock start (Y-m-d H:i). A bare value is read as local; an ISO offset would be re-interpreted."
-                                        }
-                                    ]
-                                },
-                                "description": "The duration ladder for a chosen start, each option priced in points and USD. An option that cannot be booked is returned with available=false and a translated reason rather than omitted, so the desk can say why it is refused."
+                                "description": "The space's cells for one date, served to operations so the desk's booking form offers only the windows BookingCreationService will accept. The very response the member app reads — {data: {date, state, closed_banner, slots, counts, meta}}, each slot {start_time, end_time, state, is_available}, state available | booked, counts {available, booked, total}, no reason, no rules, no branch_hours — from the same AvailabilityBrowseService call; a test asserts the two bodies are identical. The setup is read once from Operations Calendar: booking_window.min_duration_minutes (the shortest run), the booking window and branch_hours. No duration: the desk picks a run of free, consecutive cells — first to last — at least booking_window.min_duration_minutes long (cells × data.meta.granularity_minutes), and posts start_at = \"{date} {first.start_time}\", end_at = \"{date} {last.end_time}\" as shown (12-hour). Each cell is judged on its own, so the half hour right before another booking is free. Like the member app, it is not sent the cells whose time has gone — started, or inside the minimum notice. A refused run is explained by the POST's 422 message."
                             }
                         },
                         {

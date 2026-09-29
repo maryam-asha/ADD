@@ -12,6 +12,7 @@ use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -204,6 +205,26 @@ class AdminBookingCalendarTest extends TestCase
             ->assertJsonPath('branch_hours.upcoming_closures', [
                 ['date' => '2026-09-15', 'reason' => 'Public holiday'],
             ]);
+    }
+
+    /**
+     * The desk builds its date picker from the calendar response, as the
+     * member app does from the space details: the booking window comes with
+     * it, so a date beyond it is refused before any slots are asked for.
+     */
+    public function test_the_calendar_carries_the_booking_window(): void
+    {
+        app(SettingService::class)->set('booking.max_days_ahead', 30);
+        app(SettingService::class)->set('booking.min_notice_minutes', 45);
+        $this->actingAsOperations();
+        $this->space();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=week&date=2026-08-17')
+            ->assertOk()
+            // The minimum length too: the desk's day response is the member's,
+            // with no rules in it, so the calendar is where the desk reads it.
+            ->assertJsonPath('booking_window', ['min_duration_minutes' => 60, 'min_notice_minutes' => 45, 'max_days_ahead' => 30]);
     }
 
     /**

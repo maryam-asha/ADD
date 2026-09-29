@@ -15,16 +15,16 @@ class SpaceController extends Controller
     {
         $result = $service->browse($request->validated(), $request->user());
 
-        // One `data` object, like the space details and the day's slots: the
-        // branch's banner, the list as `spaces`, and the paging `meta`. The
-        // banner describes the branch those rows belong to rather than
-        // paginating them, so it sits beside `spaces`, not inside `meta`.
+        // `data` holds the branch's banner and the list as `spaces`; the
+        // paging `meta` sits beside it, at the top level. The banner describes
+        // the branch those rows belong to rather than paginating them, so it
+        // sits beside `spaces`, not inside `meta`.
         return response()->json([
             'data' => [
                 'working_hours_banner' => $result['working_hours_banner'],
                 'spaces' => $result['spaces'],
-                'meta' => $result['meta'],
             ],
+            'meta' => $result['meta'],
         ]);
     }
 

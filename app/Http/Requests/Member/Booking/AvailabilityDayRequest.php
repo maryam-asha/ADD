@@ -5,10 +5,9 @@ namespace App\Http\Requests\Member\Booking;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
- * The member's day of slots: a date and nothing else. The slots are the
- * space's own cells, and the member picks a start cell and an end cell, so
- * there is no `duration` — AvailabilitySlotsRequest keeps it for the desk,
- * whose picker is duration-first.
+ * A day of a space's cells, for the member app and the desk alike: a date
+ * and nothing else. The cells are the space's own granularity, and a booking
+ * is picked as a start cell and an end cell, so there is no `duration`.
  *
  * A calendar date, not an instant: a day is drawn in the district's own
  * dates, so this deliberately does NOT go through InterpretsLocalTimes
