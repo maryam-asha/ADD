@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionEndRequestStatus;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
@@ -177,6 +178,15 @@ class SessionClosureService
         }
 
         $session->forceFill($attributes)->save();
+
+        // An end request still waiting on this session is moot once it is
+        // closed — at the desk, by auto-close, or by a confirmation that
+        // already marked its own request before calling here.
+        $session->pendingEndRequest()->update([
+            'status' => SessionEndRequestStatus::Superseded->value,
+            'resolved_at' => now(),
+            'checked_out_at' => $attributes['checked_out_at'],
+        ]);
     }
 
     /**

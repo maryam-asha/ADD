@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Domain\Booking\Concerns\HasSessionActivity;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
@@ -16,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WalkinSession extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSessionActivity;
 
     protected $fillable = [
         'space_id',

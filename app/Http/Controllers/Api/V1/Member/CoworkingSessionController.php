@@ -6,10 +6,12 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\CoworkingStartOutcome;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Services\CoworkingSessionService;
+use App\Domain\Booking\Services\SessionEndService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StartCoworkingSessionRequest;
 use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\SessionCoverageResource;
+use App\Http\Resources\SessionEndRequestResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -60,5 +62,31 @@ class CoworkingSessionController extends Controller
         $open = $sessions->openSessionFor($request->user());
 
         return response()->json(['data' => $open === null ? null : new CoworkingSessionResource($open)]);
+    }
+
+    public function requestEnd(Request $request, SessionEndService $ends): JsonResponse
+    {
+        try {
+            $endRequest = $ends->request($request->user());
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        if ($endRequest->wasRecentlyCreated) {
+            $this->logSensitiveAction('session_end_requested', $endRequest);
+        }
+
+        return response()->json(['data' => new SessionEndRequestResource($endRequest)], $endRequest->wasRecentlyCreated ? 201 : 200);
+    }
+
+    public function cancelEnd(Request $request, SessionEndService $ends): JsonResponse
+    {
+        try {
+            $ends->cancel($request->user());
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        return response()->json(['message' => __('api.coworking.end_request_cancelled')]);
     }
 }

@@ -33,6 +33,9 @@ class CoworkingSessionResource extends JsonResource
                 ? new SessionCoverageResource($session->coverage_snapshot)
                 : null,
             'accepted_uncovered' => $isWalkin && $session->accepted_uncovered,
+            'end_request' => $session->pendingEndRequest === null
+                ? null
+                : new SessionEndRequestResource($session->pendingEndRequest),
         ];
     }
 }

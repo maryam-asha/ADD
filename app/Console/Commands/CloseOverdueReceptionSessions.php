@@ -60,6 +60,10 @@ class CloseOverdueReceptionSessions extends Command
             return;
         }
 
-        $closures->autoClose($session, $now->copy()->setTimeFromTimeString($closingTime));
+        // The member pressed "end" and reception never confirmed: bill to
+        // that moment, not to closing time.
+        $pending = $session->pendingEndRequest()->first();
+
+        $closures->autoClose($session, $pending?->requested_at ?? $now->copy()->setTimeFromTimeString($closingTime));
     }
 }

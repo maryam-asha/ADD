@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Services\Models\ServiceRequest;
@@ -12,7 +14,10 @@ use Illuminate\Support\ServiceProvider;
 /**
  * Stable aliases for every model stored in a polymorphic column by the
  * form engine — form owners (`forms.formable_type`) and the records that
- * hold answers (`form_submissions.subject_type`). An alias survives a model
+ * hold answers (`form_submissions.subject_type`) — and the coworking-session
+ * records that end requests and resource consumptions point at
+ * (`session_end_requests.sessionable_type`,
+ * `resource_consumptions.sessionable_type`). An alias survives a model
  * moving namespace; a stored class name does not.
  *
  * Deliberately `morphMap()`, not `enforceMorphMap()`: Sanctum tokens,
@@ -34,6 +39,8 @@ class MorphMapServiceProvider extends ServiceProvider
             'event_attendee' => EventAttendee::class,
             'service_type' => ServiceType::class,
             'service_request' => ServiceRequest::class,
+            'booking' => Booking::class,
+            'walkin_session' => WalkinSession::class,
         ]);
     }
 }

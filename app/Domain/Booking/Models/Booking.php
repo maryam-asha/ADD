@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Models;
 
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Booking\Concerns\HasSessionActivity;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
@@ -21,7 +22,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Booking extends Model
 {
-    use HasFactory;
+    use HasFactory, HasSessionActivity;
 
     protected $fillable = [
         'space_id',

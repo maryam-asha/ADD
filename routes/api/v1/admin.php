@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
@@ -278,6 +279,10 @@ Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionContro
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
 
 Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
+
+// A member's "end session" press, confirmed here
+// (docs/decisions/coworking-self-service-sessions.md).
+Route::post('reception/session-end-requests/{sessionEndRequest}/confirm', [SessionEndRequestController::class, 'confirm']);
 
 Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::class, 'index']);
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm']);

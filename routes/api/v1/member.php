@@ -85,6 +85,8 @@ Route::post('access/unlock', [AccessUnlockController::class, 'unlock'])->middlew
 // timer. Static segments are declared before any {type}/{id} wildcard.
 Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])->middleware('throttle:10,1');
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
+Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
+Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role
