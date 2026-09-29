@@ -15,6 +15,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
+use Spatie\Activitylog\Models\Activity;
 use Tests\Support\InteractsWithCoworking;
 use Tests\TestCase;
 
@@ -116,6 +117,19 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertSame('20.00', (string) $session->amount_owed); // 2 h at 100 points, 0.10 USD/point
         $this->assertSame(SessionEndRequestStatus::Confirmed, SessionEndRequest::sole()->status);
         Notification::assertSentTo($member, GeneralNotification::class);
+    }
+
+    public function test_the_confirmation_audit_records_the_amount_owed_like_a_desk_checkout(): void
+    {
+        $this->memberInSession();
+        $this->requestEnd();
+        $endRequest = SessionEndRequest::sole();
+
+        $this->confirm($endRequest)->assertOk();
+
+        $properties = Activity::where('description', 'session_end_confirmed')->sole()->properties;
+        $this->assertSame($endRequest->id, $properties->get('end_request_id'));
+        $this->assertSame('20.00', $properties->get('amount_owed'));
     }
 
     public function test_reception_can_set_a_different_time(): void

@@ -32,7 +32,12 @@ class SessionEndRequestController extends Controller
 
         $session = $sessionEndRequest->sessionable;
 
-        $this->logSensitiveAction('session_end_confirmed', $session, ['end_request_id' => $sessionEndRequest->id]);
+        // fresh(): the relation above was loaded before the closure, so it
+        // still holds the unbilled row. Same amount the desk checkouts audit.
+        $this->logSensitiveAction('session_end_confirmed', $session, [
+            'end_request_id' => $sessionEndRequest->id,
+            'amount_owed' => (string) $session->fresh()->amount_owed,
+        ]);
 
         $notifications->sendToUser(
             $session->user,
