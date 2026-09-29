@@ -77,6 +77,17 @@ class ResourceConsumptionSessionLinkTest extends TestCase
     {
         $member = User::factory()->create();
         $this->subscribe($member, $this->planWithPrinting());
+        $space = $this->coworkingSpace();
+
+        // Sessions exist, but none of them is this member's open one: theirs
+        // has ended, and someone else's is still running.
+        WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'user_id' => $member->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 07:00', 'Asia/Damascus')->utc(),
+            'checked_out_at' => Carbon::parse('2026-08-17 09:00', 'Asia/Damascus')->utc(),
+        ]);
+        WalkinSession::factory()->create(['space_id' => $space->id, 'user_id' => User::factory()->create()->id]);
 
         $this->assertNull($this->recordPrinting(['user_id' => $member->id])->sessionable_id);
     }
@@ -84,6 +95,12 @@ class ResourceConsumptionSessionLinkTest extends TestCase
     public function test_company_consumption_is_never_linked(): void
     {
         $company = Company::factory()->create();
+
+        // A user who shares the company's id and is mid-session: a controller
+        // that read the company id as a user id would link to this session.
+        $twin = User::find($company->id) ?? User::factory()->create(['id' => $company->id]);
+        WalkinSession::factory()->create(['space_id' => $this->coworkingSpace()->id, 'user_id' => $twin->id]);
+
         Membership::create([
             'plan_id' => $this->planWithPrinting()->id,
             'owner_type' => OwnerType::Company,
