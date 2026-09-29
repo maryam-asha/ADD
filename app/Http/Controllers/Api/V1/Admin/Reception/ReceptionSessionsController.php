@@ -5,11 +5,14 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionClosureService;
+use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActiveReceptionSessionResource;
 use Carbon\Carbon;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ReceptionSessionsController extends Controller
@@ -39,6 +42,15 @@ class ReceptionSessionsController extends Controller
         $sessions = $bookings->concat($walkins);
 
         return ActiveReceptionSessionResource::collection($sessions);
+    }
+
+    public function report(string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports): JsonResponse
+    {
+        $session = $sessions->find($type, $id);
+
+        abort_if($session === null, 404);
+
+        return response()->json(['data' => $reports->build($session)]);
     }
 
     private function isOverdue(SessionClosureService $closures, Booking|WalkinSession $session, Carbon $now): bool

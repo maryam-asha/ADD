@@ -87,6 +87,9 @@ Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])-
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
 Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
 Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);
+Route::get('coworking-sessions/{type}/{id}/report', [CoworkingSessionController::class, 'report'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

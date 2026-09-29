@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\CoworkingStartOutcome;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionEndService;
+use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StartCoworkingSessionRequest;
 use App\Http\Resources\CoworkingSessionResource;
@@ -62,6 +63,16 @@ class CoworkingSessionController extends Controller
         $open = $sessions->openSessionFor($request->user());
 
         return response()->json(['data' => $open === null ? null : new CoworkingSessionResource($open)]);
+    }
+
+    /** A session that is not the caller's is a 404, not a 403 — its existence is not theirs to learn. */
+    public function report(Request $request, string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports): JsonResponse
+    {
+        $session = $sessions->find($type, $id);
+
+        abort_if($session === null || $session->user_id !== $request->user()->id, 404);
+
+        return response()->json(['data' => $reports->build($session)]);
     }
 
     public function requestEnd(Request $request, SessionEndService $ends): JsonResponse

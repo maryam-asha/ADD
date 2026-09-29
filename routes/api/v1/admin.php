@@ -279,6 +279,9 @@ Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionContro
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
 
 Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
+Route::get('reception/sessions/{type}/{id}/report', [ReceptionSessionsController::class, 'report'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
 
 // A member's "end session" press, confirmed here
 // (docs/decisions/coworking-self-service-sessions.md).

@@ -98,6 +98,16 @@ class CoworkingSessionService
         });
     }
 
+    /** A session by the `type` segment of the report URLs — "walkin" or "booking". */
+    public function find(string $type, int $id): Booking|WalkinSession|null
+    {
+        return match ($type) {
+            'walkin' => WalkinSession::find($id),
+            'booking' => Booking::find($id),
+            default => null,
+        };
+    }
+
     /** The member's checked-in, not yet checked-out session on a coworking space, if any. */
     public function openSessionFor(User $member): Booking|WalkinSession|null
     {
