@@ -38,7 +38,7 @@ class PlanHourCoverageService
      */
     public function coverableSeconds(?Membership $membership, CarbonInterface $from, CarbonInterface $to): int
     {
-        $grant = $this->grantFor($membership);
+        $grant = $this->hourGrantFor($membership);
 
         if ($grant === null) {
             return 0;
@@ -74,7 +74,7 @@ class PlanHourCoverageService
             return 0;
         }
 
-        $grant = $this->grantFor($membership);
+        $grant = $this->hourGrantFor($membership);
 
         if ($grant === null) {
             return 0;
@@ -96,7 +96,7 @@ class PlanHourCoverageService
      * access window, no hour grant, or there is no membership at all — every
      * "this session is simply billed normally" case collapses to null here.
      */
-    private function grantFor(?Membership $membership): ?PlanResourceGrant
+    public function hourGrantFor(?Membership $membership): ?PlanResourceGrant
     {
         if ($membership === null || $membership->plan === null) {
             return null;

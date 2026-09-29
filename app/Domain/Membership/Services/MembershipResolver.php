@@ -50,6 +50,26 @@ class MembershipResolver
     }
 
     /**
+     * Whether this user ever held any membership, personal or through one
+     * of their companies, whatever its status or period — what tells an
+     * expired plan apart from never having had one.
+     */
+    public function hasHeldAnyFor(User $user): bool
+    {
+        $companyIds = $user->companies()->pluck('companies.id');
+
+        return Membership::query()
+            ->where(function ($query) use ($user, $companyIds) {
+                $query->where(fn ($q) => $q->where('owner_type', OwnerType::User)->where('owner_id', $user->id));
+
+                if ($companyIds->isNotEmpty()) {
+                    $query->orWhere(fn ($q) => $q->where('owner_type', OwnerType::Company)->whereIn('owner_id', $companyIds));
+                }
+            })
+            ->exists();
+    }
+
+    /**
      * The same active-membership lookup as activeFor(), generalized to any
      * OwnerType/id pair instead of deriving it from a User's own
      * memberships/companies — used by reception flows that already know

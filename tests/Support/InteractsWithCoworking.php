@@ -8,7 +8,14 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\MembershipStatus;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\ResourceType;
+use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Support\Security\Totp;
+use Carbon\CarbonInterface;
 use Laravel\Sanctum\Sanctum;
 
 /**
@@ -67,6 +74,35 @@ trait InteractsWithCoworking
     protected function qrFor(Kiosk $kiosk, string $secret, int $offsetSeconds = 0): string
     {
         return Kiosk::QR_PREFIX.':'.$kiosk->id.':'.app(Totp::class)->codeAt($secret, now()->getTimestamp() + $offsetSeconds);
+    }
+
+    /** A plan with a coworking-hours grant. Needs ResourceTypeSeeder (space-hours). */
+    protected function planWithHours(float $hours, ?string $windowStart = '08:00', ?string $windowEnd = '20:00'): Plan
+    {
+        $plan = Plan::factory()->create([
+            'access_window_start' => $windowStart,
+            'access_window_end' => $windowEnd,
+        ]);
+
+        $plan->resourceGrants()->create([
+            'resource_type_id' => ResourceType::where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->value('id'),
+            'quantity' => $hours,
+            'order' => 0,
+        ]);
+
+        return $plan;
+    }
+
+    protected function subscribe(User $member, Plan $plan, ?CarbonInterface $periodEnd = null): Membership
+    {
+        return Membership::create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => now()->subDays(10),
+            'current_period_end' => $periodEnd ?? now()->addDays(20),
+        ]);
     }
 
     private function actingAsRole(string $role): User

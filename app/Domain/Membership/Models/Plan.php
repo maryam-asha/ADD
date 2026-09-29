@@ -4,6 +4,7 @@ namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
 use App\Domain\Settings\Services\SettingService;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -134,6 +135,43 @@ class Plan extends Model
         }
 
         return $seconds;
+    }
+
+    /**
+     * The end, as a UTC instant, of the window occurrence containing $at —
+     * or null when $at is outside the window or there is no window. Same
+     * wrap rules as windowOverlap(): 20:00–00:00 at 21:00 ends at the next
+     * midnight; 22:00–02:00 at 01:00 ends at 02:00 that morning.
+     */
+    public function currentWindowEndsAt(CarbonInterface $at): ?CarbonImmutable
+    {
+        if (! $this->hasAccessWindow()) {
+            return null;
+        }
+
+        $windowStart = $this->minutesSinceMidnight($this->access_window_start);
+        $windowEnd = $this->minutesSinceMidnight($this->access_window_end);
+
+        if ($windowStart === null || $windowEnd === null) {
+            return null;
+        }
+
+        $timezone = app(SettingService::class)->get('app.timezone', 'Asia/Damascus');
+        $local = CarbonImmutable::instance($at)->setTimezone($timezone);
+        $minute = ($local->hour * 60) + $local->minute;
+        $midnight = $local->startOfDay();
+
+        if ($windowEnd > $windowStart) {
+            return $minute >= $windowStart && $minute < $windowEnd
+                ? $midnight->addMinutes($windowEnd)->utc()
+                : null;
+        }
+
+        if ($minute >= $windowStart) {
+            return $midnight->addDay()->addMinutes($windowEnd)->utc();
+        }
+
+        return $minute < $windowEnd ? $midnight->addMinutes($windowEnd)->utc() : null;
     }
 
     private function overlapSeconds(
