@@ -51,7 +51,7 @@ class AvailabilityPresenter
             // Null for a weekday that simply has no schedule; only an
             // explicit BusinessHourException can explain itself.
             'reason' => $day->closureReason,
-            'severity' => 'error',
+         
         ];
     }
 

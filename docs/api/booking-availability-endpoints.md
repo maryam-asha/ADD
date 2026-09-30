@@ -94,7 +94,7 @@ A `full` day must **not** be shown as closed — it is open, just sold out.
   "text": "Main Branch is closed on this date.",
   "hint": "Choose another day.",
   "reason": "Public holiday",
-  "severity": "error"
+
 }
 ```
 

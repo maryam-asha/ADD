@@ -175,9 +175,8 @@ class SpaceAvailabilityControllerTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.state', 'closed')
             ->assertJsonPath('data.slots', [])
-            ->assertJsonPath('data.closed_banner.reason', 'Public holiday')
-            ->assertJsonPath('data.closed_banner.severity', 'error');
-
+            ->assertJsonPath('data.closed_banner.reason', 'Public holiday');
+        
         $this->assertStringContainsString('closed on this date', $response->json('data.closed_banner.text'));
     }
 
