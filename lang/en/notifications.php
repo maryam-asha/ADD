@@ -163,4 +163,30 @@ return [
         ],
     ],
 
+    'payment' => [
+        'received' => [
+            'title' => 'Payment Received',
+            'body' => 'Your payment for :purpose was received (:points points).',
+        ],
+        'expired' => [
+            'title' => 'Reserved Package Released',
+            'body' => 'The package you chose to pay for at reception was not paid in time and has been released.',
+        ],
+        'purposes' => [
+            'wallet_top_up' => 'a wallet top-up',
+            'plan_purchase' => 'a package',
+            'booking' => 'a booking',
+            'event_registration' => 'an event registration',
+            'coworking_session' => 'a coworking session',
+            'booking_extension' => 'a booking extension',
+        ],
+    ],
+
+    'event' => [
+        'payment_due' => [
+            'title' => 'Payment Due',
+            'body' => 'Your seat at :event is confirmed. Pay :points points before the event to be let in.',
+        ],
+    ],
+
 ];

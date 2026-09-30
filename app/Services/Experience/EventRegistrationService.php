@@ -10,11 +10,13 @@ use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventLocationService;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Services\Notification\NotificationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use Carbon\Carbon;
@@ -167,6 +169,12 @@ class EventRegistrationService
                 $pointsDeducted = $this->payFromWallet($attendee, $user, $pricePoints, $paymentMethod === null, $walletOwnerType, $walletOwnerId);
             }
 
+            // Cash confirms the seat unpaid: the member is told they owe it.
+            // A card is being paid right now, so it is not.
+            if ($status === EventRegistrationStatus::Approved && $method === CashMethod::KEY) {
+                $this->tellPaymentDue($attendee, $lockedEvent);
+            }
+
             // 8. Answers to the event's own questions, if it asks any —
             // decided by the form itself, not by the listing flag.
             if ($form = $lockedEvent->registrationForm) {
@@ -269,6 +277,35 @@ class EventRegistrationService
         $attendee->refresh();
 
         return $pricePoints;
+    }
+
+    /**
+     * A seat confirmed for a paid event but not paid for yet (cash at the
+     * desk, or a card still to be paid): the member is told they owe it,
+     * after commit.
+     */
+    private function tellPaymentDue(EventAttendee $attendee, Event $event): void
+    {
+        if ($attendee->payment_state !== EventPaymentState::Unpaid || $attendee->user_id === null) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($attendee, $event) {
+            $member = User::query()->find($attendee->user_id);
+
+            if ($member === null) {
+                return;
+            }
+
+            app(NotificationService::class)->sendToUser($member, 'event.payment_due', [
+                'event' => $event->translate('title', $member->preferred_language ?? config('app.locale')),
+                'points' => (int) $attendee->price_points,
+            ], [
+                'purpose' => 'event_registration',
+                'payable_type' => $attendee->getMorphClass(),
+                'payable_id' => $attendee->id,
+            ]);
+        });
     }
 
     /**

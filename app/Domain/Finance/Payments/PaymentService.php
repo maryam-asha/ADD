@@ -67,6 +67,7 @@ class PaymentService
         private readonly PaymentAmountCalculator $amounts,
         private readonly ReceivedMoneyConverter $converter,
         private readonly CurrencyConversionService $currencies,
+        private readonly PaymentNotifier $notifier,
     ) {}
 
     /**
@@ -341,6 +342,8 @@ class PaymentService
                 performedBy: $operator->id,
             ));
 
+            $this->notifier->received($payment);
+
             return new SettledAtReception($payment->refresh(), $received->points, (int) $payment->amount_points);
         });
     }
@@ -435,6 +438,9 @@ class PaymentService
         }
 
         $this->spendGatewayCredit($payment);
+
+        // The member paid on the gateway's page; the money landing is news.
+        $this->notifier->received($payment);
     }
 
     /**

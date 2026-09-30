@@ -163,4 +163,30 @@ return [
         ],
     ],
 
+    'payment' => [
+        'received' => [
+            'title' => 'تم استلام الدفعة',
+            'body' => 'تم استلام دفعتك مقابل :purpose (:points نقطة).',
+        ],
+        'expired' => [
+            'title' => 'تم إلغاء حجز الباقة',
+            'body' => 'لم يتم دفع الباقة التي اخترت دفعها في الاستقبال خلال المهلة، وتم إلغاء حجزها.',
+        ],
+        'purposes' => [
+            'wallet_top_up' => 'شحن المحفظة',
+            'plan_purchase' => 'باقة',
+            'booking' => 'حجز',
+            'event_registration' => 'تسجيل في فعالية',
+            'coworking_session' => 'جلسة عمل مشترك',
+            'booking_extension' => 'تمديد حجز',
+        ],
+    ],
+
+    'event' => [
+        'payment_due' => [
+            'title' => 'دفعة مستحقة',
+            'body' => 'تم تأكيد مقعدك في :event. ادفع :points نقطة قبل الفعالية لتتمكن من الدخول.',
+        ],
+    ],
+
 ];

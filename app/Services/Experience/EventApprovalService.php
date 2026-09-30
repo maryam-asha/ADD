@@ -14,6 +14,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Services\WalletService;
 use App\Services\Experience\Exceptions\EventActionException;
+use App\Services\Notification\NotificationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Support\Facades\DB;
@@ -64,6 +65,7 @@ class EventApprovalService
             ])->save();
 
             $this->chargeIfPaid($event, $locked);
+            $this->tellPaymentDue($locked->refresh(), $event);
 
             $this->notify($locked->user_id, 'event.registration_approved');
         });
@@ -229,6 +231,35 @@ class EventApprovalService
         }
 
         $attendee->refresh();
+    }
+
+    /**
+     * A seat confirmed for a paid event but not paid for yet (cash at the
+     * desk, or a card still to be paid): the member is told they owe it,
+     * after commit.
+     */
+    private function tellPaymentDue(EventAttendee $attendee, Event $event): void
+    {
+        if ($attendee->payment_state !== EventPaymentState::Unpaid || $attendee->user_id === null) {
+            return;
+        }
+
+        DB::afterCommit(function () use ($attendee, $event) {
+            $member = User::query()->find($attendee->user_id);
+
+            if ($member === null) {
+                return;
+            }
+
+            app(NotificationService::class)->sendToUser($member, 'event.payment_due', [
+                'event' => $event->translate('title', $member->preferred_language ?? config('app.locale')),
+                'points' => (int) $attendee->price_points,
+            ], [
+                'purpose' => 'event_registration',
+                'payable_type' => $attendee->getMorphClass(),
+                'payable_id' => $attendee->id,
+            ]);
+        });
     }
 
     private function notify(?int $userId, string $templateKey): void

@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Payments\PaymentNotifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -28,7 +29,7 @@ class ExpirePendingCashPayments extends Command
 
     protected $description = 'Let cash plan holds that were never paid at reception lapse.';
 
-    public function handle(): int
+    public function handle(PaymentNotifier $notifier): int
     {
         $expired = 0;
 
@@ -38,13 +39,19 @@ class ExpirePendingCashPayments extends Command
             ->whereNotNull('expires_at')
             ->where('expires_at', '<=', now())
             ->select('id')
-            ->chunkById(200, function ($payments) use (&$expired) {
+            ->chunkById(200, function ($payments) use (&$expired, $notifier) {
                 foreach ($payments as $payment) {
                     try {
-                        $expired += Payment::query()
+                        $changed = Payment::query()
                             ->whereKey($payment->id)
                             ->where('status', PaymentStatus::Pending)
                             ->update(['status' => PaymentStatus::Expired->value]);
+
+                        if ($changed > 0) {
+                            $notifier->expired(Payment::query()->findOrFail($payment->id));
+                        }
+
+                        $expired += $changed;
                     } catch (Throwable $e) {
                         Log::error('[Payments] could not expire a cash hold', [
                             'payment_id' => $payment->id,
