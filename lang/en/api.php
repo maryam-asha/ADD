@@ -376,7 +376,7 @@ return [
             'room' => 'Meeting Room',
             'space' => 'Space',
         ],
-        'starting_from' => 'Starting from',
+        'price_points' => ':points pts',
         'per_hour' => 'hour',
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',

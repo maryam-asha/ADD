@@ -3,7 +3,6 @@
 namespace App\Support\Presenters;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
@@ -24,6 +23,7 @@ class EventPricePresenter
     public function __construct(
         private readonly PointConversionService $points,
         private readonly CurrencyResolver $currencies,
+        private readonly PriceLabelPresenter $labels,
     ) {}
 
     /**
@@ -96,33 +96,8 @@ class EventPricePresenter
             'price_display' => $priceDisplay,
             'price_display_label' => $isFree
                 ? __('api.event.price_free', [], $locale)
-                : $this->withSymbol($priceDisplay, $targetCurrency),
+                : $this->labels->currencyLabel($priceDisplay, $targetCurrency),
             'currency' => $targetCurrency,
         ];
     }
-
-    /**
-     * Thousands-separated, with the currency's own symbol placed after the
-     * number — the convention both `ل.س` and `$` read correctly in here,
-     * and the one the dashboard already uses.
-     *
-     * Falls back to the currency code when a row carries no symbol, so an
-     * admin adding a currency without one degrades to "1,000 EUR" rather
-     * than a bare number.
-     */
-    private function withSymbol(string $amount, string $currencyCode): string
-    {
-        // Memoised for the request: a listing formats a price per card, and
-        // this used to read the same currency row every time. The instance
-        // is per-resolution, which is the life of one request here.
-        $currency = $this->currencyRows[$currencyCode] ??= Currency::find($currencyCode);
-
-        $decimals = $currency?->decimal_places ?? 2;
-        $symbol = $currency?->symbol ?: $currencyCode;
-
-        return number_format((float) $amount, $decimals).' '.$symbol;
-    }
-
-    /** @var array<string, Currency|null> */
-    private array $currencyRows = [];
 }

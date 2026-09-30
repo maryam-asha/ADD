@@ -13,6 +13,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\BranchHoursPresenter;
+use App\Support\Presenters\PriceLabelPresenter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -23,6 +24,7 @@ class SpaceBrowseService
         private readonly SettingService $settings,
         private readonly PointConversionService $points,
         private readonly BranchHoursPresenter $hours,
+        private readonly PriceLabelPresenter $prices,
     ) {}
 
     /**
@@ -110,7 +112,7 @@ class SpaceBrowseService
         $paginator = $spacesQuery->orderBy('hourly_rate_points', 'asc')->paginate($perPage);
 
         // 5. Transform Space Cards
-        $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space));
+        $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space, $user));
 
         return [
             'working_hours_banner' => $banner,
@@ -262,7 +264,7 @@ class SpaceBrowseService
     /**
      * @return array<string, mixed>
      */
-    private function formatSpaceCard(Space $space): array
+    private function formatSpaceCard(Space $space, ?User $user): array
     {
         $badge = match ($space->space_type) {
             SpaceType::CoSpace => 'OPEN SPACE',
@@ -278,12 +280,6 @@ class SpaceBrowseService
             default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
         };
 
-        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
-        $rate = (float) $this->points->pointsToUsd($ratePoints);
-        $currency = 'USD';
-        $symbol = '$';
-        $isStartingFrom = $space->space_type === SpaceType::CoSpace;
-
         $amenities = $this->buildAmenities($space);
 
         return [
@@ -298,14 +294,9 @@ class SpaceBrowseService
             'capacity_label' => $space->space_type === SpaceType::CoSpace
                 ? __('api.space.single_seat')
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
-            'pricing' => [
-                'starting_from' => $isStartingFrom,
-                'hourly_rate_points' => $ratePoints,
-                'hourly_rate' => $rate,
-                'currency' => $currency,
-                'currency_symbol' => $symbol,
-                'formatted' => sprintf('%s%s / %s', $symbol, rtrim(rtrim(number_format($rate, 2), '0'), '.'), __('api.space.per_hour')),
-            ],
+            // The hourly rate, ready to print: in the member's currency and in
+            // points (PriceLabelPresenter).
+            ...$this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -483,12 +474,6 @@ class SpaceBrowseService
         $descriptionKey = 'api.space.descriptions.'.$space->space_type->value;
         $description = __($descriptionKey);
 
-        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
-        $rate = (float) $this->points->pointsToUsd($ratePoints);
-        $currency = 'USD';
-        $symbol = '$';
-        $isStartingFrom = $space->space_type === SpaceType::CoSpace;
-
         $quickFeatures = $this->buildQuickFeatures($space);
 
         $branchName = $branch->translate('name') ?? 'Aleppo Digital District';
@@ -510,14 +495,7 @@ class SpaceBrowseService
             'details' => [
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
-                'price' => [
-                    'starting_from' => $isStartingFrom,
-                    'hourly_rate_points' => $ratePoints,
-                    'hourly_rate' => $rate,
-                    'currency' => $currency,
-                    'currency_symbol' => $symbol,
-                    'formatted' => sprintf('%s%s / %s', $symbol, rtrim(rtrim(number_format($rate, 2), '0'), '.'), __('api.space.per_hour')),
-                ],
+                ...$this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

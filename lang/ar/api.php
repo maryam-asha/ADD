@@ -368,7 +368,7 @@ return [
             'room' => 'غرفة الاجتماعات',
             'space' => 'مساحة',
         ],
-        'starting_from' => 'يبدأ من',
+        'price_points' => ':points نقطة',
         'per_hour' => 'ساعة',
         'per_day' => 'يوم',
         'up_to_people' => 'حتى :count أشخاص',
