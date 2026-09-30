@@ -204,6 +204,46 @@
         {
             "key": "coworking_window_id",
             "value": "1"
+        },
+        {
+            "key": "kiosk_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "kiosk_pairing_code",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "kiosk_secret",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "coworking_qr_value",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "scan_ticket",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "coworking_session_type",
+            "value": "walkin",
+            "type": "string"
+        },
+        {
+            "key": "coworking_session_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "session_end_request_id",
+            "value": "",
+            "type": "string"
         }
     ],
     "event": [
@@ -5038,7 +5078,1486 @@
                     ]
                 },
                 {
-                    "name": "11. App (no login)",
+                    "name": "11. Coworking Sessions",
+                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. Rooms and other spaces keep their own flow. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: Start Session → (422 confirmation_required → Start Session again with scan_ticket + accept_uncovered) → Current Session for the timer → Request End → reception confirms → the member gets a coworking.session_ended notification → Session Report.\n\nTo run it end to end from Postman: Admin → Kiosks → Create Kiosk → Issue Pairing Code, then Kiosk (device app) → Pair Kiosk. That saves kiosk_id and kiosk_secret, and Start Session builds the kiosk's current code itself.",
+                    "item": [
+                        {
+                            "name": "Start Session (Scan Kiosk Code)",
+                            "event": [
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "// The kiosk's current code, built from kiosk_secret (saved by \"Pair Kiosk\") the way the kiosk app does it: RFC 6238, HMAC-SHA1, 30 s, 8 digits.",
+                                            "// Leaves coworking_qr_value alone when there is no secret, so a value scanned off a real kiosk can be pasted in instead.",
+                                            "const secret = pm.collectionVariables.get('kiosk_secret');",
+                                            "const kioskId = pm.collectionVariables.get('kiosk_id');",
+                                            "if (secret && kioskId) {",
+                                            "    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                                            "    const keyBytes = [];",
+                                            "    let bits = 0, value = 0;",
+                                            "    for (const c of secret.replace(/[\\s=]/g, '').toUpperCase()) {",
+                                            "        value = ((value << 5) | alphabet.indexOf(c)) & 0xffff;",
+                                            "        bits += 5;",
+                                            "        if (bits >= 8) { keyBytes.push((value >>> (bits - 8)) & 0xff); bits -= 8; }",
+                                            "    }",
+                                            "    const toWords = (bytes) => {",
+                                            "        const words = [];",
+                                            "        bytes.forEach((b, i) => { words[i >>> 2] |= b << (24 - (i % 4) * 8); });",
+                                            "        return CryptoJS.lib.WordArray.create(words, bytes.length);",
+                                            "    };",
+                                            "    const step = Math.floor(Date.now() / 1000 / 30);",
+                                            "    const counter = [0, 0, 0, 0, (step >>> 24) & 0xff, (step >>> 16) & 0xff, (step >>> 8) & 0xff, step & 0xff];",
+                                            "    const hash = CryptoJS.HmacSHA1(toWords(counter), toWords(keyBytes)).toString(CryptoJS.enc.Hex).match(/../g).map((h) => parseInt(h, 16));",
+                                            "    const offset = hash[19] & 0x0f;",
+                                            "    const binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];",
+                                            "    pm.collectionVariables.set('coworking_qr_value', `add-cowork:v1:${kioskId}:${String(binary % 100000000).padStart(8, '0')}`);",
+                                            "}"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "const body = pm.response.json();",
+                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data) {",
+                                            "    pm.collectionVariables.set('coworking_session_type', body.data.type);",
+                                            "    pm.collectionVariables.set('coworking_session_id', body.data.id);",
+                                            "}",
+                                            "if (pm.response.code === 422 && body.scan_ticket) {",
+                                            "    pm.collectionVariables.set('scan_ticket', body.scan_ticket);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions"
+                                    ]
+                                },
+                                "description": "**Scan the kiosk's code** (the request as saved). qr_value is what the kiosk's QR holds: `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) → Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) → the kiosk's space is an active co_space → business hours → you already have an open coworking session (200 with it — scanning twice is harmless) → a confirmed booking of yours on this space today that starts within 15 minutes or has started is checked in (type booking) → otherwise a walk-in: started at once when your plan covers it, else 422 confirmation_required. Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves coworking_session_type and coworking_session_id on 200/201, and scan_ticket on 422 confirmation_required.\n\n### Cases — see this request's saved examples\n- **Plan Covers It** — 201 walk-in; coverage.status covered, coverage.covered_until is when the plan stops covering it (window end or hours running out, whichever first).\n- **Confirmation Required** — 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing has started. Show the message and ask the member.\n- **Accept Uncovered** — body `{\"scan_ticket\": \"…\", \"accept_uncovered\": true}` → 201 paid walk-in, accepted_uncovered true. Coverage is evaluated again at this moment (a renewal in between makes it covered).\n- **Already in a Session** — 200 with the open session, nothing new started.\n- **Booking Checked In** — 201, type booking — your booking on this space was checked in instead of a walk-in.\n- **Error: Booking Awaiting Approval** — 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}` — no walk-in fallback, which would route around approval.\n- **Error: Ticket Expired** — 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` — also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** — 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}` — wrong, too old, malformed, or from an inactive/unpaired kiosk.\n- **Error: Kiosk Unavailable** — 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}` — the kiosk's space is not an active co_space (e.g. under maintenance).\n- **Error: Outside Business Hours** — 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** — 422 `{\"message\":\"This space has no available capacity right now.\"}`"
+                            },
+                            "response": [
+                                {
+                                    "name": "Plan Covers It",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Confirmation Required",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Your plan will not cover this session (you have no active plan). It will be billed at 100 points per hour.\",\n    \"reason\": \"no_plan\",\n    \"coverage\": {\n        \"status\": \"not_covered\",\n        \"reason\": \"no_plan\",\n        \"plan\": null,\n        \"hours_total\": null,\n        \"hours_remaining\": null,\n        \"window\": null,\n        \"covered_until\": null\n    },\n    \"hourly_rate_points\": 100,\n    \"scan_ticket\": \"eyJpdiI6Ii9JZ2JubWFsWldFb09NR3ZFRmZSQ0E9PSIsInZhbHVlIjoiU2xVVFppcjhDenNzS0xhaElCWjRjdmt0Ymx5MThnbGgzVmtoYTY0MEg1dz0iLCJtYWMiOiJjMDVlOWVhZTdkYTFmNWM1OWM2ZDk0YTFiM2E2Yzg3M2E3OWUzOWI4MTZhMmQ4NWE4N2MzNjFjYzAyZjg5MjQ5IiwidGFnIjoiIn0=\",\n    \"ticket_expires_at\": \"2026-08-17T07:07:00+00:00\"\n}"
+                                },
+                                {
+                                    "name": "Accept Uncovered",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"scan_ticket\": \"{{scan_ticket}}\",\n  \"accept_uncovered\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 2,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:05:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"not_covered\",\n            \"reason\": \"no_plan\",\n            \"plan\": null,\n            \"hours_total\": null,\n            \"hours_remaining\": null,\n            \"window\": null,\n            \"covered_until\": null\n        },\n        \"accepted_uncovered\": true,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Already in a Session",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Booking Checked In",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"booking\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": null,\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Booking Awaiting Approval",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Conflict",
+                                    "code": 409,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Your booking is awaiting approval. Please see reception.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Ticket Expired",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"scan_ticket\": \"{{scan_ticket}}\",\n  \"accept_uncovered\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This confirmation has expired. Scan the kiosk code again.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Invalid Code",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"add-cowork:v1:1:00000000\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This code is not valid. Scan the code currently shown on the kiosk.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Kiosk Unavailable",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Coworking sessions are not available at this kiosk right now.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Outside Business Hours",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This action is not available outside business hours.\"\n}"
+                                },
+                                {
+                                    "name": "Error: No Capacity",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This space has no available capacity right now.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Current Session (Timer)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/current",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "current"
+                                    ]
+                                },
+                                "description": "The member's open coworking session, for the timer: checked_in_at, coverage (walk-ins: the plan coverage taken at start — covered_until is when the plan stops covering it), accepted_uncovered, and end_request while one is pending. data is null when nothing is open.\n\n### Cases — see this request's saved examples\n- **No Open Session** — 200 `{\"data\": null}`.\n- **End Requested** — 200 with end_request {id, status: pending, requested_at, …} — show \"waiting for reception\"."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "No Open Session",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": null\n}"
+                                },
+                                {
+                                    "name": "End Requested",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 2 Hours\"\n            },\n            \"hours_total\": 2,\n            \"hours_remaining\": 2,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": {\n            \"id\": 1,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n            \"resolved_at\": null,\n            \"checked_out_at\": null\n        }\n    }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Request End",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 200 || pm.response.code === 201) {",
+                                            "    pm.collectionVariables.set('session_end_request_id', pm.response.json().data.id);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "current",
+                                        "end-request"
+                                    ]
+                                },
+                                "description": "The member presses \"end session\". Reception confirms it (Admin → Reception Operations → Session End Requests); the session is billed up to this moment by default. 201 with the request; pressing again while it is pending returns the same one (200). Saves session_end_request_id.\n\n### Cases — see this request's saved examples\n- **Already Requested** — 200 with the pending request.\n- **Error: No Open Session** — 422 `{\"message\":\"You have no active session.\"}` — also when reception already checked the member out."
+                            },
+                            "response": [
+                                {
+                                    "name": "201 Created",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"resolved_at\": null,\n        \"checked_out_at\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Already Requested",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"resolved_at\": null,\n        \"checked_out_at\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: No Open Session",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"You have no active session.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Withdraw End Request",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "current",
+                                        "end-request"
+                                    ]
+                                },
+                                "description": "Withdraws the pending end request; the session keeps running. Returns {message}. With no open session: 422 no_open_session.\n\n### Cases — see this request's saved examples\n- **Error: Nothing Pending** — 409 `{\"message\":\"This end request is no longer pending.\"}` — no request pending (never made, already withdrawn, or already confirmed)."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"End request withdrawn.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Nothing Pending",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Conflict",
+                                    "code": 409,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This end request is no longer pending.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Session Report",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "{{coworking_session_type}}",
+                                        "{{coworking_session_id}}",
+                                        "report"
+                                    ]
+                                },
+                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin — Start Session saves both variables. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first — a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet — kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Café orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours — name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at — null while the session is open.\n\n### Cases — see this request's saved examples\n- **Session Still Open** — 200, one \"Time so far\" line and totals null.\n- **Booking** — 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** — 404 — someone else's session, or a booking that was never checked in."
+                            },
+                            "response": [
+                                {
+                                    "name": "Closed Walk-in, Partly on the Plan",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "report"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 10800,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time covered by your plan\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 1,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": 100,\n                \"amount\": \"10.00\",\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 2,\n            \"hours_remaining\": 0\n        },\n        \"totals\": {\n            \"amount_owed\": \"10.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "Session Still Open",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "report"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": null,\n            \"duration_seconds\": 9000,\n            \"termination_source\": null\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time so far\",\n                \"quantity\": 2.5,\n                \"unit\": \"hour\",\n                \"source\": null,\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 0,\n            \"hours_remaining\": 2\n        },\n        \"totals\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Booking",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "report"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"booking\",\n            \"id\": 2,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"reception\",\n            \"checked_in_at\": \"2026-08-17T06:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 7200,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": null,\n                \"amount\": \"20.00\",\n                \"recorded_at\": null\n            }\n        ],\n        \"plan\": null,\n        \"totals\": {\n            \"amount_owed\": \"20.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Not Your Session",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "report"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Not Found",
+                                    "code": 404,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The requested resource was not found.\"\n}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "12. App (no login)",
                     "description": "Called by the app without a session.",
                     "item": [
                         {
@@ -8688,6 +10207,596 @@
                     ]
                 },
                 {
+                    "name": "Kiosks",
+                    "description": "Kiosk devices that show the rotating code members scan to start a coworking session. Each kiosk serves one co_space. Admin only — operations gets 403, since a kiosk's pairing is a credential. The TOTP secret never appears in any of these responses: it reaches the device once, through a pairing code (Issue Pairing Code → Kiosk (device app) → Pair Kiosk). See docs/decisions/coworking-self-service-sessions.md.",
+                    "item": [
+                        {
+                            "name": "List Kiosks",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks"
+                                    ]
+                                },
+                                "description": "Not paginated. Each kiosk: id, name, space_id, is_active, is_paired, paired_at, last_used_at (the last time one of its codes was accepted — the only sign of life a paired kiosk gives), created_at. The secret and the pairing code hash are never returned."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": [\n        {\n            \"id\": 1,\n            \"name\": \"Main entrance (left)\",\n            \"space_id\": 1,\n            \"is_active\": true,\n            \"is_paired\": true,\n            \"paired_at\": \"2026-08-17T07:00:00+00:00\",\n            \"last_used_at\": null,\n            \"created_at\": \"2026-08-17T07:00:00+00:00\"\n        }\n    ]\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Show Kiosk",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks",
+                                        "{{kiosk_id}}"
+                                    ]
+                                },
+                                "description": "Same shape as a List Kiosks row."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks",
+                                                "{{kiosk_id}}"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"name\": \"Main entrance (left)\",\n        \"space_id\": 1,\n        \"is_active\": true,\n        \"is_paired\": true,\n        \"paired_at\": \"2026-08-17T07:00:00+00:00\",\n        \"last_used_at\": null,\n        \"created_at\": \"2026-08-17T07:00:00+00:00\"\n    }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Create Kiosk",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    pm.collectionVariables.set('kiosk_id', pm.response.json().data.id);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"Main entrance\",\n  \"space_id\": \"{{space_id}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks"
+                                    ]
+                                },
+                                "description": "Binds a kiosk device to one coworking space. space_id must be a co_space; is_active defaults to true. 201 returns the kiosk (never a secret) and saves kiosk_id. Next: Issue Pairing Code.\n\n### Cases — see this request's saved examples\n- **Error: Not a Coworking Space** — 422 validation error on space_id when the space is a room or any other type."
+                            },
+                            "response": [
+                                {
+                                    "name": "201 Created",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": \"Main entrance\",\n  \"space_id\": 1\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"name\": \"Main entrance\",\n        \"space_id\": 1,\n        \"is_active\": true,\n        \"is_paired\": false,\n        \"paired_at\": null,\n        \"last_used_at\": null,\n        \"created_at\": \"2026-08-17T07:00:00+00:00\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Not a Coworking Space",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": \"Lobby\",\n  \"space_id\": 2\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The given data is invalid.\",\n    \"errors\": {\n        \"space_id\": [\n            \"A kiosk can only serve a coworking space.\"\n        ]\n    }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update Kiosk",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": \"Main entrance (left)\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks",
+                                        "{{kiosk_id}}"
+                                    ]
+                                },
+                                "description": "Any of name, space_id (co_space only), is_active. Deactivating stops its codes being accepted but keeps its pairing — to unpair, use Revoke Kiosk Secret. Returns {message}."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": \"Main entrance (left)\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks",
+                                                "{{kiosk_id}}"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Kiosk updated.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Delete Kiosk",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks",
+                                        "{{kiosk_id}}"
+                                    ]
+                                },
+                                "description": "204, no body. Sessions started from it keep their history; their kiosk_id becomes null."
+                            },
+                            "response": [
+                                {
+                                    "name": "204 No Content",
+                                    "originalRequest": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks",
+                                                "{{kiosk_id}}"
+                                            ]
+                                        }
+                                    },
+                                    "status": "No Content",
+                                    "code": 204,
+                                    "_postman_previewlanguage": "text",
+                                    "header": [],
+                                    "cookie": [],
+                                    "body": ""
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Issue Pairing Code",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    pm.collectionVariables.set('kiosk_pairing_code', pm.response.json().data.pairing_code);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}/pairing-code",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks",
+                                        "{{kiosk_id}}",
+                                        "pairing-code"
+                                    ]
+                                },
+                                "description": "8 characters from an alphabet without look-alikes (no 0/O, 1/I), valid 10 minutes, single use. Only its SHA-256 is stored, so this response is the only time it is shown. Issuing again replaces an unused code. Saves kiosk_pairing_code. Type it into the kiosk app (or run Kiosk (device app) → Pair Kiosk)."
+                            },
+                            "response": [
+                                {
+                                    "name": "201 Created",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}/pairing-code",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks",
+                                                "{{kiosk_id}}",
+                                                "pairing-code"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"pairing_code\": \"MDAUCU97\",\n        \"expires_at\": \"2026-08-17T07:10:00+00:00\"\n    }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Revoke Kiosk Secret",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}/secret",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "kiosks",
+                                        "{{kiosk_id}}",
+                                        "secret"
+                                    ]
+                                },
+                                "description": "Unpairs the kiosk: clears its secret and any pending pairing code, so codes from a lost or replaced device stop working at once. Separate from is_active on purpose — deactivating and reactivating would otherwise bring back the secret a lost device still holds. Pair it again to use it. Returns {message}."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/kiosks/{{kiosk_id}}/secret",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "kiosks",
+                                                "{{kiosk_id}}",
+                                                "secret"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The kiosk has been unpaired. Pair it again to use it.\"\n}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
                     "name": "Reception Operations",
                     "description": "Check-in/check-out, payment settlement, cancellation, manual wallet top-up, and booking approval/extension (docs/decisions/reception-operations-scope.md, docs/decisions/booking-creation-approval-extension.md). Bookings are created via Member (App) > Bookings > Create Booking, which auto-captures {{booking_id}}; walk-ins are created via Start Walk-in Session below, which auto-captures {{walkin_session_id}}.",
                     "item": [
@@ -8720,7 +10829,7 @@
                                                 "check-in"
                                             ]
                                         },
-                                        "description": "### Cases — see this request's saved examples\n- **Error: Outside Business Hours** — 422 `{\"message\": \"This action is not available outside business hours.\"}` when the branch is currently closed."
+                                        "description": "### Cases — see this request's saved examples\n- **Error: Outside Business Hours** — 422 `{\"message\": \"This action is not available outside business hours.\"}` when the branch is currently closed.\n- **Error: Member Already in a Session** — 409 `{\"message\":\"This member already has an active coworking session.\"}` — the member already has an open coworking session (scan or desk); one at a time on a co_space (added 2026-10-02, docs/decisions/coworking-self-service-sessions.md)."
                                     },
                                     "response": [
                                         {
@@ -8761,6 +10870,45 @@
                                             ],
                                             "cookie": [],
                                             "body": "{\n    \"message\": \"This action is not available outside business hours.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Member Already in a Session",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/bookings/{{booking_id}}/check-in",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "bookings",
+                                                        "{{booking_id}}",
+                                                        "check-in"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Conflict",
+                                            "code": 409,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"This member already has an active coworking session.\"\n}"
                                         }
                                     ]
                                 },
@@ -8814,7 +10962,7 @@
                                                 "walk-ins"
                                             ]
                                         },
-                                        "description": "### Cases — see this request's saved examples\n- **Error: No Capacity** — 422 `{\"message\": \"This space has no available capacity right now.\"}` when the space is already at Space.capacity."
+                                        "description": "### Cases — see this request's saved examples\n- **Error: No Capacity** — 422 `{\"message\": \"This space has no available capacity right now.\"}` when the space is already at Space.capacity.\n- **Error: Member Already in a Session** — 409 `{\"message\":\"This member already has an active coworking session.\"}` — the member already has an open coworking session (scan or desk); one at a time on a co_space (added 2026-10-02, docs/decisions/coworking-self-service-sessions.md)."
                                     },
                                     "response": [
                                         {
@@ -8866,6 +11014,56 @@
                                             ],
                                             "cookie": [],
                                             "body": "{\n    \"message\": \"This space has no available capacity right now.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Member Already in a Session",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "body": {
+                                                    "mode": "raw",
+                                                    "raw": "{\n  \"space_id\": {{space_id}},\n  \"user_id\": {{user_id}}\n}",
+                                                    "options": {
+                                                        "raw": {
+                                                            "language": "json"
+                                                        }
+                                                    }
+                                                },
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/walk-ins",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "walk-ins"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Conflict",
+                                            "code": 409,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"This member already has an active coworking session.\"\n}"
                                         }
                                     ]
                                 },
@@ -9965,8 +12163,326 @@
                                                 "active"
                                             ]
                                         },
-                                        "description": "Not paginated -- each row is tagged type = booking|walkin, with space_type and the checked-in user's name eager-loaded.\n\n`desk_codes` (added 2026-10-01): the codes of the desks this member's own or their company's live Dedicated Desk subscription ties them to — [] for everyone else — so reception can send them to their desk."
-                                    }
+                                        "description": "Not paginated -- each row is tagged type = booking|walkin, with space_type and the checked-in user's name eager-loaded.\n\n`desk_codes` (added 2026-10-01): the codes of the desks this member's own or their company's live Dedicated Desk subscription ties them to — [] for everyone else — so reception can send them to their desk.\n\nSelf-service coworking fields (added 2026-10-02, docs/decisions/coworking-self-service-sessions.md): `started_via` (reception | scan); `member` {id, name, phone, avatar_url, company} to check against the person at the desk; `plan` — for a walk-in, the plan coverage taken when it started (status covered | not_covered, reason, plan {id, name}, hours_total, hours_remaining, window, covered_until), null for a booking; `accepted_uncovered` — the member agreed to pay because their plan did not cover them; `end_request` — the member pressed \"end\" in the app ({id, status, requested_at, …}; confirm it with Session End Requests → Confirm Session End), null otherwise. Poll this list to see new scans and end requests."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "Scan-started Walk-in with a Pending End Request",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/sessions/active",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "sessions",
+                                                        "active"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"data\": [\n        {\n            \"id\": 1,\n            \"type\": \"walkin\",\n            \"space_id\": 1,\n            \"space_type\": \"co_space\",\n            \"user_id\": 1,\n            \"user_name\": \"Lina Haddad\",\n            \"checked_in_at\": \"2026-08-17T05:00:00.000000Z\",\n            \"is_overdue\": false,\n            \"seat_covered\": true,\n            \"membership_id\": 1,\n            \"desk_codes\": [],\n            \"started_via\": \"scan\",\n            \"member\": {\n                \"id\": 1,\n                \"name\": \"Lina Haddad\",\n                \"phone\": \"0991234567\",\n                \"avatar_url\": null,\n                \"company\": null\n            },\n            \"plan\": {\n                \"status\": \"covered\",\n                \"reason\": null,\n                \"plan\": {\n                    \"id\": 1,\n                    \"name\": \"Flex 2 Hours\"\n                },\n                \"hours_total\": 2,\n                \"hours_remaining\": 2,\n                \"window\": {\n                    \"start\": \"08:00\",\n                    \"end\": \"20:00\"\n                },\n                \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n            },\n            \"accepted_uncovered\": false,\n            \"end_request\": {\n                \"id\": 2,\n                \"status\": \"pending\",\n                \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n                \"resolved_at\": null,\n                \"checked_out_at\": null\n            }\n        },\n        {\n            \"id\": 2,\n            \"type\": \"walkin\",\n            \"space_id\": 1,\n            \"space_type\": \"co_space\",\n            \"user_id\": 3,\n            \"user_name\": \"Omar Khatib\",\n            \"checked_in_at\": \"2026-08-17T06:00:00.000000Z\",\n            \"is_overdue\": false,\n            \"seat_covered\": false,\n            \"membership_id\": null,\n            \"desk_codes\": [],\n            \"started_via\": \"reception\",\n            \"member\": {\n                \"id\": 3,\n                \"name\": \"Omar Khatib\",\n                \"phone\": \"0992345678\",\n                \"avatar_url\": null,\n                \"company\": null\n            },\n            \"plan\": {\n                \"status\": \"not_covered\",\n                \"reason\": \"no_plan\",\n                \"plan\": null,\n                \"hours_total\": null,\n                \"hours_remaining\": null,\n                \"window\": null,\n                \"covered_until\": null\n            },\n            \"accepted_uncovered\": false,\n            \"end_request\": null\n        }\n    ]\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Session Report",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/reception/sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "reception",
+                                                "sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "report"
+                                            ]
+                                        },
+                                        "description": "The same session report the member gets (see Member → 11. Coworking Sessions → Session Report), for any member's session. type is booking or walkin. 404 for a booking that was never checked in."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "200 OK",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/sessions/{{coworking_session_type}}/{{coworking_session_id}}/report",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "sessions",
+                                                        "{{coworking_session_type}}",
+                                                        "{{coworking_session_id}}",
+                                                        "report"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 10800,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time covered by your plan\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 1,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": 100,\n                \"amount\": \"10.00\",\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 2,\n            \"hours_remaining\": 0\n        },\n        \"totals\": {\n            \"amount_owed\": \"10.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        }\n    }\n}"
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Session End Requests",
+                            "description": "A member presses \"end session\" in the app (Member → 11. Coworking Sessions → Request End); reception confirms it here. An unconfirmed request is still honoured by the nightly auto-close, which bills to requested_at rather than closing time. See docs/decisions/coworking-self-service-sessions.md.",
+                            "item": [
+                                {
+                                    "name": "Confirm Session End",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "reception",
+                                                "session-end-requests",
+                                                "{{session_end_request_id}}",
+                                                "confirm"
+                                            ]
+                                        },
+                                        "description": "**Bill to when the member pressed end** (the request as saved, no body). Ends a session the member asked to end in the app: billed up to requested_at, so the time reception took to confirm is never charged — or up to checked_out_at when given (district wall-clock, not in the future). Closes through the same closure as Check Out, then notifies the member (coworking.session_ended) so their app opens the report. The request id comes with the row in List Active Reception Sessions (end_request.id). Returns {message}.\n\n### Cases — see this request's saved examples\n- **Different End Time** — body `{\"checked_out_at\": \"2026-08-17 11:15:00\"}` bills to that time instead.\n- **Error: Not Pending** — 409 `{\"message\":\"This end request is no longer pending.\"}` — already confirmed, withdrawn by the member, or the session was checked out another way (desk checkout or auto-close supersede it).\n- **Error: Past Closing Time** — 422 `{\"message\":\"The checkout time cannot be after the branch's closing time.\"}` — nothing changes: the request stays pending and the session open."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "200 OK",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "session-end-requests",
+                                                        "{{session_end_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"Session ended.\"\n}"
+                                        },
+                                        {
+                                            "name": "Different End Time",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "body": {
+                                                    "mode": "raw",
+                                                    "raw": "{\n  \"checked_out_at\": \"2026-08-17 11:15:00\"\n}",
+                                                    "options": {
+                                                        "raw": {
+                                                            "language": "json"
+                                                        }
+                                                    }
+                                                },
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "session-end-requests",
+                                                        "{{session_end_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"Session ended.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Not Pending",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "session-end-requests",
+                                                        "{{session_end_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Conflict",
+                                            "code": 409,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"This end request is no longer pending.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Past Closing Time",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "session-end-requests",
+                                                        "{{session_end_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Unprocessable Content",
+                                            "code": 422,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"The checkout time cannot be after the branch's closing time.\"\n}"
+                                        }
+                                    ]
                                 }
                             ]
                         },
@@ -17126,6 +19642,215 @@
                         "description": "The categories that published events actually use, as {id, name} in the requested language. Get Event Categories lists every category."
                     },
                     "response": []
+                }
+            ]
+        },
+        {
+            "name": "Kiosk (device app)",
+            "description": "Endpoints the kiosk device calls itself, with no login (routes/api/v1/kiosk.php). Today only pairing: after it, the kiosk generates its rotating codes offline and never calls in. See docs/decisions/coworking-self-service-sessions.md.",
+            "item": [
+                {
+                    "name": "Pair Kiosk",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const data = pm.response.json().data;",
+                                    "    pm.collectionVariables.set('kiosk_id', data.kiosk_id);",
+                                    "    pm.collectionVariables.set('kiosk_secret', data.secret);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"pairing_code\": \"{{kiosk_pairing_code}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/kiosk/pair",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "kiosk",
+                                "pair"
+                            ]
+                        },
+                        "description": "Called by the kiosk app, no login. Trades a pairing code (Admin → Kiosks → Issue Pairing Code; case, spaces and dashes are ignored) for the kiosk's TOTP secret — the only response that ever carries it, sent with Cache-Control: no-store. Every pairing generates a new secret, so pairing a replacement device cuts off the old one. Throttled to 5 per minute. Saves kiosk_id and kiosk_secret (Member → 11. Coworking Sessions → Start Session uses them).\n\nWhat the kiosk app does with it: keep `secret` in secure storage (Keychain / Keystore), never in plain preferences or logs; show a QR holding `{qr_prefix}:{kiosk_id}:{code}` where code = TOTP(secret) with `totp.algorithm` / `totp.digits` / `totp.period` (SHA1, 8, 30 — any RFC 6238 library), refreshed every period; keep the device clock NTP-synced (one step of drift is tolerated). It never calls the API again after pairing.\n\n### Cases — see this request's saved examples\n- **Error: Invalid or Expired Code** — 422 `{\"message\":\"This pairing code is invalid or has expired.\"}` — the same answer for a wrong, expired or already-used code and for an inactive kiosk.\n- **Error: Too Many Attempts** — 429 after 5 attempts in a minute."
+                    },
+                    "response": [
+                        {
+                            "name": "200 OK",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"pairing_code\": \"MDAUCU97\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/pair",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "pair"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"data\": {\n        \"kiosk_id\": 1,\n        \"name\": \"Main entrance (left)\",\n        \"secret\": \"NR5QC4D5SKNMLGKZGKPMUQRQUKSIJ3WN\",\n        \"totp\": {\n            \"algorithm\": \"SHA1\",\n            \"digits\": 8,\n            \"period\": 30\n        },\n        \"qr_prefix\": \"add-cowork:v1\"\n    }\n}"
+                        },
+                        {
+                            "name": "Error: Invalid or Expired Code",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"pairing_code\": \"MDAUCU97\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/pair",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "pair"
+                                    ]
+                                }
+                            },
+                            "status": "Unprocessable Content",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"This pairing code is invalid or has expired.\"\n}"
+                        },
+                        {
+                            "name": "Error: Too Many Attempts",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"pairing_code\": \"WRONGONE\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/pair",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "pair"
+                                    ]
+                                }
+                            },
+                            "status": "Too Many Requests",
+                            "code": 429,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"Too many attempts. Please wait before trying again.\"\n}"
+                        }
+                    ]
                 }
             ]
         },
