@@ -13,8 +13,12 @@ use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 |
 | A driver is any class implementing PaymentMethodDriver; one that also
 | implements PaymentGateway is asked for the outcome of a payment it opened
-| (status sync, reconcile, reversal). To add a method, add a class and a
-| line here — nothing else in the payment flow names a specific method.
+| (status sync, reconcile, reversal) and names the ledger method its
+| credits record. To add a method, add a class and a line here: the payment
+| lifecycle (sync, reconcile, reversal, crediting an accepted payment)
+| reaches methods only through the registry. What still names Paymera
+| itself is its own surface — the card start flow, its callback/trigger
+| routes and its `paymera` log channel.
 |
 | `enabled` only stops NEW payments from being opened with a method. A
 | disabled gateway is still consulted to settle payments already in flight,

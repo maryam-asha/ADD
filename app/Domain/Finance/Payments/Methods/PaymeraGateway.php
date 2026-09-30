@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments\Methods;
 
 use App\Domain\Finance\DataTransferObjects\CreatedPayment;
 use App\Domain\Finance\DataTransferObjects\PaymentStatusResult;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
@@ -105,6 +106,11 @@ class PaymeraGateway implements PaymentGateway
     public function callbackRouteName(): string
     {
         return 'paymera.callback';
+    }
+
+    public function ledgerMethod(): PaymentMethod
+    {
+        return PaymentMethod::Paymera;
     }
 
     /**

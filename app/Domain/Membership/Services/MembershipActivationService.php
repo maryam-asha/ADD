@@ -61,7 +61,11 @@ class MembershipActivationService
      * `$deskIds` ties a Dedicated Desk subscription to its desks in the same
      * transaction — DeskAssignmentRefusedException undoes the whole sale.
      *
+     * `$auditProperties` are added to the audit entry — how a sale paid
+     * elsewhere (PaymentService) names the payment that paid for it.
+     *
      * @param  list<int>  $deskIds
+     * @param  array<string, mixed>  $auditProperties
      */
     public function activate(
         Plan $plan,
@@ -73,12 +77,13 @@ class MembershipActivationService
         int $seats = 1,
         bool $overrideCapacity = false,
         array $deskIds = [],
+        array $auditProperties = [],
     ): Membership {
         if ($ownerType === OwnerType::User && $seats !== 1) {
             throw new \InvalidArgumentException('A member\'s own subscription holds exactly one seat.');
         }
 
-        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds) {
+        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds, $auditProperties) {
             $branchId ??= $this->branches->branchFor($ownerType, $ownerId);
             $periodStart = now();
             $periodEnd = now()->addDays($plan->duration_days);
@@ -127,7 +132,7 @@ class MembershipActivationService
 
             $this->grantPlanBalances($plan, $membership, $wallet);
 
-            $this->logSensitiveAction($auditAction ?? 'membership_purchased', $membership, [
+            $this->logSensitiveAction($auditAction ?? 'membership_purchased', $membership, array_merge([
                 'plan_id' => $plan->id,
                 'owner_type' => $ownerType->value,
                 'owner_id' => $ownerId,
@@ -136,7 +141,7 @@ class MembershipActivationService
                 'branch_id' => $branchId,
                 'seats' => $seats,
                 'capacity_overridden' => $overrideCapacity,
-            ]);
+            ], $auditProperties));
 
             return $membership;
         });

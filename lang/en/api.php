@@ -350,6 +350,7 @@ return [
         'gateway_unavailable' => 'Card payment is temporarily unavailable. Please try again shortly.',
         'could_not_start' => 'We could not start the payment. Please try again.',
         'plan_unavailable' => 'This package is not available for purchase.',
+        'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
 
         // Admin-facing.
         'not_reversible' => 'Only an accepted payment can be reversed.',
@@ -364,6 +365,7 @@ return [
         // Ledger descriptions — these land in the member's wallet history.
         'credit_description' => 'Card payment :reference',
         'reversal_description' => 'Reversal of card payment :reference',
+        'received_description' => 'Payment received',
     ],
 
     'space' => [

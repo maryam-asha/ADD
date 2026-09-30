@@ -242,6 +242,17 @@ class WalletService
     }
 
     /**
+     * Unlocked read of what `$user` may spend from `$wallet` in `$category`
+     * alone — the category side of debit()'s choice, before it falls back
+     * to general. For display and for reporting a shortfall; debits lock
+     * instead.
+     */
+    public function categoryBalance(Wallet $wallet, User $user, WalletTransactionCategory $category): int
+    {
+        return $this->eligibleBalance($wallet, $user, $category);
+    }
+
+    /**
      * Sums the wallet's non-expired General transactions with
      * `lockForUpdate()` — the row locking `debitGeneral()` uses to prevent
      * two concurrent debits from both reading the same balance.

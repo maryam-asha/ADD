@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments\Contracts;
 
 use App\Domain\Finance\DataTransferObjects\CreatedPayment;
 use App\Domain\Finance\DataTransferObjects\PaymentStatusResult;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
 
@@ -47,4 +48,12 @@ interface PaymentGateway extends PaymentMethodDriver
      * back to when the hosted page finishes.
      */
     public function callbackRouteName(): string;
+
+    /**
+     * How money that arrived through this gateway is recorded on the
+     * ledger: the `payment_method` of the credit an accepted payment writes
+     * (PaymentService::fulfilAcceptedGatewayPayment), beside the columns
+     * the reception till fills in for cash.
+     */
+    public function ledgerMethod(): PaymentMethod;
 }

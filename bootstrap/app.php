@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Finance\Exceptions\PaymentPricingException;
+use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -162,6 +163,21 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
         });
+
+        // Paying with points from a wallet that does not hold enough — the
+        // one shape every pay-with-points path answers with, so a client can
+        // show "you have X, it costs Y, you are Z short" without parsing the
+        // message.
+        $exceptions->render(fn (InsufficientPointsException $e) => response()->json([
+            'message' => __('api.payment.insufficient_points', [
+                'current' => $e->current,
+                'required' => $e->required,
+                'shortage' => $e->shortage,
+            ]),
+            'current' => $e->current,
+            'required' => $e->required,
+            'shortage' => $e->shortage,
+        ], 422));
 
         // Registered last: Throwable matches everything, so an earlier match
         // above always wins. Returning null in debug mode defers to Laravel's
