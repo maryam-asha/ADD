@@ -6,10 +6,13 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\SeatDesk;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
+use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\DeskAssignmentRefusedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Services\Notification\NotificationService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -74,6 +77,80 @@ class DedicatedDeskService
     {
         return $desks->addSelect([
             'membership_id' => $this->liveHolders()->select('membership_seat_desk.membership_id')->limit(1),
+        ]);
+    }
+
+    /**
+     * The codes of the desks each user sits at: those of their own live
+     * Dedicated Desk subscription, and of their companies' — which of a
+     * company's desks is whose is the company's to say. In three queries,
+     * for reception's list of sessions.
+     *
+     * @param  list<int>  $userIds
+     * @return array<int, list<string>> user id => desk codes
+     */
+    public function deskCodesByUser(array $userIds): array
+    {
+        $userIds = array_values(array_unique($userIds));
+
+        if ($userIds === []) {
+            return [];
+        }
+
+        $companiesOf = DB::table('company_user')
+            ->whereIn('user_id', $userIds)
+            ->get(['user_id', 'company_id'])
+            ->groupBy('user_id')
+            ->map(fn ($rows) => $rows->pluck('company_id')->all());
+
+        $companyIds = $companiesOf->flatten()->unique()->values()->all();
+
+        $codesByOwner = DB::table('membership_seat_desk')
+            ->join('memberships', 'memberships.id', '=', 'membership_seat_desk.membership_id')
+            ->join('seats_desks', 'seats_desks.id', '=', 'membership_seat_desk.seat_desk_id')
+            ->where('memberships.status', MembershipStatus::Active->value)
+            ->where('memberships.current_period_start', '<=', now())
+            ->where('memberships.current_period_end', '>=', now())
+            ->where(fn ($q) => $q
+                ->where(fn ($u) => $u->where('memberships.owner_type', OwnerType::User->value)->whereIn('memberships.owner_id', $userIds))
+                ->orWhere(fn ($c) => $c->where('memberships.owner_type', OwnerType::Company->value)->whereIn('memberships.owner_id', $companyIds)))
+            ->orderBy('seats_desks.code')
+            ->get(['memberships.owner_type', 'memberships.owner_id', 'seats_desks.code'])
+            ->groupBy(fn ($row) => $row->owner_type.':'.$row->owner_id)
+            ->map(fn ($rows) => $rows->pluck('code')->all());
+
+        $result = [];
+
+        foreach ($userIds as $userId) {
+            $codes = $codesByOwner->get(OwnerType::User->value.':'.$userId, []);
+
+            foreach ($companiesOf->get($userId, []) as $companyId) {
+                array_push($codes, ...$codesByOwner->get(OwnerType::Company->value.':'.$companyId, []));
+            }
+
+            $result[$userId] = array_values(array_unique($codes));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Tells operations and admins that a Dedicated Desk subscription arrived
+     * without a desk — one a member bought in the app — so someone ties one
+     * (the dashboard's "Dedicated desks" list).
+     */
+    public function notifyStaffDeskNeeded(Membership $membership): void
+    {
+        $staff = User::role(['operations', 'admin'])->where('status', 'active')->get();
+
+        if ($staff->isEmpty()) {
+            return;
+        }
+
+        app(NotificationService::class)->sendToUsers($staff, 'membership.desk_needed', [
+            'plan' => $membership->plan?->translate('name') ?? '#'.$membership->plan_id,
+        ], [
+            'membership_id' => $membership->id,
         ]);
     }
 

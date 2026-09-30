@@ -189,6 +189,14 @@ a desk is now a seat.
 - **The member sees their desk:** `memberships/current` carries `desks`
   (`[{code, label}]`; empty until staff tie one; `null` for any other plan), and
   so does the purchase response.
+- **Staff are told** when a member buys a Dedicated Desk plan (in the app, by
+  wallet or card): operations and admins get `membership.desk_needed`
+  (in-app + push, `NotificationService`), after the sale commits. Staff
+  activating one themselves are not told. The dashboard has no staff inbox
+  yet, so its "Dedicated desks" card also shows how many still wait.
+- **Reception sees the desk**: each active session carries `desk_codes`, the
+  desks of the member's own live Dedicated Desk subscription and of their
+  companies' (which of a company's desks is whose is the company's to say).
 - **Staff find subscriptions still owed a desk** in `GET admin/memberships`
   (`dedicated`, `live`, `without_desk`, `branch_id`), where each one carries
   its owner's name and desks.

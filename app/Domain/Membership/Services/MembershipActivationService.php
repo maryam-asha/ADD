@@ -119,6 +119,10 @@ class MembershipActivationService
 
             if ($deskIds !== []) {
                 $this->desks->assign($membership->setRelation('plan', $plan), $deskIds);
+            } elseif ($charge && $plan->isDedicatedDesk()) {
+                // Bought by the member — nobody has picked their desk yet.
+                // After commit, so a sale that rolls back tells nobody.
+                DB::afterCommit(fn () => $this->desks->notifyStaffDeskNeeded($membership->setRelation('plan', $plan)));
             }
 
             $this->grantPlanBalances($plan, $membership, $wallet);

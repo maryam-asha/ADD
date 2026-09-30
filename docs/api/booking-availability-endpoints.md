@@ -698,8 +698,9 @@ co_space with desks cannot change type (a `422` on `space_type`).
 
 #### Reception's active sessions
 
-`GET /api/v1/admin/reception/sessions/active` rows now carry `seat_covered` and
-`membership_id`. `seat_covered` is `true` when the walk-in sits in a seat their
+`GET /api/v1/admin/reception/sessions/active` rows now carry `seat_covered`,
+`membership_id` and `desk_codes` (the codes of the desks the member's own or
+their company's live Dedicated Desk subscription ties them to; `[]` otherwise). `seat_covered` is `true` when the walk-in sits in a seat their
 subscription holds, and `false` when it took a free one. Both are `null` for a
 booking.
 

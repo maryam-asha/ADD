@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Membership;
 
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\SeatDesk;
@@ -10,11 +11,15 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\WalletService;
+use App\Notifications\GeneralNotification;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -310,6 +315,75 @@ class DedicatedDeskAssignmentTest extends TestCase
         // A subscription's own desk is free for it.
         $this->getJson("/api/v1/admin/seats-desks?branch_id={$this->branch->id}&free_for_membership={$morning}")
             ->assertOk()->assertJsonCount(2, 'data');
+    }
+
+    /**
+     * A Dedicated Desk plan bought in the app arrives with no desk, so staff
+     * are told; one staff activate themselves is not news to them.
+     */
+    public function test_staff_are_told_when_a_member_buys_a_dedicated_desk_plan(): void
+    {
+        Notification::fake();
+        $this->desk();
+        $operator = User::factory()->create();
+        $operator->assignRole('operations');
+        $member = $this->member();
+        app(WalletService::class)->creditGeneral(
+            app(WalletService::class)->walletFor(OwnerType::User, $member->id),
+            1000,
+            WalletTransactionSource::TopUp,
+        );
+        $plan = Plan::factory()->dedicatedDesk()->create(['price_points' => 500]);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id])->assertCreated();
+
+        Notification::assertSentTo(
+            $operator,
+            GeneralNotification::class,
+            fn (GeneralNotification $n) => $n->toArray($operator)['template_key'] === 'membership.desk_needed',
+        );
+        Notification::assertNotSentTo($member, GeneralNotification::class);
+    }
+
+    public function test_staff_are_not_told_about_a_flexi_plan_or_their_own_activation(): void
+    {
+        Notification::fake();
+        $this->desk();
+        $this->desk();
+
+        $this->postJson('/api/v1/admin/memberships', [
+            'plan_id' => Plan::factory()->dedicatedDesk()->create()->id,
+            'user_id' => $this->member()->id,
+        ])->assertCreated();
+
+        $member = $this->member();
+        app(WalletService::class)->creditGeneral(
+            app(WalletService::class)->walletFor(OwnerType::User, $member->id),
+            1000,
+            WalletTransactionSource::TopUp,
+        );
+        Sanctum::actingAs($member, ['*']);
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => Plan::factory()->create(['price_points' => 500])->id])
+            ->assertCreated();
+
+        Notification::assertNothingSent();
+    }
+
+    /** Reception sees the desk a dedicated member sits at, next to their session. */
+    public function test_reception_sees_a_dedicated_members_desk(): void
+    {
+        $member = $this->member();
+        $desk = $this->desk();
+        $this->holdDesk($desk, $member);
+        WalkinSession::factory()->create(['space_id' => $this->coSpace->id, 'user_id' => $member->id]);
+        WalkinSession::factory()->create(['space_id' => $this->coSpace->id]);
+
+        $sessions = collect($this->getJson('/api/v1/admin/reception/sessions/active')->assertOk()->json('data'))
+            ->keyBy('user_id');
+
+        $this->assertSame([$desk->code], $sessions[$member->id]['desk_codes']);
+        $this->assertSame([], $sessions->except($member->id)->first()['desk_codes']);
     }
 
     /** Deleting the co_space would take its held desks with it, from under their subscriptions. */

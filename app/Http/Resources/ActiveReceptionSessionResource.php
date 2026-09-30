@@ -28,6 +28,9 @@ class ActiveReceptionSessionResource extends JsonResource
             // (docs/decisions/coworking-seat-pool.md).
             'seat_covered' => $this->type === 'walkin' ? (bool) $this->seat_covered : null,
             'membership_id' => $this->type === 'walkin' ? $this->membership_id : null,
+            // The codes of the desks this member's Dedicated Desk
+            // subscription (their own or their company's) ties them to.
+            'desk_codes' => $this->desk_codes ?? [],
             'started_via' => $this->resource->startSource()->value,
             // What reception checks against the person in front of them.
             'member' => [

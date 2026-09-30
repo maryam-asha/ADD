@@ -83,6 +83,10 @@ return [
     ],
 
     'membership' => [
+        'desk_needed' => [
+            'title' => 'Dedicated desk to assign',
+            'body' => 'A member subscribed to :plan in the app and needs a desk assigned.',
+        ],
         'subscribed' => [
             'title' => 'Plan Activated',
             'body' => 'Your subscription to :plan_name is now active.',

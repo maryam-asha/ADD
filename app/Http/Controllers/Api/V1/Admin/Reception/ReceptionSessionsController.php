@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\Services\SessionReportBuilder;
+use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActiveReceptionSessionResource;
@@ -17,7 +18,7 @@ use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 class ReceptionSessionsController extends Controller
 {
-    public function active(SessionClosureService $closures, SettingService $settings): AnonymousResourceCollection
+    public function active(SessionClosureService $closures, SettingService $settings, DedicatedDeskService $desks): AnonymousResourceCollection
     {
         $timezone = $settings->get('app.timezone', 'Asia/Damascus');
         $now = Carbon::now($timezone);
@@ -40,6 +41,11 @@ class ReceptionSessionsController extends Controller
         });
 
         $sessions = $bookings->concat($walkins);
+
+        // The desk a Dedicated Desk member sits at, so reception can send
+        // them to it (docs/decisions/coworking-seat-pool.md).
+        $codes = $desks->deskCodesByUser($sessions->pluck('user_id')->filter()->map(fn ($id) => (int) $id)->all());
+        $sessions->each(fn ($session) => $session->desk_codes = $codes[$session->user_id] ?? []);
 
         return ActiveReceptionSessionResource::collection($sessions);
     }

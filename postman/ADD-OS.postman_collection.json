@@ -2731,7 +2731,7 @@
                                         "memberships"
                                     ]
                                 },
-                                "description": "Gap found in the Task 15 Postman audit. Debits the buyer's personal wallet (or, with an optional company_id, the company's wallet -- requires CompanyPolicy::manageMembers) for plan.price and creates the Membership in one transaction. The plan must be a subscription (is_subscription = true) and currently active."
+                                "description": "Gap found in the Task 15 Postman audit. Debits the buyer's personal wallet (or, with an optional company_id, the company's wallet -- requires CompanyPolicy::manageMembers) for plan.price and creates the Membership in one transaction. The plan must be a subscription (is_subscription = true) and currently active.\n\nA Dedicated Desk plan bought here has no desk yet (`desks: []`); operations and admins are notified (membership.desk_needed) to tie one."
                             }
                         },
                         {
@@ -9965,7 +9965,7 @@
                                                 "active"
                                             ]
                                         },
-                                        "description": "Not paginated -- each row is tagged type = booking|walkin, with space_type and the checked-in user's name eager-loaded."
+                                        "description": "Not paginated -- each row is tagged type = booking|walkin, with space_type and the checked-in user's name eager-loaded.\n\n`desk_codes` (added 2026-10-01): the codes of the desks this member's own or their company's live Dedicated Desk subscription ties them to — [] for everyone else — so reception can send them to their desk."
                                     }
                                 }
                             ]
