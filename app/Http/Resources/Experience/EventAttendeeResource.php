@@ -4,6 +4,7 @@ namespace App\Http\Resources\Experience;
 
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Http\Resources\Forms\FormAnswerResource;
+use App\Support\Presenters\PriceLabelPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -33,6 +34,16 @@ class EventAttendeeResource extends JsonResource
             'approved_by' => $this->approved_by,
             'approved_at' => $this->approved_at?->toISOString(),
             'registered_at' => $this->created_at?->toISOString(),
+            'checked_in_at' => $this->checked_in_at?->toISOString(),
+            'checked_in_by' => $this->checked_in_by,
+            // Null for a free event: nothing to pay.
+            'payment' => $this->payment_state === null ? null : [
+                'state' => $this->payment_state->value,
+                'method' => $this->payment_method,
+                'price_points' => $this->price_points,
+                'price_label' => app(PriceLabelPresenter::class)->total((int) $this->price_points, $this->user)['price'],
+                'paid_at' => $this->paid_at?->toISOString(),
+            ],
             'answers' => FormAnswerResource::collection($this->whenLoaded('formAnswers')),
         ];
     }

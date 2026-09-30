@@ -2,25 +2,33 @@
 
 namespace App\Services\Experience;
 
+use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventLocationService;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Exceptions\InsufficientBalanceException;
-use App\Domain\Membership\Models\Wallet;
-use App\Domain\Membership\Services\WalletService;
+use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use Carbon\Carbon;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class EventRegistrationService
 {
+    use LogsSensitiveActions;
+
     public function __construct(
-        private readonly WalletService $wallets,
         private readonly FormSubmissionService $forms,
+        private readonly PaymentService $payments,
     ) {}
 
     /**
@@ -33,9 +41,15 @@ class EventRegistrationService
      *
      * @throws ValidationException
      */
-    public function register(Event $event, User $user, array $fieldValues = []): array
-    {
-        return DB::transaction(function () use ($event, $user, $fieldValues) {
+    public function register(
+        Event $event,
+        User $user,
+        array $fieldValues = [],
+        ?string $paymentMethod = null,
+        ?OwnerType $walletOwnerType = null,
+        ?int $walletOwnerId = null,
+    ): array {
+        return DB::transaction(function () use ($event, $user, $fieldValues, $paymentMethod, $walletOwnerType, $walletOwnerId) {
             // 1. Lock event for update to prevent race conditions on capacity
             $lockedEvent = Event::query()
                 ->where('id', $event->id)
@@ -116,50 +130,17 @@ class EventRegistrationService
                 ? EventRegistrationStatus::Pending
                 : EventRegistrationStatus::Approved;
 
-            // 6. Payment. Points are only ever taken from an approved
-            // registration, so a pending one costs nothing and a rejection
-            // needs no refund. A member short of points may still apply and
-            // top up before the decision.
+            // 6. Payment. A paid event's price is recorded on the
+            // registration, with how the member means to pay. Points are
+            // only ever taken from an approved registration, so a pending
+            // one costs nothing and a rejection needs no refund; an approved
+            // one paid by cash or card is confirmed unpaid and cannot be
+            // checked in until it is paid.
             $isFree = (bool) ($lockedEvent->is_free ?? true);
             $pricePoints = (int) ($lockedEvent->price_points ?? 0);
+            $isPaidEvent = ! $isFree && $pricePoints > 0;
+            $method = $paymentMethod ?? WalletMethod::KEY;
             $pointsDeducted = 0;
-
-            // TEMPORARY (config/events.php → EVENT_SKIP_BALANCE_CHECK): skips
-            // the debit outright for testing, so a member registers for a paid
-            // event without being charged and without a balance check. The
-            // debit and the check are one operation, so neither survives alone.
-            // Must be false in production — see the config note.
-            $skipDebit = (bool) config('events.skip_balance_check', false);
-
-            if ($status === EventRegistrationStatus::Approved && ! $isFree && $pricePoints > 0 && ! $skipDebit) {
-                $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
-
-                $eventTitle = is_array($lockedEvent->title)
-                    ? ($lockedEvent->title['en'] ?? $lockedEvent->title['ar'] ?? "Event #{$lockedEvent->id}")
-                    : (string) $lockedEvent->title;
-
-                try {
-                    // debitGeneral locks the balance and checks it itself;
-                    // reading it first and comparing would race.
-                    $this->wallets->debitGeneral(
-                        $wallet,
-                        $pricePoints,
-                        "Event registration: {$eventTitle}"
-                    );
-                } catch (InsufficientBalanceException) {
-                    $currentBalance = $this->wallets->generalBalance($wallet);
-
-                    throw ValidationException::withMessages([
-                        'points' => [__('api.event.insufficient_points', [
-                            'current' => $currentBalance,
-                            'required' => $pricePoints,
-                            'shortage' => max(0, $pricePoints - $currentBalance),
-                        ])],
-                    ]);
-                }
-
-                $pointsDeducted = $pricePoints;
-            }
 
             // 7. Create the attendee from the member's own profile. Name,
             // phone and email are never asked for on the form — they are
@@ -175,7 +156,16 @@ class EventRegistrationService
                     ? $this->pendingDeadlineFor($lockedEvent)
                     : null,
                 'attended' => null,
+                'price_points' => $isPaidEvent ? $pricePoints : null,
+                'payment_state' => $isPaidEvent ? EventPaymentState::Unpaid : null,
+                'payment_method' => $isPaidEvent ? $method : null,
+                'payment_wallet_owner_type' => $isPaidEvent ? $walletOwnerType?->value : null,
+                'payment_wallet_owner_id' => $isPaidEvent ? $walletOwnerId : null,
             ]);
+
+            if ($status === EventRegistrationStatus::Approved && $isPaidEvent && $method === WalletMethod::KEY) {
+                $pointsDeducted = $this->payFromWallet($attendee, $user, $pricePoints, $paymentMethod === null, $walletOwnerType, $walletOwnerId);
+            }
 
             // 8. Answers to the event's own questions, if it asks any —
             // decided by the form itself, not by the listing flag.
@@ -193,6 +183,11 @@ class EventRegistrationService
                     : __('api.event.registration_success');
             }
 
+            $this->logSensitiveAction('event_registered', $attendee, [
+                'price_points' => $isPaidEvent ? $pricePoints : 0,
+                'payment_method' => $isPaidEvent ? $method : null,
+            ]);
+
             return [
                 'message' => $successMessage,
                 'ticket_id' => $attendee->id,
@@ -207,6 +202,73 @@ class EventRegistrationService
                 ],
             ];
         });
+    }
+
+    /**
+     * Pays an approved registration from the wallet, now, through the one
+     * payment path — a payment row naming the registration and the wallet.
+     *
+     * An app that sends no method is paying the way it always did: from the
+     * member's own wallet, never asked to choose. One that says `wallet`
+     * chooses like a booking does (a company wallet among them).
+     *
+     * A wallet that falls short keeps the error this endpoint has always
+     * given — the `points` validation message with the numbers.
+     *
+     * @return int the points taken
+     *
+     * @throws ValidationException
+     */
+    private function payFromWallet(
+        EventAttendee $attendee,
+        User $user,
+        int $pricePoints,
+        bool $asBefore,
+        ?OwnerType $walletOwnerType,
+        ?int $walletOwnerId,
+    ): int {
+        // TEMPORARY (config/events.php → EVENT_SKIP_BALANCE_CHECK): skips the
+        // charge outright for testing, so a member registers for a paid event
+        // without being charged and without a balance check. The seat counts
+        // as paid, so the door lets them in. Must be false in production —
+        // see the config note.
+        if ((bool) config('events.skip_balance_check', false)) {
+            $attendee->forceFill(['payment_state' => EventPaymentState::Paid, 'paid_at' => now()])->save();
+
+            return 0;
+        }
+
+        if ($asBefore) {
+            $walletOwnerType = OwnerType::User;
+            $walletOwnerId = $user->id;
+        }
+
+        try {
+            $this->payments->start(PaymentPurpose::EventRegistration, $user, WalletMethod::KEY, [
+                'payable' => $attendee,
+                'wallet_owner_type' => $walletOwnerType,
+                'wallet_owner_id' => $walletOwnerId,
+            ]);
+        } catch (InsufficientPointsException $e) {
+            throw ValidationException::withMessages([
+                'points' => [__('api.event.insufficient_points', [
+                    'current' => $e->current,
+                    'required' => $e->required,
+                    'shortage' => $e->shortage,
+                ])],
+            ]);
+        } catch (ReceptionActionException $e) {
+            throw ValidationException::withMessages(['wallet' => [__($e->messageKey, $e->params)]]);
+        } catch (WalletChoiceRequiredException $e) {
+            throw new HttpResponseException(response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422));
+        }
+
+        $attendee->refresh();
+
+        return $pricePoints;
     }
 
     /**

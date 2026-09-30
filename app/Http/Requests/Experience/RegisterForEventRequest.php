@@ -3,9 +3,11 @@
 namespace App\Http\Requests\Experience;
 
 use App\Domain\Experience\Models\Event;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Forms\Models\Form;
 use App\Http\Requests\Concerns\ValidatesFormSubmission;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * A member signing up for an event, with answers to the event's own form
@@ -28,7 +30,13 @@ class RegisterForEventRequest extends FormRequest
      */
     public function rules(): array
     {
-        return $this->formFieldRules();
+        return array_merge($this->formFieldRules(), [
+            // Omitted: the member's own wallet, as before payment methods.
+            // A card is paid after the seat is confirmed, like a booking.
+            'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
+            'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
+            'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
+        ]);
     }
 
     /**

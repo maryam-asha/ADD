@@ -284,8 +284,7 @@ class PaymentsTableTest extends TestCase
     }
 
     /**
-     * A booking or a session is paid by naming it; an event registration is
-     * not payable from this endpoint yet.
+     * A booking, a session or an event registration is paid by naming it.
      */
     public function test_paying_for_a_record_requires_naming_it(): void
     {
@@ -296,14 +295,10 @@ class PaymentsTableTest extends TestCase
         Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         Sanctum::actingAs($member, ['member-app']);
 
-        foreach (['booking', 'coworking_session'] as $purpose) {
+        foreach (['booking', 'coworking_session', 'event_registration'] as $purpose) {
             $this->postJson('/api/v1/member/payments', ['purpose' => $purpose, 'amount' => 10])
                 ->assertStatus(422)
                 ->assertJsonValidationErrors('payable_id');
         }
-
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'event_registration', 'amount' => 10])
-            ->assertStatus(422)
-            ->assertJsonValidationErrors('purpose');
     }
 }

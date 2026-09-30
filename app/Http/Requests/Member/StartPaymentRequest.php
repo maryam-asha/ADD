@@ -30,12 +30,12 @@ class StartPaymentRequest extends FormRequest
     /**
      * @var list<string>
      */
-    private const PURPOSES = ['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session'];
+    private const PURPOSES = ['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration'];
 
     /**
      * @var list<string>
      */
-    private const PAYABLE_PURPOSES = ['booking', 'coworking_session'];
+    private const PAYABLE_PURPOSES = ['booking', 'coworking_session', 'event_registration'];
 
     /**
      * @return array<string, mixed>

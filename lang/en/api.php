@@ -344,6 +344,7 @@ return [
     ],
 
     'payment' => [
+        'registration_not_payable' => 'Only an approved registration for an event that is still on can be paid.',
         // Shown to the member. Never mentions the gateway's own fault
         // conditions (a rejected key, an unregistered server IP) — those are
         // ours, and a member must not read them as their card being declined.
@@ -497,6 +498,10 @@ return [
     ],
 
     'event' => [
+        'check_in_unpaid' => 'This registration has not been paid for yet.',
+        'check_in_not_approved' => 'Only an approved registration can be checked in.',
+        'already_checked_in' => 'This attendee has already been checked in.',
+        'checked_in' => 'Checked in.',
         'form_is_internal' => 'This event already asks its own :count question(s). Remove them before sending registration to an external form.',
         'form_is_external' => 'This event sends registration to an external form, so it has no questions of its own. Clear the link first.',
         'registers_externally' => 'Registration for this event is handled on an external form.',

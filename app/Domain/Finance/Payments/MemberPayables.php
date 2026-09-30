@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Identity\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -24,6 +25,7 @@ class MemberPayables
         return match ($purpose) {
             PaymentPurpose::Booking => Booking::query()->where('user_id', $member->id)->findOrFail($id),
             PaymentPurpose::CoworkingSession => WalkinSession::query()->where('user_id', $member->id)->findOrFail($id),
+            PaymentPurpose::EventRegistration => EventAttendee::query()->where('user_id', $member->id)->findOrFail($id),
             default => null,
         };
     }

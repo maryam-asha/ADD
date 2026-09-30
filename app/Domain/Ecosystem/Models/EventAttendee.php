@@ -5,6 +5,7 @@ namespace App\Domain\Ecosystem\Models;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Identity\Models\User;
+use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -28,6 +29,14 @@ class EventAttendee extends Model
         'approved_at',
         'pending_expires_at',
         'attended',
+        'price_points',
+        'payment_state',
+        'payment_method',
+        'payment_wallet_owner_type',
+        'payment_wallet_owner_id',
+        'paid_at',
+        'checked_in_at',
+        'checked_in_by',
     ];
 
     protected function casts(): array
@@ -37,6 +46,12 @@ class EventAttendee extends Model
             'attended' => 'boolean',
             'approved_at' => 'datetime',
             'pending_expires_at' => 'datetime',
+            'price_points' => 'integer',
+            'payment_state' => EventPaymentState::class,
+            'payment_wallet_owner_id' => 'integer',
+            'paid_at' => 'datetime',
+            'checked_in_at' => 'datetime',
+            'checked_in_by' => 'integer',
         ];
     }
 

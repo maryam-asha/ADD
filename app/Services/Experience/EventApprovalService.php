@@ -2,16 +2,20 @@
 
 namespace App\Services\Experience;
 
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Exceptions\InsufficientBalanceException;
 use App\Domain\Membership\Services\WalletService;
 use App\Services\Experience\Exceptions\EventActionException;
+use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,7 +32,7 @@ use Illuminate\Support\Facades\DB;
 class EventApprovalService
 {
     public function __construct(
-        private readonly WalletService $wallets,
+        private readonly PaymentService $payments,
     ) {}
 
     /**
@@ -50,13 +54,16 @@ class EventApprovalService
                 ->firstOrFail();
 
             $this->assertSeatAvailable($event, $locked);
-            $this->chargeIfPaid($event, $locked);
 
+            // Approved first: only an approved registration is paid for. A
+            // charge that fails rolls the approval back with it.
             $locked->forceFill([
                 'status' => EventRegistrationStatus::Approved,
                 'approved_by' => $operator->id,
                 'approved_at' => now(),
             ])->save();
+
+            $this->chargeIfPaid($event, $locked);
 
             $this->notify($locked->user_id, 'event.registration_approved');
         });
@@ -174,6 +181,12 @@ class EventApprovalService
         }
     }
 
+    /**
+     * Charges the approved registration the way the member chose when they
+     * applied: from the wallet they named (their own when they named none,
+     * as before), or not at all for cash or a card — the seat is confirmed
+     * unpaid, and they pay at the desk or from the app.
+     */
     private function chargeIfPaid(Event $event, EventAttendee $attendee): void
     {
         $pricePoints = (int) ($event->price_points ?? 0);
@@ -187,24 +200,35 @@ class EventApprovalService
             throw new EventActionException('api.event.approve_requires_member');
         }
 
-        try {
-            $wallet = $this->wallets->walletFor(OwnerType::User, $attendee->user_id);
-        } catch (ModelNotFoundException) {
-            throw new EventActionException('api.event.wallet_missing');
+        // Applied before registrations recorded their price: the event's.
+        if ($attendee->payment_state === null) {
+            $attendee->forceFill([
+                'price_points' => $pricePoints,
+                'payment_state' => EventPaymentState::Unpaid,
+                'payment_method' => WalletMethod::KEY,
+            ])->save();
         }
 
-        $title = is_array($event->title)
-            ? ($event->title['en'] ?? $event->title['ar'] ?? "Event #{$event->id}")
-            : (string) $event->title;
+        if (($attendee->payment_method ?? WalletMethod::KEY) !== WalletMethod::KEY) {
+            return;
+        }
 
         try {
-            $this->wallets->debitGeneral($wallet, $pricePoints, "Event registration: {$title}");
-        } catch (InsufficientBalanceException) {
-            throw new EventActionException('api.event.approve_insufficient_points', 422, [
-                'current' => $this->wallets->generalBalance($wallet),
-                'required' => $pricePoints,
+            $this->payments->start(PaymentPurpose::EventRegistration, $attendee->user, WalletMethod::KEY, [
+                'payable' => $attendee,
+                'wallet_owner_type' => $attendee->payment_wallet_owner_type ?? OwnerType::User->value,
+                'wallet_owner_id' => $attendee->payment_wallet_owner_id ?? $attendee->user_id,
             ]);
+        } catch (InsufficientPointsException $e) {
+            throw new EventActionException('api.event.approve_insufficient_points', 422, [
+                'current' => $e->current,
+                'required' => $e->required,
+            ]);
+        } catch (ReceptionActionException $e) {
+            throw new EventActionException($e->messageKey === 'api.payment.no_wallet' ? 'api.event.wallet_missing' : $e->messageKey, $e->status, $e->params);
         }
+
+        $attendee->refresh();
     }
 
     private function notify(?int $userId, string $templateKey): void

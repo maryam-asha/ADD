@@ -184,6 +184,8 @@ Route::get('events/{event}/attendees/pending', [AdminEventAttendeeController::cl
 Route::post('events/{event}/attendees/reject-pending', [AdminEventAttendeeController::class, 'rejectPending']);
 Route::post('events/{event}/attendees/{attendee}/approve', [AdminEventAttendeeController::class, 'approve']);
 Route::post('events/{event}/attendees/{attendee}/reject', [AdminEventAttendeeController::class, 'reject']);
+// The door: approved, and for a paid event paid (docs/decisions/unified-payments.md).
+Route::post('events/{event}/attendees/{attendee}/check-in', [AdminEventAttendeeController::class, 'checkIn']);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);

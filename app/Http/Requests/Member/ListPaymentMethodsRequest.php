@@ -27,9 +27,9 @@ class ListPaymentMethodsRequest extends FormRequest
                 'bail',
                 'required',
                 Rule::enum(PaymentPurpose::class),
-                Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session']),
+                Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration']),
             ],
-            'payable_id' => ['required_if:purpose,booking,coworking_session', 'nullable', 'integer'],
+            'payable_id' => ['required_if:purpose,booking,coworking_session,event_registration', 'nullable', 'integer'],
             'plan_id' => ['required_if:purpose,plan_purchase', 'nullable', 'integer'],
         ];
     }

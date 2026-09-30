@@ -69,6 +69,7 @@ use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
+use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Forms\FieldType;
 use Tests\TestCase;
@@ -90,6 +91,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
     private const EXPECTED_CASTS = [
         EventAttendee::class => [
             'status' => EventRegistrationStatus::class,
+            'payment_state' => EventPaymentState::class,
         ],
         AccessGrant::class => [
             'grantee_type' => OwnerType::class,

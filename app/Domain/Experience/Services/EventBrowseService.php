@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\User;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
+use App\Support\Presenters\PriceLabelPresenter;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -618,6 +619,7 @@ class EventBrowseService
             'registration_status' => $this->translateRegistrationStatus($mine?->status?->value, $locale),
             'rejection_reason' => $mine?->rejection_reason,
             'registered_at' => $mine?->created_at?->toISOString(),
+            'payment' => $this->paymentBlock($mine, $user),
         ]);
     }
 
@@ -711,6 +713,7 @@ class EventBrowseService
                 'attended' => $attendee?->attended,
                 'rejection_reason' => $attendee?->rejection_reason,
                 'registered_at' => $attendee?->created_at?->toISOString(),
+                'payment' => $this->paymentBlock($attendee, $user),
             ],
             'time_status' => [
                 'type' => $timeStatusType,
@@ -772,6 +775,28 @@ class EventBrowseService
         return $locale === 'ar'
             ? ($seatsLeft.' مقاعد متبقية')
             : ($seatsLeft.' seats left');
+    }
+
+    /**
+     * Whether this member's registration is paid for, and how they chose to
+     * pay — read off the registration itself. Null when there is nothing to
+     * pay (a free event) or no registration.
+     *
+     * @return array{state: string, method: string|null, price_points: int|null, price_label: string, paid_at: string|null}|null
+     */
+    private function paymentBlock(?Model $attendee, ?User $user): ?array
+    {
+        if ($attendee?->payment_state === null) {
+            return null;
+        }
+
+        return [
+            'state' => $attendee->payment_state->value,
+            'method' => $attendee->payment_method,
+            'price_points' => $attendee->price_points,
+            'price_label' => app(PriceLabelPresenter::class)->total((int) $attendee->price_points, $user)['price'],
+            'paid_at' => $attendee->paid_at?->toISOString(),
+        ];
     }
 
     /**
