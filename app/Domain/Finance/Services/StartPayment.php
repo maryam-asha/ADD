@@ -71,6 +71,7 @@ class StartPayment
 
         $payment = DB::transaction(fn () => Payment::create([
             'callback_token' => Payment::newCallbackToken(),
+            'method' => 'paymera',
             'purpose' => $purpose,
             'status' => PaymentStatus::Pending,
             'user_id' => $user->id,
@@ -80,6 +81,7 @@ class StartPayment
             'currency' => (string) config('paymera.currency'),
             'currency_exponent' => (int) config('paymera.currency_exponent'),
             'points_to_credit' => $points,
+            'amount_points' => $points,
             'terminal_id' => (string) config('paymera.terminal_id'),
             'lang' => $lang ?? (string) config('paymera.default_lang'),
         ]));

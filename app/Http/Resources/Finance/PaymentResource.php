@@ -6,7 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * A card payment as the member app and the dashboard see it.
+ * A payment as the member app and the dashboard see it, whatever the method
+ * (wallet points, cash at reception, a card gateway).
  *
  * Deliberately omitted: `callback_token` (it is the credential the public
  * callback/trigger routes are protected by) and `raw_response` (the
@@ -27,15 +28,29 @@ class PaymentResource extends JsonResource
             'id' => $this->id,
             'status' => $this->status->value,
             'purpose' => $this->purpose->value,
+            'method' => $this->method,
 
             // What the card was charged, as charged: the gateway's integer
             // minor units plus the exponent needed to render it. The client
-            // formats it; nothing here pre-rounds it into a float.
+            // formats it; nothing here pre-rounds it into a float. All three
+            // are null for a payment that did not go through a gateway.
             'amount_minor' => $this->amount_minor,
             'currency' => $this->currency,
             'currency_exponent' => $this->currency_exponent,
 
             'points_to_credit' => $this->points_to_credit,
+
+            // What the payment is worth in points, whatever the method.
+            'amount_points' => $this->amount_points,
+
+            // What it pays for, as the morph alias plus the id — enough for
+            // the client to find the booking or session without a second
+            // model being loaded here.
+            'payable' => $this->payable_type === null
+                ? null
+                : ['type' => $this->payable_type, 'id' => $this->payable_id],
+
+            'expires_at' => $this->expires_at?->toISOString(),
             'plan_id' => $this->plan_id,
             'membership_id' => $this->membership_id,
 
@@ -56,6 +71,14 @@ class PaymentResource extends JsonResource
                 'gateway_created_at' => $this->gateway_created_at?->toISOString(),
                 'reversed_at' => $this->reversed_at?->toISOString(),
                 'reversed_by' => $this->reversed_by,
+                'refunded_at' => $this->refunded_at?->toISOString(),
+
+                // Cash taken at the desk: in what, how much, by whom.
+                'collected_via' => $this->collected_via?->value,
+                'received_amount' => $this->received_amount,
+                'received_currency' => $this->received_currency,
+                'received_by' => $this->received_by,
+                'received_at' => $this->received_at?->toISOString(),
             ]),
         ];
     }

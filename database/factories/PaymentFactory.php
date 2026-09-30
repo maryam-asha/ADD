@@ -9,6 +9,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Database\Eloquent\Model;
 
 /**
  * @extends Factory<Payment>
@@ -30,6 +31,7 @@ class PaymentFactory extends Factory
         return [
             'payment_id' => $this->faker->uuid(),
             'callback_token' => Payment::newCallbackToken(),
+            'method' => 'paymera',
             'purpose' => PaymentPurpose::WalletTopUp,
             'status' => PaymentStatus::Pending,
             'user_id' => User::factory(),
@@ -39,6 +41,9 @@ class PaymentFactory extends Factory
             'currency' => 'USD',
             'currency_exponent' => 2,
             'points_to_credit' => $points,
+            // Follows `points_to_credit` unless a test states otherwise, so
+            // overriding one does not leave the two disagreeing.
+            'amount_points' => fn (array $attributes) => $attributes['points_to_credit'],
             'terminal_id' => '99990001',
             'lang' => 'en',
             'check_attempts' => 0,
@@ -65,6 +70,39 @@ class PaymentFactory extends Factory
             'purpose' => PaymentPurpose::PlanPurchase,
             'plan_id' => $plan->id,
             'points_to_credit' => (int) $plan->price_points,
+            'amount_points' => (int) $plan->price_points,
+        ]);
+    }
+
+    /**
+     * A payment that never touched a gateway (wallet points, cash at the
+     * desk): no terminal, no callback token, no minor-unit amount, and
+     * nothing to credit — its worth is `amount_points`.
+     */
+    public function withoutGateway(string $method, int $points): static
+    {
+        return $this->state(fn () => [
+            'method' => $method,
+            'payment_id' => null,
+            'callback_token' => null,
+            'terminal_id' => null,
+            'amount_minor' => null,
+            'currency' => null,
+            'currency_exponent' => null,
+            'lang' => null,
+            'points_to_credit' => 0,
+            'amount_points' => $points,
+        ]);
+    }
+
+    /**
+     * Pays for one record, stored under its morph-map alias.
+     */
+    public function forPayable(Model $payable): static
+    {
+        return $this->state(fn () => [
+            'payable_type' => $payable->getMorphClass(),
+            'payable_id' => $payable->getKey(),
         ]);
     }
 }

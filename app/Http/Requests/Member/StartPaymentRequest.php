@@ -31,7 +31,16 @@ class StartPaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'purpose' => ['required', Rule::enum(PaymentPurpose::class)],
+            // The enum now knows purposes that are not paid by opening a
+            // card payment (booking, event registration, coworking
+            // session). This endpoint still opens card payments for exactly
+            // two, until it is widened deliberately.
+            'purpose' => [
+                'bail',
+                'required',
+                Rule::enum(PaymentPurpose::class),
+                Rule::in([PaymentPurpose::WalletTopUp->value, PaymentPurpose::PlanPurchase->value]),
+            ],
 
             // Required for a top-up, meaningless for a plan purchase.
             'amount' => [
