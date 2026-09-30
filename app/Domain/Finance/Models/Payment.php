@@ -99,6 +99,7 @@ class Payment extends Model
             'refunded_at' => 'datetime',
             'received_at' => 'datetime',
             'expires_at' => 'datetime',
+            'settled_at' => 'datetime',
         ];
     }
 

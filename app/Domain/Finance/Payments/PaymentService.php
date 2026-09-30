@@ -15,8 +15,11 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use Illuminate\Database\DetectsConcurrencyErrors;
+use Illuminate\Database\DetectsLostConnections;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use LogicException;
 use Throwable;
 
 /**
@@ -30,14 +33,21 @@ use Throwable;
  * bought by card is therefore a credit and a debit, net zero — the same two
  * steps as a top-up followed by a purchase.
  *
- * Two idempotence links on the payment row make every step safe to repeat:
- * `wallet_transaction_id` records that the money was credited,
- * `debit_transaction_id` that the points were spent. They — not `status` —
- * are the record, because an accepted payment can legitimately move on to
- * NeedsReview.
+ * The payment row makes every step safe to repeat: `wallet_transaction_id`
+ * records that the money was credited, `settled_at` that the whole
+ * settlement — spend and delivery — is done. Not `status`: a gateway accepts
+ * a card payment before its points are spent. Not `debit_transaction_id`: a
+ * purchase that costs nothing writes no debit row.
+ *
+ * Only a Pending payment, or an Accepted one not yet settled, can be
+ * settled. Every other status is final — failed, cancelled, expired,
+ * reversed, or with a human (NeedsReview) — and settling it would spend
+ * points on a purchase nobody is waiting for.
  */
 class PaymentService
 {
+    use DetectsConcurrencyErrors, DetectsLostConnections;
+
     public function __construct(
         private readonly WalletService $wallets,
         private readonly FulfillerRegistry $fulfillers,
@@ -50,12 +60,15 @@ class PaymentService
      * `$funding` (when money arrived), spends what is due (unless it is a
      * top-up, which only buys the points), fulfils, and marks it Accepted.
      *
-     * Settling a payment that is already settled returns it untouched. Any
+     * Settling a payment that is already settled returns it untouched; one
+     * in a final state is refused (409 `api.payment.not_settleable`). Any
      * failure — the target can no longer be bought, the wallet is short,
      * fulfilment throws — rolls the whole settlement back, credit included.
      *
      * @throws InsufficientPointsException when the wallet cannot cover what is due
-     * @throws ReceptionActionException when the fulfiller refuses the target
+     * @throws ReceptionActionException when the fulfiller refuses the target,
+     *                                  or the payment is in a final state
+     * @throws LogicException when a top-up is settled without the money
      */
     public function settle(Payment $payment, ?Funding $funding = null): Payment
     {
@@ -64,22 +77,32 @@ class PaymentService
         return DB::transaction(function () use ($payment, $funding, $fulfiller) {
             $this->lock($payment);
 
-            if ($this->isSettled($payment)) {
+            if ($payment->settled_at !== null) {
                 return $payment;
+            }
+
+            if (! in_array($payment->status, [PaymentStatus::Pending, PaymentStatus::Accepted], true)) {
+                throw new ReceptionActionException('api.payment.not_settleable', 409);
             }
 
             if ($funding !== null && ! $payment->hasBeenCredited()) {
                 $this->credit($payment, $funding, __('api.payment.received_description'));
             }
 
-            if ($payment->purpose !== PaymentPurpose::WalletTopUp) {
+            if ($payment->purpose === PaymentPurpose::WalletTopUp) {
+                // A top-up is the money; accepting one that never arrived
+                // would record points nobody paid for.
+                if (! $payment->hasBeenCredited()) {
+                    throw new LogicException("Top-up payment [{$payment->id}] cannot be settled without funding.");
+                }
+            } else {
                 $fulfiller->assertPayable($payment);
                 $this->spend($payment, $fulfiller);
             }
 
             $fulfiller->fulfil($payment);
 
-            $payment->forceFill(['status' => PaymentStatus::Accepted])->save();
+            $payment->forceFill(['status' => PaymentStatus::Accepted, 'settled_at' => now()])->save();
 
             return $payment;
         });
@@ -102,6 +125,10 @@ class PaymentService
      *     rolls back: the points stay with the member, the payment becomes
      *     NeedsReview and an alert goes out. Their money is never silently
      *     absorbed, and no bank reversal is attempted (a human decides).
+     *     A deadlock or a lost connection is the exception: the database
+     *     rolled back the whole transaction, credit included, so "credited,
+     *     needs review" would be false. It propagates, the sync rolls back,
+     *     and the reconciler tries again.
      */
     public function fulfilAcceptedGatewayPayment(Payment $payment): void
     {
@@ -162,6 +189,10 @@ class PaymentService
         try {
             $this->settle($payment);
         } catch (Throwable $e) {
+            if ($this->causedByConcurrencyError($e) || $this->causedByLostConnection($e)) {
+                throw $e;
+            }
+
             // Re-read: the rolled-back settlement may have left values on
             // the model (a debit id) that never reached the database.
             $payment->refresh();
@@ -220,6 +251,13 @@ class PaymentService
         $category = $fulfiller->walletCategory();
         $due = $fulfiller->pointsDue($payment);
 
+        if ($due <= 0) {
+            // Nothing to spend, so no ledger row; settled_at is the record.
+            $payment->forceFill(['amount_points' => 0])->save();
+
+            return;
+        }
+
         try {
             $rows = $this->wallets->debit($payment->wallet, $payment->user, $category, $due, $fulfiller->describe($payment));
         } catch (InsufficientBalanceException) {
@@ -264,21 +302,6 @@ class PaymentService
 
         $payment->setRawAttributes($current->getAttributes(), true);
         $payment->setRelations([]);
-    }
-
-    /**
-     * A top-up is settled once its credit landed; anything else once its
-     * points were spent.
-     */
-    private function isSettled(Payment $payment): bool
-    {
-        if ($payment->status !== PaymentStatus::Accepted) {
-            return false;
-        }
-
-        return $payment->purpose === PaymentPurpose::WalletTopUp
-            ? $payment->hasBeenCredited()
-            : $payment->debit_transaction_id !== null;
     }
 
     /**

@@ -102,4 +102,21 @@ class ReceivedMoneyConverterTest extends TestCase
 
         $this->converter()->pointsToAmount(340, 'SYP');
     }
+
+    /**
+     * `numeric` lets through spellings bcmath refuses. They are the same
+     * money, so they convert the same; anything that is not a number is a
+     * caller's bug, not a 500 from deep inside bcmath.
+     */
+    public function test_every_numeric_spelling_of_an_amount_converts(): void
+    {
+        foreach (['1e3', ' 1000 ', '1000.', '+1000', '1000.000'] as $amount) {
+            $this->assertSame(10000, $this->converter()->toPoints($amount, 'USD')->points, $amount);
+        }
+
+        $this->assertSame(5, $this->converter()->toPoints('.5', 'USD')->points);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->converter()->toPoints('ten dollars', 'USD');
+    }
 }

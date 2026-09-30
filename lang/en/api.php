@@ -351,6 +351,7 @@ return [
         'could_not_start' => 'We could not start the payment. Please try again.',
         'plan_unavailable' => 'This package is not available for purchase.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
+        'not_settleable' => 'This payment can no longer be settled.',
 
         // Admin-facing.
         'not_reversible' => 'Only an accepted payment can be reversed.',

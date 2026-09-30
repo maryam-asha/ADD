@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Finance;
 
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
@@ -13,6 +14,7 @@ use App\Domain\Finance\Payments\Fulfillers\PlanPurchaseFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalletTopUpFulfiller;
 use App\Domain\Finance\Payments\Funding;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Foundation\Models\Building;
@@ -27,9 +29,13 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Membership\Services\DedicatedDeskService;
+use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\WalletService;
 use App\Notifications\GeneralNotification;
 use Database\Seeders\RoleSeeder;
+use Illuminate\Database\DeadlockException;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
@@ -558,6 +564,138 @@ class PaymentServiceTest extends TestCase
                     'shortage' => 70,
                 ]);
         }
+    }
+
+    // ---------------------------------------------------------------
+    // What settle() refuses, and what it never does twice
+    // ---------------------------------------------------------------
+
+    /**
+     * A payment that failed, expired, was cancelled, reversed or handed to a
+     * human is over. Settling it would spend the member's points on a
+     * purchase nobody is waiting for, or flip a reversed payment back.
+     */
+    public function test_a_payment_in_a_final_state_cannot_be_settled(): void
+    {
+        $member = $this->member();
+        $plan = $this->plan(100);
+        app(WalletService::class)->creditGeneral($this->walletOf($member), 500, WalletTransactionSource::TopUp);
+
+        foreach ([PaymentStatus::Failed, PaymentStatus::Canceled, PaymentStatus::Reversed, PaymentStatus::Expired, PaymentStatus::NeedsReview] as $status) {
+            $payment = Payment::factory()->forPlan($plan)->withoutGateway('wallet', 100)->create([
+                'user_id' => $member->id,
+                'wallet_id' => $this->walletOf($member)->id,
+                'status' => $status,
+            ]);
+
+            try {
+                $this->service()->settle($payment);
+                $this->fail("Settled a {$status->value} payment.");
+            } catch (ReceptionActionException $e) {
+                $this->assertSame('api.payment.not_settleable', $e->messageKey);
+                $this->assertSame(409, $e->status);
+            }
+
+            $this->assertSame($status, $payment->refresh()->status);
+        }
+
+        $this->assertSame(1, WalletTransaction::count());
+        $this->assertSame(0, Membership::count());
+    }
+
+    /**
+     * The card paid for the plan, so the audit entry says it was charged —
+     * as it did before PaymentService took the charge out of activation.
+     */
+    public function test_a_card_plan_purchase_is_audited_as_charged(): void
+    {
+        $member = $this->member();
+        $plan = $this->plan(100);
+        $this->fakeGateway();
+        $payment = $this->cardPayment($member, [], $plan);
+
+        app(SyncPaymentStatus::class)->handle($payment);
+
+        $activity = Activity::where('description', 'membership_purchased_by_card')->sole();
+        $this->assertTrue($activity->properties['charged']);
+        $this->assertSame($payment->id, $activity->properties['payment_id']);
+    }
+
+    /**
+     * Nothing to spend writes no debit row, so the debit link cannot be what
+     * says the payment is done — a second settle would buy the plan again.
+     */
+    public function test_a_free_purchase_is_settled_once(): void
+    {
+        $member = $this->member();
+        $plan = $this->plan(0);
+
+        $payment = Payment::factory()->forPlan($plan)->withoutGateway('wallet', 0)->create([
+            'user_id' => $member->id,
+            'wallet_id' => $this->walletOf($member)->id,
+        ]);
+
+        $this->service()->settle($payment);
+        $this->service()->settle($payment->refresh());
+
+        $payment->refresh();
+        $this->assertSame(PaymentStatus::Accepted, $payment->status);
+        $this->assertNotNull($payment->settled_at);
+        $this->assertSame(1, Membership::count());
+        $this->assertSame(0, WalletTransaction::count());
+    }
+
+    /**
+     * A top-up buys points with money. Without the money there is nothing to
+     * accept.
+     */
+    public function test_a_top_up_cannot_be_settled_without_money(): void
+    {
+        $member = $this->member();
+        $payment = Payment::factory()->withoutGateway('cash', 0)->create([
+            'user_id' => $member->id,
+            'wallet_id' => $this->walletOf($member)->id,
+        ]);
+
+        try {
+            $this->service()->settle($payment);
+            $this->fail('Settled a top-up with no money.');
+        } catch (\LogicException) {
+        }
+
+        $this->assertSame(PaymentStatus::Pending, $payment->refresh()->status);
+        $this->assertSame(0, WalletTransaction::count());
+    }
+
+    /**
+     * A deadlock or a dropped connection is not "the purchase failed": the
+     * database already rolled the credit back with it. Marking the payment
+     * NeedsReview ("credited") would be a lie and stop the reconciler; the
+     * error must reach the sync so it rolls back and is retried.
+     */
+    public function test_a_database_failure_during_the_spend_is_retried_not_reviewed(): void
+    {
+        $member = $this->member();
+        $plan = $this->plan(100);
+        $payment = $this->cardPayment($member, ['status' => PaymentStatus::Accepted], $plan);
+
+        $this->app->bind(PlanPurchaseFulfiller::class, fn ($app) => new class($app->make(MembershipActivationService::class), $app->make(DedicatedDeskService::class), $app->make(PaymentMethodRegistry::class)) extends PlanPurchaseFulfiller
+        {
+            public function fulfil(Payment $payment): void
+            {
+                throw new QueryException('mysql', 'insert into memberships', [], new \PDOException('SQLSTATE[40001]: Serialization failure: 1213 Deadlock found when trying to get lock'));
+            }
+        });
+
+        try {
+            $this->service()->fulfilAcceptedGatewayPayment($payment);
+            $this->fail('The deadlock was swallowed.');
+        } catch (QueryException|DeadlockException) {
+            // Inside a transaction Laravel re-raises it as a DeadlockException.
+        }
+
+        $this->assertNotSame(PaymentStatus::NeedsReview, $payment->refresh()->status);
+        $this->assertNull($payment->review_reason);
     }
 
     public function test_each_money_in_purpose_has_its_fulfiller(): void

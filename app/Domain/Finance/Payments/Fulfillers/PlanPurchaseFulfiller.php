@@ -65,7 +65,8 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
     /**
      * `charge: false` because PaymentService has already spent the points;
      * activation only creates the membership, holds its seats and grants
-     * its balances.
+     * its balances. The audit entry still says `charged: true` — the member
+     * did pay for it, just not inside activation.
      */
     public function fulfil(Payment $payment): void
     {
@@ -78,7 +79,7 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
             (int) $wallet->owner_id,
             charge: false,
             auditAction: $this->auditAction($payment),
-            auditProperties: ['payment_id' => $payment->id],
+            auditProperties: ['charged' => true, 'payment_id' => $payment->id],
         );
 
         // Activation tells staff about a desk-less Dedicated Desk plan only
