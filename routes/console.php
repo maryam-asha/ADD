@@ -87,3 +87,10 @@ Schedule::command('events:expire-pending-registrations')->hourly()->withoutOverl
  * overlap with a live callback cannot double-credit.
  */
 Schedule::command('paymera:reconcile')->everyFiveMinutes()->withoutOverlapping();
+
+/*
+ * Plans chosen with cash are held for reception for
+ * payments.cash_plan_hold_hours; a hold nobody came to pay lapses. Cash
+ * holds only — gateway payments are paymera:reconcile's.
+ */
+Schedule::command('payments:expire-pending')->hourly()->withoutOverlapping();

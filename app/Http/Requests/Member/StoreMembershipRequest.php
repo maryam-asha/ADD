@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Member;
 
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Membership\Models\Plan;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Whether the actor may buy on behalf of *this* company at all
@@ -28,6 +30,12 @@ class StoreMembershipRequest extends FormRequest
         return [
             'plan_id' => ['required', 'integer', 'exists:plans,id'],
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+            // Omitted: points, as before payment methods existed.
+            'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
+                ['wallet', 'cash', 'paymera'],
+                array_keys(app(PaymentMethodRegistry::class)->enabled()),
+            )))],
+            'lang' => ['nullable', 'string', Rule::in(['ar', 'en'])],
         ];
     }
 

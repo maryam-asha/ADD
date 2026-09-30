@@ -9,6 +9,7 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\Contracts\PaymentGateway;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Identity\Models\User;
@@ -79,7 +80,7 @@ class PaymentService
      * reads (`wallet_owner_type`/`wallet_owner_id` for the wallet).
      *
      * @param  array<string, mixed>  $context
-     * @return array{payment: Payment, start: PaymentStart}
+     * @return array{payment: ?Payment, start: PaymentStart} `payment` is null only for cash that writes no row (see CashMethod)
      *
      * @throws ReceptionActionException 'api.payment.method_not_supported' when the method cannot pay for `$purpose`
      */
@@ -114,6 +115,13 @@ class PaymentService
             $payment->setRelation('user', $payer);
 
             $fulfiller->assertPayable($payment);
+
+            // Cash for anything but a plan leaves the target simply unpaid;
+            // reception writes the payment when it takes the money.
+            if ($driver instanceof CashMethod && ! $driver->createsPendingRowFor($purpose)) {
+                return ['payment' => null, 'start' => PaymentStart::payAtReception()];
+            }
+
             $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
             $payment->save();
 
