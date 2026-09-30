@@ -40,9 +40,11 @@ pending `end_request`; the exact row shape is under "Reception list JSON" below.
 Schema: `kiosks`, `session_end_requests`; `walkin_sessions.started_via` /
 `kiosk_id` / `accepted_uncovered` / `coverage_snapshot`;
 `bookings.checked_in_via` / `kiosk_id`; `resource_consumptions.sessionable_*`
-(migrations `2026_09_28_100000` to `100400`). `booking` and `walkin_session`
+(migrations `2026_10_02_100000` to `100400`, dated after the co-working seat
+pool's so they run in the same order on a fresh database as on one that
+already has the pool). `booking` and `walkin_session`
 are new `MorphMapServiceProvider` aliases, shipped with the `activity_log`
-rewrite migration `2026_09_28_100300` (precedent `2026_09_27_100005`); `User`
+rewrite migration `2026_10_02_100300` (precedent `2026_09_27_100005`); `User`
 is still never aliased.
 
 ### Reception list JSON
