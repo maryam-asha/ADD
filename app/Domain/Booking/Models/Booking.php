@@ -11,6 +11,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use Carbon\CarbonInterface;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Booking extends Model
 {
@@ -106,6 +108,15 @@ class Booking extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Every payment made for this booking — the booking itself and any
+     * extension — so a list can eager-load its payment state.
+     */
+    public function payments(): MorphMany
+    {
+        return $this->morphMany(Payment::class, 'payable');
     }
 
     public function accessGrants(): HasMany

@@ -7,6 +7,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Membership\Models\ResourceConsumption;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Membership\Services\ResourceQuotaService;
+use App\Support\Presenters\PaymentStatePresenter;
 
 /**
  * The end-of-session report (docs/decisions/coworking-self-service-sessions.md):
@@ -52,6 +53,7 @@ class SessionReportBuilder
                 'payment_state' => $session->payment_state?->value,
                 'payment_method' => $session->payment_method?->value,
                 'paid_at' => $session->paid_at?->toIso8601String(),
+                'payment' => app(PaymentStatePresenter::class)->for($session, $session->user),
             ] : null,
         ];
     }

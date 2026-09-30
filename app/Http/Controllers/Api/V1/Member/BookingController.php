@@ -59,7 +59,7 @@ class BookingController extends Controller
         $paginator = $base()
             // Without this the list runs a query per card for the space,
             // its building, its branch and its floor.
-            ->with(['space.building.branch', 'space.zone.floor'])
+            ->with(['space.building.branch', 'space.zone.floor', 'user', 'payments'])
             ->when($filter === 'upcoming', fn ($query) => $query->where('end_at', '>=', now())->orderBy('start_at'))
             ->when($filter === 'past', fn ($query) => $query->where('end_at', '<', now())->orderByDesc('start_at'))
             ->when($filter === 'all', fn ($query) => $query->orderByDesc('start_at'))

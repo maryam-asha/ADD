@@ -16,6 +16,7 @@ use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\AvailabilityPresenter;
+use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonInterface;
 
@@ -307,16 +308,29 @@ class BookingPresentationService
      */
     public function payment(Booking $booking, string $locale): array
     {
+        // The block every payable shows (PaymentStatePresenter), added to the
+        // keys this one always had. `state` stays paid/unpaid for the apps
+        // already reading it; a card payment in flight is `awaiting_payment`.
+        $block = app(PaymentStatePresenter::class)->for($booking, $booking->user);
+
         return [
             'state' => $booking->payment_state->value,
             'source' => $booking->payment_source?->value,
             'label' => match ($booking->payment_source) {
                 PaymentSource::Wallet => __('api.booking.payment_methods.wallet', [], $locale),
                 PaymentSource::Cash => __('api.booking.payment_methods.cash', [], $locale),
+                PaymentSource::Gateway => __('api.payment.methods.paymera', [], $locale),
                 default => $booking->payment_state === PaymentState::Paid
                     ? __('api.booking.payment_methods.wallet', [], $locale)
                     : __('api.booking.payment_methods.cash', [], $locale),
             },
+            'method' => $block['method'],
+            'amount_points' => $block['amount_points'],
+            'price' => $block['price'],
+            'price_point' => $block['price_point'],
+            'paid_at' => $block['paid_at'],
+            'payment_id' => $block['payment_id'],
+            'awaiting_payment' => $block['state'] === 'pending',
         ];
     }
 

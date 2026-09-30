@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\WalkinSession;
+use App\Support\Presenters\PaymentStatePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -36,6 +37,8 @@ class CoworkingSessionResource extends JsonResource
             'end_request' => $session->pendingEndRequest === null
                 ? null
                 : new SessionEndRequestResource($session->pendingEndRequest),
+            // Nothing to pay while it runs; what is owed once it closes.
+            'payment' => app(PaymentStatePresenter::class)->for($session, $request->user()),
         ];
     }
 }
