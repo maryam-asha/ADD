@@ -198,14 +198,21 @@ class BookingPaymentMethodTest extends TestCase
         $this->assertSame(500, app(WalletService::class)->generalBalance($this->walletOf($member)));
     }
 
-    public function test_a_gateway_is_not_yet_accepted_for_a_new_booking(): void
+    /**
+     * Several bookings cannot share one card page (a single booking by card
+     * is covered in PayNowTest).
+     */
+    public function test_a_batch_cannot_be_paid_by_card(): void
     {
         $this->actingAsMember(500);
         $space = $this->openSpace();
 
-        $this->book($space, ['payment_method' => 'paymera'])
-            ->assertStatus(422)
-            ->assertJsonPath('message', __('api.payment.method_not_supported'));
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'paymera',
+            'windows' => [
+                ['space_id' => $space->id, 'start_at' => '2026-08-17 10:00', 'end_at' => '2026-08-17 11:00'],
+            ],
+        ])->assertStatus(422)->assertJsonValidationErrors('payment_method');
 
         $this->assertSame(0, Booking::count());
     }

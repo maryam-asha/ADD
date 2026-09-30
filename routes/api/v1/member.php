@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PaymentController;
+use App\Http\Controllers\Api\V1\Member\PaymentMethodsController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
@@ -182,6 +183,10 @@ Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController:
 // closes — it never talks to Paymera directly, so the API key stays server
 // side. `show` re-syncs with the gateway on read, which is safe to poll:
 // SyncPaymentStatus locks and refuses to re-process a settled payment.
+// How the member can pay for something before paying: the amount and each
+// enabled method (config/payments.php order), with whether it can pay now.
+Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
+
 Route::get('payments', [PaymentController::class, 'index']);
 Route::post('payments', [PaymentController::class, 'store']);
 Route::get('payments/{payment}', [PaymentController::class, 'show']);

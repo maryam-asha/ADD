@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -30,6 +31,7 @@ class BookingPaymentRouter
         private readonly WalletService $wallets,
         private readonly WalletMethod $walletMethod,
         private readonly PaymentService $payments,
+        private readonly PaymentMethodRegistry $methods,
     ) {}
 
     /**
@@ -58,9 +60,11 @@ class BookingPaymentRouter
             null => $this->legacyChoice($member, $points, $ownerType, $ownerId),
             WalletMethod::KEY => $this->strictChoice($member, $points, $ownerType, $ownerId),
             'cash' => null,
-            // A gateway pays after the booking exists (it holds the slot
-            // unpaid meanwhile); wired in with pay-now.
-            default => throw new ReceptionActionException('api.payment.method_not_supported'),
+            default => in_array($method, $this->methods->gatewayKeys(), true)
+                // A gateway pays after the booking exists: it holds the slot
+                // unpaid meanwhile, and a failed card leaves it for the desk.
+                ? null
+                : throw new ReceptionActionException('api.payment.method_not_supported'),
         };
     }
 

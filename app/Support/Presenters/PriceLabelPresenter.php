@@ -43,6 +43,21 @@ class PriceLabelPresenter
         ];
     }
 
+    /**
+     * A whole amount due, e.g. `10.00 $` and `100 pts`.
+     *
+     * @return array{price: string, price_point: string}
+     */
+    public function total(int $points, ?User $user): array
+    {
+        [$amount, $currency] = $this->amountFor($points, $user);
+
+        return [
+            'price' => $this->currencyLabel($amount, $currency),
+            'price_point' => __('api.space.price_points', ['points' => number_format($points)]),
+        ];
+    }
+
     /** The resolved display currency for this request and member. */
     public function currencyFor(?User $user): string
     {

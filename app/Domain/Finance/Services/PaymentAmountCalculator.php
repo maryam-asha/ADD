@@ -53,6 +53,22 @@ class PaymentAmountCalculator
     }
 
     /**
+     * What a number of points due (a booking, a session) costs by card —
+     * the same direction and rounding as a plan: the points are the price,
+     * and the charge is derived from them, rounded up.
+     *
+     * @return array{0: int, 1: int} [points, amountMinor]
+     */
+    public function forPoints(int $points): array
+    {
+        if ($points <= 0) {
+            throw new InvalidArgumentException('There is nothing to charge for zero points.');
+        }
+
+        return [$points, $this->pointsToMinor($points)];
+    }
+
+    /**
      * What a member-chosen top-up amount buys.
      *
      * Floors, matching the reception till: the member is never credited

@@ -10,6 +10,7 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentGateway;
 use App\Domain\Finance\Payments\PaymentStart;
+use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Finance\Services\PaymeraClient;
 use App\Domain\Identity\Models\User;
 
@@ -35,7 +36,10 @@ class PaymeraGateway implements PaymentGateway
 
     private const TRIGGER_ROUTE = 'paymera.trigger';
 
-    public function __construct(private readonly PaymeraClient $client) {}
+    public function __construct(
+        private readonly PaymeraClient $client,
+        private readonly PaymentAmountCalculator $amounts,
+    ) {}
 
     public function key(): string
     {
@@ -48,19 +52,21 @@ class PaymeraGateway implements PaymentGateway
     }
 
     /**
-     * Card money brings points in. Paying for an operation by card widens
-     * this later; until then only a top-up or a plan purchase may.
+     * Card money buys points, which then pay for whatever the payment is
+     * for. Everything a member pays for from the app; not an extension,
+     * which is only ever settled from the wallet as it happens.
      */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return in_array($purpose, [
-            PaymentPurpose::WalletTopUp,
-            PaymentPurpose::PlanPurchase,
-        ], true);
+        return $purpose !== PaymentPurpose::BookingExtension;
     }
 
     public function start(Payment $payment, array $context = []): PaymentStart
     {
+        if ($payment->callback_token === null) {
+            $this->prepare($payment, $context['lang'] ?? null);
+        }
+
         try {
             $created = $this->createPayment($payment, $payment->user);
         } catch (\Throwable $e) {
@@ -80,6 +86,28 @@ class PaymeraGateway implements PaymentGateway
         ])->save();
 
         return PaymentStart::redirect($created->url);
+    }
+
+    /**
+     * A payment opened through PaymentService (a booking, a session) arrives
+     * with only what is due in points. The card side is derived here, the
+     * way StartPayment derives it for a plan: the points are the price, the
+     * charge is computed from them, and both are frozen on the row before
+     * the gateway is called.
+     */
+    private function prepare(Payment $payment, ?string $lang): void
+    {
+        [$points, $chargeMinor] = $this->amounts->forPoints((int) $payment->amount_points);
+
+        $payment->forceFill([
+            'callback_token' => Payment::newCallbackToken(),
+            'amount_minor' => $chargeMinor,
+            'currency' => (string) config('paymera.currency'),
+            'currency_exponent' => (int) config('paymera.currency_exponent'),
+            'points_to_credit' => $points,
+            'terminal_id' => (string) config('paymera.terminal_id'),
+            'lang' => $lang ?? (string) config('paymera.default_lang'),
+        ])->save();
     }
 
     public function createPayment(Payment $payment, User $payer): CreatedPayment

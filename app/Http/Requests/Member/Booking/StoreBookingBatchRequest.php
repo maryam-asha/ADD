@@ -44,7 +44,12 @@ class StoreBookingBatchRequest extends FormRequest
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
             'note' => ['nullable', 'string', 'max:500'],
             // Omitted: the old routing (an app that predates payment methods).
-            'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
+            // Several bookings cannot share one card page; pay them from the
+            // wallet, at the desk, or one by one afterwards.
+            'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
+                ['wallet', 'cash'],
+                array_keys(app(PaymentMethodRegistry::class)->enabled()),
+            )))],
         ];
     }
 }

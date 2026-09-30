@@ -283,7 +283,11 @@ class PaymentsTableTest extends TestCase
         $this->assertSame($payment->points_to_credit, $payment->amount_points);
     }
 
-    public function test_starting_a_payment_still_refuses_the_new_purposes(): void
+    /**
+     * A booking or a session is paid by naming it; an event registration is
+     * not payable from this endpoint yet.
+     */
+    public function test_paying_for_a_record_requires_naming_it(): void
     {
         $this->seed(RoleSeeder::class);
 
@@ -292,10 +296,14 @@ class PaymentsTableTest extends TestCase
         Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         Sanctum::actingAs($member, ['member-app']);
 
-        foreach (['booking', 'event_registration', 'coworking_session'] as $purpose) {
+        foreach (['booking', 'coworking_session'] as $purpose) {
             $this->postJson('/api/v1/member/payments', ['purpose' => $purpose, 'amount' => 10])
                 ->assertStatus(422)
-                ->assertJsonValidationErrors('purpose');
+                ->assertJsonValidationErrors('payable_id');
         }
+
+        $this->postJson('/api/v1/member/payments', ['purpose' => 'event_registration', 'amount' => 10])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('purpose');
     }
 }

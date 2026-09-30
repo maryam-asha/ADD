@@ -3,6 +3,8 @@
 namespace App\Http\Requests\Member;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Membership\Models\Plan;
 use Illuminate\Contracts\Validation\Validator;
@@ -26,21 +28,42 @@ class StartPaymentRequest extends FormRequest
     }
 
     /**
+     * @var list<string>
+     */
+    private const PURPOSES = ['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session'];
+
+    /**
+     * @var list<string>
+     */
+    private const PAYABLE_PURPOSES = ['booking', 'coworking_session'];
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
     {
         return [
-            // The enum now knows purposes that are not paid by opening a
-            // card payment (booking, event registration, coworking
-            // session). This endpoint still opens card payments for exactly
-            // two, until it is widened deliberately.
+            // Everything a member pays for from the app. An extension is
+            // only ever paid as it happens, never from here.
             'purpose' => [
                 'bail',
                 'required',
                 Rule::enum(PaymentPurpose::class),
-                Rule::in([PaymentPurpose::WalletTopUp->value, PaymentPurpose::PlanPurchase->value]),
+                Rule::in(self::PURPOSES),
             ],
+
+            // Omitted: a card — what this endpoint always opened.
+            'method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
+
+            // What is being paid for, for a purpose that pays for a record.
+            'payable_id' => [
+                'required_if:purpose,'.implode(',', self::PAYABLE_PURPOSES),
+                'nullable',
+                'integer',
+            ],
+
+            'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
+            'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
 
             // Required for a top-up, meaningless for a plan purchase.
             'amount' => [
@@ -66,11 +89,11 @@ class StartPaymentRequest extends FormRequest
                 return;
             }
 
-            $purpose = PaymentPurpose::from($this->input('purpose'));
-
-            $purpose === PaymentPurpose::PlanPurchase
-                ? $this->validatePlan($validator)
-                : $this->validateTopUpAmount($validator);
+            match (PaymentPurpose::from($this->input('purpose'))) {
+                PaymentPurpose::PlanPurchase => $this->validatePlan($validator),
+                PaymentPurpose::WalletTopUp => $this->validateTopUpAmount($validator),
+                default => null,
+            };
         });
     }
 
@@ -135,6 +158,11 @@ class StartPaymentRequest extends FormRequest
         $factor = bcpow('10', (string) config('paymera.currency_exponent'), 0);
 
         return (int) bcmul((string) $amount, $factor, 0);
+    }
+
+    public function paymentMethod(): string
+    {
+        return $this->validated('method') ?? PaymeraGateway::KEY;
     }
 
     public function purpose(): PaymentPurpose

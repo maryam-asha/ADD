@@ -17,6 +17,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
@@ -131,6 +132,28 @@ class PaymentService
         };
 
         return $driver instanceof PaymentGateway ? $open() : DB::transaction($open);
+    }
+
+    /**
+     * What paying for `$purpose` would cost right now, in points — the same
+     * checks and price start() records, without writing anything.
+     *
+     * @throws ReceptionActionException when the target cannot be paid for (already paid, cancelled, ...)
+     */
+    public function quote(PaymentPurpose $purpose, ?Model $payable = null, ?Plan $plan = null): int
+    {
+        $fulfiller = $this->fulfillers->for($purpose);
+
+        $payment = new Payment;
+        $payment->forceFill(['purpose' => $purpose, 'plan_id' => $plan?->id]);
+
+        if ($payable !== null) {
+            $payment->payable()->associate($payable);
+        }
+
+        $fulfiller->assertPayable($payment);
+
+        return $fulfiller->pointsDue($payment);
     }
 
     /**
@@ -335,7 +358,9 @@ class PaymentService
 
             $payment->forceFill([
                 'status' => PaymentStatus::NeedsReview,
-                'review_reason' => "payment credited but activation failed ({$payment->purpose->value}): ".$this->reasonFor($e),
+                'review_reason' => $this->isAlreadySettled($e)
+                    ? 'payable already settled — points kept in wallet'
+                    : "payment credited but activation failed ({$payment->purpose->value}): ".$this->reasonFor($e),
             ])->save();
 
             $this->log($payment, 'alert', 'fulfilment failed after successful payment', [
@@ -384,7 +409,9 @@ class PaymentService
      */
     private function spend(Payment $payment, PaymentFulfiller $fulfiller): void
     {
-        $category = $fulfiller->walletCategory();
+        // Points bought with this payment's own money are general points;
+        // they pay for it, never an allowance the plan gave the member.
+        $category = $payment->hasBeenCredited() ? WalletTransactionCategory::General : $fulfiller->walletCategory();
         $due = $fulfiller->pointsDue($payment);
 
         if ($due <= 0) {
@@ -438,6 +465,15 @@ class PaymentService
 
         $payment->setRawAttributes($current->getAttributes(), true);
         $payment->setRelations([]);
+    }
+
+    /**
+     * Paid another way while the member was paying by card (at the desk,
+     * say): nothing failed, the money simply has nothing left to buy.
+     */
+    private function isAlreadySettled(Throwable $e): bool
+    {
+        return $e instanceof ReceptionActionException && $e->messageKey === 'api.payment.already_paid';
     }
 
     /**

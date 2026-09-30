@@ -22,12 +22,25 @@ trait RespondsToGatewayFailures
 {
     protected function gatewayFailureResponse(Throwable $e, int $userId): ?JsonResponse
     {
+        $failure = $this->gatewayFailure($e, $userId);
+
+        return $failure === null ? null : response()->json(['message' => __($failure['key'])], $failure['status']);
+    }
+
+    /**
+     * The failure logged, as the message key and status to answer with; null
+     * when `$e` is not a gateway failure.
+     *
+     * @return array{key: string, status: int}|null
+     */
+    protected function gatewayFailure(Throwable $e, int $userId): ?array
+    {
         if ($e instanceof PaymeraUnauthorizedException) {
             Log::channel('paymera')->critical('[Paymera] gateway credentials rejected', [
                 'user_id' => $userId,
             ]);
 
-            return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
+            return ['key' => 'api.payment.gateway_unavailable', 'status' => 503];
         }
 
         if ($e instanceof PaymeraException) {
@@ -36,7 +49,7 @@ trait RespondsToGatewayFailures
                 'error' => $e->getMessage(),
             ]);
 
-            return response()->json(['message' => __('api.payment.could_not_start')], 502);
+            return ['key' => 'api.payment.could_not_start', 'status' => 502];
         }
 
         return null;

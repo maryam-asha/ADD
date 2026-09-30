@@ -15,8 +15,13 @@ use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
 use App\Http\Requests\Member\Booking\ListBookingsRequest;
@@ -24,15 +29,18 @@ use App\Http\Requests\Member\Booking\PreviewBookingRequest;
 use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
+use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class BookingController extends Controller
 {
     use LogsSensitiveActions;
+    use RespondsToGatewayFailures;
 
     /**
      * The member's own bookings, with the tab counts the list header shows.
@@ -188,8 +196,12 @@ class BookingController extends Controller
         ]);
     }
 
-    public function store(StoreBookingRequest $request, BookingCreationService $creations): JsonResponse
-    {
+    public function store(
+        StoreBookingRequest $request,
+        BookingCreationService $creations,
+        PaymentService $payments,
+        PaymentMethodRegistry $methods,
+    ): JsonResponse {
         $space = Space::findOrFail($request->validated('space_id'));
 
         $walletOwnerType = $request->validated('wallet_owner_type')
@@ -218,7 +230,36 @@ class BookingController extends Controller
 
         $this->logSensitiveAction('booking_created', $booking);
 
-        return response()->json(['data' => new BookingResource($booking)], 201);
+        $method = $request->validated('payment_method');
+        $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
+            ? $this->startCardPayment($payments, $booking, $request->user(), $method, $request->header('lang'))
+            : [];
+
+        return response()->json(['data' => new BookingResource($booking)] + $card, 201);
+    }
+
+    /**
+     * A booking paid by card is made first, unpaid — it holds its slot like
+     * any unpaid booking — and then its payment is opened. If the gateway
+     * cannot be reached the booking stands, still unpaid, and the member is
+     * told the payment did not start: they can pay again, or at the desk.
+     *
+     * @return array{payment: PaymentResource|null, redirect_url: string|null, payment_error?: string}
+     */
+    private function startCardPayment(PaymentService $payments, Booking $booking, User $member, string $method, ?string $lang): array
+    {
+        try {
+            ['payment' => $payment, 'start' => $start] = $payments->start(PaymentPurpose::Booking, $member, $method, array_filter([
+                'payable' => $booking,
+                'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
+            ]));
+        } catch (Throwable $e) {
+            $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
+
+            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($failure['key'])];
+        }
+
+        return ['payment' => new PaymentResource($payment), 'redirect_url' => $start->redirectUrl];
     }
 
     /**

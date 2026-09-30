@@ -34,9 +34,13 @@ class CashMethod implements PaymentMethodDriver
         return __('api.payment.methods.'.self::KEY);
     }
 
+    /**
+     * Not an extension either: it is settled from the wallet as it happens,
+     * or the booking is left owing it.
+     */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return $purpose !== PaymentPurpose::WalletTopUp;
+        return ! in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::BookingExtension], true);
     }
 
     /**
