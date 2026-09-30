@@ -344,6 +344,8 @@ return [
     ],
 
     'payment' => [
+        'amount_short' => 'The amount received is short by :shortage :currency.',
+        'currency_unavailable' => 'This currency has no exchange rate yet.',
         'registration_not_payable' => 'Only an approved registration for an event that is still on can be paid.',
         // Shown to the member. Never mentions the gateway's own fault
         // conditions (a rejected key, an unregistered server IP) — those are

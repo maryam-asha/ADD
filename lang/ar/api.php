@@ -341,6 +341,8 @@ return [
     ],
 
     'payment' => [
+        'amount_short' => 'المبلغ المستلم ناقص بمقدار :shortage :currency.',
+        'currency_unavailable' => 'لا يوجد سعر صرف لهذه العملة بعد.',
         'registration_not_payable' => 'لا يمكن دفع إلا تسجيل مقبول في فعالية غير ملغاة.',
         'gateway_unavailable' => 'الدفع بالبطاقة غير متاح مؤقتاً. يرجى المحاولة بعد قليل.',
         'could_not_start' => 'تعذّر بدء عملية الدفع. يرجى المحاولة مرة أخرى.',

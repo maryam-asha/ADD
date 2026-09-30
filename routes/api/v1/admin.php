@@ -44,6 +44,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
@@ -290,6 +291,11 @@ Route::get('reception/bookings/{booking}/access-grant', [AccessActivationControl
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
+
+// Settle anything a member owes with the money handed over (overpayment
+// stays as points), and list everything they owe (docs/decisions/unified-payments.md).
+Route::post('reception/payments/settle', [ReceptionPaymentController::class, 'settle']);
+Route::get('reception/outstanding', [ReceptionPaymentController::class, 'outstanding']);
 
 Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
 Route::get('reception/sessions/{type}/{id}/report', [ReceptionSessionsController::class, 'report'])

@@ -10,6 +10,8 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
@@ -93,12 +95,10 @@ class SessionClosureService
     }
 
     /**
-     * Reception collected cash/sham/mtn/syriatel and confirms it here — no
-     * wallet is touched (that only happens for a wallet-sourced booking
-     * payment, out of scope this phase, and for the separate wallet
-     * top-up endpoint). "Write the same wallet-transaction-style audit
-     * trail used elsewhere" is the caller's job via LogsSensitiveActions,
-     * not this service's.
+     * Reception collected cash/sham/mtn/syriatel for exactly what is owed
+     * and confirms it here. The money goes through the ledger like every
+     * other payment (PaymentService::settleAtReception). The audit entry is
+     * the caller's, via LogsSensitiveActions.
      */
     public function settlePayment(Booking|WalkinSession $session, PaymentMethod $method, User $operator): void
     {
@@ -110,12 +110,31 @@ class SessionClosureService
             throw new ReceptionActionException('api.reception.already_paid', 409);
         }
 
-        $session->forceFill([
-            'payment_state' => PaymentState::Paid,
-            'payment_method' => $method,
-            'paid_by' => $operator->id,
-            'paid_at' => now(),
-        ])->save();
+        // Nothing charged (a free space): nothing to put through the ledger.
+        if (bccomp((string) $session->amount_owed, '0', 2) <= 0) {
+            $session->forceFill([
+                'payment_state' => PaymentState::Paid,
+                'payment_method' => $method,
+                'paid_by' => $operator->id,
+                'paid_at' => now(),
+            ])->save();
+
+            return;
+        }
+
+        // Exactly what is owed, through the one settlement path: the money
+        // becomes points in the member's wallet and is spent on the session,
+        // leaving a ledger credit, a debit and a payment row.
+        app(PaymentService::class)->settleAtReception(
+            $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
+            $session,
+            $method,
+            null,
+            null,
+            $operator,
+        );
+
+        $session->refresh();
     }
 
     /**

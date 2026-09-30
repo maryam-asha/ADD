@@ -4,6 +4,10 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
@@ -139,6 +143,27 @@ class WalletTopUpController extends Controller
                 'payment_amount' => $paymentAmount,
                 'exchange_rate_to_base' => $exchangeRate,
                 'point_rate_usd' => $pointRate,
+            ])->save();
+
+            // The same payment row every other way of paying leaves, so the
+            // payments list shows money taken at the desk too. The payer is
+            // the member topped up; for a company, whoever took the money.
+            $payment = new Payment;
+            $payment->forceFill([
+                'method' => CashMethod::KEY,
+                'purpose' => PaymentPurpose::WalletTopUp,
+                'status' => PaymentStatus::Accepted,
+                'user_id' => $wallet->owner_type === OwnerType::User ? (int) $wallet->owner_id : $request->user()->id,
+                'wallet_id' => $wallet->id,
+                'wallet_transaction_id' => $transaction->id,
+                'amount_points' => $pointsCredited,
+                'points_to_credit' => $pointsCredited,
+                'collected_via' => PaymentMethod::from($request->validated('payment_method')),
+                'received_amount' => $paymentAmount,
+                'received_currency' => $paymentCurrency,
+                'received_by' => $request->user()->id,
+                'received_at' => now(),
+                'settled_at' => now(),
             ])->save();
 
             return $transaction;

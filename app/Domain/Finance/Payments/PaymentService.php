@@ -3,15 +3,20 @@
 namespace App\Domain\Finance\Payments;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Exceptions\PaymentPricingException;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\Contracts\PaymentGateway;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -60,6 +65,8 @@ class PaymentService
         private readonly FulfillerRegistry $fulfillers,
         private readonly PaymentMethodRegistry $methods,
         private readonly PaymentAmountCalculator $amounts,
+        private readonly ReceivedMoneyConverter $converter,
+        private readonly CurrencyConversionService $currencies,
     ) {}
 
     /**
@@ -265,6 +272,133 @@ class PaymentService
                 'refunded_at' => now(),
             ])->save();
         });
+    }
+
+    /**
+     * Reception takes money for something a member owes and settles it, in
+     * one transaction: the money becomes points in the payer's wallet (with
+     * the audit columns saying how much, in what, and who took it), what is
+     * due is spent, and anything over stays in the wallet as points.
+     *
+     * `$target` is the record paid for (a booking, a session, a
+     * registration), or a plan held for cash (its pending payment). The
+     * member's own wallet takes the money — for a plan, the wallet the hold
+     * was opened on (a company's, for a company purchase).
+     *
+     * `$amount` null means exactly what is due, quoted in `$currency`
+     * (default: the base currency). Too little is refused with the shortage
+     * in that currency; nothing is recorded.
+     *
+     * @throws ReceptionActionException 409 already paid / not settleable, 422 amount_short (params: shortage, currency)
+     * @throws PaymentPricingException when `$currency` has no exchange rate
+     */
+    public function settleAtReception(
+        PaymentPurpose $purpose,
+        Model|Payment $target,
+        PaymentMethod $collectedVia,
+        ?string $amount,
+        ?string $currency,
+        User $operator,
+    ): SettledAtReception {
+        $fulfiller = $this->fulfillers->for($purpose);
+        $currency ??= $this->currencies->baseCurrencyCode();
+
+        return DB::transaction(function () use ($purpose, $target, $collectedVia, $amount, $currency, $operator, $fulfiller) {
+            $payment = $target instanceof Payment
+                ? $this->heldForCash($target, $purpose)
+                : $this->openedAtReception($purpose, $target);
+
+            $fulfiller->assertPayable($payment);
+            $due = $fulfiller->pointsDue($payment);
+
+            $handedOver = $amount ?? $this->converter->pointsToAmount($due, $currency);
+            $received = $this->converter->toPoints($handedOver, $currency);
+
+            if ($received->points < $due) {
+                throw new ReceptionActionException('api.payment.amount_short', 422, [
+                    'shortage' => bcsub($this->converter->pointsToAmount($due, $currency), $handedOver, $this->decimals($currency)),
+                    'currency' => $currency,
+                ]);
+            }
+
+            $payment->forceFill([
+                'amount_points' => $due,
+                'points_to_credit' => $received->points,
+                'collected_via' => $collectedVia,
+                'received_amount' => $handedOver,
+                'received_currency' => $currency,
+                'received_by' => $operator->id,
+                'received_at' => now(),
+            ])->save();
+
+            $this->settle($payment, new Funding(
+                points: $received->points,
+                method: $collectedVia,
+                currency: $currency,
+                amount: $handedOver,
+                rateToBase: $received->rateToBase,
+                pointRateUsd: $received->pointRateUsd,
+                performedBy: $operator->id,
+            ));
+
+            return new SettledAtReception($payment->refresh(), $received->points, (int) $payment->amount_points);
+        });
+    }
+
+    /**
+     * A plan chosen with cash: its hold, still open.
+     */
+    private function heldForCash(Payment $payment, PaymentPurpose $purpose): Payment
+    {
+        $this->lock($payment);
+
+        if ($payment->purpose !== $purpose
+            || $payment->method !== CashMethod::KEY
+            || $payment->status !== PaymentStatus::Pending
+            || ($payment->expires_at !== null && $payment->expires_at->isPast())) {
+            throw new ReceptionActionException('api.payment.not_settleable', 409);
+        }
+
+        return $payment;
+    }
+
+    /**
+     * A new payment for a record the member owes for, on the member's own
+     * wallet: the account the money goes into before it pays.
+     */
+    private function openedAtReception(PaymentPurpose $purpose, Model $payable): Payment
+    {
+        $memberId = $payable->getAttribute('user_id');
+
+        // A registration made at the door may have no account at all.
+        if ($memberId === null) {
+            throw new ReceptionActionException('api.payment.no_wallet');
+        }
+
+        // The desk has always been able to take money from a member who
+        // never had a wallet opened; the money needs one to pass through.
+        $walletId = Wallet::query()->firstOrCreate([
+            'owner_type' => OwnerType::User,
+            'owner_id' => $memberId,
+        ])->id;
+
+        $payment = new Payment;
+        $payment->forceFill([
+            'method' => CashMethod::KEY,
+            'purpose' => $purpose,
+            'status' => PaymentStatus::Pending,
+            'user_id' => $memberId,
+            'wallet_id' => $walletId,
+            'points_to_credit' => 0,
+        ]);
+        $payment->payable()->associate($payable);
+
+        return $payment;
+    }
+
+    private function decimals(string $currency): int
+    {
+        return (int) (Currency::query()->whereKey($currency)->value('decimal_places') ?? 2);
     }
 
     /**

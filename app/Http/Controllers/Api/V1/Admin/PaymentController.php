@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Exceptions\PaymeraException;
 use App\Domain\Finance\Models\Payment;
@@ -35,12 +36,16 @@ class PaymentController extends Controller
         $validated = $request->validate([
             'status' => ['nullable', Rule::enum(PaymentStatus::class)],
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
+            'method' => ['nullable', 'string', 'max:20'],
+            'purpose' => ['nullable', Rule::enum(PaymentPurpose::class)],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
         $payments = Payment::query()
             ->when($validated['status'] ?? null, fn ($q, $status) => $q->where('status', $status))
             ->when($validated['user_id'] ?? null, fn ($q, $userId) => $q->where('user_id', $userId))
+            ->when($validated['method'] ?? null, fn ($q, $method) => $q->where('method', $method))
+            ->when($validated['purpose'] ?? null, fn ($q, $purpose) => $q->where('purpose', $purpose))
             ->with(['user', 'plan'])
             ->latest()
             ->paginate($validated['per_page'] ?? 25);

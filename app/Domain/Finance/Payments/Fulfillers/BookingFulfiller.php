@@ -9,6 +9,7 @@ use App\Domain\Booking\Services\AmountCalculator;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Services\PointConversionService;
 
 /**
  * Paying for a booking. Its price is fixed when it is made (`price_points`,
@@ -20,6 +21,7 @@ class BookingFulfiller extends SessionPaymentFulfiller
     public function __construct(
         PaymentMethodRegistry $methods,
         private readonly AmountCalculator $amounts,
+        private readonly PointConversionService $points,
     ) {
         parent::__construct($methods);
     }
@@ -41,8 +43,16 @@ class BookingFulfiller extends SessionPaymentFulfiller
 
         $booking = $this->session($payment);
 
-        return $booking->price_points
-            ?? $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
+        if ($booking->price_points !== null) {
+            return $booking->price_points;
+        }
+
+        // Closed before price_points existed: what closure charged.
+        if ($booking->checked_out_at !== null && $booking->amount_owed !== null) {
+            return $this->points->usdToPointsCeil((string) $booking->amount_owed);
+        }
+
+        return $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
     }
 
     /**
