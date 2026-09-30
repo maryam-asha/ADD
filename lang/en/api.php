@@ -287,7 +287,18 @@ return [
         'secret_revoked' => 'The kiosk has been unpaired. Pair it again to use it.',
     ],
 
+    // One group for both co-working features: rooms lent to co-working
+    // (docs/decisions/coworking-seat-pool.md) and self-service sessions
+    // (docs/decisions/coworking-self-service-sessions.md). A second
+    // 'coworking' key would silently replace this one.
     'coworking' => [
+        'window_updated' => 'The co-working stretch was updated.',
+        'window_deleted' => 'The room is no longer lent to co-working for that stretch.',
+        'room_has_bookings' => 'This room has bookings in that stretch, so it cannot be lent to co-working then.',
+        'would_overbook' => 'Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.',
+        'not_a_room' => 'Only a room can be lent to co-working.',
+        'window_overlaps' => 'This room is already lent to co-working for part of that stretch.',
+
         'invalid_code' => 'This code is not valid. Scan the code currently shown on the kiosk.',
         'ticket_expired' => 'This confirmation has expired. Scan the kiosk code again.',
         'unavailable' => 'Coworking sessions are not available at this kiosk right now.',
@@ -393,15 +404,6 @@ return [
             'ac' => 'Air Conditioning',
             'stage' => 'Stage',
         ],
-    ],
-
-    'coworking' => [
-        'window_updated' => 'The co-working stretch was updated.',
-        'window_deleted' => 'The room is no longer lent to co-working for that stretch.',
-        'room_has_bookings' => 'This room has bookings in that stretch, so it cannot be lent to co-working then.',
-        'would_overbook' => 'Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.',
-        'not_a_room' => 'Only a room can be lent to co-working.',
-        'window_overlaps' => 'This room is already lent to co-working for part of that stretch.',
     ],
 
     'membership' => [
