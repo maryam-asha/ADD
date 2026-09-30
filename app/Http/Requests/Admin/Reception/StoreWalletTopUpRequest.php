@@ -6,7 +6,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Services\CurrencyConversionService;
-use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use Illuminate\Contracts\Validation\Validator;
@@ -56,21 +56,15 @@ class StoreWalletTopUpRequest extends FormRequest
             // Credits floor (Invariant 2), so a payment worth less than one
             // whole point would credit nothing at all while still writing a
             // transaction row recording the full amount taken. Refuse it at
-            // the door rather than swallow the money.
+            // the door rather than swallow the money — judged by the same
+            // converter the controller credits with, so the two can never
+            // disagree about a borderline amount.
             $amount = $this->input('amount');
 
             if ($amount !== null && ! $validator->errors()->has('amount') && ! $validator->errors()->has('currency')) {
-                $points = app(PointConversionService::class);
-                $conversion = app(CurrencyConversionService::class);
+                $currency = $this->input('currency') ?? app(CurrencyConversionService::class)->baseCurrencyCode();
 
-                $base = $conversion->baseCurrencyCode();
-                $currency = $this->input('currency') ?? $base;
-
-                $usd = $currency === $base
-                    ? (string) $amount
-                    : (string) $conversion->convert((float) $amount, $currency, $base);
-
-                if ($points->usdToPoints($usd) < 1) {
+                if (app(ReceivedMoneyConverter::class)->toPoints((string) $amount, $currency)->points < 1) {
                     $validator->errors()->add('amount', __('api.wallet.amount_below_one_point'));
                 }
             }

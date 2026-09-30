@@ -21,6 +21,20 @@ class CurrencyConversionService
         return Currency::baseCode();
     }
 
+    /**
+     * The current rate turning one unit of `$currencyCode` into the base
+     * currency, as the exact decimal string the column holds — for callers
+     * that must stay in bcmath rather than go through convert()'s floats.
+     * Null when the currency has no active rate; the base currency itself
+     * never has one (nothing to convert).
+     */
+    public function rateToBase(string $currencyCode): ?string
+    {
+        $rate = ExchangeRate::current($currencyCode);
+
+        return $rate !== null ? (string) $rate->rate_to_base : null;
+    }
+
     public function convert(float $amount, string $fromCurrency, string $toCurrency): ?float
     {
         if ($fromCurrency === $toCurrency) {

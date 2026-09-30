@@ -49,6 +49,18 @@ class PointConversionService
     }
 
     /**
+     * The USD a point count is worth at the rate's full precision. The rate
+     * may carry up to four decimal places (UpdateSettingRequest), so a
+     * point can be worth a fraction of a cent that pointsToUsd() — cents,
+     * for display — would cut off. A price that has to buy `$points` back
+     * (ReceivedMoneyConverter::pointsToAmount) is computed from this.
+     */
+    public function pointsToUsdExact(int $points): string
+    {
+        return bcmul((string) $points, $this->rate(), 10);
+    }
+
+    /**
      * Credit direction — floors. bcdiv at scale 0 truncates toward zero,
      * which is floor for the non-negative input this accepts.
      */
