@@ -87,6 +87,13 @@ class PackageBrowseService
             'is_active' => true,
             'current_period_start' => $membership->current_period_start->toIso8601String(),
             'current_period_end' => $membership->current_period_end->toIso8601String(),
+            // A Dedicated Desk subscription's desks by the code on them — an
+            // empty list until staff tie one; null for any other plan
+            // (docs/decisions/coworking-seat-pool.md).
+            'desks' => $plan?->isDedicatedDesk()
+                ? $membership->seatDesks()->orderBy('seats_desks.id')->get()
+                    ->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values()->all()
+                : null,
             'validity_text' => __('api.package.active_until', ['date' => $expiryFormatted]),
             'billing_cycle_text' => __('api.package.billing_cycle', ['start' => $cycleStart, 'end' => $cycleEnd]),
             'benefits_title' => __('api.package.benefits_title'),

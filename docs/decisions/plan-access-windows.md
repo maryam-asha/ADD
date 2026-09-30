@@ -119,6 +119,15 @@ described above. Bookings stay excluded. The "No member-facing view of a running
 session" item under "Explicitly not done here" is superseded for `co_space`
 sessions started by scan.
 
+### The window is also when the subscription holds its seat (2026-09-30)
+
+A subscription holds `seats` seats in its branch's co-working pool, and only
+while its plan is open ([coworking-seat-pool.md](coworking-seat-pool.md)). An
+evening plan therefore holds nothing during the day, and a daytime plan and an
+evening plan can share one seat. `Plan::windowSegments()` returns the open
+stretches as intervals, and `windowOverlap()` is now their sum, so the
+midnight-wrap rule stays defined in one place.
+
 ### Private plans are assigned, never bought
 
 `is_public = false` removes a plan from the member catalogue, the public list,

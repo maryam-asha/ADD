@@ -8,8 +8,11 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
@@ -18,6 +21,7 @@ use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Enums\SettingValueType;
@@ -336,15 +340,13 @@ class BookingCreationServiceTest extends TestCase
 
     /**
      * The safe default: a co_space with no capacity configured is an
-     * unfinished space, not an unlimited one, so it keeps the exclusive
-     * ceiling of 1 that every space had before this change.
+     * unfinished space, not an unlimited one — it adds no seats to its
+     * branch's pool (docs/decisions/coworking-seat-pool.md).
      */
-    public function test_a_co_space_without_a_capacity_still_admits_only_one_booking(): void
+    public function test_a_co_space_without_a_capacity_has_no_seats_to_book(): void
     {
         $space = $this->coSpace(['capacity' => null]);
         [$start, $end] = $this->slot(14);
-
-        $this->creations->create($space, User::factory()->create(), $start, $end);
 
         try {
             $this->creations->create($space, User::factory()->create(), $start, $end);
@@ -352,6 +354,60 @@ class BookingCreationServiceTest extends TestCase
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.booking.slot_unavailable', $e->messageKey);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // The branch's co-working seat pool
+    // ------------------------------------------------------------------
+
+    private function assertRefused(string $key, callable $create): void
+    {
+        try {
+            $create();
+            $this->fail("Expected a ReceptionActionException ({$key}).");
+        } catch (ReceptionActionException $e) {
+            $this->assertSame($key, $e->messageKey);
+        }
+    }
+
+    /** Every seat is held by a subscription, so there is none to book. */
+    public function test_a_co_space_booking_is_refused_when_subscriptions_hold_every_seat(): void
+    {
+        $space = $this->coSpace(['capacity' => 1]);
+        Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+        [$start, $end] = $this->slot(14);
+
+        $this->assertRefused('api.booking.slot_unavailable', fn () => $this->creations->create($space, User::factory()->create(), $start, $end));
+    }
+
+    /** The subscriber's booking sits in the seat their subscription holds. */
+    public function test_a_subscribers_own_booking_fits_in_the_seat_they_hold(): void
+    {
+        $space = $this->coSpace(['capacity' => 1]);
+        $member = User::factory()->create();
+        Membership::factory()->create(['owner_id' => $member->id, 'branch_id' => $space->building->branch_id]);
+        [$start, $end] = $this->slot(14);
+
+        $this->assertInstanceOf(Booking::class, $this->creations->create($space, $member, $start, $end));
+    }
+
+    /** The people inside now are in the pool: a booking for now needs a seat left. */
+    public function test_a_co_space_booking_for_now_counts_the_walk_ins_inside(): void
+    {
+        $space = $this->coSpace(['capacity' => 1]);
+        WalkinSession::factory()->create(['space_id' => $space->id]);
+        [$start, $end] = $this->slot(8);
+
+        $this->assertRefused('api.booking.slot_unavailable', fn () => $this->creations->create($space, User::factory()->create(), $start, $end));
+    }
+
+    public function test_a_room_lent_to_co_working_refuses_a_room_booking(): void
+    {
+        $space = $this->openSpace();
+        [$start, $end] = $this->slot(14);
+        SpaceCoworkingWindow::factory()->create(['space_id' => $space->id, 'starts_at' => $start->copy()->subHour()->utc(), 'ends_at' => $end->copy()->utc()]);
+
+        $this->assertRefused('api.booking.room_in_coworking_mode', fn () => $this->creations->create($space, User::factory()->create(), $start, $end));
     }
 
     public function test_creation_succeeds_when_capacity_is_unlimited(): void
@@ -570,22 +626,9 @@ class BookingCreationServiceTest extends TestCase
         }
     }
 
-    public function test_creation_fails_when_duration_exceeds_the_maximum(): void
-    {
-        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
-        $space = $this->openSpace();
-
-        try {
-            $this->creations->create($space, User::factory()->create(), ...$this->slot(10, 180));
-            $this->fail('Expected a ReceptionActionException for a duration above the maximum.');
-        } catch (ReceptionActionException $e) {
-            $this->assertSame('api.booking.duration_too_long', $e->messageKey);
-        }
-    }
-
     public function test_creation_fails_inside_the_minimum_notice(): void
     {
-        app(SettingService::class)->set('booking.min_advance_minutes', 120, SettingValueType::Int);
+        app(SettingService::class)->set('booking.min_notice_minutes', 120, SettingValueType::Int);
         $space = $this->openSpace();
 
         try {
@@ -601,7 +644,7 @@ class BookingCreationServiceTest extends TestCase
 
     public function test_creation_fails_beyond_the_advance_horizon(): void
     {
-        app(SettingService::class)->set('booking.max_advance_days', 7, SettingValueType::Int);
+        app(SettingService::class)->set('booking.max_days_ahead', 7, SettingValueType::Int);
         $space = $this->openSpace();
         $start = Carbon::parse('2026-08-31 10:00', 'Asia/Damascus');
 
@@ -611,5 +654,27 @@ class BookingCreationServiceTest extends TestCase
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.booking.too_far_ahead', $e->messageKey);
         }
+    }
+
+    /**
+     * The read side already hides a non-active space (list, details and
+     * availability all leave it out or 404). The write side must agree, or a
+     * screen opened before the space went into maintenance — or a direct
+     * call — could still book it.
+     */
+    public function test_creation_is_refused_on_a_space_that_is_not_active(): void
+    {
+        foreach ([OperationalStatus::Maintenance, OperationalStatus::Retired] as $status) {
+            $space = $this->openSpace(['status' => $status]);
+
+            try {
+                $this->creations->create($space, User::factory()->create(), ...$this->slot(10));
+                $this->fail("Expected a ReceptionActionException for a {$status->value} space.");
+            } catch (ReceptionActionException $e) {
+                $this->assertSame('api.booking.space_not_bookable', $e->messageKey);
+            }
+        }
+
+        $this->assertSame(0, Booking::count());
     }
 }

@@ -176,6 +176,33 @@ php artisan paymera:reconcile     # run the sweep by hand
 |---|---|
 | `ErrorCode 1` on a known-good key | Server IP not registered (production only) |
 | Payments stay `pending` forever | Queue worker or scheduler not running |
-| Accepted but never credited; repeated alerts | No active exchange rate for `PAYMERA_CURRENCY` |
+| **503 on every start-payment attempt** | No active exchange rate for `PAYMERA_CURRENCY` — enter one in the admin exchange-rate screen |
+| Accepted but never credited; repeated alerts | Same cause, hit after the charge instead of before it |
+| Paymera never calls back | `APP_URL` is not the real public HTTPS origin — `callbackURL`/`triggerURL` are built from it |
 | `needs_review` with "amount mismatch" | The gateway's amount differs from ours — investigate before crediting by hand |
 | 403 on reverse, even as admin | `permissions:sync` has not been run |
+
+## Currency and the exchange rate
+
+`PAYMERA_CURRENCY` is what the card is charged in; the ledger's base
+currency is USD (`currencies.is_base`). When the two differ — the normal
+case, charging in SYP — **an active `ExchangeRate` row for the charge
+currency is a hard prerequisite**. Nothing seeds one.
+
+Without it, `PaymentAmountCalculator` throws `PaymentPricingException`,
+which `bootstrap/app.php` renders as a **503 with a translated message**
+(not a 500), logging an `alert` on the `paymera` channel. The member is
+told the gateway is briefly unavailable, which is true, and no payment row
+is created.
+
+The ledger records what the member actually paid: `payment_currency` names
+the charged currency, `payment_amount` is the amount **in that currency**,
+and `exchange_rate_to_base` is the rate applied (null when charging in the
+base currency). That trio is what makes a historical credit re-derivable
+after the live rate moves — the same shape the reception till uses for cash
+taken in a foreign currency.
+
+Rounding: the charge is **ceiled** to the minor unit. A plan worth exactly
+100.00 USD at a stored rate of `0.0000680272` converts to 1,470,000.2352
+SYP and is charged as `147000024` minor units — the member pays a fraction
+more rather than receiving a fraction of a point's worth free.

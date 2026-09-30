@@ -86,10 +86,18 @@ class FulfilAcceptedPayment
             // `performed_by_user_id` stays null: nobody took this money by
             // hand. These columns are audit-only and never affect balance
             // computation (WalletBalanceIgnoresAuditColumnsTest).
+            //
+            // `payment_amount` is in `payment_currency`, NOT in USD. The
+            // two are read as a pair — "2500.00" beside "SYP" has to mean
+            // 2500 lira — and an earlier version stored the USD value here,
+            // which made every non-USD card credit misreport what the member
+            // actually paid. `exchange_rate_to_base` is what lets the USD
+            // value still be re-derived later, after the live rate moves.
             $transaction->forceFill([
                 'payment_method' => PaymentMethod::Paymera,
                 'payment_currency' => $payment->currency,
-                'payment_amount' => $this->amounts->minorToUsd($payment->amount_minor),
+                'payment_amount' => $this->amounts->minorToCharged($payment->amount_minor),
+                'exchange_rate_to_base' => $this->amounts->appliedExchangeRate(),
                 'point_rate_usd' => null,
             ])->save();
 

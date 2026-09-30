@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\PoolTimeline;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
@@ -82,6 +83,13 @@ class BookingCalendarService
         // hours belong to the branch, not the space.
         $periodsByDate = $this->businessHours->periodsForRange($from, $to, $branch);
 
+        // A co_space's seats are its branch's pool, so its occupancy is the
+        // pool's — read once for the range, whatever the number of rows
+        // (docs/decisions/coworking-seat-pool.md).
+        $pool = $spaces->contains(fn (Space $space) => $this->availability->usesBranchPool($space))
+            ? $this->availability->poolTimeline($spaces->first(fn (Space $space) => $this->availability->usesBranchPool($space)), $from->utc(), $to->addDay()->utc())
+            : null;
+
         $resources = $spaces
             ->map(fn (Space $space) => $this->resourceRow(
                 $space,
@@ -90,9 +98,12 @@ class BookingCalendarService
                 $from,
                 $to,
                 $locale,
+                $this->availability->usesBranchPool($space) ? $pool : null,
             ))
             ->values()
             ->all();
+
+        $rules = $this->availability->rulesFor($spaces->first());
 
         return [
             'view' => $view,
@@ -104,12 +115,24 @@ class BookingCalendarService
             'branch_hours' => $this->presenter->branchHours(
                 $branch,
                 $periodsByDate[$anchor->format('Y-m-d')] ?? [],
-                // Weekday names, not the dates keying $periodsByDate — the
-                // label describes the weekly shape ("Sunday – Thursday").
-                $this->openWeekdays($periodsByDate),
-                $this->availability->rulesFor($spaces->first()),
+                // The ordinary week, from the schedule itself — not the days
+                // in view, which in a day view named one weekday as the week.
+                $this->businessHours->weeklySchedule($branch),
+                $rules,
                 $locale,
+                $this->businessHours->upcomingClosures($branch),
             ),
+            // The desk's booking setup, read once with the calendar as the
+            // member app reads its rules once from the space details: the
+            // shortest run the booking form accepts, and the window its date
+            // picker refuses dates beyond before asking for any slots. The
+            // day's slots carry none of it. All global settings, one block
+            // per response.
+            'booking_window' => [
+                'min_duration_minutes' => $rules->minDurationMinutes,
+                'min_notice_minutes' => $rules->minNoticeMinutes,
+                'max_days_ahead' => $rules->maxDaysAhead,
+            ],
             'resources' => $resources,
             'totals' => $this->totals($resources, $bookings),
             'meta' => [
@@ -135,6 +158,7 @@ class BookingCalendarService
         CarbonImmutable $from,
         CarbonImmutable $to,
         string $locale,
+        ?PoolTimeline $pool = null,
     ): array {
         $rules = $this->availability->rulesFor($space);
         $days = [];
@@ -162,7 +186,9 @@ class BookingCalendarService
                 'day' => $date->format('d'),
                 'state' => $periods === [] ? 'closed' : 'open',
                 'periods' => $periods,
-                'occupancy' => $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
+                'occupancy' => $pool !== null
+                    ? $this->poolOccupancy($pool, $periods, $date)
+                    : $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
                 'bookings' => $onThisDay->map(fn (Booking $booking) => $this->bookingCell($booking, $locale))->all(),
             ];
         }
@@ -232,6 +258,46 @@ class BookingCalendarService
     }
 
     /**
+     * How much of the co-working pool's open day is taken: seat-minutes
+     * held or occupied over seat-minutes open, inside the day's open
+     * periods. Subscriptions holding seats, bookings and the walk-ins inside
+     * now all count, as they do for every pool decision.
+     *
+     * `booked_minutes` / `open_minutes` keep their names for the grid, as
+     * seat-minutes here.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods
+     * @return array<string, int>
+     */
+    private function poolOccupancy(PoolTimeline $pool, array $periods, CarbonImmutable $date): array
+    {
+        $taken = 0;
+        $open = 0;
+
+        foreach ($periods as $period) {
+            $periodStart = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['open_time'], $date->timezone)->utc();
+            $periodEnd = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['close_time'], $date->timezone)->utc();
+
+            foreach ($pool->segments() as $segment) {
+                $start = max($segment['start'], $periodStart);
+                $end = min($segment['end'], $periodEnd);
+
+                if ($start->lessThan($end)) {
+                    $minutes = (int) $start->diffInMinutes($end);
+                    $open += $minutes * $segment['capacity'];
+                    $taken += $minutes * min($segment['usage'], $segment['capacity']);
+                }
+            }
+        }
+
+        return [
+            'booked_minutes' => $taken,
+            'open_minutes' => $open,
+            'percent' => $open === 0 ? 0 : (int) min(100, round($taken / $open * 100)),
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function bookingCell(Booking $booking, string $locale): array
@@ -279,23 +345,6 @@ class BookingCalendarService
     }
 
     /**
-     * The distinct weekdays the branch was open on across this range.
-     *
-     * @param  array<string, array<int, array{open_time: string, close_time: string}>>  $periodsByDate
-     * @return list<string>
-     */
-    private function openWeekdays(array $periodsByDate): array
-    {
-        return collect($periodsByDate)
-            ->filter(fn (array $periods) => $periods !== [])
-            ->keys()
-            ->map(fn (string $date) => strtolower(CarbonImmutable::parse($date)->format('l')))
-            ->unique()
-            ->values()
-            ->all();
-    }
-
-    /**
      * @return Collection<int, Space>
      */
     private function spacesFor(array $filters): Collection
@@ -340,6 +389,7 @@ class BookingCalendarService
             'view' => $view,
             'range' => ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d'), 'timezone' => $timezone],
             'branch_hours' => null,
+            'booking_window' => null,
             'resources' => [],
             'totals' => ['spaces' => 0, 'bookings' => 0, 'occupancy_percent' => 0, 'by_status' => []],
             'meta' => [

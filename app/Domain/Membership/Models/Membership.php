@@ -2,17 +2,26 @@
 
 namespace App\Domain\Membership\Models;
 
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Membership\Concerns\ValidatesOwner;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Services\MembershipBranchResolver;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * The actual purchase record (ERD v2.0 naming). Same manual-polymorphic
  * owner_type/owner_id pattern as Wallet, but no uniqueness constraint — an
  * owner may hold more than one concurrent membership.
+ *
+ * It holds `seats` seats in its branch's co-working pool for as long as it
+ * is active, and only while its plan is open when the plan has an access
+ * window (docs/decisions/coworking-seat-pool.md). The branch, when not
+ * given, comes from MembershipBranchResolver on save.
  */
 class Membership extends Model
 {
@@ -22,6 +31,8 @@ class Membership extends Model
         'plan_id',
         'owner_type',
         'owner_id',
+        'branch_id',
+        'seats',
         'status',
         'current_period_start',
         'current_period_end',
@@ -32,6 +43,7 @@ class Membership extends Model
         return [
             'owner_type' => OwnerType::class,
             'status' => MembershipStatus::class,
+            'seats' => 'integer',
             'current_period_start' => 'datetime',
             'current_period_end' => 'datetime',
         ];
@@ -49,11 +61,29 @@ class Membership extends Model
                     'A Membership cannot be created for a one-time package plan (is_subscription=false).'
                 );
             }
+
+            if ($model->branch_id === null && $model->owner_type !== null && $model->owner_id !== null) {
+                $model->branch_id = app(MembershipBranchResolver::class)->branchFor($model->owner_type, (int) $model->owner_id);
+            }
         });
     }
 
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    public function branch(): BelongsTo
+    {
+        return $this->belongsTo(Branch::class);
+    }
+
+    /**
+     * The desks a Dedicated Desk subscription is tied to — tied and untied
+     * only through DedicatedDeskService.
+     */
+    public function seatDesks(): BelongsToMany
+    {
+        return $this->belongsToMany(SeatDesk::class, 'membership_seat_desk')->withTimestamps();
     }
 }

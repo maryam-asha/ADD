@@ -40,15 +40,13 @@ Route::get('spaces', [SpaceController::class, 'index']);
 Route::get('spaces/{space}', [SpaceController::class, 'show']);
 
 // docs/decisions/booking-availability-and-calendar.md — the read side of
-// the booking rules: which days are open, which slots are free on a day,
-// and what each duration would cost from a chosen start. Read-only and
-// advisory; none of these hold a slot, so POST bookings still re-checks
-// under a row lock. Each slot's `reason` is the very message that endpoint
-// would return for the same window, because both go through
-// AvailabilityService.
-Route::get('spaces/{space}/availability', [SpaceAvailabilityController::class, 'month']);
+// the booking rules: which of the space's cells are free on a day. Read-only
+// and advisory; it holds no slot, so POST bookings still re-checks under a
+// row lock, through the same AvailabilityService. There is no member month
+// calendar — the app builds it from the space details' setup — and no member
+// quote: the member picks a start and an end cell rather than a length from
+// a ladder (the desk keeps its quote in admin.php).
 Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::class, 'day']);
-Route::get('spaces/{space}/availability/quote', [SpaceAvailabilityController::class, 'quote']);
 
 // docs/decisions/booking-creation-approval-extension.md — member-facing
 // booking creation with slot granularity/buffer/approval rules.
@@ -139,7 +137,7 @@ Route::patch('consents/public-directory', [PublicDirectoryConsentController::cla
 Route::delete('account', [AccountController::class, 'delete']);
 Route::patch('account/deactivate', [AccountController::class, 'deactivate']);
 Route::patch('account/password', [AccountController::class, 'changePassword']);
-Route::match(['post', 'patch'], 'profile/image', [AccountController::class, 'updateProfileImage']);
+Route::post('profile/image', [AccountController::class, 'updateProfileImage']);
 
 // Privacy Policy
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
@@ -160,8 +158,6 @@ Route::get('events', [EventController::class, 'index']);
 Route::get('events/categories', [EventController::class, 'categories']);
 Route::get('events/statuses', [EventController::class, 'statuses']);
 Route::get('events/my-events', [EventController::class, 'myEvents']);
-Route::get('my-events', [EventController::class, 'myEvents']);
-Route::get('event-categories', [EventController::class, 'categories']);
 Route::get('events/{event}', [EventController::class, 'show']);
 Route::get('events/{event}/registration-form', [EventController::class, 'registrationForm']);
 Route::post('events/{event}/register', [EventController::class, 'register']);
@@ -169,14 +165,12 @@ Route::post('events/{event}/register', [EventController::class, 'register']);
 // ADD Services — catalog, sections (axes), flat list, and request submission
 Route::get('services', [MemberServiceController::class, 'index']);
 Route::get('services/axes', [MemberServiceController::class, 'axes']);
-Route::get('services/categories', [MemberServiceController::class, 'axes']);
 Route::get('services/axes/{axis}', [MemberServiceController::class, 'axisServices']);
 Route::get('services/all', [MemberServiceController::class, 'all']);
 Route::get('services/{slug}', [MemberServiceController::class, 'show']);
 // The form and submission endpoints are keyed on the service id, like events' own
 // registration-form, while the catalog reads above stay on the slug.
 Route::get('services/{id}/registration-form', [MemberServiceController::class, 'registrationForm'])->whereNumber('id');
-Route::get('services/{id}/request-form', [MemberServiceController::class, 'registrationForm'])->whereNumber('id');
 Route::post('services/{id}/requests', [MemberServiceController::class, 'submitRequest'])->whereNumber('id');
 
 // Member's own service request history

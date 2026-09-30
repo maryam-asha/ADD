@@ -265,10 +265,8 @@ class EventBrowseServiceTest extends TestCase
         $this->assertEquals(['id' => $resAr->json('data.0.id'), 'name' => 'ريادة الأعمال'], $resAr->json('data.0'));
         $this->assertEquals(['id' => $resAr->json('data.1.id'), 'name' => 'التصميم وتجربة المستخدم'], $resAr->json('data.1'));
 
-        // 3. Alternate route /member/event-categories
-        $resAlt = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/member/event-categories');
-        $resAlt->assertOk();
-        $resAlt->assertJsonCount(2, 'data');
+        // 3. One URL per endpoint: the old /member/event-categories alias is gone.
+        $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/member/event-categories')->assertNotFound();
 
         // 4. Public endpoint /events/categories
         $resPub = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/events/categories');
@@ -804,9 +802,7 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('سابق', $resAr->json('data.0.time_status.label'));
         $this->assertSame('عرض الفعالية', $resAr->json('data.0.action.label'));
 
-        // Test alternate route /api/v1/member/my-events
-        $resAlt = $this->getJson('/api/v1/member/my-events');
-        $resAlt->assertOk();
-        $resAlt->assertJsonPath('counts.upcoming', 2);
+        // One URL per endpoint: the old /member/my-events alias is gone.
+        $this->getJson('/api/v1/member/my-events')->assertNotFound();
     }
 }

@@ -20,6 +20,8 @@ class SettingSeederTest extends TestCase
         $this->assertSame(60, $settings->get('booking.cancellation_window_minutes'));
         $this->assertSame(30, $settings->get('booking.slot_granularity_minutes'));
         $this->assertSame(60, $settings->get('booking.min_duration_minutes'));
+        // A member books at least an hour before the start.
+        $this->assertSame(60, $settings->get('booking.min_notice_minutes'));
         $this->assertSame(10, $settings->get('booking.overrun_grace_minutes'));
         $this->assertSame(0, $settings->get('booking.buffer_minutes'));
         $this->assertSame(80, $settings->get('profile.completion_threshold'));

@@ -51,19 +51,18 @@ class MemberAuthController extends Controller
         $phone = $request->validated('phone');
 
         try {
-            // One transaction so the parked profile and the live code are never
-            // out of step. A throttled request rolls the upsert back rather than
-            // leaving a profile the member has no code to unlock — and rather
-            // than letting an older code unlock a newer profile.
-            DB::transaction(function () use ($phone, $request) {
+            // The profile is parked in the same transaction as the code, so the
+            // two are never out of step, and a throttled request writes neither
+            // — no profile left without a code, and no older code unlocking a
+            // newer profile. The send itself happens after that transaction
+            // commits (see OtpService::request()).
+            $this->otp->request($phone, OtpPurpose::Registration, function () use ($phone, $request) {
                 PendingRegistration::updateOrCreate(['phone' => $phone], [
                     'name' => $request->validated('name'),
                     'email' => $request->validated('email'),
                     'password' => $request->validated('password'),
                     'expires_at' => now()->addMinutes(config('otp.expires_after_minutes')),
                 ]);
-
-                $this->otp->request($phone, OtpPurpose::Registration);
             });
         } catch (OtpThrottledException $e) {
             return response()->json([
@@ -71,7 +70,8 @@ class MemberAuthController extends Controller
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
         } catch (OtpDeliveryFailedException) {
-            // The transaction already rolled the parked profile back.
+            // The parked profile stays, so register/resend can retry the send
+            // without the member retyping everything; it expires on its own.
             return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 

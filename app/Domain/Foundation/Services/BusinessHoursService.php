@@ -132,6 +132,77 @@ class BusinessHoursService
         return $resolved;
     }
 
+    /**
+     * The branch's weekly schedule: every weekday, with its own periods
+     * (earliest first; none means closed that weekday), in one query.
+     *
+     * The shape of an ordinary week, for a card that says which days keep
+     * which hours. It is not what any given date resolves to — an exception
+     * replaces a weekday's hours on its date — so anything about one date
+     * still goes through periodsFor()/periodsForRange().
+     *
+     * @return array<string, list<array{open_time: string, close_time: string}>> keyed by DayOfWeek value
+     */
+    public function weeklySchedule(Branch $branch): array
+    {
+        $rows = BusinessHour::query()
+            ->where('branch_id', $branch->id)
+            ->orderBy('open_time')
+            ->get(['day_of_week', 'open_time', 'close_time'])
+            ->groupBy(fn (BusinessHour $businessHour) => $businessHour->day_of_week instanceof DayOfWeek
+                ? $businessHour->day_of_week->value
+                : (string) $businessHour->day_of_week);
+
+        $schedule = [];
+
+        foreach (DayOfWeek::cases() as $day) {
+            $schedule[$day->value] = ($rows->get($day->value) ?? collect())
+                ->map(fn (BusinessHour $businessHour) => [
+                    'open_time' => $businessHour->open_time,
+                    'close_time' => $businessHour->close_time,
+                ])
+                ->values()
+                ->all();
+        }
+
+        return $schedule;
+    }
+
+    /**
+     * The branch's all-day closures from today on, in date order, in one
+     * query.
+     *
+     * For a date picker that must refuse a closed day before anyone picks
+     * it, in whatever month the user navigates to — which is why this is
+     * not bounded by any calendar range. Only `is_closed` rows: an exception
+     * that shortens a day leaves it open, and bookable. A weekday with no
+     * schedule at all is also closed but is not listed here; that is the
+     * weekly shape, which `open_weekdays` already describes.
+     *
+     * "Today" is the district's today, so a closure is not dropped a few
+     * hours early by a UTC date that has not rolled over yet.
+     *
+     * @return list<array{date: string, reason: string|null}>
+     */
+    public function upcomingClosures(Branch $branch): array
+    {
+        $today = $this->toLocal(Carbon::now())->toDateString();
+
+        return BusinessHourException::query()
+            ->where('branch_id', $branch->id)
+            ->where('is_closed', true)
+            // whereDate for the same reason periodsForRange() uses it.
+            ->whereDate('date', '>=', $today)
+            ->orderBy('date')
+            ->get(['date', 'reason'])
+            ->map(fn (BusinessHourException $exception) => [
+                'date' => Carbon::parse($exception->date)->toDateString(),
+                'reason' => $exception->reason,
+            ])
+            ->values()
+            ->all();
+    }
+
     private function toLocal(CarbonInterface $instant): CarbonInterface
     {
         return $instant->clone()->setTimezone(

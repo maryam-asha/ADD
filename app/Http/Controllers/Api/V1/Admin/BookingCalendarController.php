@@ -7,8 +7,7 @@ use App\Domain\Booking\Services\BookingCalendarService;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Booking\CalendarRequest;
-use App\Http\Requests\Member\Booking\AvailabilityQuoteRequest;
-use App\Http\Requests\Member\Booking\AvailabilitySlotsRequest;
+use App\Http\Requests\Member\Booking\AvailabilityDayRequest;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -50,8 +49,13 @@ class BookingCalendarController extends Controller
     }
 
     /**
-     * The bookable slots for one space on one date — the same payload the
-     * member app's time picker reads, and deliberately the same service.
+     * The space's cells for one date — the member app's response exactly,
+     * `{data: {date, state, closed_banner, slots, counts, meta}}`, from the
+     * same service; SpaceAvailabilityControllerTest asserts the two bodies
+     * are identical. The desk picks a run of free cells, first to last, at
+     * least `booking_window.min_duration_minutes` long — read once, with the
+     * hours and closures, from index(), the way the member app reads its
+     * setup once from the space details.
      *
      * Reception books on a member's behalf through the very same
      * BookingCreationService, so the desk must be able to see which windows
@@ -60,38 +64,19 @@ class BookingCalendarController extends Controller
      * minimum duration, the buffer and the existing overlaps by being
      * refused — one 422 at a time.
      *
-     * The Form Requests are reused from the member namespace rather than
-     * copied: they validate a date and an instant, which is not a
-     * role-specific question. Re-declaring them here would be a second copy
-     * free to drift.
+     * The Form Request is reused from the member namespace rather than
+     * copied: it validates a date, which is not a role-specific question.
+     * Re-declaring it here would be a second copy free to drift.
      */
     public function slots(
-        AvailabilitySlotsRequest $request,
+        AvailabilityDayRequest $request,
         Space $space,
         AvailabilityBrowseService $availability,
     ): JsonResponse {
-        return response()->json($availability->day(
+        return response()->json(['data' => $availability->day(
             $space,
             $request->validated('date'),
             app()->getLocale(),
-            $request->duration(),
-        ));
-    }
-
-    /**
-     * The duration ladder for a chosen start, with each option priced and
-     * flagged available or not. An unavailable option carries the reason
-     * rather than being hidden, so the desk can say why 1.5h is refused.
-     */
-    public function quote(
-        AvailabilityQuoteRequest $request,
-        Space $space,
-        AvailabilityBrowseService $availability,
-    ): JsonResponse {
-        return response()->json($availability->quote(
-            $space,
-            $request->validated('start_at'),
-            app()->getLocale(),
-        ));
+        )]);
     }
 }

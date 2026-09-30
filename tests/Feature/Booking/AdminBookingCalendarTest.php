@@ -12,6 +12,8 @@ use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -120,6 +122,23 @@ class AdminBookingCalendarTest extends TestCase
             ->assertJsonPath('resources.0.days.0.date', '2026-08-17');
     }
 
+    /**
+     * The branch's open days come from its weekly schedule, not from the
+     * days in view: a one-day view used to report that one weekday as the
+     * whole week.
+     */
+    public function test_the_open_weekdays_are_the_whole_weeks_even_in_the_day_view(): void
+    {
+        $this->actingAsOperations();
+        $this->space();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=day&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('branch_hours.open_weekdays', ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday'])
+            ->assertJsonPath('branch_hours.days_label', 'Sunday – Thursday');
+    }
+
     public function test_a_booking_appears_on_its_day_with_the_member_who_made_it(): void
     {
         $this->actingAsOperations();
@@ -156,6 +175,57 @@ class AdminBookingCalendarTest extends TestCase
             ->assertJsonPath('resources.0.days.0.state', 'closed')
             ->assertJsonPath('resources.0.days.0.occupancy.open_minutes', 0)
             ->assertJsonPath('resources.0.days.0.occupancy.percent', 0);
+    }
+
+    /**
+     * The desk's date picker navigates freely, so the closures it must refuse
+     * cannot be limited to the range this response covers: a holiday next
+     * month is listed while the calendar shows this week. Past closures, and
+     * exceptions that only shorten a day, are not.
+     */
+    public function test_branch_hours_lists_every_upcoming_closure_beyond_the_range_shown(): void
+    {
+        $this->actingAsOperations();
+        $this->space();
+
+        foreach ([
+            ['date' => '2026-08-10', 'is_closed' => true, 'reason' => 'Already past'],
+            ['date' => '2026-08-20', 'is_closed' => false, 'open_time' => '10:00', 'close_time' => '14:00', 'reason' => 'Short day'],
+            ['date' => '2026-09-15', 'is_closed' => true, 'reason' => 'Public holiday'],
+        ] as $attributes) {
+            BusinessHourException::factory()->create(array_merge([
+                'branch_id' => $this->branch->id,
+                'open_time' => null,
+                'close_time' => null,
+            ], $attributes));
+        }
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=week&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('branch_hours.upcoming_closures', [
+                ['date' => '2026-09-15', 'reason' => 'Public holiday'],
+            ]);
+    }
+
+    /**
+     * The desk builds its date picker from the calendar response, as the
+     * member app does from the space details: the booking window comes with
+     * it, so a date beyond it is refused before any slots are asked for.
+     */
+    public function test_the_calendar_carries_the_booking_window(): void
+    {
+        app(SettingService::class)->set('booking.max_days_ahead', 30);
+        app(SettingService::class)->set('booking.min_notice_minutes', 45);
+        $this->actingAsOperations();
+        $this->space();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=week&date=2026-08-17')
+            ->assertOk()
+            // The minimum length too: the desk's day response is the member's,
+            // with no rules in it, so the calendar is where the desk reads it.
+            ->assertJsonPath('booking_window', ['min_duration_minutes' => 60, 'min_notice_minutes' => 45, 'max_days_ahead' => 30]);
     }
 
     /**
@@ -201,6 +271,27 @@ class AdminBookingCalendarTest extends TestCase
             ->assertOk()
             ->assertJsonPath('resources.0.space.concurrency_ceiling', 4)
             ->assertJsonPath('resources.0.days.0.occupancy.percent', 25);
+    }
+
+    /**
+     * A co_space's occupancy is its branch's pool's: two subscriptions
+     * holding seats all day fill half of four seats before any booking
+     * (docs/decisions/coworking-seat-pool.md).
+     */
+    public function test_a_co_spaces_occupancy_counts_the_seats_subscriptions_hold(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->space(['space_type' => SpaceType::CoSpace, 'is_lockable' => false, 'capacity' => 4]);
+        Membership::factory()->count(2)->create([
+            'branch_id' => $space->building->branch_id,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(10),
+        ]);
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/calendar?view=day&date=2026-08-17')
+            ->assertOk()
+            ->assertJsonPath('resources.0.days.0.occupancy.percent', 50);
     }
 
     public function test_a_booking_running_past_closing_is_clipped_to_the_open_window(): void

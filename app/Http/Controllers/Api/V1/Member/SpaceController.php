@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
+use App\Domain\Booking\Services\AvailabilityBrowseService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\SpaceBrowseService;
 use App\Http\Controllers\Controller;
@@ -14,23 +15,40 @@ class SpaceController extends Controller
     {
         $result = $service->browse($request->validated(), $request->user());
 
-        // `data` is the spaces list itself, like every other member listing, so a
-        // client can iterate it without unwrapping a named key first. The banner
-        // describes the branch those rows belong to rather than paginating them,
-        // so it sits alongside `data` instead of inside it or inside `meta`.
+        // `data` holds the branch's banner and the list as `spaces`; the
+        // paging `meta` sits beside it, at the top level. The banner describes
+        // the branch those rows belong to rather than paginating them, so it
+        // sits beside `spaces`, not inside `meta`.
         return response()->json([
-            'working_hours_banner' => $result['working_hours_banner'],
-            'data' => $result['spaces'],
+            'data' => [
+                'working_hours_banner' => $result['working_hours_banner'],
+                'spaces' => $result['spaces'],
+            ],
             'meta' => $result['meta'],
         ]);
     }
 
-    public function show(Space $space, SpaceBrowseService $service): JsonResponse
+    /**
+     * The space, plus `booking`: the setup its booking calendar starts from
+     * (rules, and the upcoming closures as date-times). Sent once here so
+     * the slots endpoint, asked again on every date change, can carry only
+     * what changes. The branch's
+     * week comes once with the spaces list, not here.
+     *
+     * Composed here rather than inside SpaceBrowseService: the setup belongs
+     * to the Booking domain, which already depends on Foundation, and
+     * Foundation reaching back would make the two depend on each other.
+     */
+    public function show(Space $space, SpaceBrowseService $service, AvailabilityBrowseService $availability): JsonResponse
     {
+        // details() 404s a non-active space before any booking setup is built.
         $details = $service->details($space, request()->user());
 
         return response()->json([
-            'data' => $details,
+            'data' => [
+                ...$details,
+                'booking' => $availability->bookingSetup($space, app()->getLocale()),
+            ],
         ]);
     }
 }

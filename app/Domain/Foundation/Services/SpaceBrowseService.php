@@ -12,6 +12,7 @@ use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Settings\Services\SettingService;
+use App\Support\Presenters\BranchHoursPresenter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -21,6 +22,7 @@ class SpaceBrowseService
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
         private readonly PointConversionService $points,
+        private readonly BranchHoursPresenter $hours,
     ) {}
 
     /**
@@ -65,10 +67,15 @@ class SpaceBrowseService
             ];
         }
 
-        // 2. Working Hours Banner for Branch (Today)
+        // 2. Working Hours Banner for Branch: today's hours, plus the branch's
+        // week and closures. They are the same for every space, so they are
+        // stated here, once, rather than in each space's details.
         $today = Carbon::now($timezone)->startOfDay();
         $periods = $this->businessHours->periodsFor($today, $branch);
-        $banner = $this->buildWorkingHoursBanner($periods, $today, $timezone);
+        $banner = [
+            ...$this->buildWorkingHoursBanner($periods, $today, $timezone),
+            ...$this->branchWeek($branch, $periods, $timezone),
+        ];
 
         // 3. Query Active Spaces for Branch
         $spacesQuery = Space::query()
@@ -179,6 +186,41 @@ class SpaceBrowseService
             'open_time' => $firstOpen,
             'close_time' => $lastClose,
             'is_open' => true,
+        ];
+    }
+
+    /**
+     * The branch's hours beyond today, for the list's banner — everything the
+     * member app needs about the branch before any booking screen opens:
+     *
+     * - `periods`: today's, the periods behind `hours`.
+     * - `schedule` / `open_weekdays` / `days_label`: the ordinary week, its
+     *   days grouped by the hours they share (a branch keeps different hours
+     *   on different days).
+     * - the timezone, and its label derived per request (Damascus has DST).
+     *
+     * The upcoming closures are not here: the booking calendar is set up
+     * from the space details, which carry them as plain dates.
+     *
+     * Written by the same BranchHoursPresenter as the calendars' hours card.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods  today's
+     * @return array<string, mixed>
+     */
+    private function branchWeek(Branch $branch, array $periods, string $timezone): array
+    {
+        $locale = app()->getLocale();
+        $timezoneLabel = $this->hours->timezoneLabel($timezone);
+
+        return [
+            'title' => __('api.booking.branch_hours_title', [
+                'branch' => $branch->translate('name', $locale) ?? 'Aleppo Digital District',
+            ], $locale),
+            'periods' => $periods,
+            ...$this->hours->week($this->businessHours->weeklySchedule($branch), $timezone, $locale),
+            'timezone' => $timezone,
+            'timezone_label' => $timezoneLabel,
+            'timezone_note' => __('api.booking.timezone_note', ['offset' => $timezoneLabel], $locale),
         ];
     }
 

@@ -7,7 +7,7 @@ validation vocabulary the server enforces on submit.
 > request forms are driven by the same enum, the same constraint table and the
 > same rule builder on the server. A field object from
 > `GET events/{event}/registration-form` and one from
-> `GET services/{id}/request-form` are the **same shape** — build the widget
+> `GET services/{id}/registration-form` are the **same shape** — build the widget
 > factory once.
 
 Source of truth: `app/Support/Forms/` — `FieldType.php`, `FieldConstraints.php`,

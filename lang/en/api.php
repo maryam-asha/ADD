@@ -87,12 +87,17 @@ return [
         'floor_updated' => 'Floor updated.',
         'zone_updated' => 'Zone updated.',
         'space_updated' => 'Space updated.',
+        'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
+        'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
+        'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
         'resource_updated' => 'Resource updated.',
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
+        'seat_desk_code_taken' => 'Another desk in this branch already has this code.',
+        'seat_desk_held' => 'This desk belongs to a live Dedicated Desk subscription.',
         'device_updated' => 'Device updated.',
         'device_qr_value_regenerated' => 'The device QR value has been regenerated.',
         'device_not_a_lock' => 'Only lock devices have a QR value.',
@@ -106,6 +111,7 @@ return [
         'membership_already_active' => 'This member or company already has an active membership.',
         'membership_plan_not_subscription' => 'This plan is a one-time package, not a subscription, and cannot be activated as a membership.',
         'membership_plan_inactive' => 'This plan is no longer available.',
+        'membership_seats_user_owner' => 'A member\'s own subscription holds exactly one seat; seats are for company subscriptions.',
         'resource_type_updated' => 'Resource type updated.',
         'event_category_updated' => 'Event category updated.',
         'event_updated' => 'Event updated.',
@@ -187,15 +193,28 @@ return [
         'member_already_in_session' => 'This member already has an active coworking session.',
     ],
 
+    // Weekday names, for labels built from the weekly schedule
+    // ("Saturday, Monday – Thursday").
+    'weekdays' => [
+        'saturday' => 'Saturday',
+        'sunday' => 'Sunday',
+        'monday' => 'Monday',
+        'tuesday' => 'Tuesday',
+        'wednesday' => 'Wednesday',
+        'thursday' => 'Thursday',
+        'friday' => 'Friday',
+    ],
+
     'booking' => [
         'invalid_start_time' => "The start time does not match this space's slot granularity.",
         'duration_too_short' => 'The booking duration is shorter than the minimum allowed.',
-        'duration_too_long' => 'The booking duration is longer than the maximum allowed.',
         'too_soon' => 'This time is too soon to book. Please choose a later start.',
         'too_far_ahead' => 'This date is too far ahead to book yet.',
+        'space_not_bookable' => 'This space is not available for booking right now.',
         'duration_not_offered' => 'This duration is not available for this space.',
         'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
         'slot_unavailable' => 'This space is not available for the requested time.',
+        'room_in_coworking_mode' => 'This room is part of the co-working space at that time, so it cannot be booked as a room.',
         'buffer_conflict' => 'This booking is too close to another booking on this space.',
         'wallet_choice_required' => 'More than one wallet can cover this booking. Please choose one.',
         'not_pending' => 'This booking is not awaiting approval.',
@@ -219,13 +238,6 @@ return [
         'choose_another_day' => 'Choose another day.',
         'branch_hours_title' => ':branch Hours',
         'timezone_note' => 'All times shown in your local time (:offset)',
-        'slots_greyed_note' => 'Greyed-out slots are already booked.',
-        'legend' => [
-            'available' => 'Available',
-            'booked' => 'Booked',
-            'outside_hours' => 'Outside hours',
-        ],
-        'range_too_long' => 'The requested date range is too long. Request at most :days days.',
 
         // Member booking lifecycle: list, detail, cancellation, preview.
         'cancelled' => 'Booking cancelled.',
@@ -358,7 +370,6 @@ return [
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
-        'min_duration_note' => ':granularity-min start slots • Min. :min_duration',
         'book_this_space' => 'Book This Space',
         'person' => ':count person',
         'people' => ':count people',
@@ -382,6 +393,24 @@ return [
             'ac' => 'Air Conditioning',
             'stage' => 'Stage',
         ],
+    ],
+
+    'coworking' => [
+        'window_updated' => 'The co-working stretch was updated.',
+        'window_deleted' => 'The room is no longer lent to co-working for that stretch.',
+        'room_has_bookings' => 'This room has bookings in that stretch, so it cannot be lent to co-working then.',
+        'would_overbook' => 'Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.',
+        'not_a_room' => 'Only a room can be lent to co-working.',
+        'window_overlaps' => 'This room is already lent to co-working for part of that stretch.',
+    ],
+
+    'membership' => [
+        'desks_assigned' => 'Desks assigned.',
+        'desks_need_dedicated_plan' => 'Only a Dedicated Desk subscription is tied to desks.',
+        'desks_exceed_seats' => 'A subscription gets no more desks than the seats it holds.',
+        'desks_outside_branch' => 'Every desk must be in a co-working space of the subscription\'s branch.',
+        'desk_taken' => 'A desk is already held by another subscription during some of these hours and dates.',
+        'seat_pool_full' => 'Every co-working seat in this branch is already taken for part of this plan\'s period, so it cannot be subscribed to now.',
     ],
 
     'package' => [

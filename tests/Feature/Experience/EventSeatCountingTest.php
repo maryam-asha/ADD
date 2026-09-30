@@ -168,7 +168,7 @@ class EventSeatCountingTest extends TestCase
         ]);
 
         Sanctum::actingAs($user, ['*']);
-        $response = $this->getJson('/api/v1/member/my-events');
+        $response = $this->getJson('/api/v1/member/events/my-events');
 
         $card = collect($response->json('data'))->firstWhere('id', $event->id);
         $this->assertNotNull($card);
@@ -190,7 +190,7 @@ class EventSeatCountingTest extends TestCase
         ]);
 
         Sanctum::actingAs($user, ['*']);
-        $card = collect($this->getJson('/api/v1/member/my-events')->json('data'))
+        $card = collect($this->getJson('/api/v1/member/events/my-events')->json('data'))
             ->firstWhere('id', $event->id);
 
         $this->assertSame('rejected', $card['registration']['status']);

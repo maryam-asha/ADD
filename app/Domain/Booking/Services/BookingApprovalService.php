@@ -26,7 +26,6 @@ class BookingApprovalService
     public function __construct(
         private readonly WalletService $wallets,
         private readonly AmountCalculator $amounts,
-        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly PlanDiscountService $discounts,
     ) {}
 
@@ -60,12 +59,6 @@ class BookingApprovalService
                 'approved_by' => $operator->id,
                 'approved_at' => now(),
             ])->save();
-
-            // A rejected booking leaves the blocking set, so the slot it was
-            // holding is free again and the derived counter follows.
-            // Approval does not touch the counter: a pending booking already
-            // held the slot, so confirming it changes nothing.
-            $this->capacitySlots->release($locked, $locked->space);
 
             if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
                 $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);

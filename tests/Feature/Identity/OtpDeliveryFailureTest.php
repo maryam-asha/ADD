@@ -5,6 +5,7 @@ namespace Tests\Feature\Identity;
 use App\Domain\Identity\Models\PendingRegistration;
 use App\Services\Otp\OtpProvider;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\Support\CapturingOtpProvider;
 use Tests\TestCase;
 
@@ -56,14 +57,46 @@ class OtpDeliveryFailureTest extends TestCase
         ]);
     }
 
-    public function test_a_failed_send_is_reported_and_leaves_nothing_behind(): void
+    public function test_a_failed_send_is_reported_and_leaves_no_live_code(): void
     {
         $this->register()
             ->assertStatus(503)
             ->assertJson(['message' => __('api.auth.otp_send_failed')]);
 
         $this->assertDatabaseCount('otp_verifications', 0);
-        $this->assertSame(0, PendingRegistration::count());
+    }
+
+    public function test_after_a_failed_send_the_parked_profile_can_be_resent_to(): void
+    {
+        $this->register()->assertStatus(503);
+        $this->assertSame(1, PendingRegistration::count());
+
+        $this->gatewayUp = true;
+
+        $this->postJson('/api/v1/auth/register/resend', ['phone' => self::PHONE])
+            ->assertOk()
+            ->assertJson(['message' => __('api.auth.otp_sent')]);
+    }
+
+    public function test_the_gateway_is_never_called_inside_a_database_transaction(): void
+    {
+        $levels = [];
+        $this->app->instance(OtpProvider::class, new class($levels) implements OtpProvider
+        {
+            public function __construct(private array &$levels) {}
+
+            public function send(string $phone, string $code, string $provider): bool
+            {
+                $this->levels[] = DB::transactionLevel();
+
+                return true;
+            }
+        });
+
+        $this->register()->assertOk();
+
+        // RefreshDatabase wraps each test in one transaction of its own.
+        $this->assertSame([1], $levels);
     }
 
     public function test_a_failed_send_does_not_start_the_resend_cooldown(): void

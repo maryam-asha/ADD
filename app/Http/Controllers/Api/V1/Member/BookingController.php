@@ -14,6 +14,7 @@ use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Http\Controllers\Controller;
@@ -127,14 +128,27 @@ class BookingController extends Controller
         $existing = $availability->blockingBookings($space, $start, $end, $rules);
 
         $unavailableKey = match (true) {
+            ! $availability->acceptsBookings($space) => 'api.booking.space_not_bookable',
             ! $availability->isFarEnoughAhead($start, $rules) => 'api.booking.too_soon',
             ! $availability->isWithinAdvanceHorizon($start, $rules) => 'api.booking.too_far_ahead',
             ! $availability->isWithinBusinessHours($space, $start, $end, $rules) => 'api.reception.outside_business_hours',
             ! $availability->isValidGranularity($start, $rules) => 'api.booking.invalid_start_time',
             ! $availability->isLongEnough($start, $end, $rules) => 'api.booking.duration_too_short',
-            ! $availability->isShortEnough($start, $end, $rules) => 'api.booking.duration_too_long',
             ! $availability->matchesDurationGranularity($start, $end, $rules) => 'api.booking.duration_invalid_granularity',
-            $availability->exceedsCeiling($existing, $start, $end, $rules) => 'api.booking.slot_unavailable',
+            // A co_space's seat comes from its branch's pool, counted on the
+            // member's subscription as the POST counts it; a room may be lent
+            // to co-working (docs/decisions/coworking-seat-pool.md).
+            $rules->usesBranchPool && $availability->exceedsPool(
+                $availability->poolTimeline($space, $start, $end, PoolDemand::presence($start, $end, $request->user())),
+                $start,
+                $end,
+            ) => 'api.booking.slot_unavailable',
+            ! $rules->usesBranchPool && $availability->exceedsCeiling($existing, $start, $end, $rules) => 'api.booking.slot_unavailable',
+            ! $rules->usesBranchPool && $availability->isInCoworkingMode(
+                $availability->blockingCoworkingWindows($space, $start, $end),
+                $start,
+                $end,
+            ) => 'api.booking.room_in_coworking_mode',
             $availability->violatesBuffer($existing, $start, $end, $rules) => 'api.booking.buffer_conflict',
             default => null,
         };

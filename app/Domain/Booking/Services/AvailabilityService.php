@@ -5,9 +5,13 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\ValueObjects\DayAvailability;
+use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Booking\ValueObjects\PoolTimeline;
 use App\Domain\Booking\ValueObjects\SlotAvailability;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\BusinessHourException;
@@ -50,6 +54,7 @@ class AvailabilityService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
+        private readonly CoworkingPoolService $pool,
     ) {}
 
     /**
@@ -69,9 +74,9 @@ class AvailabilityService
             capacity: $space->capacity,
             concurrencyCeiling: $this->concurrencyCeilingFor($space),
             timezone: (string) $this->settings->get('app.timezone', 'Asia/Damascus'),
-            maxDurationMinutes: $this->positiveOrNull($this->settings->get('booking.max_duration_minutes')),
-            minAdvanceMinutes: max(0, (int) $this->settings->get('booking.min_advance_minutes', 0)),
-            maxAdvanceDays: $this->positiveOrNull($this->settings->get('booking.max_advance_days')),
+            minNoticeMinutes: max(0, (int) $this->settings->get('booking.min_notice_minutes', 0)),
+            maxDaysAhead: $this->positiveOrNull($this->settings->get('booking.max_days_ahead')),
+            usesBranchPool: $this->usesBranchPool($space),
         );
     }
 
@@ -107,6 +112,21 @@ class AvailabilityService
     // ---------------------------------------------------------------
 
     /**
+     * Whether the space takes bookings at all. Only an active space does: one
+     * under maintenance or retired disappears from every booking surface
+     * (PRD §5.6).
+     *
+     * One definition for both sides: the read path 404s on it (the member
+     * list, details and availability never show such a space) and the write
+     * path refuses on it — without the second, a screen opened just before a
+     * space went into maintenance, or a direct call, could still book it.
+     */
+    public function acceptsBookings(Space $space): bool
+    {
+        return $space->status === OperationalStatus::Active;
+    }
+
+    /**
      * A window must fall entirely inside ONE open period of the branch's
      * day. Spanning midnight or straddling a lunch closure both fail.
      */
@@ -129,37 +149,6 @@ class AvailabilityService
         $endTime = $localEnd->format('H:i');
 
         foreach ($this->businessHours->periodsFor($start, $branch) as $period) {
-            if ($startTime >= $period['open_time'] && $endTime <= $period['close_time']) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * The same question against periods already resolved for the day, so a
-     * day's worth of slots costs no further business-hours queries.
-     *
-     * @param  array<int, array{open_time: string, close_time: string}>  $periods
-     */
-    public function fitsWithinPeriods(
-        CarbonInterface $start,
-        CarbonInterface $end,
-        array $periods,
-        SpaceBookingRules $rules,
-    ): bool {
-        $localStart = $start->copy()->setTimezone($rules->timezone);
-        $localEnd = $end->copy()->setTimezone($rules->timezone);
-
-        if (! $localStart->isSameDay($localEnd)) {
-            return false;
-        }
-
-        $startTime = $localStart->format('H:i');
-        $endTime = $localEnd->format('H:i');
-
-        foreach ($periods as $period) {
             if ($startTime >= $period['open_time'] && $endTime <= $period['close_time']) {
                 return true;
             }
@@ -197,20 +186,9 @@ class AvailabilityService
         return ($duration - $rules->minDurationMinutes) % $rules->granularityMinutes === 0;
     }
 
-    /**
-     * The ceiling counterpart of isLongEnough(). No maximum configured
-     * means any length the day can hold.
-     */
-    public function isShortEnough(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): bool
-    {
-        return $rules->maxDurationMinutes === null
-            || (int) $start->diffInMinutes($end) <= $rules->maxDurationMinutes;
-    }
-
     public function isValidDuration(CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): bool
     {
         return $this->isLongEnough($start, $end, $rules)
-            && $this->isShortEnough($start, $end, $rules)
             && $this->matchesDurationGranularity($start, $end, $rules);
     }
 
@@ -223,12 +201,11 @@ class AvailabilityService
     public function isValidDurationInMinutes(int $minutes, SpaceBookingRules $rules): bool
     {
         return $minutes >= $rules->minDurationMinutes
-            && ($rules->maxDurationMinutes === null || $minutes <= $rules->maxDurationMinutes)
             && ($minutes - $rules->minDurationMinutes) % $rules->granularityMinutes === 0;
     }
 
     /**
-     * The minimum notice: a start closer to now than `min_advance_minutes`
+     * The minimum notice: a start closer to now than `min_notice_minutes`
      * cannot be booked.
      *
      * Zero (the default) means there is no notice rule at all — not "must
@@ -238,13 +215,13 @@ class AvailabilityService
      */
     public function isFarEnoughAhead(CarbonInterface $start, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->minAdvanceMinutes === 0) {
+        if ($rules->minNoticeMinutes === 0) {
             return true;
         }
 
         $now ??= CarbonImmutable::now('UTC');
 
-        return $start->greaterThanOrEqualTo($now->copy()->addMinutes($rules->minAdvanceMinutes));
+        return $start->greaterThanOrEqualTo($now->copy()->addMinutes($rules->minNoticeMinutes));
     }
 
     /**
@@ -255,7 +232,7 @@ class AvailabilityService
      */
     public function isWithinAdvanceHorizon(CarbonInterface $start, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->maxAdvanceDays === null) {
+        if ($rules->maxDaysAhead === null) {
             return true;
         }
 
@@ -264,14 +241,14 @@ class AvailabilityService
 
     private function isDateBeyondHorizon(CarbonInterface $localDate, SpaceBookingRules $rules, ?CarbonInterface $now = null): bool
     {
-        if ($rules->maxAdvanceDays === null) {
+        if ($rules->maxDaysAhead === null) {
             return false;
         }
 
         $lastDate = ($now ?? CarbonImmutable::now('UTC'))
             ->copy()
             ->setTimezone($rules->timezone)
-            ->addDays($rules->maxAdvanceDays)
+            ->addDays($rules->maxDaysAhead)
             ->format('Y-m-d');
 
         return $localDate->format('Y-m-d') > $lastDate;
@@ -391,6 +368,87 @@ class AvailabilityService
     }
 
     // ---------------------------------------------------------------
+    // The branch's co-working seat pool (docs/decisions/coworking-seat-pool.md)
+    // ---------------------------------------------------------------
+
+    /**
+     * Whether the space's seats are its branch's co-working pool rather than
+     * a ceiling of its own. A co_space is; every other type is exclusive.
+     */
+    public function usesBranchPool(Space $space): bool
+    {
+        return $space->space_type === SpaceType::CoSpace;
+    }
+
+    /**
+     * Whether [$start, $end) has fewer than `$seats` free seats at some
+     * moment of the pool's timeline.
+     *
+     * The read path asks with a timeline of what already exists and one seat
+     * for the booking it is offering; the write path folds the new booking,
+     * walk-in or subscription into the timeline as its candidate and asks
+     * with none — "does anything overflow once it is in".
+     */
+    public function exceedsPool(PoolTimeline $timeline, CarbonInterface $start, CarbonInterface $end, int $seats = 0): bool
+    {
+        return $timeline->minFreeBetween($start, $end) < $seats;
+    }
+
+    /**
+     * Whether a room is lent to co-working at any moment of [$start, $end),
+     * and so takes no room booking then.
+     *
+     * @param  Collection<int, SpaceCoworkingWindow>  $windows
+     */
+    public function isInCoworkingMode(Collection $windows, CarbonInterface $start, CarbonInterface $end): bool
+    {
+        return $windows->contains(
+            fn (SpaceCoworkingWindow $window) => $window->starts_at < $end && $window->ends_at > $start
+        );
+    }
+
+    /**
+     * The one read of the pool for a space's booking decisions: its branch's
+     * timeline over the range, with the candidate folded in when given.
+     */
+    public function poolTimeline(Space $space, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate = null): PoolTimeline
+    {
+        return $this->pool->timeline($space->building->branch, $from, $to, $candidate);
+    }
+
+    /**
+     * The room's co-working windows touching the range, fetched once.
+     *
+     * @return Collection<int, SpaceCoworkingWindow>
+     */
+    public function blockingCoworkingWindows(Space $space, CarbonInterface $from, CarbonInterface $to): Collection
+    {
+        return SpaceCoworkingWindow::query()
+            ->where('space_id', $space->id)
+            ->overlapping($from, $to)
+            ->get()
+            ->toBase();
+    }
+
+    /**
+     * What else contends for a space over the range, read once for the read
+     * path: the pool's timeline for a co_space, the co-working windows for any
+     * other space. Given values are kept, so a caller that already holds them
+     * — daysInRange() handing a month's to each day — costs nothing more.
+     *
+     * @param  Collection<int, SpaceCoworkingWindow>|null  $windows
+     * @return array{0: PoolTimeline|null, 1: Collection<int, SpaceCoworkingWindow>}
+     */
+    private function contention(Space $space, SpaceBookingRules $rules, CarbonInterface $from, CarbonInterface $to, ?PoolTimeline $pool = null, ?Collection $windows = null): array
+    {
+        if ($rules->usesBranchPool) {
+            return [$pool ?? $this->poolTimeline($space, $from, $to), $windows ?? new Collection];
+        }
+
+        return [null, $windows ?? $this->blockingCoworkingWindows($space, $from, $to)];
+    }
+
+    // ---------------------------------------------------------------
     // The one place blocking bookings are read from the database
     // ---------------------------------------------------------------
 
@@ -433,18 +491,17 @@ class AvailabilityService
      * Slots are generated across the day's open periods only; the grid the
      * app draws is the union of those, so a closed day yields none.
      *
-     * Two shapes, one set of predicates:
+     * Each slot is a granularity-sized cell of the grid. Two questions, one
+     * set of predicates:
      *
-     * - Without a duration, each slot is a granularity-sized cell of the
-     *   grid, but its state answers "can a booking START here" — the cell
-     *   is judged against the shortest legal booking from that start, not
-     *   against the cell alone. A green 10:30 cell that could not hold the
-     *   60-minute minimum before an 11:00 booking would only send the
-     *   member to a quote where every option is disabled.
-     * - With a duration, each slot is the whole booking window
-     *   (start → start + duration), stepping by the granularity. A start
-     *   whose window would run past the period's close is simply not
-     *   listed: no waiting makes it bookable, unlike a taken one.
+     * - By default a cell's state answers "can a booking START here": it is
+     *   judged against the shortest legal booking from that start. That is
+     *   what a day's availability counts — a day of scattered half-hours
+     *   with a 60-minute minimum is full.
+     * - `eachCellAlone` judges each cell on itself: "is this stretch free".
+     *   That is what a picker of runs needs — the 10:30 cell before an 11:00
+     *   booking cannot start a 60-minute booking, yet it is a valid last
+     *   cell of 10:00–11:00. The minimum then applies to the run.
      *
      * @param  Collection<int, Booking>|null  $prefetched
      * @return list<SlotAvailability>
@@ -455,7 +512,9 @@ class AvailabilityService
         ?SpaceBookingRules $rules = null,
         ?Collection $prefetched = null,
         ?array $periods = null,
-        ?int $durationMinutes = null,
+        bool $eachCellAlone = false,
+        ?PoolTimeline $pool = null,
+        ?Collection $windows = null,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -470,14 +529,14 @@ class AvailabilityService
         }
 
         $existing = $prefetched ?? $this->blockingBookings($space, $dayStart->utc(), $dayEnd->utc(), $rules);
+        [$pool, $windows] = $this->contention($space, $rules, $dayStart->utc(), $dayEnd->utc(), $pool, $windows);
 
         $now = CarbonImmutable::now('UTC');
         $slots = [];
 
-        // The length each start is judged by, and the length each listed
-        // slot spans.
-        $judgedMinutes = $durationMinutes ?? max($rules->granularityMinutes, $rules->minDurationMinutes);
-        $spanMinutes = $durationMinutes ?? $rules->granularityMinutes;
+        // The length each cell is judged by, and the length it spans.
+        $spanMinutes = $rules->granularityMinutes;
+        $judgedMinutes = $eachCellAlone ? $spanMinutes : max($spanMinutes, $rules->minDurationMinutes);
 
         foreach ($periods as $period) {
             $cursor = CarbonImmutable::parse(
@@ -502,6 +561,8 @@ class AvailabilityService
                         $existing,
                         $rules,
                         $now,
+                        $pool,
+                        $windows,
                     ),
                 );
 
@@ -519,6 +580,7 @@ class AvailabilityService
      * neighbour's buffer.
      *
      * @param  Collection<int, Booking>  $existing
+     * @param  Collection<int, SpaceCoworkingWindow>  $windows
      */
     private function stateFor(
         CarbonInterface $start,
@@ -527,6 +589,8 @@ class AvailabilityService
         Collection $existing,
         SpaceBookingRules $rules,
         CarbonInterface $now,
+        ?PoolTimeline $pool,
+        Collection $windows,
     ): SlotState {
         if ($start->lessThan($now)) {
             return SlotState::Past;
@@ -544,7 +608,16 @@ class AvailabilityService
             return SlotState::OutsideHours;
         }
 
-        if ($this->exceedsCeiling($existing, $start, $end, $rules)) {
+        if ($this->isInCoworkingMode($windows, $start, $end)) {
+            return SlotState::CoworkingMode;
+        }
+
+        if ($pool !== null) {
+            // One more seat, for the booking this cell offers.
+            if ($this->exceedsPool($pool, $start, $end, 1)) {
+                return SlotState::AtCapacity;
+            }
+        } elseif ($this->exceedsCeiling($existing, $start, $end, $rules)) {
             return $rules->allowsConcurrentBookings()
                 ? SlotState::AtCapacity
                 : SlotState::Booked;
@@ -564,9 +637,9 @@ class AvailabilityService
      * BusinessHoursService::periodsForRange(), and every space's bookings
      * in one — so a 31-day calendar costs three queries, not 93.
      *
-     * With a duration, "available" means at least one start can hold a
-     * booking that long — a day whose free gaps are all shorter reads as
-     * full for that duration, which is what the member will find on it.
+     * "Available" means at least one start can hold a booking of the
+     * minimum length — a day whose free gaps are all shorter reads as full,
+     * which is what the member will find on it.
      *
      * @return list<DayAvailability>
      */
@@ -575,7 +648,6 @@ class AvailabilityService
         CarbonInterface $fromLocalDate,
         CarbonInterface $toLocalDate,
         ?SpaceBookingRules $rules = null,
-        ?int $durationMinutes = null,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -587,6 +659,7 @@ class AvailabilityService
         $reasonsByDate = $this->closureReasonsForRange($from, $to, $branch);
 
         $existing = $this->blockingBookings($space, $from->utc(), $to->addDay()->utc(), $rules);
+        [$pool, $windows] = $this->contention($space, $rules, $from->utc(), $to->addDay()->utc());
 
         $today = CarbonImmutable::now($rules->timezone)->startOfDay();
         $days = [];
@@ -634,7 +707,7 @@ class AvailabilityService
                 continue;
             }
 
-            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, $durationMinutes);
+            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, pool: $pool, windows: $windows);
             $available = count(array_filter($slots, fn (SlotAvailability $slot) => $slot->isAvailable()));
 
             $days[] = new DayAvailability(

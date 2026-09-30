@@ -22,7 +22,6 @@ class BookingCancellationService
         private readonly WalletService $wallets,
         private readonly SettingService $settings,
         private readonly AmountCalculator $amounts,
-        private readonly CapacitySlotSynchronizer $capacitySlots,
         private readonly PlanDiscountService $discounts,
     ) {}
 
@@ -104,10 +103,6 @@ class BookingCancellationService
                 'status' => BookingStatus::Cancelled,
                 'cancelled_at' => now(),
             ])->save();
-
-            // The slot is free again the moment the status leaves the
-            // blocking set, so the derived counter must follow it here.
-            $this->capacitySlots->release($locked, $locked->space);
 
             if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
                 $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);

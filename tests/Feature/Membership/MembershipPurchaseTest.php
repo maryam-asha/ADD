@@ -3,6 +3,9 @@
 namespace Tests\Feature\Membership;
 
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Building;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -15,6 +18,7 @@ use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -55,6 +59,9 @@ class MembershipPurchaseTest extends TestCase
     private function makeCompanyWithAdminAndMember(int $generalBalance = 5000): array
     {
         $company = Company::factory()->create();
+        // Seats for the company's subscription to hold, in its branch's
+        // co-working pool (docs/decisions/coworking-seat-pool.md).
+        $this->coSpaceIn($company->branch_id, 10);
         $wallet = Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
         $this->wallets->creditGeneral($wallet, $generalBalance, WalletTransactionSource::TopUp);
 
@@ -67,6 +74,40 @@ class MembershipPurchaseTest extends TestCase
         $company->members()->attach($member->id, ['is_admin' => false]);
 
         return compact('company', 'wallet', 'admin', 'member');
+    }
+
+    private function coSpaceIn(int $branchId, int $capacity): Space
+    {
+        return Space::factory()->create([
+            'building_id' => Building::factory()->create(['branch_id' => $branchId])->id,
+            'capacity' => $capacity,
+        ]);
+    }
+
+    /**
+     * A subscription holds a seat for its whole period, so it is not sold
+     * when its branch's co-working seats are all held — and nothing is
+     * charged for the attempt.
+     */
+    public function test_a_plan_is_not_sold_when_its_branch_has_no_seat_left(): void
+    {
+        Cache::forget('default_branch_id');
+        $branch = Branch::factory()->create(['is_default' => true]);
+        $this->coSpaceIn($branch->id, 1);
+        Membership::factory()->create(['branch_id' => $branch->id]);
+        $member = $this->makeFundedMember(5000);
+        $plan = Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30]);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->withHeader('lang', 'en')
+            ->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.membership.seat_pool_full', [], 'en'))
+            ->assertJsonStructure(['message', 'first_shortfall_at']);
+
+        $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->first();
+        $this->assertSame(5000, $this->rawGeneralBalance($wallet));
+        $this->assertSame(0, Membership::where('owner_id', $member->id)->where('owner_type', OwnerType::User)->count());
     }
 
     private function rawGeneralBalance(Wallet $wallet): int

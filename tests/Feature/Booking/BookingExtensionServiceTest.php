@@ -6,6 +6,7 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -13,8 +14,6 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
-use App\Domain\Settings\Enums\SettingValueType;
-use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -127,6 +126,68 @@ class BookingExtensionServiceTest extends TestCase
         $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')));
     }
 
+    // ------------------------------------------------------------------
+    // The co-working seat pool (docs/decisions/coworking-seat-pool.md)
+    // ------------------------------------------------------------------
+
+    private function checkedInCoSpaceBooking(int $capacity): Booking
+    {
+        $space = Space::factory()->create(['capacity' => $capacity, 'hourly_rate_points' => 100, 'slot_granularity_minutes' => 30]);
+
+        return $this->checkedInBooking(['space_id' => $space->id]);
+    }
+
+    /** Another member's seat next hour does not end this one's: there are seats to spare. */
+    public function test_a_co_space_booking_extends_while_the_pool_has_a_seat(): void
+    {
+        $booking = $this->checkedInCoSpaceBooking(2);
+        Booking::factory()->create([
+            'space_id' => $booking->space_id,
+            'start_at' => Carbon::parse('2026-08-17 11:00:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        $this->extensions->extend($booking, 60);
+
+        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
+    }
+
+    public function test_a_co_space_extension_stops_where_the_pool_runs_out(): void
+    {
+        $booking = $this->checkedInCoSpaceBooking(1);
+        Booking::factory()->create([
+            'space_id' => $booking->space_id,
+            'start_at' => Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:30:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        try {
+            $this->extensions->extend($booking, 60);
+            $this->fail('Expected an extension conflict.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.extension_conflict', $e->messageKey);
+            $this->assertSame('2026-08-17T08:30:00+00:00', $e->params['latest_end_at']);
+        }
+    }
+
+    public function test_a_room_extension_stops_where_the_room_is_lent_to_co_working(): void
+    {
+        $booking = $this->checkedInBooking();
+        SpaceCoworkingWindow::factory()->create([
+            'space_id' => $booking->space_id,
+            'starts_at' => Carbon::parse('2026-08-17 11:30:00', 'Asia/Damascus')->utc(),
+            'ends_at' => Carbon::parse('2026-08-17 15:00:00', 'Asia/Damascus')->utc(),
+        ]);
+
+        try {
+            $this->extensions->extend($booking, 60);
+            $this->fail('Expected an extension conflict.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.extension_conflict', $e->messageKey);
+            $this->assertSame('2026-08-17T08:30:00+00:00', $e->params['latest_end_at']);
+        }
+    }
+
     public function test_extension_debits_the_wallet_when_the_booking_was_paid_by_wallet(): void
     {
         $member = User::factory()->create();
@@ -219,24 +280,6 @@ class BookingExtensionServiceTest extends TestCase
             $this->assertSame('api.booking.extension_conflict', $e->messageKey);
         }
 
-        $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
-    }
-
-    public function test_extension_fails_when_the_extended_booking_would_exceed_the_maximum_duration(): void
-    {
-        app(SettingService::class)->set('booking.max_duration_minutes', 120, SettingValueType::Int);
-        $booking = $this->checkedInBooking();
-
-        // 60 already booked + 90 more = 150, above the 120 ceiling — even
-        // though 90 on its own is a legal length.
-        try {
-            $this->extensions->extend($booking, 90);
-            $this->fail('Expected a ReceptionActionException for exceeding the maximum duration.');
-        } catch (ReceptionActionException $e) {
-            $this->assertSame('api.booking.duration_too_long', $e->messageKey);
-        }
-
-        $this->extensions->extend($booking->fresh(), 60);
         $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
     }
 }

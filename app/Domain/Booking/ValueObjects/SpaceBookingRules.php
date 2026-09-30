@@ -26,12 +26,15 @@ final readonly class SpaceBookingRules
         public ?int $capacity,
         public int $concurrencyCeiling,
         public string $timezone,
-        // Null means "no ceiling" / "no horizon". A zero in the settings
-        // table reads the same way, so an admin clearing the value does
-        // not accidentally forbid every booking.
-        public ?int $maxDurationMinutes = null,
-        public int $minAdvanceMinutes = 0,
-        public ?int $maxAdvanceDays = null,
+        // There is no ceiling on a booking's length: a member may book as
+        // long as the day holds. Null means "no horizon"; a zero in the
+        // settings table reads the same way, so an admin clearing the value
+        // does not accidentally forbid every booking.
+        public int $minNoticeMinutes = 0,
+        public ?int $maxDaysAhead = null,
+        // A co_space draws on its branch's co-working seat pool rather than a
+        // ceiling of its own (docs/decisions/coworking-seat-pool.md).
+        public bool $usesBranchPool = false,
     ) {}
 
     /**
@@ -41,11 +44,11 @@ final readonly class SpaceBookingRules
      */
     public function bufferApplies(): bool
     {
-        return $this->bufferMinutes > 0 && $this->concurrencyCeiling === 1;
+        return $this->bufferMinutes > 0 && ! $this->usesBranchPool && $this->concurrencyCeiling === 1;
     }
 
     public function allowsConcurrentBookings(): bool
     {
-        return $this->concurrencyCeiling > 1;
+        return $this->usesBranchPool || $this->concurrencyCeiling > 1;
     }
 }

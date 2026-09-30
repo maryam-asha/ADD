@@ -5,9 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Domain\Booking\Services\AvailabilityBrowseService;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Member\Booking\AvailabilityCalendarRequest;
-use App\Http\Requests\Member\Booking\AvailabilityQuoteRequest;
-use App\Http\Requests\Member\Booking\AvailabilitySlotsRequest;
+use App\Http\Requests\Member\Booking\AvailabilityDayRequest;
 use Illuminate\Http\JsonResponse;
 
 /**
@@ -20,42 +18,32 @@ use Illuminate\Http\JsonResponse;
  */
 class SpaceAvailabilityController extends Controller
 {
-    public function month(
-        AvailabilityCalendarRequest $request,
-        Space $space,
-        AvailabilityBrowseService $availability,
-    ): JsonResponse {
-        return response()->json($availability->calendar(
-            $space,
-            $request->validated('from'),
-            $request->validated('to'),
-            app()->getLocale(),
-            $request->duration(),
-        ));
-    }
-
+    /**
+     * Only what changes with the date, in one object:
+     * `{data: {date, state, closed_banner, slots, counts, meta}}` — the very
+     * body the desk's Admin\BookingCalendarController::slots() returns.
+     *
+     * The slots are the space's own cells (`meta.granularity_minutes` each).
+     * There is no duration: the member picks a start cell and an end cell,
+     * at least the rules' `min_duration_minutes` long with no ceiling, and
+     * the price is the space's `hourly_rate_points` from the details times
+     * that length. The POST re-checks the whole window, so a run of cells
+     * that cannot be booked together is refused there with its reason.
+     *
+     * The booking setup — rules and closures from the space details
+     * (`data.booking`), the branch's week from the spaces list — is not
+     * repeated on every call: the member app reads it once and re-asks this
+     * endpoint only as the date changes.
+     */
     public function day(
-        AvailabilitySlotsRequest $request,
+        AvailabilityDayRequest $request,
         Space $space,
         AvailabilityBrowseService $availability,
     ): JsonResponse {
-        return response()->json($availability->day(
+        return response()->json(['data' => $availability->day(
             $space,
             $request->validated('date'),
             app()->getLocale(),
-            $request->duration(),
-        ));
-    }
-
-    public function quote(
-        AvailabilityQuoteRequest $request,
-        Space $space,
-        AvailabilityBrowseService $availability,
-    ): JsonResponse {
-        return response()->json($availability->quote(
-            $space,
-            $request->validated('start_at'),
-            app()->getLocale(),
-        ));
+        )]);
     }
 }

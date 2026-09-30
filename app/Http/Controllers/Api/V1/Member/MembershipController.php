@@ -5,12 +5,14 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
+use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\PackageBrowseService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\MembershipResource;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -62,8 +64,16 @@ class MembershipController extends Controller
             // (shouldRenderJsonWhen(true) in bootstrap/app.php turns this into
             // a plain JSON {"message": ...} response).
             abort(422, __('api.wallet.insufficient_balance_for_plan'));
+        } catch (SeatPoolExhaustedException $e) {
+            // Every co-working seat in the branch is held for part of the
+            // plan's period (docs/decisions/coworking-seat-pool.md); nothing
+            // was charged.
+            throw new HttpResponseException(response()->json([
+                'message' => __('api.membership.seat_pool_full'),
+                'first_shortfall_at' => $e->firstShortfall->toIso8601String(),
+            ], 422));
         }
 
-        return new MembershipResource($membership->load('plan'));
+        return new MembershipResource($membership->load(['plan', 'seatDesks']));
     }
 }
