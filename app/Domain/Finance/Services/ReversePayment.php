@@ -5,6 +5,8 @@ namespace App\Domain\Finance\Services;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Identity\Models\User;
 use App\Events\Finance\PaymentReversed;
 use Illuminate\Support\Facades\Cache;
@@ -19,17 +21,24 @@ use RuntimeException;
  * (that leaves the points with the member instead, by decision). Calling
  * the bank is a human's call.
  *
- * Ordering is deliberate: Paymera is asked first, and the local record
+ * Ordering is deliberate: the gateway is asked first, and the local record
  * only moves to Reversed once the gateway has accepted. Marking locally
  * first would leave a payment reading as reversed while the cardholder was
  * never refunded, which is the worse of the two failure modes.
+ *
+ * Only a payment made through a gateway can be reversed here. One paid
+ * another way (wallet points, cash) has no bank to call, and is refused
+ * with UnknownPaymentMethodException before anything is touched.
  */
 class ReversePayment
 {
     use LogsSensitiveActions;
 
-    public function __construct(private readonly PaymeraClient $client) {}
+    public function __construct(private readonly PaymentMethodRegistry $registry) {}
 
+    /**
+     * @throws UnknownPaymentMethodException when the payment's method is not a gateway
+     */
     public function handle(Payment $payment, User $actor): Payment
     {
         if (! $payment->status->isReversible()) {
@@ -38,13 +47,17 @@ class ReversePayment
             );
         }
 
+        // Resolved up front, before any lock is taken: a payment with no
+        // gateway behind it has nothing to reverse.
+        $gateway = $this->registry->gatewayFor($payment);
+
         if ($payment->payment_id === null) {
             throw new RuntimeException("Payment {$payment->id} has no gateway id to reverse.");
         }
 
         // Shares SyncPaymentStatus's lock key so a reversal cannot interleave
         // with a status sync deciding the same payment's fate.
-        $lock = Cache::lock("paymera:payment:{$payment->id}", 30);
+        $lock = Cache::lock("payments:payment:{$payment->id}", 30);
 
         if (! $lock->get()) {
             throw new RuntimeException("Payment {$payment->id} is busy; try again.");
@@ -61,7 +74,7 @@ class ReversePayment
                 );
             }
 
-            $this->client->cancelPayment($payment->payment_id, $payment->lang);
+            $gateway->cancel($payment);
 
             DB::transaction(function () use ($payment, $actor) {
                 $payment->forceFill([

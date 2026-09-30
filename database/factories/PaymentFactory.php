@@ -5,6 +5,7 @@ namespace Database\Factories;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
@@ -31,7 +32,7 @@ class PaymentFactory extends Factory
         return [
             'payment_id' => $this->faker->uuid(),
             'callback_token' => Payment::newCallbackToken(),
-            'method' => 'paymera',
+            'method' => PaymeraGateway::KEY,
             'purpose' => PaymentPurpose::WalletTopUp,
             'status' => PaymentStatus::Pending,
             'user_id' => User::factory(),

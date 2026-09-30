@@ -4,6 +4,8 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Events\Finance\PaymentAccepted;
 use App\Events\Finance\PaymentFailed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -42,7 +44,7 @@ class SyncPaymentStatus
 
     private const LOCK_WAIT_SECONDS = 10;
 
-    public function __construct(private readonly PaymeraClient $client) {}
+    public function __construct(private readonly PaymentMethodRegistry $registry) {}
 
     /**
      * Brings the local record in line with the gateway. Returns the payment
@@ -61,7 +63,9 @@ class SyncPaymentStatus
             return $payment;
         }
 
-        $lock = Cache::lock("paymera:payment:{$payment->id}", self::LOCK_SECONDS);
+        // Shared with ReversePayment, and the same for every method: the
+        // lock guards the payment row, not any one gateway.
+        $lock = Cache::lock("payments:payment:{$payment->id}", self::LOCK_SECONDS);
 
         try {
             // Waits rather than bailing: when the callback and the trigger
@@ -69,7 +73,7 @@ class SyncPaymentStatus
             // not a stale "still pending".
             $lock->block(self::LOCK_WAIT_SECONDS);
         } catch (LockTimeoutException) {
-            Log::channel('paymera')->warning('[Paymera] sync skipped, lock busy', [
+            $this->log($payment, 'warning', 'sync skipped, lock busy', [
                 'payment_id' => $payment->id,
             ]);
 
@@ -94,7 +98,7 @@ class SyncPaymentStatus
 
     private function process(Payment $payment): Payment
     {
-        $result = $this->client->getPaymentStatus($payment->payment_id);
+        $result = $this->registry->gatewayFor($payment)->fetchStatus($payment);
 
         $payment->forceFill([
             'last_checked_at' => now(),
@@ -164,7 +168,7 @@ class SyncPaymentStatus
 
         // Deliberately `alert`: an accepted payment that does not match our
         // record means either a bug or tampering, and both want a human.
-        Log::channel('paymera')->alert('[Paymera] accepted payment failed verification', [
+        $this->log($payment, 'alert', 'accepted payment failed verification', [
             'payment_id' => $payment->id,
             'gateway_payment_id' => $payment->payment_id,
             'reason' => $reason,
@@ -199,7 +203,7 @@ class SyncPaymentStatus
             // non-base currency: every retry then fails identically, and
             // without this line the member's paid-for points would never
             // arrive and nothing would say why.
-            Log::channel('paymera')->alert('[Paymera] accepted payment could not be fulfilled', [
+            $this->log($payment, 'alert', 'accepted payment could not be fulfilled', [
                 'payment_id' => $payment->id,
                 'gateway_payment_id' => $payment->payment_id,
                 'error' => $e->getMessage(),
@@ -256,11 +260,29 @@ class SyncPaymentStatus
             'review_reason' => 'still pending after '.config('paymera.pending_expiry_minutes').' minutes',
         ])->save();
 
-        Log::channel('paymera')->warning('[Paymera] payment expired while pending', [
+        $this->log($payment, 'warning', 'payment expired while pending', [
             'payment_id' => $payment->id,
             'gateway_payment_id' => $payment->payment_id,
         ]);
 
         return $payment;
+    }
+
+    /**
+     * Paymera's lines keep going to the dedicated `paymera` channel, which
+     * is where its operators (and the secrets-never-logged test) look. A
+     * payment through any other gateway logs to the default channel.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function log(Payment $payment, string $level, string $message, array $context = []): void
+    {
+        if ($payment->method === PaymeraGateway::KEY) {
+            Log::channel('paymera')->{$level}("[Paymera] {$message}", $context);
+
+            return;
+        }
+
+        Log::{$level}("[Payments] {$message}", $context);
     }
 }

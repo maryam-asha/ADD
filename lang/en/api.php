@@ -356,6 +356,11 @@ return [
         'reversal_failed' => 'The gateway rejected the reversal. Please check the payment at the bank before retrying.',
         'reversed' => 'The payment has been reversed.',
 
+        // Names of the payment methods (config/payments.php), keyed by method.
+        'methods' => [
+            'paymera' => 'Card',
+        ],
+
         // Ledger descriptions — these land in the member's wallet history.
         'credit_description' => 'Card payment :reference',
         'reversal_description' => 'Reversal of card payment :reference',

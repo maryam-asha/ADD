@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use Illuminate\Console\Command;
 
@@ -16,9 +17,15 @@ use Illuminate\Console\Command;
  * member's money sits at the bank.
  *
  * Runs every five minutes (routes/console.php). Each pending payment is
- * re-checked against the gateway; one that has sat past
+ * re-checked against its gateway; one that has sat past
  * `paymera.pending_expiry_minutes` gets one final check and is then
  * written off as expired rather than polled indefinitely.
+ *
+ * Despite the name, this covers every payment whose method is a gateway
+ * (see PaymentMethodRegistry::gatewayKeys()). The command keeps its name
+ * and schedule because deployed cron entries and runbooks call it by it.
+ * A pending payment with no gateway behind it — cash awaiting the desk —
+ * has nobody to ask, and is left alone.
  *
  * Every payment is handled through SyncPaymentStatus, which locks and
  * re-checks finality — so this command overlapping with a callback, a
@@ -28,9 +35,9 @@ class ReconcilePaymeraPayments extends Command
 {
     protected $signature = 'paymera:reconcile';
 
-    protected $description = 'Re-check every pending Paymera payment against the gateway, and expire the ones that never resolved.';
+    protected $description = 'Re-check every pending gateway (Paymera) payment against the gateway, and expire the ones that never resolved.';
 
-    public function handle(SyncPaymentStatus $sync): int
+    public function handle(SyncPaymentStatus $sync, PaymentMethodRegistry $registry): int
     {
         $expiryMinutes = (int) config('paymera.pending_expiry_minutes');
         $cutoff = now()->subMinutes($expiryMinutes);
@@ -41,6 +48,8 @@ class ReconcilePaymeraPayments extends Command
 
         Payment::query()
             ->pending()
+            // Only payments a gateway can answer for.
+            ->whereIn('method', $registry->gatewayKeys())
             // A payment that never got an id from create-payment has nothing
             // to ask the gateway about.
             ->whereNotNull('payment_id')

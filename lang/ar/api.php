@@ -349,6 +349,10 @@ return [
         'reversal_failed' => 'رفضت البوابة عملية الإلغاء. يرجى التحقق من الدفعة لدى البنك قبل إعادة المحاولة.',
         'reversed' => 'تم إلغاء الدفعة.',
 
+        'methods' => [
+            'paymera' => 'بطاقة',
+        ],
+
         'credit_description' => 'دفع بالبطاقة :reference',
         'reversal_description' => 'إلغاء دفعة بالبطاقة :reference',
     ],

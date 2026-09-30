@@ -5,6 +5,8 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Plan;
@@ -32,12 +34,13 @@ use InvalidArgumentException;
  * The row is written BEFORE Paymera is called, so a create that times out
  * after Paymera committed still leaves us a record the reconciler can
  * resolve. That row simply has no `payment_id` yet, and is failed
- * explicitly if the call does not come back.
+ * explicitly if the call does not come back. The call itself is the
+ * Paymera gateway's `start()`, reached through the payment-method registry.
  */
 class StartPayment
 {
     public function __construct(
-        private readonly PaymeraClient $client,
+        private readonly PaymentMethodRegistry $registry,
         private readonly WalletService $wallets,
         private readonly PaymentAmountCalculator $amounts,
     ) {}
@@ -64,6 +67,10 @@ class StartPayment
             ? $this->amounts->forPlan($plan)
             : $this->amounts->forTopUp($amountMinor);
 
+        // Resolved before the row is written: a method that is switched off
+        // must refuse here, not after leaving a pending row with no id.
+        $gateway = $this->registry->get(PaymeraGateway::KEY);
+
         // A member always funds their own personal wallet here. Company
         // wallets are funded by their admins through the existing
         // allocation/top-up paths, which carry their own authorization.
@@ -71,7 +78,7 @@ class StartPayment
 
         $payment = DB::transaction(fn () => Payment::create([
             'callback_token' => Payment::newCallbackToken(),
-            'method' => 'paymera',
+            'method' => PaymeraGateway::KEY,
             'purpose' => $purpose,
             'status' => PaymentStatus::Pending,
             'user_id' => $user->id,
@@ -86,49 +93,10 @@ class StartPayment
             'lang' => $lang ?? (string) config('paymera.default_lang'),
         ]));
 
-        try {
-            $created = $this->client->createPayment(
-                amountMinor: $chargeMinor,
-                callbackUrl: route('paymera.callback', ['token' => $payment->callback_token]),
-                triggerUrl: route('paymera.trigger', ['token' => $payment->callback_token]),
-                lang: $payment->lang,
-                extra: $this->savedCardOptions($user),
-            );
-        } catch (\Throwable $e) {
-            // The local row must not linger as Pending: the reconciler would
-            // keep polling a payment id that does not exist. It is marked
-            // failed here, and never retried automatically.
-            $payment->forceFill([
-                'status' => PaymentStatus::Failed,
-                'review_reason' => 'create-payment failed: '.$e->getMessage(),
-            ])->save();
+        // The gateway creates the payment, records its id on the row, or
+        // marks the row Failed and rethrows if the call does not come back.
+        $start = $gateway->start($payment);
 
-            throw $e;
-        }
-
-        $payment->forceFill([
-            'payment_id' => $created->paymentId,
-        ])->save();
-
-        return ['payment' => $payment, 'url' => $created->url];
-    }
-
-    /**
-     * `appUser` is mandatory whenever savedCards is on — it is the identity
-     * Paymera files the stored card under. Sending our own user id keeps
-     * one member's saved cards from ever surfacing for another.
-     *
-     * @return array<string, mixed>
-     */
-    private function savedCardOptions(User $user): array
-    {
-        if (! config('paymera.saved_cards_enabled')) {
-            return [];
-        }
-
-        return [
-            'savedCards' => 1,
-            'appUser' => (string) $user->id,
-        ];
+        return ['payment' => $payment, 'url' => (string) $start->redirectUrl];
     }
 }

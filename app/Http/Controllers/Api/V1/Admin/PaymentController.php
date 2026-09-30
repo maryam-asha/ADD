@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Exceptions\PaymeraException;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
 use App\Domain\Finance\Services\ReversePayment;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Finance\PaymentResource;
@@ -86,6 +87,11 @@ class PaymentController extends Controller
             ]);
 
             return response()->json(['message' => __('api.payment.reversal_failed')], 502);
+        } catch (UnknownPaymentMethodException $e) {
+            // Paid by wallet points or cash (or by a method since removed
+            // from config): there is no gateway to reverse it through.
+            // Refused the same way as any other non-reversible payment.
+            return response()->json(['message' => __('api.payment.not_reversible')], 422);
         } catch (\RuntimeException $e) {
             // Raced with another reversal or a status sync.
             return response()->json(['message' => __('api.payment.not_reversible')], 422);
