@@ -341,6 +341,7 @@ return [
     ],
 
     'payment' => [
+        'no_balance' => 'لا يوجد رصيد في محفظتك',
         'amount_short' => 'المبلغ المستلم ناقص بمقدار :shortage :currency.',
         'currency_unavailable' => 'لا يوجد سعر صرف لهذه العملة بعد.',
         'registration_not_payable' => 'لا يمكن دفع إلا تسجيل مقبول في فعالية غير ملغاة.',

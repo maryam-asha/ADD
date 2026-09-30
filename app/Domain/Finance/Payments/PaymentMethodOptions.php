@@ -6,6 +6,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\WalletService;
 use Illuminate\Database\Eloquent\Model;
@@ -30,20 +31,25 @@ class PaymentMethodOptions
     ) {}
 
     /**
+     * `$purpose` null lists every enabled method, for a screen that has not
+     * decided what is being paid for yet. `$member` null (no login) lists the
+     * methods without any balance: nothing is priced for a guest but a plan,
+     * whose price is public.
+     *
      * @return array{amount_points: int|null, methods: list<array<string, mixed>>}
      */
-    public function for(PaymentPurpose $purpose, User $member, ?Model $payable = null, ?Plan $plan = null): array
+    public function for(?PaymentPurpose $purpose, ?User $member, ?Model $payable = null, ?Plan $plan = null): array
     {
-        // A top-up has no price: the member names the amount.
-        $points = $purpose === PaymentPurpose::WalletTopUp ? null : $this->payments->quote($purpose, $payable, $plan);
+        $points = $this->pointsDue($purpose, $member, $payable, $plan);
+        $drivers = $purpose === null ? $this->methods->enabled() : $this->methods->availableFor($purpose);
 
         $methods = [];
 
-        foreach ($this->methods->availableFor($purpose) as $key => $driver) {
+        foreach ($drivers as $key => $driver) {
             $option = ['key' => $key, 'label' => $driver->label(), 'available' => true, 'reason' => null];
 
             if ($key === WalletMethod::KEY) {
-                $option = $this->walletOption($option, $purpose, $member, (int) $points);
+                $option = $this->walletOption($option, $purpose, $member, $points);
             }
 
             $methods[] = $option;
@@ -52,13 +58,40 @@ class PaymentMethodOptions
         return ['amount_points' => $points, 'methods' => $methods];
     }
 
+    private function pointsDue(?PaymentPurpose $purpose, ?User $member, ?Model $payable, ?Plan $plan): ?int
+    {
+        // A top-up has no price: the member names the amount.
+        if ($purpose === null || $purpose === PaymentPurpose::WalletTopUp) {
+            return null;
+        }
+
+        // A record is only priced for the member it belongs to.
+        if ($payable === null && $plan === null) {
+            return null;
+        }
+
+        if ($payable !== null && $member === null) {
+            return null;
+        }
+
+        return $this->payments->quote($purpose, $payable, $plan);
+    }
+
     /**
+     * The wallet's balance — the most the member can spend from any wallet
+     * they may use, in the purpose's pool (general when none) — and, with
+     * an amount, whether it covers it. Without a member: no balance.
+     *
      * @param  array<string, mixed>  $option
      * @return array<string, mixed>
      */
-    private function walletOption(array $option, PaymentPurpose $purpose, User $member, int $points): array
+    private function walletOption(array $option, ?PaymentPurpose $purpose, ?User $member, ?int $points): array
     {
-        $category = $this->fulfillers->for($purpose)->walletCategory();
+        if ($member === null) {
+            return $option + ['balance' => null];
+        }
+
+        $category = $purpose === null ? WalletTransactionCategory::General : $this->fulfillers->for($purpose)->walletCategory();
 
         $wallets = collect($this->wallets->spendOptions($member, $category))
             // A plan paid from a wallet goes to that wallet's owner; bought
@@ -69,14 +102,17 @@ class PaymentMethodOptions
                 'owner_id' => $wallet['owner_id'],
                 'owner_label' => $wallet['owner_label'],
                 'usable_balance' => $wallet['usable_balance'],
-                'sufficient' => $wallet['usable_balance'] >= $points,
+                'sufficient' => $wallet['usable_balance'] >= (int) $points,
             ])
             ->values()
             ->all();
 
         $best = (int) max(array_column($wallets, 'usable_balance') ?: [0]);
 
-        if ($best < $points) {
+        if ($best <= 0) {
+            $option['available'] = false;
+            $option['reason'] = __('api.payment.no_balance');
+        } elseif ($points !== null && $best < $points) {
             $option['available'] = false;
             $option['reason'] = __('api.payment.insufficient_points', [
                 'current' => $best,
@@ -85,6 +121,6 @@ class PaymentMethodOptions
             ]);
         }
 
-        return $option + ['wallets' => $wallets];
+        return $option + ['balance' => $best, 'wallets' => $wallets];
     }
 }
