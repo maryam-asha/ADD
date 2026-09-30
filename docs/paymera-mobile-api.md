@@ -1,6 +1,7 @@
 # الدفع بالبطاقة — دليل تطبيق الموبايل
 
-مرجع مطوّر التطبيق لتنفيذ الدفع بالبطاقة عبر Paymera eGate.
+مرجع مطوّر التطبيق لتنفيذ الدفع بالبطاقة عبر Paymera eGate، ولدفع أي عملية
+(حجز، جلسة، فعالية، باقة) بالمحفظة أو في الاستقبال — انظر القسم 11.
 
 > **الخلاصة في ثلاث خطوات:** اطلب رابط دفع من الـAPI ← افتحه في WebView ←
 > اسأل الـAPI عن النتيجة. التطبيق **لا يتصل بـPaymera إطلاقاً**، ولا يرى
@@ -268,3 +269,119 @@ GET /api/v1/member/payments
 | شراء باقة ناجح | `accepted` + `membership_id` |
 | انقطاع الشبكة أثناء الاستعلام | إعادة محاولة، لا رسالة فشل |
 | العربية والإنجليزية | صفحة البنك ورسائلنا بنفس اللغة |
+
+---
+
+## 11. الدفع لأي عملية — المحفظة، الاستقبال، البطاقة
+
+المسار نفسه `POST /api/v1/member/payments` صار يدفع كل ما يدفعه العضو، لا
+الشحن والباقة فقط. الطلب القديم (بلا `method`) يعمل كما هو تماماً، والرد
+يضيف حقلاً واحداً: `next`.
+
+### أ. معرفة طرق الدفع قبل الدفع
+
+```http
+GET /api/v1/member/payment-methods?purpose=booking&payable_id=15
+```
+
+| `purpose` | معه |
+|---|---|
+| `booking` | `payable_id` = رقم الحجز |
+| `coworking_session` | `payable_id` = رقم الجلسة (بعد إغلاقها) |
+| `event_registration` | `payable_id` = `ticket_id` من التسجيل |
+| `plan_purchase` | `plan_id` |
+| `wallet_top_up` | لا شيء (العضو يحدد المبلغ) |
+
+```json
+{
+  "data": {
+    "amount_points": 100,
+    "price": "10.00 $",
+    "price_point": "100 pts",
+    "methods": [
+      {
+        "key": "wallet", "label": "نقاط المحفظة", "available": true, "reason": null,
+        "wallets": [
+          {"owner_type": "user", "owner_id": 7, "owner_label": "Personal", "usable_balance": 300, "sufficient": true},
+          {"owner_type": "company", "owner_id": 3, "owner_label": "ACME", "usable_balance": 50, "sufficient": false}
+        ]
+      },
+      {"key": "cash", "label": "نقداً في الاستقبال", "available": true, "reason": null},
+      {"key": "paymera", "label": "بطاقة", "available": true, "reason": null}
+    ]
+  }
+}
+```
+
+- اعرض الطرق **بالترتيب الذي تصل به**، ولا تفترض أسماءها: طريقة جديدة تُضاف
+  من الخادم تظهر هنا وحدها.
+- `available: false` مع `reason`: اعرض الطريقة معطّلة مع السبب (مثلاً نقاط
+  غير كافية).
+- الحجز المدفوع مسبقاً ← `409`؛ ما ليس للعضو ← `404`.
+
+### ب. الدفع
+
+```http
+POST /api/v1/member/payments
+{
+  "purpose": "booking",
+  "payable_id": 15,
+  "method": "wallet",
+  "wallet_owner_type": "company",
+  "wallet_owner_id": 3
+}
+```
+
+`method`: `wallet` | `cash` | `paymera` (أو أي مفتاح وصل في القائمة).
+`wallet_owner_type/id` اختياريان للمحفظة؛ إذا كان للعضو أكثر من محفظة ولم
+يحدد، يعود 422 مع `wallet_options` كما في الحجز.
+
+الرد دائماً 201:
+
+```json
+{"data": {"payment": {...}, "redirect_url": "https://...", "next": "redirect"}}
+```
+
+| `next` | ماذا يفعل التطبيق |
+|---|---|
+| `redirect` | يفتح `redirect_url` في WebView ثم يستعلم `GET payments/{id}` كما في القسم 3 و4 |
+| `done` | دُفع الآن من المحفظة — حدّث الشاشة |
+| `pay_at_reception` | لا شيء يُدفع الآن؛ اعرض "ادفع في الاستقبال". قد يكون `payment` هنا `null` |
+
+نقاط غير كافية ← 422 `{message, current, required, shortage}`.
+
+### ج. الدفع عند الإنشاء
+
+- **الحجز:** `POST member/bookings` يقبل `payment_method`. `wallet` يدفع
+  الآن أو يرفض بـ 422 ولا يُنشأ الحجز؛ `cash` ينشئه غير مدفوع؛ `paymera`
+  ينشئه غير مدفوع ويضيف بجانب `data` الحقلين `payment` و`redirect_url`. إن
+  تعذّر فتح صفحة البطاقة يبقى الحجز، مع `payment: null` و`payment_error`.
+  الحجز المتعدد (`/batch`) يقبل `wallet` أو `cash` فقط.
+- **الفعالية:** `POST member/events/{id}/register` يقبل `payment_method`
+  و`wallet_owner_type/id`. البطاقة أو النقد يؤكدان المقعد **غير مدفوع**، ولا
+  يُسمح بالدخول قبل الدفع.
+- **الباقة:** `POST member/memberships` يقبل `payment_method`. `cash` يعيد
+  `{"data": {"pending_purchase": {...}}}` — حجز لمدة 48 ساعة بلا اشتراك حتى
+  يدفع العضو في الاستقبال، ويظهر أيضاً في `memberships/current` تحت
+  `pending_purchase`. `paymera` يعيد شكل بدء الدفع أعلاه.
+
+### د. كتلة `payment` في الشاشات
+
+تظهر على الحجوزات (القائمة والتفاصيل)، والجلسة الحالية، وتقرير الجلسة
+(`totals.payment`)، وتسجيل الفعالية:
+
+```json
+{"state": "unpaid", "method": null, "amount_points": 100, "price": "10.00 $",
+ "price_point": "100 pts", "paid_at": null, "payment_id": null}
+```
+
+`state`: `paid` | `unpaid` | `pending` (دفع بطاقة جارٍ أو باقة محجوزة للنقد)
+| `null` (لا شيء للدفع: فعالية مجانية أو جلسة ما زالت مفتوحة).
+
+في الحجوزات بقي `state` كما كان (`paid`/`unpaid`) حفاظاً على التطبيق الحالي،
+والدفع الجاري يظهر في `awaiting_payment: true`.
+
+### هـ. زر "ادفع الآن"
+
+كل ما هو `unpaid` في الكتلة أعلاه يُدفع لاحقاً بالمسار نفسه (ب) باستخدام
+`payable_id`. الجلسة المفتوحة لا تُدفع قبل إغلاقها (422).

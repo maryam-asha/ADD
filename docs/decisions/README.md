@@ -38,6 +38,7 @@ minimal version that gets reworked later.
 - [coworking-seat-pool.md](coworking-seat-pool.md) — one co-working seat pool per branch: subscriptions hold seats (inside their plan's hours), bookings and walk-ins take them, rooms can be lent in overload; replaces the three disagreeing capacity counts and retires `space_capacity_slots`
 - [rbac-permission-pilot.md](rbac-permission-pilot.md) — dynamic roles + auto-derived `module.action` permissions replace `Gate::before`'s admin bypass and the coarse `role:admin|operations` check; Branches is the one pilot resource enforcing it today, inside D.8's existing flat-role constraints
 - [coworking-self-service-sessions.md](coworking-self-service-sessions.md) — scan-to-start coworking sessions with a TOTP kiosk, confirm-before-paid, member-requested end confirmed by reception, and the session report
+- [unified-payments.md](unified-payments.md) — every operation paid by wallet points, cash at reception or a gateway through one `payments` table and one points ledger; payment methods as config-registered drivers, one fulfiller per purpose
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has
