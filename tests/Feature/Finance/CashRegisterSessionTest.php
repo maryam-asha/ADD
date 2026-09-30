@@ -2,9 +2,12 @@
 
 namespace Tests\Feature\Finance;
 
+use App\Domain\Booking\Enums\PaymentState as BookingPaymentState;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\CashRegisterSessionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\CashRegisterSession;
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -22,6 +25,7 @@ class CashRegisterSessionTest extends TestCase
     use RefreshDatabase;
 
     private User $operator;
+
     private Branch $branch;
 
     protected function setUp(): void
@@ -119,6 +123,10 @@ class CashRegisterSessionTest extends TestCase
             'category' => WalletTransactionCategory::General,
             'performed_by_user_id' => $this->operator->id,
             'payment_method' => PaymentMethod::Cash->value,
+            // The money handed over, which is what the drawer holds — not
+            // the points it bought.
+            'payment_amount' => '50.00',
+            'payment_currency' => 'USD',
             'created_at' => now()->subHours(2),
         ]);
 
@@ -163,5 +171,94 @@ class CashRegisterSessionTest extends TestCase
             'status' => 'open',
             'opening_balance' => '200.00',
         ]);
+    }
+
+    private function openShift(): CashRegisterSession
+    {
+        return CashRegisterSession::create([
+            'user_id' => $this->operator->id,
+            'branch_id' => $this->branch->id,
+            'opened_at' => now()->subHour(),
+            'opening_balance' => '0.00',
+            'status' => CashRegisterSessionStatus::Open,
+        ]);
+    }
+
+    private function closeFor(CashRegisterSession $session): string
+    {
+        return $this->postJson("/api/v1/admin/reception/cash-register-sessions/{$session->id}/close", ['closing_balance' => '0.00'])
+            ->assertOk()
+            ->json('data.expected_balance');
+    }
+
+    /**
+     * $25 handed over buys 250 points; the drawer holds $25.
+     */
+    public function test_a_cash_top_up_counts_the_money_not_the_points(): void
+    {
+        $session = $this->openShift();
+        $member = User::factory()->create();
+        Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id, 'amount' => '25.00', 'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertSame('25.00', $this->closeFor($session));
+    }
+
+    /**
+     * Money in another currency is counted at the rate it was taken at.
+     */
+    public function test_money_in_another_currency_is_counted_at_its_recorded_rate(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001']);
+        $session = $this->openShift();
+        $member = User::factory()->create();
+        Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id, 'amount' => '150000', 'currency' => 'SYP', 'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertSame('15.00', $this->closeFor($session));
+    }
+
+    public function test_cash_taken_to_settle_a_booking_is_counted(): void
+    {
+        $session = $this->openShift();
+        $member = User::factory()->create();
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'checked_out_at' => now()->subMinutes(10),
+            'amount_owed' => '10.00',
+            'price_points' => 100,
+            'payment_state' => BookingPaymentState::Unpaid,
+        ]);
+
+        $this->postJson('/api/v1/admin/reception/payments/settle', [
+            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash', 'amount' => '12.00',
+        ])->assertCreated();
+
+        $this->assertSame('12.00', $this->closeFor($session));
+    }
+
+    public function test_money_taken_by_sham_cash_is_not_in_the_drawer(): void
+    {
+        $session = $this->openShift();
+        $member = User::factory()->create();
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'checked_out_at' => now()->subMinutes(10),
+            'amount_owed' => '10.00',
+            'price_points' => 100,
+            'payment_state' => BookingPaymentState::Unpaid,
+        ]);
+
+        $this->postJson('/api/v1/admin/reception/payments/settle', [
+            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'sham',
+        ])->assertCreated();
+
+        $this->assertSame('0.00', $this->closeFor($session));
     }
 }
