@@ -3,17 +3,11 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\PaymentSource;
-use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionSource;
-use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\PlanDiscountService;
-use App\Domain\Membership\Services\WalletService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -24,8 +18,7 @@ use Illuminate\Support\Facades\DB;
 class BookingApprovalService
 {
     public function __construct(
-        private readonly WalletService $wallets,
-        private readonly AmountCalculator $amounts,
+        private readonly BookingRefunder $refunder,
         private readonly PlanDiscountService $discounts,
     ) {}
 
@@ -60,18 +53,7 @@ class BookingApprovalService
                 'approved_at' => now(),
             ])->save();
 
-            if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
-                $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
-
-                // A discounted booking was only ever charged the net
-                // amount, so it is only that net amount that gets
-                // refunded here — not the raw undiscounted rate.
-                $redemption = PlanDiscountRedemption::where('booking_id', $locked->id)->first();
-                $refundPoints = $redemption !== null ? $points - $redemption->points_discounted : $points;
-
-                $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
-                $this->wallets->creditGeneral($wallet, $refundPoints, WalletTransactionSource::Refund, 'Booking rejection refund');
-            }
+            $this->refunder->refund($locked, 'Booking rejection refund');
 
             // The usage this booking consumed is returned once it no
             // longer holds a charge (docs/decisions/plan-discounts-design.md).

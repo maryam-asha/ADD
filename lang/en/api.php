@@ -356,6 +356,7 @@ return [
         'booking_not_payable' => 'A cancelled or rejected booking cannot be paid.',
         'nothing_due' => 'There is nothing to pay.',
         'no_wallet' => 'There is no wallet to record this payment against.',
+        'not_refundable' => 'Only a settled payment made with points can be refunded.',
         'payable_not_found' => 'We could not find what you are paying for.',
         'not_settleable' => 'This payment can no longer be settled.',
 

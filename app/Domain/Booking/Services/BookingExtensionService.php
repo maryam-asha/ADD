@@ -8,6 +8,9 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\ValueObjects\PoolDemand;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
@@ -31,6 +34,7 @@ class BookingExtensionService
         private readonly AvailabilityService $availability,
         private readonly AmountCalculator $amounts,
         private readonly WalletService $wallets,
+        private readonly PaymentService $payments,
         private readonly MembershipResolver $membershipResolver,
         private readonly PlanDiscountService $discounts,
     ) {}
@@ -133,8 +137,16 @@ class BookingExtensionService
                     ->firstWhere('owner_type', OwnerType::User->value);
 
                 if ($personalOption !== null && $personalOption['usable_balance'] >= $differencePoints) {
-                    $wallet = $this->wallets->walletFor(OwnerType::User, $lockedBooking->user_id);
-                    $this->wallets->debit($wallet, $lockedBooking->user, WalletTransactionCategory::SpaceSpecific, $differencePoints, "Booking #{$lockedBooking->id} extension");
+                    // Through a payment row, so cancelling or rejecting the
+                    // booking later refunds these points with the rest.
+                    if ($differencePoints > 0) {
+                        $this->payments->start(PaymentPurpose::BookingExtension, $lockedBooking->user, WalletMethod::KEY, [
+                            'payable' => $lockedBooking,
+                            'points' => $differencePoints,
+                            'wallet_owner_type' => OwnerType::User,
+                            'wallet_owner_id' => $lockedBooking->user_id,
+                        ]);
+                    }
                 } else {
                     $paymentState = PaymentState::Unpaid;
                 }
@@ -149,6 +161,8 @@ class BookingExtensionService
             $lockedBooking->forceFill([
                 'end_at' => $newEndAt,
                 'payment_state' => $paymentState,
+                // The booking's whole price in points, as creation records it.
+                'price_points' => $discountedNew ?? $newPoints,
             ])->save();
         });
     }

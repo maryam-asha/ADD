@@ -18,6 +18,11 @@ namespace App\Domain\Finance\Enums;
  * `Booking`, `EventRegistration` and `CoworkingSession` pay for an
  * operation: the payment points at it (`payable`) and, when it is paid with
  * points, the wallet is debited rather than credited.
+ *
+ * `BookingExtension` pays the difference when a checked-in booking is
+ * made longer. Its payable is the booking itself, which is already paid,
+ * so it cannot share `Booking`'s "not already paid" check; refunds for a
+ * booking return every payment made for it, whatever its purpose.
  */
 enum PaymentPurpose: string
 {
@@ -26,4 +31,5 @@ enum PaymentPurpose: string
     case Booking = 'booking';
     case EventRegistration = 'event_registration';
     case CoworkingSession = 'coworking_session';
+    case BookingExtension = 'booking_extension';
 }

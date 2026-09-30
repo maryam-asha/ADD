@@ -202,6 +202,41 @@ class PaymentService
     }
 
     /**
+     * Gives a payment's points back, as points, to the wallet that paid —
+     * the booking a company paid for refunds the company. Idempotent on
+     * `refunded_at`; only a settled payment that spent points has anything
+     * to give back.
+     *
+     * @throws ReceptionActionException 409 'api.payment.not_refundable'
+     */
+    public function refund(Payment $payment, string $description): void
+    {
+        DB::transaction(function () use ($payment, $description) {
+            $this->lock($payment);
+
+            if ($payment->isRefunded()) {
+                return;
+            }
+
+            if ($payment->status !== PaymentStatus::Accepted || $payment->debit_transaction_id === null) {
+                throw new ReceptionActionException('api.payment.not_refundable', 409);
+            }
+
+            $transaction = $this->wallets->creditGeneral(
+                $payment->wallet,
+                (int) $payment->amount_points,
+                WalletTransactionSource::Refund,
+                $description,
+            );
+
+            $payment->forceFill([
+                'refund_transaction_id' => $transaction->id,
+                'refunded_at' => now(),
+            ])->save();
+        });
+    }
+
+    /**
      * Turns a card payment the gateway has just accepted into points, and
      * spends them on what it was for. Called synchronously, inside
      * SyncPaymentStatus's transaction, by the FulfilAcceptedPayment listener.

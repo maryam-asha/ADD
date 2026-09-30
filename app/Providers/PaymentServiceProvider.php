@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\FulfillerRegistry;
+use App\Domain\Finance\Payments\Fulfillers\BookingExtensionFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\BookingFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\PlanPurchaseFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalkinSessionFulfiller;
@@ -35,6 +36,7 @@ class PaymentServiceProvider extends ServiceProvider
         PaymentPurpose::PlanPurchase->value => PlanPurchaseFulfiller::class,
         PaymentPurpose::Booking->value => BookingFulfiller::class,
         PaymentPurpose::CoworkingSession->value => WalkinSessionFulfiller::class,
+        PaymentPurpose::BookingExtension->value => BookingExtensionFulfiller::class,
     ];
 
     public function register(): void
