@@ -1,6 +1,8 @@
 <?php
 
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 
 /*
 |--------------------------------------------------------------------------
@@ -30,11 +32,27 @@ return [
 
     'methods' => [
 
+        'wallet' => [
+            'driver' => WalletMethod::class,
+            'enabled' => env('PAYMENTS_WALLET_ENABLED', true),
+        ],
+
+        'cash' => [
+            'driver' => CashMethod::class,
+            'enabled' => env('PAYMENTS_CASH_ENABLED', true),
+        ],
+
         'paymera' => [
             'driver' => PaymeraGateway::class,
             'enabled' => env('PAYMENTS_PAYMERA_ENABLED', true),
         ],
 
     ],
+
+    /*
+    | How long a plan bought with cash is held for the member to pay at the
+    | desk before payments:expire-pending lets it go.
+    */
+    'cash_plan_hold_hours' => (int) env('PAYMENTS_CASH_PLAN_HOLD_HOURS', 48),
 
 ];

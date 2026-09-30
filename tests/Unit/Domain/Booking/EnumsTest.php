@@ -26,8 +26,9 @@ class EnumsTest extends TestCase
     {
         // `plan` marks a walk-in absorbed in full by the member's plan access
         // window, where nothing was collected at all
-        // (docs/decisions/plan-access-windows.md).
-        $this->assertSame(['wallet', 'cash', 'plan'], array_column(PaymentSource::cases(), 'value'));
+        // (docs/decisions/plan-access-windows.md). `gateway` is a card (or
+        // any other gateway) payment made from the app.
+        $this->assertSame(['wallet', 'cash', 'plan', 'gateway'], array_column(PaymentSource::cases(), 'value'));
     }
 
     public function test_termination_source_cases(): void

@@ -219,7 +219,12 @@ class BookingBatchCreationTest extends TestCase
         $this->assertSame(0, Booking::count());
     }
 
-    public function test_a_batch_debits_the_wallet_once_for_the_summed_total(): void
+    /**
+     * One wallet is chosen for the summed total, then each booking is paid
+     * on its own — one payment row and one debit each
+     * (docs/superpowers/plans/2026-09-30-unified-payments.md, Task 4).
+     */
+    public function test_a_batch_debits_the_wallet_once_per_booking_for_the_summed_total(): void
     {
         $member = $this->actingAsMember();
         $space = $this->openSpace();
@@ -237,8 +242,8 @@ class BookingBatchCreationTest extends TestCase
 
         $debits = WalletTransaction::where('wallet_id', $wallet->id)->where('amount', '<', 0)->get();
 
-        $this->assertCount(1, $debits, 'Three bookings must cost one debit, not three.');
-        $this->assertSame(-300, (int) $debits->first()->amount);
+        $this->assertCount(3, $debits, 'Each booking has its own debit.');
+        $this->assertSame(-300, (int) $debits->sum('amount'));
         $this->assertSame(700, app(WalletService::class)->generalBalance($wallet->fresh()));
     }
 

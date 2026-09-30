@@ -311,9 +311,9 @@ class PlanDiscountBookingTest extends TestCase
         $response->assertCreated();
         $this->assertSame(2, Booking::count());
 
-        // One combined debit for the batch: 70 (discounted) + 100 (full
-        // price) = 170.
-        $this->assertSame(1, $wallet->transactions()->where('amount', -170)->count());
+        // One debit per booking: 70 (discounted) + 100 (full price).
+        $this->assertSame(1, $wallet->transactions()->where('amount', -70)->count());
+        $this->assertSame(1, $wallet->transactions()->where('amount', -100)->count());
 
         $bookings = Booking::orderBy('start_at')->get();
         $first = $bookings->first();

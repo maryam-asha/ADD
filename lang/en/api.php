@@ -351,6 +351,12 @@ return [
         'could_not_start' => 'We could not start the payment. Please try again.',
         'plan_unavailable' => 'This package is not available for purchase.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
+        'method_not_supported' => 'This payment method cannot be used for this.',
+        'already_paid' => 'This has already been paid.',
+        'booking_not_payable' => 'A cancelled or rejected booking cannot be paid.',
+        'nothing_due' => 'There is nothing to pay.',
+        'no_wallet' => 'There is no wallet to record this payment against.',
+        'payable_not_found' => 'We could not find what you are paying for.',
         'not_settleable' => 'This payment can no longer be settled.',
 
         // Admin-facing.
@@ -360,6 +366,8 @@ return [
 
         // Names of the payment methods (config/payments.php), keyed by method.
         'methods' => [
+            'wallet' => 'Wallet points',
+            'cash' => 'Cash at reception',
             'paymera' => 'Card',
         ],
 

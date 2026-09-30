@@ -205,6 +205,7 @@ class BookingController extends Controller
                 $walletOwnerType,
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
+                $request->validated('payment_method'),
             );
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
@@ -240,6 +241,7 @@ class BookingController extends Controller
                 $walletOwnerType,
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
+                $request->validated('payment_method'),
             );
         } catch (BatchUnavailableException $e) {
             return response()->json([

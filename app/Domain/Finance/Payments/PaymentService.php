@@ -7,16 +7,21 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
+use App\Domain\Finance\Payments\Contracts\PaymentGateway;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
+use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Exceptions\InsufficientBalanceException;
+use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\DetectsLostConnections;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use LogicException;
@@ -54,6 +59,94 @@ class PaymentService
         private readonly PaymentMethodRegistry $methods,
         private readonly PaymentAmountCalculator $amounts,
     ) {}
+
+    /**
+     * Opens a payment for `$purpose` by `$method` and hands it to the
+     * method's driver, which settles it now (wallet), sends the member to
+     * pay (a gateway), or leaves it for the desk.
+     *
+     * The target is checked before anything is written, and the row records
+     * what is due at this moment — the quote the member is paying. It starts
+     * on the payer's personal wallet: the account money lands in first. A
+     * driver that spends from elsewhere (a company wallet) moves it.
+     *
+     * Everything but a gateway runs in one transaction, so a wallet payment
+     * that falls short leaves no row behind. A gateway's start makes an HTTP
+     * call and records its own failure on the row; that record must survive.
+     *
+     * `$context`: `payable` (the Model paid for), `plan`, `points` (an amount
+     * fixed by the caller rather than the fulfiller), and whatever the driver
+     * reads (`wallet_owner_type`/`wallet_owner_id` for the wallet).
+     *
+     * @param  array<string, mixed>  $context
+     * @return array{payment: Payment, start: PaymentStart}
+     *
+     * @throws ReceptionActionException 'api.payment.method_not_supported' when the method cannot pay for `$purpose`
+     */
+    public function start(PaymentPurpose $purpose, User $payer, string $method, array $context = []): array
+    {
+        $driver = $this->methods->get($method);
+
+        if (! $driver->supports($purpose)) {
+            throw new ReceptionActionException('api.payment.method_not_supported');
+        }
+
+        $fulfiller = $this->fulfillers->for($purpose);
+
+        $open = function () use ($purpose, $payer, $driver, $fulfiller, $context) {
+            $payment = new Payment;
+            $payment->forceFill([
+                'method' => $driver->key(),
+                'purpose' => $purpose,
+                'status' => PaymentStatus::Pending,
+                'user_id' => $payer->id,
+                'wallet_id' => $this->openingWalletId($payer, $context),
+                'plan_id' => isset($context['plan']) ? $context['plan']->id : null,
+                // The card path's own name for the points a payment buys;
+                // nothing is bought with money until funding arrives.
+                'points_to_credit' => 0,
+            ]);
+
+            if (($context['payable'] ?? null) instanceof Model) {
+                $payment->payable()->associate($context['payable']);
+            }
+
+            $payment->setRelation('user', $payer);
+
+            $fulfiller->assertPayable($payment);
+            $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
+            $payment->save();
+
+            $start = $driver->start($payment, $context);
+
+            return ['payment' => $payment->refresh(), 'start' => $start];
+        };
+
+        return $driver instanceof PaymentGateway ? $open() : DB::transaction($open);
+    }
+
+    /**
+     * The wallet a new payment starts on: the one the payer named (the
+     * driver still checks they may spend from it), else their own.
+     *
+     * @param  array<string, mixed>  $context
+     */
+    private function openingWalletId(User $payer, array $context): int
+    {
+        $ownerType = $context['wallet_owner_type'] ?? null;
+        $ownerId = $context['wallet_owner_id'] ?? null;
+
+        $named = $ownerType !== null && $ownerId !== null
+            ? Wallet::query()
+                ->where('owner_type', is_string($ownerType) ? OwnerType::from($ownerType) : $ownerType)
+                ->where('owner_id', (int) $ownerId)
+                ->value('id')
+            : null;
+
+        return $named
+            ?? Wallet::query()->where('owner_type', OwnerType::User)->where('owner_id', $payer->id)->value('id')
+            ?? throw new ReceptionActionException('api.payment.no_wallet');
+    }
 
     /**
      * Settles a payment in one transaction, with its row locked: credits

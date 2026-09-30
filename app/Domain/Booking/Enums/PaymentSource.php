@@ -20,4 +20,6 @@ enum PaymentSource: string
     case Wallet = 'wallet';
     case Cash = 'cash';
     case Plan = 'plan';
+    // Paid by card (or any other gateway) through the app.
+    case Gateway = 'gateway';
 }

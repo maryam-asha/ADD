@@ -3,10 +3,8 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
-use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\ValueObjects\PoolDemand;
@@ -17,10 +15,8 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
-use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -40,11 +36,11 @@ class BookingCreationService
     public function __construct(
         private readonly AvailabilityService $availability,
         private readonly AmountCalculator $amounts,
-        private readonly WalletService $wallets,
         private readonly PointConversionService $points,
         private readonly SettingService $settings,
         private readonly MembershipResolver $membershipResolver,
         private readonly PlanDiscountService $discounts,
+        private readonly BookingPaymentRouter $payments,
     ) {}
 
     public function create(
@@ -55,6 +51,7 @@ class BookingCreationService
         ?OwnerType $walletOwnerType = null,
         ?int $walletOwnerId = null,
         ?string $note = null,
+        ?string $paymentMethod = null,
     ): Booking {
         // Normalize to UTC: Eloquent's datetime cast stores the Carbon
         // value's current wall-clock as-is and reinterprets it as UTC on
@@ -73,7 +70,7 @@ class BookingCreationService
         $this->assertValidGranularity($startAt, $rules);
         $this->assertValidDuration($startAt, $endAt, $rules);
 
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note) {
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod) {
             if ($rules->usesBranchPool) {
                 // Every decision about a branch's co-working seats — bookings,
                 // walk-ins, subscriptions — is serialized on the branch row,
@@ -112,7 +109,9 @@ class BookingCreationService
             $discount = $membership !== null ? $this->discounts->resolveFor($membership, $locked) : null;
             $finalPoints = $discount !== null ? $this->discounts->apply($points, $discount) : $points;
 
-            [$paymentState, $paymentSource] = $this->routePayment($locked, $member, $finalPoints, $walletOwnerType, $walletOwnerId);
+            // Decided before the booking is made, so a refusal (a wallet
+            // choice, a strict wallet payment that falls short) makes none.
+            $payingWallet = $this->payments->choose($member, $finalPoints, $paymentMethod, $walletOwnerType, $walletOwnerId);
 
             // `amount_owed`/`currency` are the booking's money-denominated
             // record of the charge and remain decimal USD — only the wallet
@@ -130,12 +129,16 @@ class BookingCreationService
                 'status' => $status,
                 'amount_owed' => $amount,
                 'currency' => 'USD',
-                'payment_state' => $paymentState,
-                'payment_source' => $paymentSource,
+                'price_points' => $finalPoints,
+                'payment_state' => PaymentState::Unpaid,
                 'note' => $note,
             ]);
 
-            if ($discount !== null && $paymentState === PaymentState::Paid) {
+            if ($payingWallet !== null) {
+                $this->payments->pay($booking, $member, $payingWallet);
+            }
+
+            if ($discount !== null && $booking->payment_state === PaymentState::Paid) {
                 $this->discounts->redeem($discount, $membership, $booking, $points - $finalPoints);
             }
 
@@ -164,51 +167,6 @@ class BookingCreationService
                 'status' => 'sent',
             ]);
         });
-    }
-
-    /**
-     * @return array{0: PaymentState, 1: ?PaymentSource}
-     */
-    private function routePayment(Space $space, User $member, int $points, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
-    {
-        if ($points <= 0) {
-            return [PaymentState::Unpaid, null];
-        }
-
-        if ($walletOwnerType !== null && $walletOwnerId !== null) {
-            $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
-            $matched = collect($options)->first(
-                fn (array $option) => $option['owner_type'] === $walletOwnerType->value && $option['owner_id'] === $walletOwnerId
-            );
-
-            if ($matched === null) {
-                throw new ReceptionActionException('api.booking.wallet_not_owned');
-            }
-
-            if ($matched['usable_balance'] < $points) {
-                return [PaymentState::Unpaid, null];
-            }
-
-            $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, "Booking for space #{$space->id}");
-
-            return [PaymentState::Paid, PaymentSource::Wallet];
-        }
-
-        $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
-
-        if (count($options) > 1) {
-            throw new WalletChoiceRequiredException($options);
-        }
-
-        if (count($options) === 1 && $options[0]['usable_balance'] >= $points) {
-            $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, "Booking for space #{$space->id}");
-
-            return [PaymentState::Paid, PaymentSource::Wallet];
-        }
-
-        return [PaymentState::Unpaid, null];
     }
 
     // ------------------------------------------------------------------

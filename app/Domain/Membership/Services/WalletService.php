@@ -414,7 +414,9 @@ class WalletService
         $categoryBalance = $this->eligibleBalance($wallet, $user, $category);
         $generalBalance = $this->eligibleBalance($wallet, $user, WalletTransactionCategory::General);
 
-        $usableBalance = $categoryBalance > 0 ? $categoryBalance : $generalBalance;
+        // What debit() can actually spend: it tries the category first and
+        // falls back to general for the whole amount when that falls short.
+        $usableBalance = max($categoryBalance, $generalBalance);
 
         if ($usableBalance <= 0) {
             return null;

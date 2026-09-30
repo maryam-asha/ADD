@@ -144,7 +144,7 @@ class PaymentMethodRegistryTest extends TestCase
     {
         config(['payments.methods.fake.enabled' => false]);
 
-        $this->assertSame(['paymera'], array_keys($this->registry()->enabled()));
+        $this->assertSame(['wallet', 'cash', 'paymera'], array_keys($this->registry()->enabled()));
     }
 
     public function test_available_for_a_purpose_lists_only_methods_that_support_it(): void
@@ -158,10 +158,13 @@ class PaymentMethodRegistryTest extends TestCase
             array_keys($this->registry()->availableFor(PaymentPurpose::WalletTopUp))
         );
         $this->assertSame(
-            ['offline'],
+            ['wallet', 'cash', 'offline'],
             array_keys($this->registry()->availableFor(PaymentPurpose::Booking))
         );
-        $this->assertSame([], $this->registry()->availableFor(PaymentPurpose::EventRegistration));
+        $this->assertSame(
+            ['wallet', 'cash'],
+            array_keys($this->registry()->availableFor(PaymentPurpose::EventRegistration))
+        );
     }
 
     public function test_the_registry_is_a_singleton_that_still_reads_config_lazily(): void
@@ -174,7 +177,7 @@ class PaymentMethodRegistryTest extends TestCase
         // must not need to know about container caching.
         config(['payments.methods.fake.enabled' => false]);
 
-        $this->assertSame(['paymera'], array_keys($first->enabled()));
+        $this->assertSame(['wallet', 'cash', 'paymera'], array_keys($first->enabled()));
     }
 
     public function test_gateway_for_resolves_a_payment_by_its_method(): void
@@ -249,7 +252,7 @@ class PaymentMethodRegistryTest extends TestCase
 
     public function test_a_registered_fake_gateway_is_listed(): void
     {
-        $this->assertSame(['paymera', 'fake'], array_keys($this->registry()->enabled()));
+        $this->assertSame(['wallet', 'cash', 'paymera', 'fake'], array_keys($this->registry()->enabled()));
     }
 
     public function test_a_pending_fake_payment_is_synced_through_the_fake_gateway_and_credited(): void

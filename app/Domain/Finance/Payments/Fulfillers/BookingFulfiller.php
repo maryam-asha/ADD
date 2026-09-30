@@ -1,0 +1,71 @@
+<?php
+
+namespace App\Domain\Finance\Payments\Fulfillers;
+
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\AmountCalculator;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
+
+/**
+ * Paying for a booking. Its price is fixed when it is made (`price_points`,
+ * after any plan discount) — the payment's own `amount_points` once the
+ * payment is open, so what the member was quoted is what they pay.
+ */
+class BookingFulfiller extends SessionPaymentFulfiller
+{
+    public function __construct(
+        PaymentMethodRegistry $methods,
+        private readonly AmountCalculator $amounts,
+    ) {
+        parent::__construct($methods);
+    }
+
+    public function purpose(): PaymentPurpose
+    {
+        return PaymentPurpose::Booking;
+    }
+
+    /**
+     * Rows made before `price_points` existed are priced again, as
+     * cancellation's refund always has.
+     */
+    public function pointsDue(Payment $payment): int
+    {
+        if ($payment->amount_points !== null) {
+            return $payment->amount_points;
+        }
+
+        $booking = $this->session($payment);
+
+        return $booking->price_points
+            ?? $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
+    }
+
+    /**
+     * The same wording the booking's own debit has always carried.
+     */
+    public function describe(Payment $payment): string
+    {
+        return "Booking for space #{$this->session($payment)->space_id}";
+    }
+
+    public function assertPayable(Payment $payment): void
+    {
+        $booking = $this->session($payment);
+
+        if (in_array($booking->status, [BookingStatus::Cancelled, BookingStatus::Rejected], true)) {
+            throw new ReceptionActionException('api.payment.booking_not_payable');
+        }
+
+        $this->assertNotPaid($booking);
+    }
+
+    protected function session(Payment $payment): Booking
+    {
+        return $this->lockedPayable($payment, Booking::class);
+    }
+}

@@ -3,11 +3,8 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\BatchUnavailableException;
-use App\Domain\Booking\Exceptions\ReceptionActionException;
-use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
@@ -17,11 +14,9 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
-use App\Domain\Membership\Services\WalletService;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -64,10 +59,10 @@ class BookingBatchCreationService
     public function __construct(
         private readonly AvailabilityService $availability,
         private readonly AmountCalculator $amounts,
-        private readonly WalletService $wallets,
         private readonly PointConversionService $points,
         private readonly MembershipResolver $membershipResolver,
         private readonly PlanDiscountService $discounts,
+        private readonly BookingPaymentRouter $payments,
     ) {}
 
     /**
@@ -80,6 +75,7 @@ class BookingBatchCreationService
         ?OwnerType $walletOwnerType = null,
         ?int $walletOwnerId = null,
         ?string $note = null,
+        ?string $paymentMethod = null,
     ): array {
         $normalized = $this->normalize($windows);
 
@@ -91,7 +87,7 @@ class BookingBatchCreationService
             throw new BatchUnavailableException($failures);
         }
 
-        return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note) {
+        return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note, $paymentMethod) {
             // Lock every distinct space in ascending id order. Two
             // concurrent batches touching the same pair of spaces would
             // otherwise be free to grab them in opposite orders and
@@ -221,10 +217,14 @@ class BookingBatchCreationService
             $totalPoints = collect($accepted)->sum('points');
 
             // Routed once for the summed total, so a member with two
-            // eligible wallets is asked to choose once rather than N times.
-            [$paymentState, $paymentSource] = $this->routePayment(
+            // eligible wallets is asked to choose once rather than N times,
+            // and a wallet that covers some dates but not all pays for none.
+            // Each booking then gets its own payment row and debit, inside
+            // this transaction — still all or nothing.
+            $payingWallet = $this->payments->choose(
                 $member,
                 $totalPoints,
+                $paymentMethod,
                 $walletOwnerType,
                 $walletOwnerId,
             );
@@ -243,12 +243,16 @@ class BookingBatchCreationService
                     'status' => $status,
                     'amount_owed' => $this->points->pointsToUsd($row['points']),
                     'currency' => 'USD',
-                    'payment_state' => $paymentState,
-                    'payment_source' => $paymentSource,
+                    'price_points' => $row['points'],
+                    'payment_state' => PaymentState::Unpaid,
                     'note' => $note,
                 ]);
 
-                if ($row['discount'] !== null && $paymentState === PaymentState::Paid) {
+                if ($payingWallet !== null && $row['points'] > 0) {
+                    $this->payments->pay($booking, $member, $payingWallet);
+                }
+
+                if ($row['discount'] !== null && $booking->payment_state === PaymentState::Paid) {
                     $this->discounts->redeem($row['discount'], $membership, $booking, $row['points_discounted']);
                 }
 
@@ -409,50 +413,6 @@ class BookingBatchCreationService
             'reason' => str_contains($messageKey, '.') ? substr($messageKey, strrpos($messageKey, '.') + 1) : $messageKey,
             'message_key' => $messageKey,
         ];
-    }
-
-    /**
-     * @return array{0: PaymentState, 1: ?PaymentSource}
-     */
-    private function routePayment(User $member, int $points, ?OwnerType $walletOwnerType, ?int $walletOwnerId): array
-    {
-        if ($points <= 0) {
-            return [PaymentState::Unpaid, null];
-        }
-
-        $options = $this->wallets->spendOptions($member, WalletTransactionCategory::SpaceSpecific);
-
-        if ($walletOwnerType !== null && $walletOwnerId !== null) {
-            $matched = collect($options)->first(
-                fn (array $option) => $option['owner_type'] === $walletOwnerType->value && $option['owner_id'] === $walletOwnerId
-            );
-
-            if ($matched === null) {
-                throw new ReceptionActionException('api.booking.wallet_not_owned');
-            }
-
-            if ($matched['usable_balance'] < $points) {
-                return [PaymentState::Unpaid, null];
-            }
-
-            $wallet = $this->wallets->walletFor($walletOwnerType, $walletOwnerId);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, 'Multi-date booking');
-
-            return [PaymentState::Paid, PaymentSource::Wallet];
-        }
-
-        if (count($options) > 1) {
-            throw new WalletChoiceRequiredException($options);
-        }
-
-        if (count($options) === 1 && $options[0]['usable_balance'] >= $points) {
-            $wallet = $this->wallets->walletFor(OwnerType::from($options[0]['owner_type']), $options[0]['owner_id']);
-            $this->wallets->debit($wallet, $member, WalletTransactionCategory::SpaceSpecific, $points, 'Multi-date booking');
-
-            return [PaymentState::Paid, PaymentSource::Wallet];
-        }
-
-        return [PaymentState::Unpaid, null];
     }
 
     private function notifyOperations(): void

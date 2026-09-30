@@ -178,6 +178,13 @@ class SessionClosureService
             'currency' => 'USD',
         ];
 
+        // The same price in points, what a payment settles. A walk-in is
+        // priced only now; a booking keeps the price it was made (and
+        // perhaps paid) at, unless it closes unpaid and is repriced here.
+        if ($session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid) {
+            $attributes['price_points'] = $points;
+        }
+
         if ($session instanceof WalkinSession && $coveredSeconds > 0) {
             $attributes['plan_covered_seconds'] = $coveredSeconds;
 

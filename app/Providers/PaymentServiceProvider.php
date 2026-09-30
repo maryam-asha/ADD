@@ -5,7 +5,9 @@ namespace App\Providers;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\FulfillerRegistry;
+use App\Domain\Finance\Payments\Fulfillers\BookingFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\PlanPurchaseFulfiller;
+use App\Domain\Finance\Payments\Fulfillers\WalkinSessionFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalletTopUpFulfiller;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
@@ -31,6 +33,8 @@ class PaymentServiceProvider extends ServiceProvider
     private const FULFILLERS = [
         PaymentPurpose::WalletTopUp->value => WalletTopUpFulfiller::class,
         PaymentPurpose::PlanPurchase->value => PlanPurchaseFulfiller::class,
+        PaymentPurpose::Booking->value => BookingFulfiller::class,
+        PaymentPurpose::CoworkingSession->value => WalkinSessionFulfiller::class,
     ];
 
     public function register(): void
