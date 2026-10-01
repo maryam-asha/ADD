@@ -103,12 +103,17 @@ class StartPaymentRequest extends FormRequest
      * uses, so a member can only pay for something they were actually
      * offered — a private or deactivated plan id guessed by hand is
      * rejected here.
+     *
+     * A one-time package is not a subscription, and no membership can be
+     * made of one — the rule POST member/memberships applies
+     * (StoreMembershipRequest). Refused here rather than after the money is
+     * taken.
      */
     private function validatePlan(Validator $validator): void
     {
         $plan = Plan::query()->publiclyListable()->find($this->input('plan_id'));
 
-        if ($plan === null) {
+        if ($plan === null || ! $plan->is_subscription) {
             $validator->errors()->add('plan_id', __('api.payment.plan_unavailable'));
 
             return;

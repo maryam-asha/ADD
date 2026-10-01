@@ -333,8 +333,16 @@ POST /api/v1/member/payments
 ```
 
 `method`: `wallet` | `cash` | `paymera` (أو أي مفتاح وصل في القائمة).
-`wallet_owner_type/id` اختياريان للمحفظة؛ إذا كان للعضو أكثر من محفظة ولم
-يحدد، يعود 422 مع `wallet_options` كما في الحجز.
+`wallet_owner_type/id` اختياريان، وتُقرأ **مع `wallet` فقط**: محفظتك
+الشخصية أو محفظة شركة أنت عضو فيها؛ إذا كان للعضو أكثر من محفظة ولم يحدد،
+يعود 422 مع `wallet_options` كما في الحجز. مع البطاقة أو النقد يذهب المال
+دائماً إلى محفظتك الشخصية أولاً، مهما أُرسل في هذين الحقلين.
+
+**الباقة (`plan_purchase`) هنا باقتك الشخصية دائماً:** `wallet_owner_type`
+غير `user` ← 422 `api.payment.company_plan_not_allowed`. باقة الشركة يشتريها
+مسؤول الشركة عبر `POST member/memberships` مع `company_id`. الباقة لمرة واحدة
+(ليست اشتراكاً) ← 422 على `plan_id`، والفرع الممتلئ ← 422 مع
+`first_shortfall_at` كما في `memberships`.
 
 الرد دائماً 201:
 

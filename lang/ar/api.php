@@ -350,6 +350,7 @@ return [
         'plan_unavailable' => 'هذه الباقة غير متاحة للشراء.',
         'insufficient_points' => 'رصيدك الحالي :current نقطة، بينما المطلوب :required نقطة (ينقصك :shortage نقطة).',
         'method_not_supported' => 'لا يمكن استخدام طريقة الدفع هذه لهذه العملية.',
+        'company_plan_not_allowed' => 'لا يشتري باقة الشركة إلا مسؤول الشركة، كعملية شراء باسم الشركة.',
         'already_paid' => 'تم دفع هذا مسبقاً.',
         'booking_not_payable' => 'لا يمكن دفع حجز ملغى أو مرفوض.',
         'nothing_due' => 'لا يوجد مبلغ مستحق.',

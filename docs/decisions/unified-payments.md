@@ -26,7 +26,9 @@ The user's decisions the design records:
 - Reception enters the amount received; any overpayment becomes points.
 - Events and plans may be paid from the same wallets as bookings (personal,
   or a company the member belongs to), with an explicit choice when several
-  apply.
+  apply. For plans the user later ruled narrower: a company wallet pays only
+  for a company plan, bought by the company's admin (see Rulings, "Company
+  wallets pay for a company plan only").
 
 ## The model
 
@@ -89,7 +91,7 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 | booking (`POST member/bookings`) | pay now or 422 | unpaid | unpaid, then its card payment opens |
 | multi-date booking (`/batch`) | one wallet for the total, one payment per booking | unpaid | refused (validation) |
 | event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens |
-| anything unpaid (`POST member/payments`) | yes | `pay_at_reception` | yes |
+| anything unpaid (`POST member/payments`) | yes (a plan: the member's own only) | `pay_at_reception` (a plan: a hold on the member's own wallet) | yes, into the member's own wallet |
 | top-up | — | reception only (`wallet-top-ups`) | yes |
 
 Reception: `POST admin/reception/payments/settle` settles any of the four with
@@ -166,6 +168,27 @@ already open on it still sync and reverse.
   settle endpoints never needed one.
 - **A company plan cannot be bought by card from the app** yet: card money
   lands in the member's own wallet.
+- **Whose wallet a payment touches** (final review C1; the user's ruling on
+  the spec's "plans paid from the same wallets as bookings"). Only a method
+  that picks the wallet itself and checks the payer may spend from it
+  (`ChoosesWallet`: `WalletMethod` — the member's own, or a company they
+  belong to) is given the `wallet_owner_type`/`wallet_owner_id` a client
+  sends. Every other method opens on the payer's **personal** wallet: card
+  and cash money always land in the payer's own wallet first, whatever the
+  request named. The one exception is a wallet the caller has already
+  authorized (`authorized_wallet` in the context, never built from request
+  input): `POST member/memberships` with `company_id` opens a company's cash
+  hold on the company's wallet after `CompanyPolicy::manageMembers`.
+- **Company wallets pay for a company plan only, bought by the company's
+  admin through `POST member/memberships` with `company_id`.** On
+  `POST member/payments` a `plan_purchase` is always the member's own plan: a
+  non-user `wallet_owner_type` is refused with 422
+  `api.payment.company_plan_not_allowed`, for every method. The endpoint
+  applies the plan rules memberships applies: a one-time package
+  (`is_subscription = false`) is a 422 on `plan_id`, and a full branch is
+  422 `api.membership.seat_pool_full` with `first_shortfall_at`, never a 500.
+  Bookings, sessions and events keep the full wallet choice (personal or a
+  company the member belongs to), checked by `WalletMethod`.
 
 ## Deploying
 
