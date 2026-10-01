@@ -270,3 +270,11 @@ already open on it still sync and reverse.
   `Booking/BookingPaymentMethodTest`, `Booking/BookingRefundToPayingWalletTest`,
   `Membership/PlanPurchasePaymentMethodTest`, `Experience/EventPaymentTest`,
   `Experience/EventCheckInTest`; unit `ReceivedMoneyConverterTest`.
+- Final-review fixes: `PayNowWalletOwnerTest` (C1),
+  `Booking/BookingExtensionOwedTest` (C2), `Membership/PlanDiscountUsageTest`
+  (I1), `CardStartFailureTest` (I2), `Experience/EventPaymentBlockTest`
+  (I3), `MoneyAmountSpellingTest` (M4), and
+  `PaymeraCreatePaymentPayloadTest`, which pins what a card payment asks
+  Paymera for: `callbackURL`/`triggerURL` from `route('paymera.callback'|
+  'paymera.trigger', token)`, and `savedCards`/`appUser` only when
+  `paymera.saved_cards_enabled` is on.
