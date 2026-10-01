@@ -178,7 +178,7 @@ class ReceptionSettlementTest extends TestCase
         $plan = Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30, 'is_active' => true]);
         ['payment' => $hold] = app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
 
-        $this->settle(['purpose' => 'plan_purchase', 'payment_id' => $hold->id, 'collected_via' => 'sham'])
+        $this->settle(['purpose' => 'plan_purchase', 'payment_id' => $hold->id, 'collected_via' => 'cash'])
             ->assertCreated()
             ->assertJsonPath('data.payment.id', $hold->id)
             ->assertJsonPath('data.points_charged', 1200);
@@ -188,7 +188,7 @@ class ReceptionSettlementTest extends TestCase
         $hold->refresh();
         $this->assertSame(PaymentStatus::Accepted, $hold->status);
         $this->assertSame($membership->id, $hold->membership_id);
-        $this->assertSame(PaymentMethod::Sham, $hold->collected_via);
+        $this->assertSame(PaymentMethod::Cash, $hold->collected_via);
     }
 
     public function test_a_plan_whose_branch_is_full_records_nothing(): void
@@ -271,12 +271,12 @@ class ReceptionSettlementTest extends TestCase
         ]);
 
         $this->withHeader('lang', 'en')
-            ->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", ['payment_method' => 'mtn'])
+            ->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", ['payment_method' => 'cash'])
             ->assertOk()
             ->assertExactJson(['message' => __('api.reception.payment_settled', [], 'en')]);
 
         $this->assertSame(PaymentState::Paid, $session->refresh()->payment_state);
-        $this->assertSame(PaymentMethod::Mtn, $session->payment_method);
+        $this->assertSame(PaymentMethod::Cash, $session->payment_method);
         $this->assertSame(1, Payment::count());
     }
 

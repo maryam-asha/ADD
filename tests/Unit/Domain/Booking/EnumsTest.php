@@ -37,15 +37,15 @@ class EnumsTest extends TestCase
     }
 
     /**
-     * `paymera` joined the four till methods when card payments landed
-     * (docs/paymera.md). It is the only one not taken by hand at reception,
-     * which is why a wallet transaction carrying it has no
-     * `performed_by_user_id`.
+     * Cash at the desk and a card through Paymera — the only two. sham,
+     * mtn and syriatel were planned but never used, and were removed.
+     * `paymera` is not taken by hand, which is why a wallet transaction
+     * carrying it has no `performed_by_user_id`.
      */
     public function test_payment_method_cases(): void
     {
         $this->assertSame(
-            ['cash', 'sham', 'mtn', 'syriatel', 'paymera'],
+            ['cash', 'paymera'],
             array_column(PaymentMethod::cases(), 'value')
         );
     }

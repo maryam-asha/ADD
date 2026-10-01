@@ -95,7 +95,7 @@ class SessionClosureService
     }
 
     /**
-     * Reception collected cash/sham/mtn/syriatel for exactly what is owed
+     * Reception collected cash for exactly what is owed
      * and confirms it here. The money goes through the ledger like every
      * other payment (PaymentService::settleAtReception). The audit entry is
      * the caller's, via LogsSensitiveActions.

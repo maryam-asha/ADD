@@ -28,7 +28,7 @@ class SettleAtReceptionRequest extends FormRequest
             'purpose' => ['bail', 'required', Rule::in(['booking', 'coworking_session', 'event_registration', 'plan_purchase'])],
             'payable_id' => ['required_unless:purpose,plan_purchase', 'nullable', 'integer'],
             'payment_id' => ['required_if:purpose,plan_purchase', 'nullable', 'integer'],
-            'collected_via' => ['required', Rule::enum(PaymentMethod::class)],
+            'collected_via' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],
             'amount' => ['nullable', 'numeric', 'min:0.01'],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
         ];

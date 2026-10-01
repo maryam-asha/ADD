@@ -154,7 +154,7 @@ class WalkInSessionControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", [
-            'payment_method' => 'mtn',
+            'payment_method' => 'cash',
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Payment settled.']);

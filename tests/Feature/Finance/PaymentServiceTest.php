@@ -247,7 +247,7 @@ class PaymentServiceTest extends TestCase
 
         $this->service()->fulfilAcceptedGatewayPayment($payment);
 
-        $this->assertSame(PaymentMethod::Sham, $payment->refresh()->walletTransaction->payment_method);
+        $this->assertSame(PaymentMethod::Cash, $payment->refresh()->walletTransaction->payment_method);
     }
 
     // ---------------------------------------------------------------
@@ -720,6 +720,6 @@ class LedgerProbeGateway extends PaymeraGateway
 
     public function ledgerMethod(): PaymentMethod
     {
-        return PaymentMethod::Sham;
+        return PaymentMethod::Cash;
     }
 }

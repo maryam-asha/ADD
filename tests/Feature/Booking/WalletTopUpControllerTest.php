@@ -65,7 +65,7 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
             'amount' => '50.00',
-            'payment_method' => 'syriatel',
+            'payment_method' => 'cash',
         ]);
 
         $response->assertCreated();

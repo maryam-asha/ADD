@@ -211,7 +211,7 @@ class BookingReceptionControllerTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", [
-            'payment_method' => 'sham',
+            'payment_method' => 'cash',
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Payment settled.']);

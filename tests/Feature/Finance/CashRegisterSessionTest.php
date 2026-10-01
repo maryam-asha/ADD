@@ -243,7 +243,7 @@ class CashRegisterSessionTest extends TestCase
         $this->assertSame('12.00', $this->closeFor($session));
     }
 
-    public function test_money_taken_by_sham_cash_is_not_in_the_drawer(): void
+    public function test_reception_takes_cash_only(): void
     {
         $session = $this->openShift();
         $member = User::factory()->create();
@@ -255,10 +255,17 @@ class CashRegisterSessionTest extends TestCase
             'payment_state' => BookingPaymentState::Unpaid,
         ]);
 
-        $this->postJson('/api/v1/admin/reception/payments/settle', [
-            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'sham',
-        ])->assertCreated();
+        foreach (['sham', 'mtn', 'syriatel', 'paymera'] as $method) {
+            $this->postJson('/api/v1/admin/reception/payments/settle', [
+                'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => $method,
+            ])->assertUnprocessable()->assertJsonValidationErrors('collected_via');
 
+            $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+                'user_id' => $member->id, 'amount' => '10.00', 'payment_method' => $method,
+            ])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        }
+
+        $this->assertSame(BookingPaymentState::Unpaid, $booking->fresh()->payment_state);
         $this->assertSame('0.00', $this->closeFor($session));
     }
 }

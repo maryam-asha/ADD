@@ -28,7 +28,7 @@ class StoreWalletTopUpRequest extends FormRequest
         return [
             'amount' => ['required', 'numeric', 'min:0.01'],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
-            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            'payment_method' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
             'company_id' => ['required_without:user_id', 'integer', 'exists:companies,id'],
             'description' => ['nullable', 'string', 'max:255'],

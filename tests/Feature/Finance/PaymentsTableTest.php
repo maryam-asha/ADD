@@ -149,7 +149,7 @@ class PaymentsTableTest extends TestCase
 
         $payment = $this->nonGatewayPayment($wallet, [
             'method' => 'cash',
-            'collected_via' => 'sham',
+            'collected_via' => 'cash',
             'received_amount' => '12.5',
             'received_currency' => 'USD',
             'received_by' => $receiver->id,
@@ -160,7 +160,7 @@ class PaymentsTableTest extends TestCase
 
         $fresh = Payment::query()->findOrFail($payment->id);
 
-        $this->assertSame(PaymentMethod::Sham, $fresh->collected_via);
+        $this->assertSame(PaymentMethod::Cash, $fresh->collected_via);
         $this->assertSame('12.50', $fresh->received_amount);
         $this->assertSame(40, $fresh->amount_points);
         $this->assertTrue($fresh->receivedBy->is($receiver));
