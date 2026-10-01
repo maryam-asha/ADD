@@ -67,7 +67,9 @@ class PaymentController extends Controller
                     // Ignored for a plan purchase — the price comes from the
                     // database, never from the request.
                     amountMinor: $request->amountMinor(),
-                    lang: $request->validated('lang'),
+                    // The gateway page speaks the member's language: the
+                    // `lang` header, already applied as the app locale.
+                    lang: app()->getLocale(),
                 );
 
                 return $this->started($payment, PaymentStart::redirect($url));
@@ -80,7 +82,7 @@ class PaymentController extends Controller
                 // this endpoint that is always the member.
                 'wallet_owner_type' => $request->validated('wallet_owner_type') ?? ($purpose === PaymentPurpose::PlanPurchase ? OwnerType::User->value : null),
                 'wallet_owner_id' => $request->validated('wallet_owner_id') ?? ($purpose === PaymentPurpose::PlanPurchase ? $member->id : null),
-                'lang' => $request->validated('lang'),
+                'lang' => app()->getLocale(),
             ], fn ($value) => $value !== null));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);

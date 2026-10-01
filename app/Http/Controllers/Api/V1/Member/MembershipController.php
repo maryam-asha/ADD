@@ -88,7 +88,7 @@ class MembershipController extends Controller
 
         return match ($request->validated('payment_method') ?? WalletMethod::KEY) {
             CashMethod::KEY => $this->holdForCash($payments, $member, $plan, $ownerType, $ownerId),
-            PaymeraGateway::KEY => $this->startCard($card, $member, $plan, $ownerType, $request->validated('lang')),
+            PaymeraGateway::KEY => $this->startCard($card, $member, $plan, $ownerType, app()->getLocale()),
             default => $this->payWithPoints($payments, $member, $plan, $ownerType, $ownerId),
         };
     }

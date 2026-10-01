@@ -112,7 +112,7 @@ class EventController extends Controller
         if ($method !== null && in_array($method, $methods->gatewayKeys(), true)
             && $attendee?->status === EventRegistrationStatus::Approved
             && $attendee->payment_state === EventPaymentState::Unpaid) {
-            $result += $this->startCardPayment($payments, $attendee, $request->user(), $method, $request->header('lang'));
+            $result += $this->startCardPayment($payments, $attendee, $request->user(), $method, app()->getLocale());
         }
 
         return response()->json(['data' => $result], 201);

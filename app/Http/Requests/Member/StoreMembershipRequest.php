@@ -35,7 +35,6 @@ class StoreMembershipRequest extends FormRequest
                 ['wallet', 'cash', 'paymera'],
                 array_keys(app(PaymentMethodRegistry::class)->enabled()),
             )))],
-            'lang' => ['nullable', 'string', Rule::in(['ar', 'en'])],
         ];
     }
 

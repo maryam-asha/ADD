@@ -37,8 +37,7 @@ POST /api/v1/member/payments
 ```json
 {
   "purpose": "wallet_top_up",
-  "amount": "1470000",
-  "lang": "ar"
+  "amount": "1470000"
 }
 ```
 
@@ -50,10 +49,12 @@ POST /api/v1/member/payments
 ```json
 {
   "purpose": "plan_purchase",
-  "plan_id": 7,
-  "lang": "ar"
+  "plan_id": 7
 }
 ```
+
+لغة صفحة Paymera تؤخذ من الهيدر `lang` (`ar` أو `en`، والافتراضي `ar`) —
+لا تُرسل في جسم الطلب.
 
 **لا ترسل `amount` هنا.** السعر يُقرأ من قاعدة البيانات، وأي `amount` مرسل
 يُتجاهل تماماً. هذا مقصود: العميل لا يحدد ما سيُخصم من بطاقته.
@@ -65,7 +66,6 @@ POST /api/v1/member/payments
 | `purpose` | نعم | `wallet_top_up` أو `plan_purchase` |
 | `amount` | مع `wallet_top_up` فقط | نص/رقم، بالوحدات الكبرى، ≥ 0.01 |
 | `plan_id` | مع `plan_purchase` فقط | معرّف باقة متاحة للبيع |
-| `lang` | لا | `ar` أو `en` — يحدد لغة صفحة Paymera |
 
 ### الرد الناجح — 201
 

@@ -232,7 +232,7 @@ class BookingController extends Controller
 
         $method = $request->validated('payment_method');
         $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
-            ? $this->startCardPayment($payments, $booking, $request->user(), $method, $request->header('lang'))
+            ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
             : [];
 
         return response()->json(['data' => new BookingResource($booking)] + $card, 201);

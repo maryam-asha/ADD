@@ -77,8 +77,6 @@ class StartPaymentRequest extends FormRequest
                 'integer',
                 'exists:plans,id',
             ],
-
-            'lang' => ['nullable', 'string', 'in:en,ar'],
         ];
     }
 
