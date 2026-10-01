@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PaymentController;
+use App\Http\Controllers\Api\V1\Member\PaymentMethodsController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
@@ -34,7 +35,7 @@ use Illuminate\Support\Facades\Route;
 // hybrid-routing choice: every currently-spendable wallet for a category,
 // clearly labeled by source. No spend happens here.
 //
-// Deprecated for the app: GET /api/v1/payment-methods (routes/api/v1/mobile.php)
+// Deprecated for the app: GET member/payment-methods (below)
 // returns the same wallets with their balances inside the `wallet` method.
 // Kept for the app version that still calls it.
 Route::get('wallet/options', [WalletController::class, 'options']);
@@ -186,6 +187,10 @@ Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController:
 // closes — it never talks to Paymera directly, so the API key stays server
 // side. `show` re-syncs with the gateway on read, which is safe to poll:
 // SyncPaymentStatus locks and refuses to re-process a settled payment.
+// The payment methods the member may use, in config/payments.php order; the
+// wallet method carries the member's points (docs/decisions/unified-payments.md).
+Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
+
 Route::get('payments', [PaymentController::class, 'index']);
 Route::post('payments', [PaymentController::class, 'store']);
 Route::get('payments/{payment}', [PaymentController::class, 'show']);

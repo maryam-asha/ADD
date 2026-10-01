@@ -14,11 +14,10 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * GET /api/v1/payment-methods — the payment methods the app may offer,
- * readable before login; with a member's token, the wallet method also
- * says how many points they have.
+ * GET member/payment-methods — the payment methods the member may use, the
+ * wallet method carrying how many points they have.
  */
-class PublicPaymentMethodsTest extends TestCase
+class PaymentMethodsWalletBalanceTest extends TestCase
 {
     use RefreshDatabase;
 
@@ -52,20 +51,22 @@ class PublicPaymentMethodsTest extends TestCase
             $headers['Authorization'] = "Bearer {$token}";
         }
 
-        return $this->withHeaders($headers)->getJson('/api/v1/payment-methods'.($query ? '?'.http_build_query($query) : ''));
+        return $this->withHeaders($headers)->getJson('/api/v1/member/payment-methods'.($query ? '?'.http_build_query($query) : ''));
     }
 
-    public function test_without_a_token_it_lists_the_enabled_methods_and_no_balance(): void
+    public function test_it_needs_a_members_token(): void
     {
-        $response = $this->methods()->assertOk();
+        $this->methods()->assertUnauthorized();
+    }
+
+    public function test_it_lists_the_enabled_methods_in_config_order(): void
+    {
+        [, $token] = $this->memberWithToken(100);
+
+        $response = $this->methods([], $token)->assertOk()->assertJsonPath('data.amount_points', null);
 
         $this->assertSame(['wallet', 'cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
-        $response
-            ->assertJsonPath('data.methods.0.label', __('api.payment.methods.wallet', [], 'en'))
-            ->assertJsonPath('data.methods.0.available', true)
-            ->assertJsonPath('data.methods.0.balance', null)
-            ->assertJsonPath('data.amount_points', null);
-        $this->assertArrayNotHasKey('wallets', $response->json('data.methods.0'));
+        $response->assertJsonPath('data.methods.0.label', __('api.payment.methods.wallet', [], 'en'));
     }
 
     public function test_with_a_members_token_the_wallet_shows_its_balance(): void
@@ -112,34 +113,28 @@ class PublicPaymentMethodsTest extends TestCase
 
     public function test_a_top_up_offers_only_the_card(): void
     {
+        [, $token] = $this->memberWithToken(0);
+
         $this->assertSame(
             ['paymera'],
-            array_column($this->methods(['purpose' => 'wallet_top_up'])->assertOk()->json('data.methods'), 'key'),
+            array_column($this->methods(['purpose' => 'wallet_top_up'], $token)->assertOk()->json('data.methods'), 'key'),
         );
-    }
-
-    public function test_without_a_token_a_record_cannot_be_priced(): void
-    {
-        $booking = Booking::factory()->create(['price_points' => 100]);
-
-        $this->methods(['purpose' => 'booking', 'payable_id' => $booking->id])
-            ->assertOk()
-            ->assertJsonPath('data.amount_points', null);
     }
 
     public function test_a_disabled_method_is_absent(): void
     {
         config(['payments.methods.cash.enabled' => false]);
+        [, $token] = $this->memberWithToken(0);
 
-        $this->assertSame(['wallet', 'paymera'], array_column($this->methods()->json('data.methods'), 'key'));
+        $this->assertSame(['wallet', 'paymera'], array_column($this->methods([], $token)->json('data.methods'), 'key'));
     }
 
-    public function test_a_staff_token_is_not_a_members_wallet(): void
+    public function test_a_staff_token_is_refused(): void
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
         $token = $operator->createToken('dash', ['dashboard'])->plainTextToken;
 
-        $this->methods([], $token)->assertOk()->assertJsonPath('data.methods.0.balance', null);
+        $this->methods([], $token)->assertForbidden();
     }
 }

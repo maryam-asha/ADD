@@ -19,10 +19,10 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * GET /api/v1/payment-methods with a member's token, for something the
- * member is about to pay for: the amount, and each enabled method that can
- * pay for it, with whether it can right now and why not. (Without a token,
- * and without a purpose: PublicPaymentMethodsTest.)
+ * GET member/payment-methods for something the member is about to pay
+ * for: the amount, and each enabled method that can pay for it, with
+ * whether it can right now and why not. (Without a purpose, and the wallet
+ * balance: PaymentMethodsWalletBalanceTest.)
  * (docs/superpowers/plans/2026-09-30-unified-payments.md, Task 10).
  */
 class MemberPaymentMethodsTest extends TestCase
@@ -62,7 +62,7 @@ class MemberPaymentMethodsTest extends TestCase
 
     private function methods(array $query)
     {
-        return $this->withHeader('lang', 'en')->getJson('/api/v1/payment-methods?'.http_build_query($query));
+        return $this->withHeader('lang', 'en')->getJson('/api/v1/member/payment-methods?'.http_build_query($query));
     }
 
     public function test_a_booking_lists_the_wallet_with_its_balance_then_cash_then_card(): void
