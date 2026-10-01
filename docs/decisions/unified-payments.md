@@ -171,6 +171,17 @@ already open on it still sync and reverse.
   unpaid owing only the extension — never the whole booking again. At
   check-out an unpaid booking is repriced for the time used, never below
   what was already paid, and is paid once its payments cover it.
+- **A card start never leaves a payment pending** (final review I2): nothing
+  due (0 points) is refused with 422 `api.payment.nothing_due` before any
+  row is written — `BookingFulfiller::assertPayable` (every method, as the
+  session and registration fulfillers already did) and `PaymentService::start`
+  for any gateway. Once the row exists, `PaymeraGateway::start` prices the
+  charge inside the guard that marks it `failed`, so a missing exchange rate
+  fails the row like a call that never came back. `RespondsToGatewayFailures`
+  maps that pricing failure to 503 `gateway_unavailable`; a booking or a
+  registration made with a card therefore still answers 201 with
+  `payment: null` and `payment_error` (also `nothing_due` for a free
+  booking), and `POST member/payments` answers 503.
 - **A plan discount is used up by every booking it priced**, paid at
   creation or later (final review I1): the `PlanDiscountRedemption` is
   written when the booking is made (single and batch), and voided on cancel

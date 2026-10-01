@@ -84,6 +84,13 @@ class BookingFulfiller extends SessionPaymentFulfiller
         }
 
         $this->assertNotPaid($booking);
+
+        // A free booking (a free room, a 100% discount) has nothing to pay,
+        // and a payment for nothing is refused before any row is written,
+        // as a session's is.
+        if ($this->pointsDue($payment) <= 0) {
+            throw new ReceptionActionException('api.payment.nothing_due');
+        }
     }
 
     protected function session(Payment $payment): Booking

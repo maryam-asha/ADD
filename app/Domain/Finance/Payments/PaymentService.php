@@ -86,7 +86,10 @@ class PaymentService
      *
      * Everything but a gateway runs in one transaction, so a wallet payment
      * that falls short leaves no row behind. A gateway's start makes an HTTP
-     * call and records its own failure on the row; that record must survive.
+     * call and records its own failure on the row — pricing the charge
+     * included — so the row is Failed, never left Pending; that record must
+     * survive. Nothing due is refused (422 `api.payment.nothing_due`) before
+     * a gateway row is written.
      *
      * `$context`: `payable` (the Model paid for), `plan`, `points` (an amount
      * fixed by the caller rather than the fulfiller), `authorized_wallet` (a
@@ -139,6 +142,13 @@ class PaymentService
             }
 
             $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
+
+            // A gateway cannot charge nothing; refused before the row exists,
+            // so a free target never leaves a payment behind.
+            if ($driver instanceof PaymentGateway && $payment->amount_points <= 0) {
+                throw new ReceptionActionException('api.payment.nothing_due');
+            }
+
             $payment->save();
 
             $start = $driver->start($payment, $context);

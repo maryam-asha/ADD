@@ -363,7 +363,9 @@ POST /api/v1/member/payments
 - **الحجز:** `POST member/bookings` يقبل `payment_method`. `wallet` يدفع
   الآن أو يرفض بـ 422 ولا يُنشأ الحجز؛ `cash` ينشئه غير مدفوع؛ `paymera`
   ينشئه غير مدفوع ويضيف بجانب `data` الحقلين `payment` و`redirect_url`. إن
-  تعذّر فتح صفحة البطاقة يبقى الحجز، مع `payment: null` و`payment_error`.
+  تعذّر فتح صفحة البطاقة (البوابة أو سعر الصرف غير متاحين) يبقى الحجز، مع
+  `payment: null` و`payment_error`. والحجز المجاني لا دفعة له: `payment: null`
+  و`payment_error` = "لا يوجد مبلغ مستحق".
   الحجز المتعدد (`/batch`) يقبل `wallet` أو `cash` فقط.
 - **الفعالية:** `POST member/events/{id}/register` يقبل `payment_method`
   و`wallet_owner_type/id`. البطاقة أو النقد يؤكدان المقعد **غير مدفوع**، ولا

@@ -241,8 +241,10 @@ class BookingController extends Controller
     /**
      * A booking paid by card is made first, unpaid — it holds its slot like
      * any unpaid booking — and then its payment is opened. If the gateway
-     * cannot be reached the booking stands, still unpaid, and the member is
-     * told the payment did not start: they can pay again, or at the desk.
+     * cannot be reached (or the charge cannot be priced) the booking stands,
+     * still unpaid, and the member is told the payment did not start: they
+     * can pay again, or at the desk. A booking that costs nothing has no
+     * payment to open, and says so the same way.
      *
      * @return array{payment: PaymentResource|null, redirect_url: string|null, payment_error?: string}
      */
@@ -253,6 +255,8 @@ class BookingController extends Controller
                 'payable' => $booking,
                 'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
             ]));
+        } catch (ReceptionActionException $e) {
+            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($e->messageKey, $e->params)];
         } catch (Throwable $e) {
             $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
 
