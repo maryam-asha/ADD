@@ -63,7 +63,7 @@ POST /api/v1/member/payments
 | الحقل | إلزامي | الوصف |
 |---|---|---|
 | `purpose` | نعم | `wallet_top_up` أو `plan_purchase` |
-| `amount` | مع `wallet_top_up` فقط | نص/رقم، بالوحدات الكبرى، ≥ 0.01 |
+| `amount` | مع `wallet_top_up` فقط | نص/رقم، بالوحدات الكبرى، ≥ 0.01، رقم عشري عادي (`10` أو `10.50`) — صيغة الأُس مثل `1e3` ← 422 |
 | `plan_id` | مع `plan_purchase` فقط | معرّف باقة متاحة للبيع |
 | `lang` | لا | `ar` أو `en` — يحدد لغة صفحة Paymera |
 

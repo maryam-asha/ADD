@@ -3,9 +3,9 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\DataTransferObjects\ConvertedMoney;
+use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Models\Currency;
-use InvalidArgumentException;
 
 /**
  * Money received — cash at the desk, a transfer, any amount that is not
@@ -35,10 +35,11 @@ class ReceivedMoneyConverter
 
     /**
      * @throws PaymentPricingException when `$currencyCode` has no exchange rate
+     * @throws InvalidMoneyAmountException when `$amount` is not a plain decimal
      */
     public function toPoints(string $amount, string $currencyCode): ConvertedMoney
     {
-        $amount = $this->normalize($amount);
+        $amount = $this->plainDecimal($amount);
         $base = $this->currency->baseCurrencyCode();
         $rate = null;
         $exactBase = $amount;
@@ -101,31 +102,22 @@ class ReceivedMoneyConverter
     }
 
     /**
-     * The amount as a plain decimal string bcmath accepts. Request rules say
-     * `numeric`, which also lets through `1e3`, ` 5 `, `5.`, `+5` and `.5` —
-     * the same money, spelled in ways bcmath refuses with a ValueError. A
-     * plain spelling passes untouched; an exponent is expanded through a
-     * float, which only an exotic input takes and which is exact for any
-     * amount a person hands over.
+     * The amount, checked to be a plain decimal string bcmath accepts
+     * (`12`, `12.50`). Anything else — `1e3`, ` 5`, `5.`, `+5`, `.5` — is
+     * refused as a domain error (422), never handed to bcmath, which would
+     * throw a ValueError (a 500). The request rules on every payment
+     * endpoint already accept only this spelling; this is the line that
+     * holds for any caller.
      *
-     * @throws InvalidArgumentException when `$amount` is not a number at all
+     * @throws InvalidMoneyAmountException when `$amount` is not a plain decimal
      */
-    private function normalize(string $amount): string
+    private function plainDecimal(string $amount): string
     {
-        $amount = trim($amount);
-
-        if (preg_match('/^\+?(\d*)(?:\.(\d*))?$/', $amount, $parts) === 1 && ($parts[1] !== '' || ($parts[2] ?? '') !== '')) {
-            $whole = $parts[1] === '' ? '0' : $parts[1];
-            $fraction = $parts[2] ?? '';
-
-            return $fraction === '' ? $whole : "{$whole}.{$fraction}";
+        if (preg_match('/^\d+(\.\d+)?$/', $amount) !== 1) {
+            throw InvalidMoneyAmountException::for($amount);
         }
 
-        if (is_numeric($amount)) {
-            return rtrim(rtrim(sprintf('%.10F', (float) $amount), '0'), '.');
-        }
-
-        throw new InvalidArgumentException("Not an amount of money: [{$amount}].");
+        return $amount;
     }
 
     private function decimalPlaces(string $currencyCode): int

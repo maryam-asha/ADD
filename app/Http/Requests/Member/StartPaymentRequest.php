@@ -65,10 +65,13 @@ class StartPaymentRequest extends FormRequest
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
 
-            // Required for a top-up, meaningless for a plan purchase.
+            // Required for a top-up, meaningless for a plan purchase. A plain
+            // decimal: `numeric` alone lets `1e3` through, which bcmath
+            // refuses (amountMinor()).
             'amount' => [
                 'required_if:purpose,'.PaymentPurpose::WalletTopUp->value,
                 'numeric',
+                'regex:/^\d+(\.\d{1,6})?$/',
                 'min:0.01',
             ],
 

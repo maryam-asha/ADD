@@ -360,6 +360,7 @@ return [
         'already_paid' => 'This has already been paid.',
         'booking_not_payable' => 'A cancelled or rejected booking cannot be paid.',
         'nothing_due' => 'There is nothing to pay.',
+        'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
         'no_wallet' => 'There is no wallet to record this payment against.',
         'not_refundable' => 'Only a settled payment made with points can be refunded.',
         'payable_not_found' => 'We could not find what you are paying for.',

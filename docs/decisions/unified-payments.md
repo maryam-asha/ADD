@@ -188,6 +188,15 @@ already open on it still sync and reverse.
   registration made with a card therefore still answers 201 with
   `payment: null` and `payment_error` (also `nothing_due` for a free
   booking), and `POST member/payments` answers 503.
+- **A money amount is a plain decimal** (final review M4). `amount` on
+  reception settle, the reception top-up (and its preview) and the member's
+  card top-up is `numeric` plus `regex:/^\d+(\.\d{1,6})?$/`: an exponent
+  (`1e0`, `1.0E+2`) passes `numeric` but breaks bcmath, and is now a 422 on
+  `amount`. Padding never arrives (TrimStrings makes ` 5` the same money as
+  `5`). Behind the rules, `ReceivedMoneyConverter` accepts only a plain
+  decimal and refuses anything else with `InvalidMoneyAmountException`,
+  rendered 422 `api.payment.invalid_amount` — no spelling of an amount is a
+  500. (It used to rewrite such spellings through a float.)
 - **A plan discount is used up by every booking it priced**, paid at
   creation or later (final review I1): the `PlanDiscountRedemption` is
   written when the booking is made (single and batch), and voided on cancel

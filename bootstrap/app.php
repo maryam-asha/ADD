@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -163,6 +164,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
         });
+
+        // An amount of money that is not a plain decimal (`1e3`, ` 5`):
+        // refused by ReceivedMoneyConverter before bcmath can throw a
+        // ValueError. The request rules on payment endpoints already refuse
+        // it; this keeps any other caller's answer a 422, never a 500.
+        $exceptions->render(fn (InvalidMoneyAmountException $e) => response()->json([
+            'message' => __('api.payment.invalid_amount'),
+        ], 422));
 
         // Paying with points from a wallet that does not hold enough — the
         // one shape every pay-with-points path answers with, so a client can

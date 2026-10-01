@@ -26,7 +26,9 @@ class StoreWalletTopUpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            // A plain decimal: `numeric` alone lets `1e3` through, which
+            // bcmath refuses (docs/decisions/unified-payments.md).
+            'amount' => ['required', 'numeric', 'regex:/^\d+(\.\d{1,6})?$/', 'min:0.01'],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
