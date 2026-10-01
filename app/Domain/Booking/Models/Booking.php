@@ -11,6 +11,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -117,6 +118,26 @@ class Booking extends Model
     public function payments(): MorphMany
     {
         return $this->morphMany(Payment::class, 'payable');
+    }
+
+    /**
+     * The points already paid for this booking: every payment made for it —
+     * the booking itself and any extension, whatever the method — that was
+     * accepted, settled and not refunded. What the booking still owes is its
+     * price less this, so a paid booking that was then extended owes only
+     * the extension.
+     *
+     * Reads the eager-loaded `payments` when a list has loaded them.
+     */
+    public function pointsPaid(): int
+    {
+        $payments = $this->relationLoaded('payments') ? $this->getRelation('payments') : $this->payments()->get();
+
+        return (int) $payments
+            ->filter(fn (Payment $payment) => $payment->status === PaymentStatus::Accepted
+                && $payment->settled_at !== null
+                && $payment->refunded_at === null)
+            ->sum(fn (Payment $payment) => (int) $payment->amount_points);
     }
 
     public function accessGrants(): HasMany

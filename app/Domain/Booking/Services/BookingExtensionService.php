@@ -119,6 +119,7 @@ class BookingExtensionService
             // (docs/decisions/plan-discounts-design.md).
             $redemption = PlanDiscountRedemption::where('booking_id', $lockedBooking->id)->first();
             $membership = $redemption !== null ? $this->membershipResolver->activeFor($lockedBooking->user) : null;
+            $discountedOld = null;
             $discountedNew = null;
 
             if ($redemption !== null && $membership !== null) {
@@ -130,27 +131,18 @@ class BookingExtensionService
                 $differencePoints = $newPoints - $oldPoints;
             }
 
+            // The booking's whole price, as creation records it, grows by
+            // exactly what the extension costs — so what it still owes (its
+            // price less what was paid for it, Booking::pointsPaid) grows by
+            // that and nothing more.
+            $newPrice = ($lockedBooking->price_points ?? $discountedOld ?? $oldPoints) + $differencePoints;
+
             $paymentState = $lockedBooking->payment_state;
 
-            if ($lockedBooking->payment_state === PaymentState::Paid && $lockedBooking->payment_source === PaymentSource::Wallet) {
-                $personalOption = collect($this->wallets->spendOptions($lockedBooking->user, WalletTransactionCategory::SpaceSpecific))
-                    ->firstWhere('owner_type', OwnerType::User->value);
-
-                if ($personalOption !== null && $personalOption['usable_balance'] >= $differencePoints) {
-                    // Through a payment row, so cancelling or rejecting the
-                    // booking later refunds these points with the rest.
-                    if ($differencePoints > 0) {
-                        $this->payments->start(PaymentPurpose::BookingExtension, $lockedBooking->user, WalletMethod::KEY, [
-                            'payable' => $lockedBooking,
-                            'points' => $differencePoints,
-                            'wallet_owner_type' => OwnerType::User,
-                            'wallet_owner_id' => $lockedBooking->user_id,
-                        ]);
-                    }
-                } else {
-                    $paymentState = PaymentState::Unpaid;
-                }
-            } else {
+            if ($differencePoints > 0 && $paymentState === PaymentState::Paid && ! $this->chargeExtension($lockedBooking, $differencePoints)) {
+                // Owes the extension, and only the extension: what was paid
+                // stays paid, and reception, pay-now and check-out charge
+                // the difference.
                 $paymentState = PaymentState::Unpaid;
             }
 
@@ -161,9 +153,38 @@ class BookingExtensionService
             $lockedBooking->forceFill([
                 'end_at' => $newEndAt,
                 'payment_state' => $paymentState,
-                // The booking's whole price in points, as creation records it.
-                'price_points' => $discountedNew ?? $newPoints,
+                'price_points' => $newPrice,
             ])->save();
         });
+    }
+
+    /**
+     * A booking paid from the wallet pays its extension from the member's
+     * own wallet, when that covers the difference — through a payment row,
+     * so cancelling or rejecting the booking later refunds these points
+     * with the rest. Any other paid booking (a card, the desk) is not
+     * charged behind the member's back: it is left owing the difference.
+     */
+    private function chargeExtension(Booking $booking, int $differencePoints): bool
+    {
+        if ($booking->payment_source !== PaymentSource::Wallet) {
+            return false;
+        }
+
+        $personalOption = collect($this->wallets->spendOptions($booking->user, WalletTransactionCategory::SpaceSpecific))
+            ->firstWhere('owner_type', OwnerType::User->value);
+
+        if ($personalOption === null || $personalOption['usable_balance'] < $differencePoints) {
+            return false;
+        }
+
+        $this->payments->start(PaymentPurpose::BookingExtension, $booking->user, WalletMethod::KEY, [
+            'payable' => $booking,
+            'points' => $differencePoints,
+            'wallet_owner_type' => OwnerType::User,
+            'wallet_owner_id' => $booking->user_id,
+        ]);
+
+        return true;
     }
 }

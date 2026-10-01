@@ -200,8 +200,10 @@ class SessionClosureService
         // The same price in points, what a payment settles. A walk-in is
         // priced only now; a booking keeps the price it was made (and
         // perhaps paid) at, unless it closes unpaid and is repriced here.
-        if ($session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid) {
+        if ($session instanceof WalkinSession) {
             $attributes['price_points'] = $points;
+        } elseif ($session->payment_state !== PaymentState::Paid) {
+            $attributes += $this->repriceUnpaidBooking($session, $points);
         }
 
         if ($session instanceof WalkinSession && $coveredSeconds > 0) {
@@ -227,6 +229,33 @@ class SessionClosureService
             'resolved_at' => now(),
             'checked_out_at' => $attributes['checked_out_at'],
         ]);
+    }
+
+    /**
+     * An unpaid booking is billed for the time it was used. Part of it may
+     * already be paid — a paid booking that was then extended — and what
+     * it owes is its price less those payments (Booking::pointsPaid), so
+     * nothing already paid is billed again. It is never repriced below what
+     * was paid (no refund for leaving early, as for any paid booking), and
+     * once what was paid covers the time used it is paid.
+     *
+     * @return array<string, mixed>
+     */
+    private function repriceUnpaidBooking(Booking $booking, int $points): array
+    {
+        $paid = $booking->pointsPaid();
+
+        if ($paid <= 0) {
+            return ['price_points' => $points];
+        }
+
+        $attributes = ['price_points' => max($points, $paid)];
+
+        if ($paid >= $points) {
+            $attributes['payment_state'] = PaymentState::Paid;
+        }
+
+        return $attributes;
     }
 
     /**

@@ -13,8 +13,9 @@ use App\Domain\Finance\Services\PointConversionService;
 
 /**
  * Paying for a booking. Its price is fixed when it is made (`price_points`,
- * after any plan discount) — the payment's own `amount_points` once the
- * payment is open, so what the member was quoted is what they pay.
+ * after any plan discount); what is due is that price less what has been
+ * paid for it already — the payment's own `amount_points` once the payment
+ * is open, so what the member was quoted is what they pay.
  */
 class BookingFulfiller extends SessionPaymentFulfiller
 {
@@ -32,8 +33,10 @@ class BookingFulfiller extends SessionPaymentFulfiller
     }
 
     /**
-     * Rows made before `price_points` existed are priced again, as
-     * cancellation's refund always has.
+     * What the booking still owes: its price less what has already been
+     * paid for it (Booking::pointsPaid) — so a paid booking that was then
+     * extended owes only the extension, at the desk, by card or from the
+     * wallet, and nothing already paid is charged again.
      */
     public function pointsDue(Payment $payment): int
     {
@@ -43,6 +46,15 @@ class BookingFulfiller extends SessionPaymentFulfiller
 
         $booking = $this->session($payment);
 
+        return max(0, $this->price($booking) - $booking->pointsPaid());
+    }
+
+    /**
+     * The booking's whole price. Rows made before `price_points` existed
+     * are priced again, as cancellation's refund always has.
+     */
+    private function price(Booking $booking): int
+    {
         if ($booking->price_points !== null) {
             return $booking->price_points;
         }

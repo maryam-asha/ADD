@@ -65,7 +65,7 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 |---|---|---|---|---|
 | `wallet_top_up` | `WalletTopUpFulfiller` | 0 | — | nothing |
 | `plan_purchase` | `PlanPurchaseFulfiller` | `plans.price_points`, re-read | general | activate for the wallet's owner (`charge: false`, audited `charged: true`) |
-| `booking` | `BookingFulfiller` | `bookings.price_points` | space-specific | mark paid, source wallet/cash/gateway |
+| `booking` | `BookingFulfiller` | `bookings.price_points` less what was already paid for it | space-specific | mark paid, source wallet/cash/gateway |
 | `coworking_session` | `WalkinSessionFulfiller` | `walkin_sessions.price_points` (written at closure) | space-specific | mark paid |
 | `event_registration` | `EventRegistrationFulfiller` | `event_attendees.price_points` | general | `payment_state = paid` |
 | `booking_extension` | `BookingExtensionFulfiller` | the difference, passed in | space-specific | nothing |
@@ -159,6 +159,18 @@ already open on it still sync and reverse.
   own unpaid state is the record until reception takes the money.
 - **An extension is `booking_extension`**, a purpose of its own, because its
   payable is an already-paid booking.
+- **What a booking owes is its price less what was paid for it** (final
+  review C2): `price_points` minus every accepted, settled, unrefunded
+  payment whose payable is the booking, whatever its purpose
+  (`Booking::pointsPaid()`). `BookingFulfiller::pointsDue` (pay-now, the
+  desk, `payment-methods`), `OutstandingItems` and the `payment` block all
+  read it. Extending a paid booking grows `price_points` by exactly the
+  extension: a booking paid from the wallet still pays it from the member's
+  own wallet when that covers it (a `booking_extension` row); any other
+  paid booking (a card, the desk), or one the wallet cannot cover, becomes
+  unpaid owing only the extension — never the whole booking again. At
+  check-out an unpaid booking is repriced for the time used, never below
+  what was already paid, and is paid once its payments cover it.
 - **The cash register counts money, not points**, in the base currency
   (other currencies at the rate stored on the row); the session has no
   currency of its own.
@@ -202,9 +214,10 @@ already open on it still sync and reverse.
 
 ## Explicitly not done here
 
-- The booking extension still flips a paid booking to unpaid when the
-  personal wallet cannot cover the difference; settling it then charges the
-  whole price again. A follow-up.
+- A booking paid before payment rows existed (before this deploy) has no
+  row saying it was paid; extended after the deploy beyond what the
+  personal wallet covers, it owes its whole new price. Only a booking
+  checked in across the deploy can reach this.
 - Refunds for a cancelled paid event.
 - Card refunds back to the card: refunds are always points.
 - Café orders.
