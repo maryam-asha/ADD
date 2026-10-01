@@ -8,38 +8,50 @@ use App\Domain\Finance\Payments\MemberPayables;
 use App\Domain\Finance\Payments\PaymentMethodOptions;
 use App\Domain\Membership\Models\Plan;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Member\ListPaymentMethodsRequest;
 use App\Support\Presenters\PriceLabelPresenter;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 /**
- * How the member can pay for something, before they pay: the amount and
- * each enabled payment method, with whether it can pay right now. Creates
- * nothing — POST member/payments (or the operation's own endpoint) does.
+ * GET member/payment-methods — the payment methods the member may use, in
+ * config/payments.php order, so a gateway added in config appears here with
+ * no app change. The `wallet` method carries the member's points: `balance`
+ * (the most they can spend from any wallet they may use) and `wallets`
+ * (personal and company, each with its usable balance); with nothing to
+ * spend it is unavailable with a reason.
+ *
+ * Every parameter is optional. `purpose` keeps only the methods that can pay
+ * for it (a top-up: the card); with `payable_id` (the member's own record)
+ * or `plan_id` it also prices it and says whether the wallet covers it.
  */
 class PaymentMethodsController extends Controller
 {
     public function index(
-        ListPaymentMethodsRequest $request,
+        Request $request,
         PaymentMethodOptions $options,
         MemberPayables $payables,
         PriceLabelPresenter $prices,
     ): JsonResponse {
-        $member = $request->user();
-        $purpose = $request->purpose();
+        $validated = $request->validate([
+            'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration'])],
+            'payable_id' => ['nullable', 'integer'],
+            'plan_id' => ['nullable', 'integer'],
+        ]);
 
-        // Only a plan the member could actually buy — the catalog's filter.
-        $plan = $purpose === PaymentPurpose::PlanPurchase
-            ? Plan::query()->publiclyListable()->findOrFail($request->validated('plan_id'))
+        $member = $request->user();
+        $purpose = isset($validated['purpose']) ? PaymentPurpose::from($validated['purpose']) : null;
+
+        $plan = $purpose === PaymentPurpose::PlanPurchase && isset($validated['plan_id'])
+            ? Plan::query()->publiclyListable()->findOrFail($validated['plan_id'])
+            : null;
+
+        $payable = $purpose !== null && isset($validated['payable_id'])
+            ? $payables->find($purpose, (int) $validated['payable_id'], $member)
             : null;
 
         try {
-            $result = $options->for(
-                $purpose,
-                $member,
-                $payables->find($purpose, $request->validated('payable_id'), $member),
-                $plan,
-            );
+            $result = $options->for($purpose, $member, $payable, $plan);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

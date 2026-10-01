@@ -99,8 +99,12 @@ the amount received; `GET admin/reception/outstanding?user_id=` lists
 everything the member owes. The door: `POST admin/events/{event}/attendees/{attendee}/check-in`
 refuses an unpaid paid-event registration (409).
 
-The app asks `GET member/payment-methods?purpose=…` for the amount and each
-enabled method with `available` / `reason`, and reads a `payment` block
+The app asks `GET member/payment-methods` (the member's token; the wallet
+method carries their points as `balance`; `purpose` + `payable_id`/`plan_id`
+optionally price what is being paid for) for each enabled method with
+`available` / `reason`.
+It is the one place the app reads payment methods; `member/wallet/options`
+is kept only for the app version that still calls it. The app then reads a `payment` block
 (`PaymentStatePresenter`) on bookings, sessions, the session report and
 event registrations. On the member's event detail and "my events" it is the
 presenter's block itself — `{state, method, amount_points, price,
