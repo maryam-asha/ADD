@@ -55,4 +55,15 @@ return [
     */
     'cash_plan_hold_hours' => (int) env('PAYMENTS_CASH_PLAN_HOLD_HOURS', 48),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Smallest wallet top-up
+    |--------------------------------------------------------------------------
+    |
+    | The fewest points a member may add to their wallet from the app. Only
+    | the top-up has a floor; everything else is paid at whatever it costs.
+    | The app is told what it is worth in the charged currency.
+    */
+    'min_top_up_points' => (int) env('PAYMENTS_MIN_TOP_UP_POINTS', 10),
+
 ];

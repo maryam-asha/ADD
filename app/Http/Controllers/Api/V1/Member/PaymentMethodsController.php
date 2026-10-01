@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\MemberPayables;
 use App\Domain\Finance\Payments\PaymentMethodOptions;
+use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Membership\Models\Plan;
 use App\Http\Controllers\Controller;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -32,6 +34,7 @@ class PaymentMethodsController extends Controller
         PaymentMethodOptions $options,
         MemberPayables $payables,
         PriceLabelPresenter $prices,
+        PaymentAmountCalculator $amounts,
     ): JsonResponse {
         $validated = $request->validate([
             'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration'])],
@@ -66,7 +69,27 @@ class PaymentMethodsController extends Controller
                 'price' => $labels['price'],
                 'price_point' => $labels['price_point'],
                 'methods' => $result['methods'],
+                // A top-up has no price, only a floor: the fewest points
+                // and what they cost in the charged currency.
+                'min_top_up' => $purpose === PaymentPurpose::WalletTopUp ? $this->minimumTopUp($amounts) : null,
             ],
         ]);
+    }
+
+    /**
+     * Null when the charged currency has no exchange rate yet: the
+     * methods are still worth showing, and paying would 503 anyway.
+     *
+     * @return array{points: int, amount: string, currency: string}|null
+     */
+    private function minimumTopUp(PaymentAmountCalculator $amounts): ?array
+    {
+        try {
+            $minimum = $amounts->minimumTopUp();
+        } catch (PaymentPricingException) {
+            return null;
+        }
+
+        return ['points' => $minimum['points'], 'amount' => $minimum['amount'], 'currency' => $minimum['currency']];
     }
 }

@@ -38,6 +38,7 @@ return [
         'insufficient_balance' => 'Insufficient general balance to allocate this amount.',
         'insufficient_balance_for_plan' => 'Insufficient general balance to purchase this plan.',
         'amount_below_one_point' => 'The amount paid is too small to credit a single point.',
+        'top_up_below_minimum' => 'The minimum top-up is :amount :currency (:points points).',
     ],
 
     'system' => [

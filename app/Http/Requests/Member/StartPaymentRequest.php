@@ -128,10 +128,17 @@ class StartPaymentRequest extends FormRequest
     {
         $amounts = app(PaymentAmountCalculator::class);
 
-        try {
-            $amounts->forTopUp($this->amountMinor());
-        } catch (\InvalidArgumentException) {
-            $validator->errors()->add('amount', __('api.wallet.amount_below_one_point'));
+        // A top-up has a floor, named in money as well as points so the
+        // member knows what to type. Compared in money: the whole amount
+        // shown is exactly what is accepted.
+        $minimum = $amounts->minimumTopUp();
+
+        if ((int) $this->amountMinor() < $minimum['amount_minor']) {
+            $validator->errors()->add('amount', __('api.wallet.top_up_below_minimum', [
+                'amount' => number_format((int) $minimum['amount']),
+                'currency' => $minimum['currency'],
+                'points' => $minimum['points'],
+            ]));
         }
 
         // PaymentPricingException is deliberately NOT caught here. It means

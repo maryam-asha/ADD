@@ -38,6 +38,7 @@ return [
         'insufficient_balance' => 'الرصيد العام غير كافٍ لتخصيص هذا المبلغ.',
         'insufficient_balance_for_plan' => 'الرصيد العام غير كافٍ لشراء هذه الباقة.',
         'amount_below_one_point' => 'المبلغ المدفوع أصغر من أن يُضاف كنقطة واحدة.',
+        'top_up_below_minimum' => 'أقل مبلغ للشحن هو :amount :currency (:points نقاط).',
     ],
 
     'system' => [

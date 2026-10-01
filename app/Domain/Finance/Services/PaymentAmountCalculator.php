@@ -95,6 +95,30 @@ class PaymentAmountCalculator
     }
 
     /**
+     * The smallest top-up a member may make from the app, in points and in
+     * the charged currency — rounded to the nearest whole unit (13,840, not
+     * 13,840.01), since that is what the member is asked to type. Paying it
+     * is accepted as the minimum.
+     *
+     * @return array{points: int, amount_minor: int, amount: string, currency: string}
+     */
+    public function minimumTopUp(): array
+    {
+        $points = max(1, (int) config('payments.min_top_up_points'));
+        $factor = bcpow('10', (string) $this->exponent(), 0);
+
+        // Half up to a whole unit: add half a unit, then truncate.
+        $whole = bcdiv(bcadd((string) $this->pointsToMinor($points), bcdiv($factor, '2', 0), 0), $factor, 0);
+
+        return [
+            'points' => $points,
+            'amount_minor' => (int) bcmul($whole, $factor, 0),
+            'amount' => $whole,
+            'currency' => $this->currencyCode(),
+        ];
+    }
+
+    /**
      * Gateway minor units for a point count, rounding UP to the minor unit.
      *
      * Rounding up is deliberate and is the house-favouring direction here:
