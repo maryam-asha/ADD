@@ -15,7 +15,6 @@ use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
 use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PaymentController;
-use App\Http\Controllers\Api\V1\Member\PaymentMethodsController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
@@ -34,6 +33,10 @@ use Illuminate\Support\Facades\Route;
 // both a personal wallet and a company membership") — the read side of the
 // hybrid-routing choice: every currently-spendable wallet for a category,
 // clearly labeled by source. No spend happens here.
+//
+// Deprecated for the app: GET /api/v1/payment-methods (routes/api/v1/mobile.php)
+// returns the same wallets with their balances inside the `wallet` method.
+// Kept for the app version that still calls it.
 Route::get('wallet/options', [WalletController::class, 'options']);
 
 // Browse spaces for members with working hours, filtering and amenities.
@@ -183,10 +186,6 @@ Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController:
 // closes — it never talks to Paymera directly, so the API key stays server
 // side. `show` re-syncs with the gateway on read, which is safe to poll:
 // SyncPaymentStatus locks and refuses to re-process a settled payment.
-// How the member can pay for something before paying: the amount and each
-// enabled method (config/payments.php order), with whether it can pay now.
-Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
-
 Route::get('payments', [PaymentController::class, 'index']);
 Route::post('payments', [PaymentController::class, 'store']);
 Route::get('payments/{payment}', [PaymentController::class, 'show']);

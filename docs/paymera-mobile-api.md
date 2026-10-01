@@ -278,34 +278,33 @@ GET /api/v1/member/payments
 الشحن والباقة فقط. الطلب القديم (بلا `method`) يعمل كما هو تماماً، والرد
 يضيف حقلاً واحداً: `next`.
 
-### أ. معرفة طرق الدفع قبل الدفع
+### أ. معرفة طرق الدفع
+
+خدمة واحدة تُرجع طرق الدفع المتاحة، **ولا تحتاج تسجيل دخول**:
 
 ```http
-GET /api/v1/member/payment-methods?purpose=booking&payable_id=15
+GET /api/v1/payment-methods
+Authorization: Bearer <access_token>   ← اختياري
 ```
 
-| `purpose` | معه |
-|---|---|
-| `booking` | `payable_id` = رقم الحجز |
-| `coworking_session` | `payable_id` = رقم الجلسة (بعد إغلاقها) |
-| `event_registration` | `payable_id` = `ticket_id` من التسجيل |
-| `plan_purchase` | `plan_id` |
-| `wallet_top_up` | لا شيء (العضو يحدد المبلغ) |
+- بدون توكن: الطرق فقط.
+- مع توكن العضو: طريقة `wallet` تحمل `balance` (رصيد النقاط) و`wallets`
+  (الشخصية ومحافظ الشركات)، وتكون `available: false` مع
+  `reason: "لا يوجد رصيد في محفظتك"` إذا كان الرصيد صفراً.
+- كل الباراميترات اختيارية. `purpose` يُبقي الطرق التي تدفع هذه العملية
+  فقط (شحن المحفظة: البطاقة فقط)، ومعه `payable_id` (أو `plan_id`) يُعاد
+  `amount_points` و`price`، وهل يكفي الرصيد لها. مفيد مثلاً لأن نقاط
+  الباقة المخصّصة للمساحات تُحسب عند `purpose=booking` فقط.
 
 ```json
 {
   "data": {
-    "amount_points": 100,
-    "price": "10.00 $",
-    "price_point": "100 pts",
+    "amount_points": null,
+    "price": null,
+    "price_point": null,
     "methods": [
-      {
-        "key": "wallet", "label": "نقاط المحفظة", "available": true, "reason": null,
-        "wallets": [
-          {"owner_type": "user", "owner_id": 7, "owner_label": "Personal", "usable_balance": 300, "sufficient": true},
-          {"owner_type": "company", "owner_id": 3, "owner_label": "ACME", "usable_balance": 50, "sufficient": false}
-        ]
-      },
+      {"key": "wallet", "label": "نقاط المحفظة", "available": true, "reason": null, "balance": 400,
+       "wallets": [{"owner_type": "user", "owner_id": 7, "owner_label": "Personal", "usable_balance": 400, "sufficient": true}]},
       {"key": "cash", "label": "نقداً في الاستقبال", "available": true, "reason": null},
       {"key": "paymera", "label": "بطاقة", "available": true, "reason": null}
     ]
@@ -313,11 +312,9 @@ GET /api/v1/member/payment-methods?purpose=booking&payable_id=15
 }
 ```
 
-- اعرض الطرق **بالترتيب الذي تصل به**، ولا تفترض أسماءها: طريقة جديدة تُضاف
-  من الخادم تظهر هنا وحدها.
-- `available: false` مع `reason`: اعرض الطريقة معطّلة مع السبب (مثلاً نقاط
-  غير كافية).
-- الحجز المدفوع مسبقاً ← `409`؛ ما ليس للعضو ← `404`.
+اعرض الطرق **بالترتيب الذي تصل به** وحسب `key`، ولا تفترض قائمة ثابتة: أي
+طريقة جديدة (مثل Sham Cash لاحقاً) تُضاف من الخادم وتظهر هنا وحدها.
+`GET member/wallet/options` لم يعد لازماً للتطبيق.
 
 ### ب. الدفع
 

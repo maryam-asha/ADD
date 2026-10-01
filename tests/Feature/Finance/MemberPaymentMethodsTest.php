@@ -19,9 +19,10 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * GET member/payment-methods — what the app shows before the member pays
- * for something: the amount, and each enabled method that can pay for it,
- * with whether it can right now and why not
+ * GET /api/v1/payment-methods with a member's token, for something the
+ * member is about to pay for: the amount, and each enabled method that can
+ * pay for it, with whether it can right now and why not. (Without a token,
+ * and without a purpose: PublicPaymentMethodsTest.)
  * (docs/superpowers/plans/2026-09-30-unified-payments.md, Task 10).
  */
 class MemberPaymentMethodsTest extends TestCase
@@ -61,7 +62,7 @@ class MemberPaymentMethodsTest extends TestCase
 
     private function methods(array $query)
     {
-        return $this->withHeader('lang', 'en')->getJson('/api/v1/member/payment-methods?'.http_build_query($query));
+        return $this->withHeader('lang', 'en')->getJson('/api/v1/payment-methods?'.http_build_query($query));
     }
 
     public function test_a_booking_lists_the_wallet_with_its_balance_then_cash_then_card(): void
@@ -195,13 +196,18 @@ class MemberPaymentMethodsTest extends TestCase
             ->assertJsonPath('message', __('api.payment.already_paid', [], 'en'));
     }
 
-    public function test_the_purpose_and_what_is_paid_for_are_required(): void
+    /**
+     * Nothing is required: without a purpose every enabled method is listed,
+     * and a plan or a record named without its id is simply not priced.
+     */
+    public function test_nothing_is_required(): void
     {
-        $this->member();
+        $this->member(300);
 
-        $this->methods([])->assertStatus(422)->assertJsonValidationErrors('purpose');
-        $this->methods(['purpose' => 'booking'])->assertStatus(422)->assertJsonValidationErrors('payable_id');
-        $this->methods(['purpose' => 'plan_purchase'])->assertStatus(422)->assertJsonValidationErrors('plan_id');
+        $this->methods([])->assertOk()->assertJsonPath('data.amount_points', null);
+        $this->methods(['purpose' => 'booking'])->assertOk()->assertJsonPath('data.amount_points', null);
+        $this->methods(['purpose' => 'plan_purchase'])->assertOk()->assertJsonPath('data.amount_points', null);
+        $this->methods(['purpose' => 'not_a_purpose'])->assertStatus(422)->assertJsonValidationErrors('purpose');
     }
 }
 
