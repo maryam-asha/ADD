@@ -138,7 +138,11 @@ class BookingCreationService
                 $this->payments->pay($booking, $member, $payingWallet);
             }
 
-            if ($discount !== null && $booking->payment_state === PaymentState::Paid) {
+            // The discount is used up by the booking it priced, paid now or
+            // later (cash, card, pay-now, the desk): `price_points` is the
+            // discounted price whenever it is paid, so the usage limit must
+            // count it either way. Cancelling or rejecting gives it back.
+            if ($discount !== null) {
                 $this->discounts->redeem($discount, $membership, $booking, $points - $finalPoints);
             }
 

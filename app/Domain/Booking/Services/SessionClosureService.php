@@ -16,6 +16,8 @@ use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -30,6 +32,7 @@ class SessionClosureService
         private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly PlanHourCoverageService $planHours,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     /**
@@ -183,6 +186,11 @@ class SessionClosureService
             // points rounding (Invariant 2) applied once to the real charge.
             $coveredSeconds > 0 ? $checkedOutAt->copy()->subSeconds($coveredSeconds) : $checkedOutAt,
         );
+
+        if ($session instanceof Booking) {
+            $points = $this->withBookingDiscount($session, $points);
+        }
+
         $amount = $this->points->pointsToUsd($points);
 
         $attributes = [
@@ -229,6 +237,19 @@ class SessionClosureService
             'resolved_at' => now(),
             'checked_out_at' => $attributes['checked_out_at'],
         ]);
+    }
+
+    /**
+     * A booking keeps the plan discount it was made with
+     * (PlanDiscountRedemption) when it is priced at check-out: the price it
+     * was quoted is the price, whenever it is paid. Read from the booking's
+     * own redemption, never re-resolved, like the booking's detail.
+     */
+    private function withBookingDiscount(Booking $booking, int $points): int
+    {
+        $discount = PlanDiscountRedemption::query()->where('booking_id', $booking->id)->first()?->discount;
+
+        return $discount === null ? $points : $this->discounts->apply($points, $discount);
     }
 
     /**

@@ -171,6 +171,13 @@ already open on it still sync and reverse.
   unpaid owing only the extension — never the whole booking again. At
   check-out an unpaid booking is repriced for the time used, never below
   what was already paid, and is paid once its payments cover it.
+- **A plan discount is used up by every booking it priced**, paid at
+  creation or later (final review I1): the `PlanDiscountRedemption` is
+  written when the booking is made (single and batch), and voided on cancel
+  or reject as before, so `usage_limit` cannot be bypassed by paying later.
+  Check-out prices the time used at the booking's own discount, so the
+  discounted price quoted at booking is what the desk collects after
+  check-out (`docs/decisions/plan-discounts-design.md`).
 - **The cash register counts money, not points**, in the base currency
   (other currencies at the rate stored on the row); the session has no
   currency of its own.

@@ -81,8 +81,10 @@ class PlanDiscountService
     }
 
     /**
-     * Must be called inside the same DB transaction as the wallet debit it
-     * belongs to.
+     * Records that `$discount` priced `$booking`, whether the booking is
+     * paid now or later — the discounted price is its price either way.
+     * Must be called inside the same DB transaction that creates the
+     * booking.
      */
     public function redeem(PlanDiscount $discount, Membership $membership, Booking $booking, int $pointsDiscounted): void
     {
