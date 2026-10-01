@@ -102,7 +102,13 @@ refuses an unpaid paid-event registration (409).
 The app asks `GET member/payment-methods?purpose=…` for the amount and each
 enabled method with `available` / `reason`, and reads a `payment` block
 (`PaymentStatePresenter`) on bookings, sessions, the session report and
-event registrations.
+event registrations. On the member's event detail and "my events" it is the
+presenter's block itself — `{state, method, amount_points, price,
+price_point, paid_at, payment_id}`, `state` null for a free event, the whole
+block null when the member has no registration (final review I3). The
+earlier `price_points`/`price_label` keys there were dropped rather than
+kept beside the new ones: they were added on this branch (052feee) and never
+reached a released app.
 
 ## Adding a gateway
 
