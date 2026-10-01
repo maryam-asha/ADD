@@ -71,6 +71,7 @@ class BookingTimezoneTest extends TestCase
         // 19:00-20:00 sits inside 08:00-20:00. Read as UTC it would be
         // 22:00-23:00 and refused.
         $this->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17 19:00:00',
             'end_at' => '2026-08-17 20:00:00',
@@ -84,6 +85,7 @@ class BookingTimezoneTest extends TestCase
         $this->actingAsMember();
 
         $this->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17 10:00:00',
             'end_at' => '2026-08-17 11:00:00',
@@ -105,6 +107,7 @@ class BookingTimezoneTest extends TestCase
         // 21:00 really is past the 20:00 close — the fix must not make
         // everything pass.
         $this->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17 21:00:00',
             'end_at' => '2026-08-17 22:00:00',
@@ -119,6 +122,7 @@ class BookingTimezoneTest extends TestCase
 
         // What every existing booking test sends; it must keep working.
         $this->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:00:00+03:00',
             'end_at' => '2026-08-17T11:00:00+03:00',
@@ -138,6 +142,7 @@ class BookingTimezoneTest extends TestCase
 
         // 07:00Z is 10:00 local — inside hours, and must not be re-read.
         $this->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T07:00:00Z',
             'end_at' => '2026-08-17T08:00:00Z',

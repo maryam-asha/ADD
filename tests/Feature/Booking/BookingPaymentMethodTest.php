@@ -231,28 +231,29 @@ class BookingPaymentMethodTest extends TestCase
      * An app that predates payment methods: the one wallet that can pay,
      * pays — and now leaves a payment row behind.
      */
-    public function test_without_a_method_one_sufficient_wallet_still_pays_and_is_recorded(): void
+    public function test_a_booking_without_a_method_is_refused_and_nothing_is_booked(): void
     {
-        $member = $this->actingAsMember(500);
+        $this->actingAsMember(500);
         $space = $this->openSpace();
 
-        $this->book($space)->assertCreated();
+        $this->book($space)->assertUnprocessable()->assertJsonValidationErrors('payment_method');
 
-        $this->assertSame(PaymentState::Paid, Booking::sole()->payment_state);
-        $payment = Payment::sole();
-        $this->assertSame('wallet', $payment->method);
-        $this->assertSame($this->walletOf($member)->id, $payment->wallet_id);
+        $this->assertSame(0, Booking::count());
+        $this->assertSame(0, Payment::count());
     }
 
-    public function test_without_a_method_too_few_points_still_books_unpaid(): void
+    public function test_a_batch_without_a_method_is_refused_and_nothing_is_booked(): void
     {
-        $this->actingAsMember(30);
+        $this->actingAsMember(500);
         $space = $this->openSpace();
 
-        $this->book($space)->assertCreated();
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'windows' => [
+                ['space_id' => $space->id, 'start_at' => '2026-08-17 10:00', 'end_at' => '2026-08-17 11:00'],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
 
-        $this->assertSame(PaymentState::Unpaid, Booking::sole()->payment_state);
-        $this->assertSame(0, Payment::count());
+        $this->assertSame(0, Booking::count());
     }
 
     public function test_a_batch_paid_by_wallet_writes_one_payment_per_booking(): void

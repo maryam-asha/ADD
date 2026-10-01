@@ -294,6 +294,7 @@ class PlanDiscountBookingTest extends TestCase
         [$secondStart, $secondEnd] = $this->slot(14);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 [
                     'space_id' => $space->id,

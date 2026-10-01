@@ -100,6 +100,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'cash',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-18'),
@@ -124,6 +125,7 @@ class BookingBatchCreationTest extends TestCase
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-18'),
@@ -148,6 +150,7 @@ class BookingBatchCreationTest extends TestCase
         Membership::factory()->create(['branch_id' => $space->building->branch_id]);
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [$this->window($space, '2026-08-17')],
         ])
             ->assertStatus(422)
@@ -165,6 +168,7 @@ class BookingBatchCreationTest extends TestCase
         ]);
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [$this->window($space, '2026-08-17'), $this->window($space, '2026-08-18')],
         ])
             ->assertStatus(422)
@@ -188,6 +192,7 @@ class BookingBatchCreationTest extends TestCase
         ]);
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-19'),
@@ -209,6 +214,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($space, '2026-08-17', 10, 120),
                 $this->window($space, '2026-08-17', 11, 60),
@@ -233,6 +239,7 @@ class BookingBatchCreationTest extends TestCase
         app(WalletService::class)->creditGeneral($wallet, 1000, WalletTransactionSource::TopUp, 'Seed');
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-18'),
@@ -258,7 +265,7 @@ class BookingBatchCreationTest extends TestCase
         }
 
         $this->withHeader('lang', 'en')
-            ->postJson('/api/v1/member/bookings/batch', ['windows' => $windows])
+            ->postJson('/api/v1/member/bookings/batch', ['windows' => $windows, 'payment_method' => 'wallet'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('windows');
     }
@@ -269,6 +276,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace(['requires_approval' => true]);
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'cash',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-18'),
@@ -284,6 +292,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($space, '2026-08-17', 14),
                 // now() is 08:00, so a 06:00 start has gone.
@@ -304,6 +313,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace();
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'cash',
             'windows' => [
                 $this->window($space, '2026-08-17'),
                 $this->window($space, '2026-08-18'),
@@ -319,6 +329,7 @@ class BookingBatchCreationTest extends TestCase
         $space = $this->openSpace();
 
         $this->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [$this->window($space, '2026-08-17')],
         ])->assertUnauthorized();
     }
@@ -330,6 +341,7 @@ class BookingBatchCreationTest extends TestCase
         $closed = $this->openSpace(['status' => OperationalStatus::Maintenance]);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/batch', [
+            'payment_method' => 'wallet',
             'windows' => [
                 $this->window($open, '2026-08-17'),
                 $this->window($closed, '2026-08-17'),

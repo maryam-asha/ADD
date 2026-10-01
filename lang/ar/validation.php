@@ -163,6 +163,8 @@ return [
         ],
     ],
 
-    'attributes' => [],
+    'attributes' => [
+        'payment_method' => 'طريقة الدفع',
+    ],
 
 ];

@@ -68,6 +68,7 @@ class BookingControllerTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:00:00+03:00',
             'end_at' => '2026-08-17T11:00:00+03:00',
@@ -85,6 +86,7 @@ class BookingControllerTest extends TestCase
         $space = $this->openSpace(['slot_granularity_minutes' => 30]);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'wallet',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:15:00+03:00',
             'end_at' => '2026-08-17T11:15:00+03:00',
@@ -105,6 +107,7 @@ class BookingControllerTest extends TestCase
         (new WalletService)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'wallet',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:00:00+03:00',
             'end_at' => '2026-08-17T11:00:00+03:00',
@@ -121,6 +124,7 @@ class BookingControllerTest extends TestCase
         $space = $this->openSpace();
 
         $response = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'wallet',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:00:00+03:00',
             'end_at' => '2026-08-17T11:00:00+03:00',
@@ -139,6 +143,7 @@ class BookingControllerTest extends TestCase
         $space = $this->openSpace();
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'wallet',
             'space_id' => $space->id,
             'start_at' => '2026-08-17T10:00:00+03:00',
             'end_at' => '2026-08-17T11:00:00+03:00',

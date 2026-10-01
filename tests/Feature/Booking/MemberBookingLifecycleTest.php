@@ -500,6 +500,7 @@ class MemberBookingLifecycleTest extends TestCase
         ])->assertOk()->json('data.unavailable_reason');
 
         $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'wallet',
             'space_id' => $space->id,
             'start_at' => '2026-08-17 14:00',
             'end_at' => '2026-08-17 15:00',
@@ -514,6 +515,7 @@ class MemberBookingLifecycleTest extends TestCase
         $space = $this->openSpace();
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'payment_method' => 'cash',
             'space_id' => $space->id,
             'start_at' => '2026-08-17 14:00',
             'end_at' => '2026-08-17 15:00',
@@ -550,7 +552,7 @@ class MemberBookingLifecycleTest extends TestCase
         $previewReason = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', $window)
             ->assertOk()->json('data.unavailable_reason');
 
-        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window)
+        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window + ['payment_method' => 'wallet'])
             ->assertStatus(422)->json('message');
 
         $this->assertSame(__('api.booking.too_far_ahead', [], 'en'), $postMessage);
@@ -570,7 +572,7 @@ class MemberBookingLifecycleTest extends TestCase
         $previewReason = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', $window)
             ->assertOk()->json('data.unavailable_reason');
 
-        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window)
+        $postMessage = $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', $window + ['payment_method' => 'wallet'])
             ->assertStatus(422)->json('message');
 
         $this->assertSame(__('api.booking.space_not_bookable', [], 'en'), $postMessage);

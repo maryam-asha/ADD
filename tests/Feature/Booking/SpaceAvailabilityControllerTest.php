@@ -624,6 +624,7 @@ class SpaceAvailabilityControllerTest extends TestCase
 
         $this->withHeader('lang', 'en')
             ->postJson('/api/v1/member/bookings', [
+                'payment_method' => 'cash',
                 'space_id' => $space->id,
                 'start_at' => "2026-08-17 {$slot['start_time']}",
                 'end_at' => "2026-08-17 {$slot['end_time']}",
