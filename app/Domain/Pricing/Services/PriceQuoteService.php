@@ -5,6 +5,7 @@ namespace App\Domain\Pricing\Services;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\AmountCalculator;
+use App\Domain\Experience\Models\Event;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -176,6 +177,23 @@ class PriceQuoteService
             null,
             $payment->exists ? $this->ledger->forRedeemable($payment) : null,
         );
+    }
+
+    /**
+     * A paid event's registration: its price, and a coupon on top. Events
+     * carry no sale of their own. A free event takes no coupon.
+     *
+     * @throws CouponRejectedException
+     */
+    public function forEvent(Event $event, ?User $member, ?Coupon $coupon): PriceQuote
+    {
+        $list = ($event->is_free ?? true) ? 0 : (int) ($event->price_points ?? 0);
+
+        if ($coupon !== null && $list <= 0) {
+            throw new CouponRejectedException(CouponRejection::NotApplicable);
+        }
+
+        return $this->compose($list, $list, null, $list, $member, $coupon, PricingTarget::forEvent($event), new UsageInFlight);
     }
 
     /**

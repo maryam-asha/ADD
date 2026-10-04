@@ -36,6 +36,8 @@ class RegisterForEventRequest extends FormRequest
             'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
+            // A coupon code for a paid event, checked by the registration itself.
+            'coupon_code' => ['nullable', 'string', 'max:40'],
         ]);
     }
 

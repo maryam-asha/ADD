@@ -102,6 +102,7 @@ class EventController extends Controller
             $method,
             $request->validated('wallet_owner_type') ? OwnerType::from($request->validated('wallet_owner_type')) : null,
             $request->validated('wallet_owner_id'),
+            $request->validated('coupon_code'),
         );
 
         // A card pays once the seat is confirmed; a pending one is paid
