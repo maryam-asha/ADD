@@ -4,6 +4,7 @@ namespace App\Support\Presenters;
 
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\ValueObjects\PriceQuote;
 
 /**
  * What became of the code a member sent with a purchase, for the response:
@@ -28,6 +29,33 @@ class CouponOutcomePresenter
             ];
         }
 
+        return $this->notApplied($code, $locale);
+    }
+
+    /**
+     * The same, for a price not yet bought — a preview.
+     *
+     * @return array{code: string, applied: bool, points_discounted: int, message: string|null}
+     */
+    public function fromQuote(string $code, PriceQuote $quote, ?string $locale = null): array
+    {
+        if ($quote->appliedCoupon() === null) {
+            return $this->notApplied($code, $locale);
+        }
+
+        return [
+            'code' => $quote->appliedCoupon()->code,
+            'applied' => true,
+            'points_discounted' => $quote->couponPoints,
+            'message' => null,
+        ];
+    }
+
+    /**
+     * @return array{code: string, applied: bool, points_discounted: int, message: string|null}
+     */
+    private function notApplied(string $code, ?string $locale): array
+    {
         return [
             'code' => Coupon::normalizeCode($code),
             'applied' => false,

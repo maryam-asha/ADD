@@ -12,11 +12,12 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Models\Wallet;
-use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\ValueObjects\PriceLine;
+use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\AvailabilityPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
@@ -35,63 +36,53 @@ use Carbon\CarbonInterface;
 class BookingPresentationService
 {
     public function __construct(
-        private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly WalletService $wallets,
         private readonly SettingService $settings,
         private readonly BookingCancellationService $cancellations,
         private readonly LocalTime $time,
         private readonly AvailabilityPresenter $presenter,
-        private readonly MembershipResolver $membershipResolver,
-        private readonly PlanDiscountService $discounts,
+        private readonly PriceQuoteService $quotes,
         private readonly BookingExtensionPlanner $extensions,
         private readonly PriceLabelPresenter $prices,
         private readonly BookingRefunder $refunder,
     ) {}
 
     /**
-     * The "1 hour × $12.00 / Subtotal / VAT (0%) / Total" block.
+     * The "1 hour × $12.00 / Sale / Discount / Coupon / Subtotal / VAT (0%) /
+     * Total" block.
      *
      * VAT reads from a setting rather than a literal zero, so the zero is
      * a recorded decision and the arithmetic already handles a real rate
      * if one is ever introduced.
      *
-     * Two distinct discount modes, never both: pass `$booking` for an
-     * already-created booking's detail, which shows the discount it
-     * actually got — read from its PlanDiscountRedemption row, historical
-     * and never re-resolved, so it can't disagree with what the member was
-     * actually charged even if the discount has since lapsed or been
-     * exhausted. Pass `$member` for a live pre-booking preview, which shows
-     * the discount they would get if they booked right now
-     * (docs/decisions/plan-discounts-design.md).
+     * Two modes, never both: pass `$booking` for an already-created
+     * booking's detail, which shows what it was actually charged — read back
+     * from its price, list price and redemptions, never re-priced, so it
+     * cannot disagree with the charge however rates, sales or coupons have
+     * moved. Pass `$member` (and their `$coupon`) for a live pre-booking
+     * preview: the price they would pay if they booked right now. Both come
+     * from PriceQuoteService, the one place a price is composed.
      *
      * @return array<string, mixed>
      */
-    public function breakdown(Space $space, CarbonInterface $start, CarbonInterface $end, string $locale, ?Booking $booking = null, ?User $member = null): array
+    public function breakdown(Space $space, CarbonInterface $start, CarbonInterface $end, string $locale, ?Booking $booking = null, ?User $member = null, ?Coupon $coupon = null): array
     {
-        $rawPoints = $this->amounts->forRange($space, $start, $end);
-        $discountPoints = 0;
-        $discountPercentage = 0;
+        $quote = $booking !== null
+            ? $this->quotes->forExistingBooking($booking)
+            : $this->quotes->forBooking($space, $start, $end, $member, $coupon);
 
-        if ($booking !== null) {
-            $redemption = PlanDiscountRedemption::where('booking_id', $booking->id)->first();
+        return $this->breakdownOf($quote, $space, $start, $end, $locale);
+    }
 
-            if ($redemption !== null) {
-                $discountPoints = $redemption->points_discounted;
-                $discountPercentage = $redemption->discount->percentage;
-            }
-        } elseif ($member !== null) {
-            $membership = $this->membershipResolver->activeFor($member);
-            $discount = $membership !== null ? $this->discounts->resolveFor($membership, $space) : null;
-
-            if ($discount !== null) {
-                $finalPoints = $this->discounts->apply($rawPoints, $discount);
-                $discountPoints = $rawPoints - $finalPoints;
-                $discountPercentage = $discount->percentage;
-            }
-        }
-
-        $points = $rawPoints - $discountPoints;
+    /**
+     * The block for a quote already composed.
+     *
+     * @return array<string, mixed>
+     */
+    public function breakdownOf(PriceQuote $quote, Space $space, CarbonInterface $start, CarbonInterface $end, string $locale): array
+    {
+        $points = $quote->finalPoints;
         $vatPercent = (int) $this->settings->get('booking.vat_percent', 0);
 
         // Integer arithmetic, rounding the VAT up, so a partial point is
@@ -105,28 +96,22 @@ class BookingPresentationService
         $minutes = (int) $start->diffInMinutes($end);
         $rate = (int) ($space->hourly_rate_points ?? 0);
 
-        $lines = [
-            [
-                'key' => 'base',
-                'label' => __('api.booking.hours_times_rate', [
+        $lines = array_map(fn (PriceLine $line) => [
+            // `discount` is the plan discount's key, as it always was.
+            'key' => $line->key === 'plan_discount' ? 'discount' : $line->key,
+            'label' => match ($line->key) {
+                'base' => __('api.booking.hours_times_rate', [
                     'duration' => $this->presenter->durationLabel($minutes),
                     'rate' => $this->money($rate),
                 ], $locale),
-                'points' => $rawPoints,
-                'amount' => $this->points->pointsToUsd($rawPoints),
-                'formatted' => $this->money($rawPoints),
-            ],
-        ];
-
-        if ($discountPoints > 0) {
-            $lines[] = [
-                'key' => 'discount',
-                'label' => __('api.booking.discount_label', ['percent' => $discountPercentage], $locale),
-                'points' => -$discountPoints,
-                'amount' => -$this->points->pointsToUsd($discountPoints),
-                'formatted' => '-'.$this->money($discountPoints),
-            ];
-        }
+                'sale' => __('api.booking.sale_label', [], $locale),
+                'plan_discount' => __('api.booking.discount_label', ['percent' => $line->percentage], $locale),
+                'coupon' => __('api.booking.coupon_label', ['code' => $line->code], $locale),
+            },
+            'points' => $line->points,
+            'amount' => $line->points < 0 ? -$this->points->pointsToUsd(-$line->points) : $this->points->pointsToUsd($line->points),
+            'formatted' => $line->points < 0 ? '-'.$this->money(-$line->points) : $this->money($line->points),
+        ], $quote->lines());
 
         return [
             'lines' => $lines,

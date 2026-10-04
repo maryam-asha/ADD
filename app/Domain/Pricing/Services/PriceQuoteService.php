@@ -2,10 +2,12 @@
 
 namespace App\Domain\Pricing\Services;
 
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\AmountCalculator;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\PlanDiscount;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Pricing\Enums\CouponOutcome;
@@ -47,6 +49,7 @@ class PriceQuoteService
         private readonly PlanDiscountService $planDiscounts,
         private readonly CouponEligibility $eligibility,
         private readonly CouponCalculator $coupons,
+        private readonly CouponLedger $ledger,
     ) {}
 
     /**
@@ -79,6 +82,49 @@ class PriceQuoteService
             $coupon,
             PricingTarget::forSpace(PricingPurpose::Booking, $space),
             $inFlight,
+        );
+    }
+
+    /**
+     * What a booking was actually charged, read back from what it recorded —
+     * its price and list price, its plan-discount and coupon redemptions —
+     * and never re-priced at today's rates, so its breakdown cannot disagree
+     * with the charge however the rates, the sale or the coupon have moved
+     * since. Whatever is left of the list price besides those two was the
+     * sale. A booking from before `price_points` existed is priced again
+     * from its window, less its plan discount, as its refund always was.
+     */
+    public function forExistingBooking(Booking $booking): PriceQuote
+    {
+        $planRedemption = PlanDiscountRedemption::query()->where('booking_id', $booking->id)->first();
+        $couponRedemption = $this->ledger->forRedeemable($booking);
+
+        $planOff = (int) ($planRedemption?->points_discounted ?? 0);
+        $couponOff = (int) ($couponRedemption?->points_discounted ?? 0);
+
+        $list = $booking->list_price_points
+            ?? ($booking->price_points !== null
+                ? $booking->price_points + $planOff + $couponOff
+                : $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at));
+        $final = $booking->price_points ?? max(0, $list - $planOff - $couponOff);
+        $saleOff = max(0, $list - $final - $planOff - $couponOff);
+
+        [$choice, $automaticOff] = match (true) {
+            $planOff > 0 => [PriceChoice::Plan, $planOff],
+            $saleOff > 0 => [PriceChoice::Sale, $saleOff],
+            default => [PriceChoice::List, 0],
+        };
+
+        return new PriceQuote(
+            listPoints: $list,
+            choice: $choice,
+            automaticPoints: $automaticOff,
+            planDiscount: $choice === PriceChoice::Plan ? $planRedemption?->discount : null,
+            coupon: $couponRedemption?->coupon,
+            couponOutcome: $couponRedemption !== null ? CouponOutcome::Applied : CouponOutcome::None,
+            couponBasePoints: (int) ($couponRedemption?->base_points ?? 0),
+            couponPoints: $couponOff,
+            finalPoints: $final,
         );
     }
 

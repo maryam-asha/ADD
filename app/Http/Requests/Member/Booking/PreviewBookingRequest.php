@@ -33,6 +33,8 @@ class PreviewBookingRequest extends FormRequest
             'space_id' => ['required', 'integer', 'exists:spaces,id'],
             'start_at' => ['required', 'date'],
             'end_at' => ['required', 'date', 'after:start_at'],
+            // A coupon code to price the booking with, as POST bookings would.
+            'coupon_code' => ['nullable', 'string', 'max:40'],
         ];
     }
 }

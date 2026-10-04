@@ -21,7 +21,9 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
@@ -144,6 +146,8 @@ class BookingController extends Controller
         PreviewBookingRequest $request,
         AvailabilityService $availability,
         BookingPresentationService $presentation,
+        PriceQuoteService $quotes,
+        CouponEligibility $coupons,
     ): JsonResponse {
         $space = Space::with(['building.branch', 'zone.floor'])->findOrFail($request->validated('space_id'));
         $locale = app()->getLocale();
@@ -180,10 +184,22 @@ class BookingController extends Controller
             default => null,
         };
 
-        $breakdown = $presentation->breakdown($space, $start, $end, $locale, member: $request->user());
+        // Priced exactly as POST bookings will price it — a coupon included —
+        // so the preview and the charge cannot disagree.
+        $code = $request->validated('coupon_code');
+
+        try {
+            $coupon = $code !== null ? $coupons->resolve($code) : null;
+            $quote = $quotes->forBooking($space, $start, $end, $request->user(), $coupon);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $breakdown = $presentation->breakdownOf($quote, $space, $start, $end, $locale);
 
         return response()->json([
             'data' => [
+                ...($code !== null ? ['coupon' => app(CouponOutcomePresenter::class)->fromQuote($code, $quote, $locale)] : []),
                 'space' => [
                     'id' => $space->id,
                     'title' => $space->displayTitle($locale),
