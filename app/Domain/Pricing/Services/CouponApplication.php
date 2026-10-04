@@ -52,14 +52,9 @@ class CouponApplication
             /** @var Booking|WalkinSession|EventAttendee $locked */
             $locked = $payable::query()->whereKey($payable->getKey())->lockForUpdate()->firstOrFail();
 
-            $this->assertTakesACoupon($locked);
+            $quote = $this->preview($locked, $member, $coupon);
 
-            $price = (int) $locked->price_points;
-            $list = (int) ($locked->list_price_points ?? $price);
-
-            $quote = $this->quotes->forCouponOn($list, $price, $coupon, $member, $this->target($locked));
-
-            $attributes = ['price_points' => $quote->finalPoints, 'list_price_points' => $list];
+            $attributes = ['price_points' => $quote->finalPoints, 'list_price_points' => $quote->listPoints];
 
             // A booking's and a session's money record moves with its price.
             if (! $locked instanceof EventAttendee) {
@@ -73,6 +68,21 @@ class CouponApplication
 
             return $quote;
         });
+    }
+
+    /**
+     * What applying the coupon would leave the record owing — the same
+     * checks and price apply() writes, writing nothing.
+     *
+     * @throws CouponRejectedException
+     */
+    public function preview(Booking|WalkinSession|EventAttendee $record, User $member, Coupon $coupon): PriceQuote
+    {
+        $this->assertTakesACoupon($record);
+
+        $price = (int) $record->price_points;
+
+        return $this->quotes->forCouponOn((int) ($record->list_price_points ?? $price), $price, $coupon, $member, $this->target($record));
     }
 
     /**

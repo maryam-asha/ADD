@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
+use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
@@ -205,6 +206,12 @@ Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController:
 // The payment methods the member may use, in config/payments.php order; the
 // wallet method carries the member's points (docs/decisions/unified-payments.md).
 Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
+
+// "Apply" for a coupon code: what it would take off a plan, a booking, a
+// co-working session or an event registration — writing nothing
+// (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+// Throttled, so codes cannot be guessed at speed.
+Route::post('coupons/preview', CouponPreviewController::class)->middleware('throttle:20,1');
 
 Route::get('payments', [PaymentController::class, 'index']);
 Route::post('payments', [PaymentController::class, 'store']);
