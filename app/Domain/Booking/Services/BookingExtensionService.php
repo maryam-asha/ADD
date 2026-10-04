@@ -122,6 +122,8 @@ class BookingExtensionService
                 'seat_space_id' => $seatSpaceId,
                 'payment_state' => $paymentState,
                 'price_points' => $newPrice,
+                // The list price grows with it, so the breakdown still adds up.
+                'list_price_points' => ($lockedBooking->list_price_points ?? $price['undiscounted_total'] - $price['list_difference']) + $price['list_difference'],
             ])->save();
 
             return $moved ? $lockedBooking->fresh()->seatingSpace() : null;

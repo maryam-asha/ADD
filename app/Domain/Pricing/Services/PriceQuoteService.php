@@ -86,6 +86,37 @@ class PriceQuoteService
     }
 
     /**
+     * What growing a booking to `$newEnd` costs, at the terms it was made on
+     * (D7): with the plan discount it was priced with while that membership
+     * is still active (`$redemption`), else at the space's sale by usage
+     * time. Never a coupon — a coupon took its points off the booking as it
+     * was made. Each figure is the difference of two whole-booking prices,
+     * so the booking stays rounded once, as AmountCalculator rounds.
+     *
+     * @return array{difference: int, list_difference: int, total: int, undiscounted_total: int}
+     */
+    public function forExtension(Booking $booking, Space $space, CarbonInterface $newEnd, ?PlanDiscountRedemption $redemption): array
+    {
+        $oldList = $this->amounts->forRange($space, $booking->start_at, $booking->end_at);
+        $newList = $this->amounts->forRange($space, $booking->start_at, $newEnd);
+
+        if ($redemption !== null) {
+            $old = $this->planDiscounts->apply($oldList, $redemption->discount);
+            $new = $this->planDiscounts->apply($newList, $redemption->discount);
+        } else {
+            $old = $this->amounts->forSegments($this->timeline->segments($space, $booking->start_at, $booking->end_at));
+            $new = $this->amounts->forSegments($this->timeline->segments($space, $booking->start_at, $newEnd));
+        }
+
+        return [
+            'difference' => $new - $old,
+            'list_difference' => $newList - $oldList,
+            'total' => $new,
+            'undiscounted_total' => $newList,
+        ];
+    }
+
+    /**
      * What a booking was actually charged, read back from what it recorded —
      * its price and list price, its plan-discount and coupon redemptions —
      * and never re-priced at today's rates, so its breakdown cannot disagree
