@@ -156,7 +156,7 @@ class EventRegistrationFormTest extends TestCase
         $this->assertCount(1, $response->json('data.registration_form'));
     }
 
-    public function test_an_event_without_a_form_still_answers_with_an_empty_registration_form(): void
+    public function test_an_event_without_a_form_returns_no_registration_form(): void
     {
         $event = Event::factory()->create();
 
@@ -164,7 +164,7 @@ class EventRegistrationFormTest extends TestCase
         $response = $this->getJson("/api/v1/member/events/{$event->id}/registration-form");
 
         $response->assertOk();
-        $this->assertSame([], $response->json('data.registration_form'));
+        $this->assertSame(['external_form_url' => null], $response->json('data'));
     }
 
     public function test_an_event_with_external_form_returns_no_fields(): void
@@ -178,9 +178,8 @@ class EventRegistrationFormTest extends TestCase
         $response = $this->getJson("/api/v1/member/events/{$event->id}/registration-form");
 
         $response->assertOk();
-        $this->assertSame('https://forms.example.com/external', $response->json('data.external_form_url'));
-        $this->assertArrayNotHasKey('registration_form', $response->json('data'));
-        $this->assertArrayNotHasKey('fields', $response->json('data'));
+        // The link and nothing else.
+        $this->assertSame(['external_form_url' => 'https://forms.example.com/external'], $response->json('data'));
     }
 
     // ── Submitting the form ──────────────────────────────────────────────────

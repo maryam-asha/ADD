@@ -3,6 +3,7 @@
 namespace App\Domain\Experience\Services;
 
 use App\Domain\Experience\Models\Event;
+use App\Support\Time\LocalTime;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -44,6 +45,50 @@ class EventSchedule
 
             $this->syncEnvelope($event);
         });
+    }
+
+    /**
+     * The sittings an envelope describes, read the way people write them.
+     *
+     * "1 Nov 10:00 – 4 Nov 14:00" for a course means four mornings, not one
+     * 76-hour block: when the envelope spans several local days and its end
+     * hour is later than its start hour, it is one sitting a day at those
+     * hours. Anything else — one day, or a run that ends at or before the
+     * hour it started (a hackathon, Friday 18:00 to Sunday 18:00) — is a
+     * single continuous sitting.
+     *
+     * Days are counted in local time: "10:00" is the district's 10:00.
+     *
+     * @return list<array{start_at: string, end_at: string}> UTC instants
+     */
+    public function sittingsFromEnvelope(Event $event): array
+    {
+        if ($event->start_at === null || $event->end_at === null) {
+            return [];
+        }
+
+        $time = app(LocalTime::class);
+        $start = $time->toLocal($event->start_at);
+        $end = $time->toLocal($event->end_at);
+
+        $single = [[
+            'start_at' => $event->start_at->toDateTimeString(),
+            'end_at' => $event->end_at->toDateTimeString(),
+        ]];
+
+        if ($start->toDateString() === $end->toDateString() || $end->format('H:i:s') <= $start->format('H:i:s')) {
+            return $single;
+        }
+
+        $sittings = [];
+        for ($day = $start->copy()->startOfDay(); $day->lte($end); $day->addDay()) {
+            $sittings[] = [
+                'start_at' => $time->toUtc($day->format('Y-m-d').' '.$start->format('H:i:s'))->toDateTimeString(),
+                'end_at' => $time->toUtc($day->format('Y-m-d').' '.$end->format('H:i:s'))->toDateTimeString(),
+            ];
+        }
+
+        return $sittings;
     }
 
     /**

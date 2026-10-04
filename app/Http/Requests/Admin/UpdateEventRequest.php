@@ -4,13 +4,14 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Experience\Models\Event;
 use App\Http\Requests\Concerns\InterpretsLocalTimes;
+use App\Http\Requests\Concerns\ValidatesEventRegistrationWindow;
 use App\Rules\RegistrationSourceIsExclusive;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateEventRequest extends FormRequest
 {
-    use InterpretsLocalTimes;
+    use InterpretsLocalTimes, ValidatesEventRegistrationWindow;
 
     public function authorize(): bool
     {
@@ -22,7 +23,7 @@ class UpdateEventRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
-        $this->interpretLocalTimes(['start_at', 'end_at']);
+        $this->interpretLocalTimes(['start_at', 'end_at', 'registration_opens_at', 'registration_closes_at']);
         $this->interpretLocalTimesIn('sessions', ['start_at', 'end_at']);
 
         if ($this->has('room_id') && ! $this->has('space_id')) {
@@ -62,7 +63,15 @@ class UpdateEventRequest extends FormRequest
                 'sessions.*.title' => ['nullable', 'array'],
                 'sessions.*.title.en' => ['nullable', 'string', 'max:255'],
                 'sessions.*.title.ar' => ['nullable', 'string', 'max:255'],
+                // The window a member may register in. Unset ends mean
+                // "from publication" and "until the event starts"; the
+                // close is checked against the start in after().
+                'registration_opens_at' => ['nullable', 'date'],
+                'registration_closes_at' => ['nullable', 'date'],
                 'capacity' => ['nullable', 'integer', 'min:1'],
+                // The admin's word that no more places are available —
+                // the only "full" an external event can have.
+                'is_marked_full' => ['sometimes', 'boolean'],
                 'requires_approval' => ['nullable', 'boolean'],
                 // Registration happens here or there, never both: an
                 // external form knows nothing about our seats or approvals.
@@ -80,6 +89,14 @@ class UpdateEventRequest extends FormRequest
                 'order' => ['nullable', 'integer', 'min:0'],
             ]
         );
+    }
+
+    /**
+     * @return list<callable>
+     */
+    public function after(): array
+    {
+        return $this->registrationWindowChecks($this->targetEvent());
     }
 
     /** The event being edited, for rules that depend on what it already has. */

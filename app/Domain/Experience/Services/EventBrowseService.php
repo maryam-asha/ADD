@@ -5,6 +5,7 @@ namespace App\Domain\Experience\Services;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
 use App\Domain\Identity\Models\User;
+use App\Http\Resources\Forms\FormFieldResource;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
@@ -17,6 +18,13 @@ use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class EventBrowseService
 {
+    /**
+     * When registration closes, in SQL: the admin's close, or the start.
+     * The query-side twin of Event::registrationClosesAt(), so the
+     * open/full/closed filters agree with the status on each card.
+     */
+    private const REGISTRATION_CLOSES_AT = 'COALESCE(events.registration_closes_at, events.start_at)';
+
     /**
      * Resolve current locale from request header or app locale.
      */
@@ -290,9 +298,6 @@ class EventBrowseService
     }
 
     /**
-     * Filter events by dynamic status (open, full, closed, cancelled, all).
-     */
-    /**
      * Correlated count of the seats an event has taken. Placeholders are
      * bound by the caller from EventRegistrationStatus, so the status list
      * here can never drift from the enum.
@@ -310,6 +315,14 @@ class EventBrowseService
             ." AND event_attendees.status IN ({$placeholders}))";
     }
 
+    /**
+     * Filter events by dynamic status (open, full, closed, cancelled, all).
+     *
+     * `closed` means registration has closed — at registration_closes_at, or
+     * at the start — not that the event is over; an event under way is
+     * closed. `upcoming` has not opened yet (registration_opens_at ahead).
+     * `open` and `full` are the events taking registrations now.
+     */
     protected function applyStatusFilter(Builder $query, array $filters): void
     {
         $status = $filters['status'] ?? null;
@@ -348,33 +361,27 @@ class EventBrowseService
                         $sub->where('status', 'cancelled');
                     } elseif ($st === 'closed') {
                         $sub->where('status', 'published')
-                            ->where(function (Builder $dateQ) use ($now) {
-                                $dateQ->where(function ($d) use ($now) {
-                                    $d->whereNotNull('end_at')->where('end_at', '<', $now);
-                                })->orWhere(function ($d) use ($now) {
-                                    $d->whereNull('end_at')->where('start_at', '<', $now);
-                                });
-                            });
+                            ->whereRaw(self::REGISTRATION_CLOSES_AT.' <= ?', [$now]);
+                    } elseif ($st === 'upcoming') {
+                        $sub->where('status', 'published')
+                            ->where('registration_opens_at', '>', $now)
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now]);
                     } elseif ($st === 'full') {
                         $sub->where('status', 'published')
-                            ->where(function (Builder $dateQ) use ($now) {
-                                $dateQ->where(function ($d) use ($now) {
-                                    $d->whereNotNull('end_at')->where('end_at', '>=', $now);
-                                })->orWhere(function ($d) use ($now) {
-                                    $d->whereNull('end_at')->where('start_at', '>=', $now);
-                                });
-                            })
-                            ->whereNotNull('capacity')
-                            ->whereRaw($this->seatCountSubquery().' >= events.capacity', EventRegistrationStatus::seatHoldingValues());
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now])
+                            ->where(fn (Builder $o) => $o->whereNull('registration_opens_at')->orWhere('registration_opens_at', '<=', $now))
+                            ->where(function (Builder $capQ) {
+                                $capQ->where('is_marked_full', true)
+                                    ->orWhere(function (Builder $seatQ) {
+                                        $seatQ->whereNotNull('capacity')
+                                            ->whereRaw($this->seatCountSubquery().' >= events.capacity', EventRegistrationStatus::seatHoldingValues());
+                                    });
+                            });
                     } elseif ($st === 'open') {
                         $sub->where('status', 'published')
-                            ->where(function (Builder $dateQ) use ($now) {
-                                $dateQ->where(function ($d) use ($now) {
-                                    $d->whereNotNull('end_at')->where('end_at', '>=', $now);
-                                })->orWhere(function ($d) use ($now) {
-                                    $d->whereNull('end_at')->where('start_at', '>=', $now);
-                                });
-                            })
+                            ->whereRaw('('.self::REGISTRATION_CLOSES_AT.' IS NULL OR '.self::REGISTRATION_CLOSES_AT.' > ?)', [$now])
+                            ->where(fn (Builder $o) => $o->whereNull('registration_opens_at')->orWhere('registration_opens_at', '<=', $now))
+                            ->where('is_marked_full', false)
                             ->where(function (Builder $capQ) {
                                 $capQ->whereNull('capacity')
                                     ->orWhereRaw($this->seatCountSubquery().' < events.capacity', EventRegistrationStatus::seatHoldingValues());
@@ -402,6 +409,12 @@ class EventBrowseService
                 'color' => '#10B981',
             ],
             [
+                'id' => 'upcoming',
+                'slug' => 'upcoming',
+                'name' => $locale === 'en' ? 'Registration Opens Soon' : 'يفتح التسجيل قريباً',
+                'color' => '#3B82F6',
+            ],
+            [
                 'id' => 'full',
                 'slug' => 'full',
                 'name' => $locale === 'en' ? 'Full' : 'مكتمل العدد',
@@ -410,7 +423,7 @@ class EventBrowseService
             [
                 'id' => 'closed',
                 'slug' => 'closed',
-                'name' => $locale === 'en' ? 'Closed / Past' : 'منتهي',
+                'name' => $locale === 'en' ? 'Registration Closed' : 'التسجيل مغلق',
                 'color' => '#6B7280',
             ],
             [
@@ -464,16 +477,27 @@ class EventBrowseService
         $attendeesCount = (int) ($event->attendees_count ?? 0);
 
         $seatsLeft = $capacity !== null ? max(0, $capacity - $attendeesCount) : null;
-        $isFull = $capacity !== null && $seatsLeft === 0;
+        // An admin's "full" stands on its own: it is the only signal an
+        // external event has, since its seats are counted somewhere else.
+        $isFull = (bool) $event->is_marked_full || ($capacity !== null && $seatsLeft === 0);
         $isCancelled = $event->status === 'cancelled';
         $now = Carbon::now();
-        $isPast = $end ? $end->isBefore($now) : ($start ? $start->isBefore($now) : false);
 
+        $registrationState = $this->resolveRegistrationState($event, $isFull, $now);
+
+        // The status follows the registration window, not the event's own
+        // dates: a card used to read "open for registration" for an event
+        // already under way, beside a can_register of false. "closed" is
+        // from registration_closes_at (or the start), "upcoming" until
+        // registration_opens_at — the same moments applyStatusFilter() uses.
+        $window = $event->registrationWindow($now);
         $computedStatus = 'open';
         if ($isCancelled) {
             $computedStatus = 'cancelled';
-        } elseif ($isPast) {
+        } elseif ($window === 'closed') {
             $computedStatus = 'closed';
+        } elseif ($window === 'not_yet_open') {
+            $computedStatus = 'upcoming';
         } elseif ($isFull) {
             $computedStatus = 'full';
         }
@@ -527,7 +551,7 @@ class EventBrowseService
             'image_url' => $event->image_url,
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
-            ...$price,
+            'pricing' => $price,
             'status' => $computedStatus,
             'is_registered' => $isRegistered,
             // On a card, only a live application: a rejection against every
@@ -536,15 +560,13 @@ class EventBrowseService
             'registration_status' => $isRegistered ? $registrationStatus : null,
             'requires_approval' => (bool) $event->requires_approval,
             'has_registration_form' => (bool) $event->has_registration_form,
-            'external_form_url' => $event->external_form_url,
-            // A member already holding a seat cannot take a second one —
-            // this used to say true and then 422 on the attempt. A
-            // rejected registration is not seat-holding, so they may
-            // register again.
-            'can_register' => ! $event->registersExternally()
-                && ! $isCancelled && ! $isFull && ! $isPast
-                && $event->status === 'published'
-                && ! $isRegistered,
+            // Handed out only while the window is open: a link to a form
+            // that is full or closed invites a registration nobody honours.
+            'external_form_url' => $registrationState === 'open' ? $event->external_form_url : null,
+            'registration_state' => $registrationState,
+            'registration_opens_at' => app(LocalTime::class)->toLocal($event->registration_opens_at)?->toIso8601String(),
+            'registration_closes_at' => app(LocalTime::class)->toLocal($event->registrationClosesAt())?->toIso8601String(),
+            'can_register' => $this->canRegister($event, $registrationState, $isRegistered),
         ];
 
         if (! $isMember) {
@@ -722,6 +744,88 @@ class EventBrowseService
             'my_badges' => $myBadges,
             'action' => $action,
         ]);
+    }
+
+    /**
+     * What the registration-form endpoints answer — one way in, and only
+     * what that way needs:
+     *
+     *  - external: the link alone, and null once the event is full or its
+     *    window closed, so nobody is sent to a form that will not be honoured;
+     *  - in-app with questions: the questions;
+     *  - in-app asking nothing: no form key at all — there is nothing to fill.
+     *
+     * @return array<string, mixed>
+     */
+    public function registrationFormPayload(Event $event): array
+    {
+        if ($event->registersExternally()) {
+            return [
+                'external_form_url' => $this->registrationState($event) === 'open' ? $event->external_form_url : null,
+            ];
+        }
+
+        $fields = $event->registrationForm?->activeFields ?? collect();
+
+        if ($fields->isEmpty()) {
+            return ['external_form_url' => null];
+        }
+
+        return [
+            'external_form_url' => null,
+            'registration_form' => FormFieldResource::collection($fields),
+        ];
+    }
+
+    /**
+     * Where registration stands for an event loaded on its own, without the
+     * listing's seat count.
+     */
+    public function registrationState(Event $event): string
+    {
+        $isFull = (bool) $event->is_marked_full
+            || ($event->capacity !== null && $event->seatHoldingAttendees()->count() >= (int) $event->capacity);
+
+        return $this->resolveRegistrationState($event, $isFull, Carbon::now());
+    }
+
+    /**
+     * Whether this member may register now — on our form or on the external
+     * one, which ever the event uses.
+     *
+     * The same values decide it for both kinds: the event is published, the
+     * window is open (after `registration_opens_at`, before
+     * `registration_closes_at`, and never once the event has started), and
+     * it is not full — by seats or by the admin's mark. An in-app event
+     * also refuses a member already holding a seat, who would otherwise see
+     * true and then a 422; a rejected registration holds none, so they may
+     * apply again. An external event's roster lives on its own form, so
+     * there is nothing of ours to check that against.
+     */
+    private function canRegister(Event $event, string $registrationState, bool $isRegistered): bool
+    {
+        if ($event->status !== 'published' || $registrationState !== 'open') {
+            return false;
+        }
+
+        return $event->registersExternally() || ! $isRegistered;
+    }
+
+    /**
+     * `closed` / `not_yet_open` / `full` / `open`. A closed window outranks
+     * everything: there is no point telling someone an event they can no
+     * longer join is also full.
+     */
+    private function resolveRegistrationState(Event $event, bool $isFull, Carbon $now): string
+    {
+        $window = $event->registrationWindow($now);
+
+        return match (true) {
+            $event->status === 'cancelled', $window === 'closed' => 'closed',
+            $window === 'not_yet_open' => 'not_yet_open',
+            $isFull => 'full',
+            default => 'open',
+        };
     }
 
     /**

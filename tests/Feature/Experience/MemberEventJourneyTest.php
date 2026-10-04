@@ -126,7 +126,8 @@ class MemberEventJourneyTest extends TestCase
         $payload = $this->getJson("/api/v1/member/events/{$external->id}")->json('data');
 
         $this->assertSame('https://forms.example.com/abc', $payload['external_form_url']);
-        $this->assertFalse($payload['can_register']);
+        // Registration is open — it just happens on the external form.
+        $this->assertTrue($payload['can_register']);
     }
 
     public function test_details_carry_the_schedule_when_the_event_runs_several_days(): void
@@ -249,8 +250,8 @@ class MemberEventJourneyTest extends TestCase
         $this->assertArrayNotHasKey('identity', $form);
     }
 
-    /** An event that asks nothing still answers, so the app has one path. */
-    public function test_an_event_that_asks_nothing_returns_an_empty_form(): void
+    /** An event that asks nothing still answers 200, with no form to fill. */
+    public function test_an_event_that_asks_nothing_returns_no_form(): void
     {
         $event = $this->published();
 
@@ -260,7 +261,7 @@ class MemberEventJourneyTest extends TestCase
             ->assertStatus(200)
             ->json('data');
 
-        $this->assertSame([], $form['registration_form']);
+        $this->assertArrayNotHasKey('registration_form', $form);
         $this->assertArrayNotHasKey('has_registration_form', $form);
     }
 

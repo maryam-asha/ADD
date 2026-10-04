@@ -15,7 +15,6 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Experience\RegisterForEventRequest;
 use App\Http\Requests\Public\BrowseEventsRequest;
 use App\Http\Resources\Finance\PaymentResource;
-use App\Http\Resources\Forms\FormFieldResource;
 use App\Services\Experience\EventRegistrationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -140,28 +139,17 @@ class EventController extends Controller
     /**
      * The form a member fills in to register.
      *
-     * Always 200s, with an empty `fields` list when the event asks nothing,
-     * so the app has a single code path. Identity is returned separately
-     * and read-only: it comes from the account, and no form field may
-     * redefine it.
+     * Always 200s. An external event answers with its link alone; an event
+     * that asks nothing carries no `registration_form` key at all. Identity
+     * is never a question here: it comes from the account, and no form
+     * field may redefine it.
      */
-    public function registrationForm(Request $request, int|string $id): JsonResponse
+    public function registrationForm(Request $request, int|string $id, EventBrowseService $service): JsonResponse
     {
         $event = Event::with('registrationForm.activeFields')->findOrFail($id);
 
-        if ($event->registersExternally()) {
-            return response()->json([
-                'data' => [
-                    'external_form_url' => $event->external_form_url,
-                ],
-            ]);
-        }
-
         return response()->json([
-            'data' => [
-                'external_form_url' => null,
-                'registration_form' => FormFieldResource::collection($event->registrationForm?->activeFields ?? collect()),
-            ],
+            'data' => $service->registrationFormPayload($event),
         ]);
     }
 }

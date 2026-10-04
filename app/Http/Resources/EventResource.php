@@ -87,7 +87,17 @@ class EventResource extends JsonResource
                 ];
             })->all()),
             'location' => app(EventLocationService::class)->displayLocation($this->resource, $locale),
+            // The editor sees what was set — null means "from publication" /
+            // "until the start" — while everyone else sees the effective
+            // window, the close already defaulted to the start.
+            'registration_opens_at' => $isAdmin
+                ? $this->registration_opens_at?->toISOString()
+                : $time->toLocal($this->registration_opens_at)?->toIso8601String(),
+            'registration_closes_at' => $isAdmin
+                ? $this->registration_closes_at?->toISOString()
+                : $time->toLocal($this->registrationClosesAt())?->toIso8601String(),
             'capacity' => $this->capacity,
+            'is_marked_full' => (bool) $this->is_marked_full,
             'requires_approval' => (bool) $this->requires_approval,
             'has_registration_form' => (bool) $this->has_registration_form,
             'external_form_url' => $this->external_form_url,

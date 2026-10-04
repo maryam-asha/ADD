@@ -49,23 +49,29 @@ class EventPricePresenter
     }
 
     /**
-     * The member-facing view: the two labels a client prints, and nothing
-     * else. A member never needs the raw point count — registration
-     * charges the wallet server-side and validates the balance there, so
-     * shipping the number would only invite a client to re-derive a price
-     * the server already decided.
+     * The member-facing view: the formatted price and points as numbers
+     * along with their display-ready labels in a single pricing object.
      *
-     * Admin surfaces keep the full block (they edit the stored value).
-     *
-     * @return array{price_label: string, price_display_label: string}
+     * @return array{
+     *     points: int,
+     *     points_label: string,
+     *     price: int|float,
+     *     price_label: string,
+     *     currency: string
+     * }
      */
     public function presentForDisplay(Event $event, ?User $user, string $locale): array
     {
         $price = $this->presentFor($event, $user, $locale);
+        $amount = $price['price_display'];
+        $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
 
         return [
-            'price_label' => $price['price_label'],
-            'price_display_label' => $price['price_display_label'],
+            'points' => $price['price_points'],
+            'points_label' => $price['price_label'],
+            'price' => $numericPrice,
+            'price_label' => $price['price_display_label'],
+            'currency' => $price['currency'],
         ];
     }
 
@@ -96,7 +102,7 @@ class EventPricePresenter
             'price_display' => $priceDisplay,
             'price_display_label' => $isFree
                 ? __('api.event.price_free', [], $locale)
-                : $this->labels->currencyLabel($priceDisplay, $targetCurrency),
+                : $this->labels->currencyLabel($priceDisplay, $targetCurrency, $locale),
             'currency' => $targetCurrency,
         ];
     }

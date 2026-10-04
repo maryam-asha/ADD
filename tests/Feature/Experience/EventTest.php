@@ -249,16 +249,18 @@ class EventTest extends TestCase
         // The member surface returns display labels only: the points as
         // the member spends them, and the same price in their chosen
         // currency. 100 pts =  .00 = 100,000 SYP at the seeded rate.
-        $this->assertSame('100 pts', $item['price_label']);
-        $this->assertSame('100,000.00 ل.س', $item['price_display_label']);
+        $this->assertSame(100, $item['pricing']['points']);
+        $this->assertSame('100 pts', $item['pricing']['points_label']);
+        $this->assertSame(100000, $item['pricing']['price']);
+        $this->assertSame('100,000 SYP', $item['pricing']['price_label']);
+        $this->assertSame('SYP', $item['pricing']['currency']);
 
-        // The raw figures stay server-side — registration debits the
-        // wallet and validates the balance there, so a member client has
-        // nothing to compute and no way to re-derive the price.
-        $this->assertArrayNotHasKey('price_points', $item);
-        $this->assertArrayNotHasKey('price_usd', $item);
-        $this->assertArrayNotHasKey('price_display', $item);
-        $this->assertArrayNotHasKey('display_currency', $item);
+        // In Arabic, price label uses the localized symbol 'ل.س'
+        $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/events');
+        $responseAr->assertOk();
+        $itemAr = collect($responseAr->json('data'))->firstWhere('id', $event->id);
+        $this->assertSame('100,000 ل.س', $itemAr['pricing']['price_label']);
+        $this->assertSame('100 نقطة', $itemAr['pricing']['points_label']);
     }
 
     public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void
@@ -490,8 +492,10 @@ class EventTest extends TestCase
         $card = collect($this->getJson('/api/v1/events')->json('data'))
             ->firstWhere('id', $event->id);
 
+        // can_register says registration is open; the link says where.
+        // The POST stays refused (above) — the member registers there.
         $this->assertSame('https://forms.example.com/signup', $card['external_form_url']);
-        $this->assertFalse($card['can_register']);
+        $this->assertTrue($card['can_register']);
     }
 
     public function test_an_external_url_must_be_a_url(): void

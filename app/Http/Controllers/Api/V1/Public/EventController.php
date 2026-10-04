@@ -6,7 +6,6 @@ use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventBrowseService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Public\BrowseEventsRequest;
-use App\Http\Resources\Forms\FormFieldResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -55,25 +54,14 @@ class EventController extends Controller
      *
      * No identity block here: a visitor has no account to prefill from.
      */
-    public function registrationForm(int|string $id): JsonResponse
+    public function registrationForm(int|string $id, EventBrowseService $service): JsonResponse
     {
         $event = Event::with('registrationForm.activeFields')
             ->where('status', 'published')
             ->findOrFail($id);
 
-        if ($event->registersExternally()) {
-            return response()->json([
-                'data' => [
-                    'external_form_url' => $event->external_form_url,
-                ],
-            ]);
-        }
-
         return response()->json([
-            'data' => [
-                'external_form_url' => null,
-                'registration_form' => FormFieldResource::collection($event->registrationForm?->activeFields ?? collect()),
-            ],
+            'data' => $service->registrationFormPayload($event),
         ]);
     }
 }

@@ -19,6 +19,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Services\Notification\NotificationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Support\Facades\DB;
@@ -80,15 +81,28 @@ class EventRegistrationService
                 ]);
             }
 
-            // 3. Validate event has not past
-            $now = Carbon::now();
-            $endAt = $lockedEvent->end_at ? Carbon::parse($lockedEvent->end_at) : null;
-            $startAt = $lockedEvent->start_at ? Carbon::parse($lockedEvent->start_at) : null;
-            $isPast = $endAt ? $endAt->isBefore($now) : ($startAt ? $startAt->isBefore($now) : false);
+            // 3. Validate the registration window. It closes at the event's
+            // start unless the admin closed it earlier — an event under way
+            // takes no one new, however long it still runs.
+            $window = $lockedEvent->registrationWindow();
 
-            if ($isPast) {
+            if ($window === 'closed') {
                 throw ValidationException::withMessages([
                     'event' => [__('api.event.closed')],
+                ]);
+            }
+
+            if ($window === 'not_yet_open') {
+                throw ValidationException::withMessages([
+                    'event' => [__('api.event.not_yet_open', [
+                        'date' => app(LocalTime::class)->toLocal($lockedEvent->registration_opens_at)->format('Y-m-d H:i'),
+                    ])],
+                ]);
+            }
+
+            if ($lockedEvent->is_marked_full) {
+                throw ValidationException::withMessages([
+                    'capacity' => [__('api.event.full')],
                 ]);
             }
 

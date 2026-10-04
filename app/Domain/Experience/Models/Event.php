@@ -12,6 +12,8 @@ use App\Domain\Forms\Models\Form;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Support\Enums\EventRegistrationStatus;
+use Carbon\Carbon;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,8 +32,11 @@ class Event extends Model implements HasForms
         'description',
         'start_at',
         'end_at',
+        'registration_opens_at',
+        'registration_closes_at',
         'location',
         'capacity',
+        'is_marked_full',
         'requires_approval',
         'has_registration_form',
         'external_form_url',
@@ -52,6 +57,9 @@ class Event extends Model implements HasForms
             'description' => 'array',
             'start_at' => 'datetime',
             'end_at' => 'datetime',
+            'registration_opens_at' => 'datetime',
+            'registration_closes_at' => 'datetime',
+            'is_marked_full' => 'boolean',
             'requires_approval' => 'boolean',
             'has_registration_form' => 'boolean',
             'is_free' => 'boolean',
@@ -88,6 +96,39 @@ class Event extends Model implements HasForms
     public function registersExternally(): bool
     {
         return filled($this->external_form_url);
+    }
+
+    /**
+     * The last moment a registration is accepted: the admin's close when set,
+     * otherwise the event's start — nobody registers for something already
+     * under way, whether or not it has ended.
+     */
+    public function registrationClosesAt(): ?CarbonInterface
+    {
+        return $this->registration_closes_at ?? $this->start_at;
+    }
+
+    /**
+     * Where the registration window stands by the clock alone —
+     * `not_yet_open`, `open` or `closed`. Seats, cancellation and the
+     * admin's "full" mark are the caller's to layer on top; this is the one
+     * place both the listings and the registration endpoint read the window
+     * from, so the two cannot disagree.
+     */
+    public function registrationWindow(?CarbonInterface $now = null): string
+    {
+        $now ??= Carbon::now();
+        $closesAt = $this->registrationClosesAt();
+
+        if ($closesAt !== null && ! $now->isBefore($closesAt)) {
+            return 'closed';
+        }
+
+        if ($this->registration_opens_at !== null && $now->isBefore($this->registration_opens_at)) {
+            return 'not_yet_open';
+        }
+
+        return 'open';
     }
 
     /**

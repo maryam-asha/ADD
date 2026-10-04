@@ -79,6 +79,13 @@ Schedule::command('access:revoke-grants-on-booking-cancellation')->everyFiveMinu
 Schedule::command('events:expire-pending-registrations')->hourly()->withoutOverlapping();
 
 /*
+ * Bookings (docs/decisions/booking-outcomes-and-extension.md) — a request
+ * still undecided when it starts lapses to rejected with its points refunded,
+ * and a confirmed booking nobody checked into is a no-show once it ends.
+ */
+Schedule::command('bookings:close-elapsed')->everyFiveMinutes()->withoutOverlapping();
+
+/*
  * Card payments (docs/paymera.md) — the backstop under the callback and the
  * trigger. A payment can be left pending by a closed browser, a lost trigger
  * request or a queue worker that was down; without this sweep it would stay

@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventCategory;
+use App\Domain\Experience\Services\EventSchedule;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Support\Time\LocalTime;
@@ -36,14 +37,23 @@ class EventSeeder extends Seeder
         $hallId = Space::query()->where('space_type', 'event_hall')->value('id');
         $roomId = Space::query()->where('space_type', 'room')->value('id');
 
+        $schedule = app(EventSchedule::class);
+
         foreach ($this->events($categories, $hallId, $roomId) as $index => $event) {
-            Event::query()->firstOrCreate(
+            $created = Event::query()->firstOrCreate(
                 ['title->en' => $event['title']['en']],
                 array_merge($event, [
                     'branch_id' => $branchId,
                     'order' => $index + 1,
                 ])
             );
+
+            // Every event runs on sessions. A multi-day course with daily
+            // hours is one sitting a day, not one block spanning the nights
+            // between — which is what copying the envelope used to produce.
+            if (! $created->sessions()->exists()) {
+                $schedule->replace($created, $schedule->sittingsFromEnvelope($created));
+            }
         }
     }
 

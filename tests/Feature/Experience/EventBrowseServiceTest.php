@@ -139,8 +139,13 @@ class EventBrowseServiceTest extends TestCase
                     'location',
                     'seats_left_text',
                     'is_free',
-                    'price_label',
-                    'price_display_label',
+                    'pricing' => [
+                        'points',
+                        'points_label',
+                        'price',
+                        'price_label',
+                        'currency',
+                    ],
                     'is_registered',
                     'can_register',
                 ],
@@ -166,8 +171,11 @@ class EventBrowseServiceTest extends TestCase
         // Check Paid Event
         $paidItem = $data->firstWhere('id', $paidEvent->id);
         $this->assertSame('Brand Building Masterclass', $paidItem['title']);
-        $this->assertFalse($paidItem['is_free']);
-        $this->assertEquals('150 pts', $paidItem['price_label']);
+        $this->assertSame(150, $paidItem['pricing']['points']);
+        $this->assertSame(15, $paidItem['pricing']['price']);
+        $this->assertSame('USD', $paidItem['pricing']['currency']);
+        $this->assertEquals('150 pts', $paidItem['pricing']['points_label']);
+        $this->assertEquals('15 $', $paidItem['pricing']['price_label']);
 
         // Check Full Event
         $fullItem = $data->firstWhere('id', $fullEvent->id);
@@ -180,7 +188,8 @@ class EventBrowseServiceTest extends TestCase
         $freeItemAr = collect($resAr->json('data'))->firstWhere('id', $freeEvent->id);
         $this->assertSame('أساسيات الشركات الناشئة', $freeItemAr['title']);
         $this->assertEquals(['id' => $category->id, 'name' => 'ورش عمل'], $freeItemAr['category']);
-        $this->assertSame('مجاني', $freeItemAr['price_label']);
+        $this->assertSame('مجاني', $freeItemAr['pricing']['points_label']);
+        $this->assertSame('مجاني', $freeItemAr['pricing']['price_label']);
     }
 
     public function test_translatable_fields_return_string_based_on_header_lang_and_not_both_languages(): void
@@ -440,7 +449,7 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('Startup Essentials Workshop', $guestRes->json('data.title'));
         $this->assertIsString($guestRes->json('data.description'));
         $this->assertSame('Join us for an interactive session covering the key steps to launch and grow your startup.', $guestRes->json('data.description'));
-        $this->assertSame('Free', $guestRes->json('data.price_label'));
+        $this->assertSame('Free', $guestRes->json('data.pricing.points_label'));
         $this->assertTrue($guestRes->json('data.can_register'));
         $this->assertFalse($guestRes->json('data.is_registered'));
 
@@ -459,7 +468,7 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('ورشة أساسيات الشركات الناشئة', $memberRes->json('data.title'));
         $this->assertIsString($memberRes->json('data.description'));
         $this->assertSame('انضم إلينا في جلسة تفاعلية تغطي الخطوات الرئيسية لإطلاق وتنمية شركتك الناشئة.', $memberRes->json('data.description'));
-        $this->assertSame('مجاني', $memberRes->json('data.price_label'));
+        $this->assertSame('مجاني', $memberRes->json('data.pricing.points_label'));
         $this->assertTrue($memberRes->json('data.is_registered'));
     }
 
@@ -468,12 +477,18 @@ class EventBrowseServiceTest extends TestCase
         // 1. Public endpoint in English
         $resEn = $this->withHeaders(['lang' => 'en'])->getJson('/api/v1/events/statuses');
         $resEn->assertOk();
-        $resEn->assertJsonCount(4, 'data');
+        $resEn->assertJsonCount(5, 'data');
         $resEn->assertJsonFragment([
             'id' => 'open',
             'slug' => 'open',
             'name' => 'Open for Registration',
             'color' => '#10B981',
+        ]);
+        $resEn->assertJsonFragment([
+            'id' => 'upcoming',
+            'slug' => 'upcoming',
+            'name' => 'Registration Opens Soon',
+            'color' => '#3B82F6',
         ]);
         $resEn->assertJsonFragment([
             'id' => 'full',
@@ -484,7 +499,7 @@ class EventBrowseServiceTest extends TestCase
         $resEn->assertJsonFragment([
             'id' => 'closed',
             'slug' => 'closed',
-            'name' => 'Closed / Past',
+            'name' => 'Registration Closed',
             'color' => '#6B7280',
         ]);
         $resEn->assertJsonFragment([
@@ -521,7 +536,7 @@ class EventBrowseServiceTest extends TestCase
 
         $resAdmin = $this->getJson('/api/v1/admin/events/statuses');
         $resAdmin->assertOk();
-        $resAdmin->assertJsonCount(4, 'data');
+        $resAdmin->assertJsonCount(5, 'data');
     }
 
     public function test_can_search_by_description_and_use_q_parameter(): void
