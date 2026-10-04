@@ -195,7 +195,7 @@ class MembershipPurchaseTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.plan.price_display', '147000.02');
+        $response->assertJsonPath('data.plan.price_display', '147001');
         $response->assertJsonPath('data.plan.currency', 'SYP');
         $response->assertJsonPath('data.plan.price_points', 100);
     }

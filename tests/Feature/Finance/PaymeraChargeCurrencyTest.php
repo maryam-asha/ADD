@@ -257,11 +257,12 @@ class PaymeraChargeCurrencyTest extends TestCase
         // 1000 points = 100.00 USD. The stored rate 0.0000680272 is 1/14700
         // truncated to ten places, so the exact conversion is
         // 100 / 0.0000680272 = 1,470,000.2352 SYP — not a round 1,470,000.
-        // pointsToMinor() ceils, giving 147,000,024 minor units: the member
-        // pays 0.24 SYP more rather than receiving a fraction of a point's
-        // worth for free. That rounding direction is the deliberate
+        // pointsToMinor() ceils — and the pound has no piasters in use, so to
+        // a whole pound: 1,470,001 SYP, 147,000,100 minor units. The member
+        // pays under one pound more rather than receiving a fraction of a
+        // point's worth for free. That rounding direction is the deliberate
         // house-favouring rule, so it is pinned here exactly.
-        $expectedMinor = 147_000_024;
+        $expectedMinor = 147_000_100;
 
         $this->fakeGateway($expectedMinor);
 

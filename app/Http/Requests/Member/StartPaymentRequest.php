@@ -3,10 +3,12 @@
 namespace App\Http\Requests\Member;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Membership\Models\Plan;
+use App\Rules\AmountFitsCurrency;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -65,11 +67,14 @@ class StartPaymentRequest extends FormRequest
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
 
-            // Required for a top-up, meaningless for a plan purchase.
+            // Required for a top-up, meaningless for a plan purchase — and for
+            // a top-up in cash, where reception enters what is handed over.
             'amount' => [
-                'required_if:purpose,'.PaymentPurpose::WalletTopUp->value,
+                Rule::requiredIf(fn () => $this->input('purpose') === PaymentPurpose::WalletTopUp->value && ! $this->paysInCash()),
                 'numeric',
                 'min:0.01',
+                // In the card gateway's currency.
+                new AmountFitsCurrency((string) config('paymera.currency')),
             ],
 
             'plan_id' => [
@@ -89,7 +94,7 @@ class StartPaymentRequest extends FormRequest
 
             match (PaymentPurpose::from($this->input('purpose'))) {
                 PaymentPurpose::PlanPurchase => $this->validatePlan($validator),
-                PaymentPurpose::WalletTopUp => $this->validateTopUpAmount($validator),
+                PaymentPurpose::WalletTopUp => $this->paysInCash() ? null : $this->validateTopUpAmount($validator),
                 default => null,
             };
         });
@@ -163,6 +168,15 @@ class StartPaymentRequest extends FormRequest
         $factor = bcpow('10', (string) config('paymera.currency_exponent'), 0);
 
         return (int) bcmul((string) $amount, $factor, 0);
+    }
+
+    /**
+     * Cash is only ever paid at the desk: from here it is directions, with
+     * no amount for anyone to charge.
+     */
+    private function paysInCash(): bool
+    {
+        return $this->input('method') === CashMethod::KEY;
     }
 
     public function paymentMethod(): string

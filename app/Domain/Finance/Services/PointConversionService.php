@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Settings\Services\SettingService;
 use InvalidArgumentException;
 
@@ -102,7 +103,16 @@ class PointConversionService
 
         $converted = $this->currency->convert((float) $usd, $baseCurrency, $currencyCode);
 
-        return $converted !== null ? number_format($converted, 2, '.', '') : null;
+        if ($converted === null) {
+            return null;
+        }
+
+        // At the currency's own decimals — a whole pound for SYP — rounded up,
+        // the direction every amount asked for is rounded in.
+        $decimals = (int) (Currency::query()->whereKey($currencyCode)->value('decimal_places') ?? 2);
+        $factor = 10 ** $decimals;
+
+        return number_format(ceil(round($converted * $factor, 6)) / $factor, $decimals, '.', '');
     }
 
     private function rejectNegative(string $usd): void

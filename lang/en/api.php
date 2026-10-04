@@ -39,6 +39,30 @@ return [
         'insufficient_balance_for_plan' => 'Insufficient general balance to purchase this plan.',
         'amount_below_one_point' => 'The amount paid is too small to credit a single point.',
         'top_up_below_minimum' => 'The minimum top-up is :amount :currency (:points points).',
+
+        // The member's wallet history (WalletTransactionPresenter): what
+        // each row was, and the pool it moved.
+        'kinds' => [
+            'booking' => 'Booking',
+            'booking_extension' => 'Booking extension',
+            'coworking_session' => 'Coworking session',
+            'event_registration' => 'Event registration',
+            'plan_purchase' => 'Package purchase',
+            'top_up' => 'Wallet top-up',
+            'payment_received' => 'Payment received',
+            'refund' => 'Refund',
+            'reversal' => 'Card payment reversed',
+            'subscription_grant' => 'Package points',
+            'gift' => 'Gift points',
+            'company_allocation' => 'Company allocation',
+            'spend' => 'Payment',
+        ],
+        'categories' => [
+            'general' => 'General balance',
+            'cafe' => 'Café balance',
+            'printing_internet' => 'Printing & internet balance',
+            'space_specific' => 'Space balance',
+        ],
     ],
 
     'system' => [
@@ -49,6 +73,8 @@ return [
     ],
 
     'validation' => [
+        'amount_must_be_whole' => 'An amount in :currency must be a whole number, with no decimals.',
+        'amount_too_precise' => 'An amount in :currency can have at most :decimals decimal places.',
         'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
         'vocabulary_not_an_object' => 'Validation settings must be an object.',
         'constraint_not_allowed_for_type' => '":key" is not a setting a :type field accepts.',
@@ -62,6 +88,8 @@ return [
         'constraint_must_be_text' => '":key" must be text.',
         'constraint_range_inverted' => '":min" must not be greater than ":max".',
         'amenity_not_available_for_space_type' => '":amenity" is not an available amenity for this space type.',
+        'registration_closes_after_start' => 'Registration must close no later than the event starts (:start).',
+        'registration_closes_before_it_opens' => 'Registration must close after it opens.',
         'failed' => 'The given data is invalid.',
     ],
 
@@ -224,10 +252,27 @@ return [
         'rejected' => 'Booking rejected.',
         'invalid_extension_duration' => 'The extension duration does not meet the minimum duration or granularity requirements.',
         'extension_conflict' => 'This booking cannot be extended past :latest_end_at.',
+        'extension_past_closing' => 'This booking cannot be extended past the branch closing at :latest_end_at.',
+        'extension_not_allowed' => 'Bookings on this space cannot be extended.',
+        'extension_outside_booking_time' => 'A booking can only be extended while it is running.',
+        'extension_seat_room_closes' => 'The room you are seated in returns from co-working at :latest_end_at, and no other co-working seat is free after it.',
+        'extension_reasons' => [
+            'space_disallows' => 'Bookings on this space cannot be extended.',
+            'not_checked_in' => 'You can extend only while you are checked in.',
+            'outside_booking_time' => 'You can extend only while your booking is running.',
+            'next_slot_booked' => 'The next time slot is already booked, so your booking cannot be extended.',
+            'branch_closing' => 'The branch closes when your booking ends, so it cannot be extended.',
+            'seat_room_closes' => 'The room you are seated in stops serving co-working when your booking ends, and no other seat is free.',
+        ],
         'extended' => 'Booking extended.',
+        'extended_seat_moved' => 'Booking extended. The room you were seated in returns from co-working, so please move to :place.',
         'wallet_not_owned' => 'You are not authorized to spend from that wallet.',
         'check_in_requires_approval' => 'This booking must be approved before it can be checked in.',
         'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
+        'check_in_no_show' => 'This booking ended without a check-in and can no longer be checked in.',
+        'check_in_ended' => 'This booking has already ended and can no longer be checked in.',
+        'not_cancellable' => 'This booking has already been closed and cannot be cancelled.',
+        'lapsed_unreviewed' => 'Your request was not reviewed before it started, so it was closed automatically.',
 
         // Availability calendar. `slot_in_past` and `space_at_capacity`
         // are the two slot states the write path has no error for — a past
@@ -247,6 +292,14 @@ return [
         'batch_partially_unavailable' => 'Some of the selected dates are not available. Nothing was booked.',
         'batch_created' => ':count bookings created.',
         'cancellation_note' => 'You can cancel this booking up to :duration before the start time.',
+        // The list card's day and time lines.
+        'date_today' => 'Today, :date',
+        'date_tomorrow' => 'Tomorrow, :date',
+        'time_range' => ':start - :end (:duration)',
+        // The detail's cancel screen.
+        'cancel_until' => 'You can cancel this booking until :at.',
+        'refund_to_own_wallet' => 'Your wallet',
+        'refund_to_company_wallet' => 'Your company\'s wallet',
         'points_amount' => ':points pts',
         'vat_label' => 'VAT (:percent%)',
         'hours_times_rate' => ':duration × :rate / hour',
@@ -258,6 +311,16 @@ return [
             'pending' => 'Under Review',
             'rejected' => 'Rejected',
             'cancelled' => 'Cancelled',
+            'completed' => 'Completed',
+            'no_show' => 'Not Attended',
+        ],
+        // Shown under the status only where the money differs between two
+        // bookings with the same status.
+        'status_notes' => [
+            'refunded' => 'Your points were returned to your wallet.',
+            'payment_due' => 'You can pay from the app or at reception.',
+            'no_show_charged' => 'The points are not refunded because the booking was not cancelled before its deadline.',
+            'no_show_free' => 'Nothing is owed for this booking.',
         ],
         'steps' => [
             'submitted' => 'Submitted',
@@ -299,6 +362,7 @@ return [
         'would_overbook' => 'Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.',
         'not_a_room' => 'Only a room can be lent to co-working.',
         'window_overlaps' => 'This room is already lent to co-working for part of that stretch.',
+        'window_in_past' => 'That stretch has already ended. Check the times, including AM/PM.',
 
         'invalid_code' => 'This code is not valid. Scan the code currently shown on the kiosk.',
         'ticket_expired' => 'This confirmation has expired. Scan the kiosk code again.',
@@ -309,6 +373,8 @@ return [
         'end_request_not_pending' => 'This end request is no longer pending.',
         'end_request_cancelled' => 'End request withdrawn.',
         'session_ended' => 'Session ended.',
+        'session_ended_paid' => 'Session ended and paid.',
+        'session_ended_unpaid' => 'Session ended. Payment is still due.',
         'reasons' => [
             'no_plan' => 'you have no active plan',
             'plan_expired' => 'your plan has expired',
@@ -374,7 +440,13 @@ return [
         'methods' => [
             'wallet' => 'Wallet points',
             'cash' => 'Cash at reception',
-            'paymera' => 'Card',
+            'paymera' => 'Paymera - Bank card',
+        ],
+
+        // What the member does next with a method, when its name alone
+        // does not say (PaymentMethodOptions `hint`).
+        'hints' => [
+            'cash_top_up' => 'Hand the cash to reception and the points are added to your wallet on the spot.',
         ],
 
         // Ledger descriptions — these land in the member's wallet history.
@@ -514,6 +586,7 @@ return [
         'cancelled' => 'This event is cancelled and registration is closed.',
         'not_available' => 'This event is currently not available for registration.',
         'closed' => 'Registration for this event has closed.',
+        'not_yet_open' => 'Registration for this event opens on :date.',
         'already_registered' => 'You are already registered for this event.',
         'full' => 'Sorry, this event is full. All seats are completely booked.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',

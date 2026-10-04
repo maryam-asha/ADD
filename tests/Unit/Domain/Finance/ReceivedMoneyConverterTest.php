@@ -78,14 +78,15 @@ class ReceivedMoneyConverterTest extends TestCase
     {
         ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => self::SYP_RATE]);
 
-        // 340 points = $34.00 = 499,800.07996... SYP -> up to the piaster.
+        // 340 points = $34.00 = 499,800.07996... SYP -> up to a whole pound:
+        // the pound has no piasters in use (decimal_places = 0).
         $amount = $this->converter()->pointsToAmount(340, 'SYP');
 
-        $this->assertSame('499800.08', $amount);
+        $this->assertSame('499801', $amount);
 
-        // Exactly enough: the quote buys the points, one piaster less does not.
+        // Enough: the quote buys the points, the whole pound below does not.
         $this->assertSame(340, $this->converter()->toPoints($amount, 'SYP')->points);
-        $this->assertSame(339, $this->converter()->toPoints('499800.07', 'SYP')->points);
+        $this->assertSame(339, $this->converter()->toPoints('499800', 'SYP')->points);
     }
 
     public function test_a_currency_with_no_rate_cannot_be_converted(): void

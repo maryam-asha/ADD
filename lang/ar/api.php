@@ -39,6 +39,30 @@ return [
         'insufficient_balance_for_plan' => 'الرصيد العام غير كافٍ لشراء هذه الباقة.',
         'amount_below_one_point' => 'المبلغ المدفوع أصغر من أن يُضاف كنقطة واحدة.',
         'top_up_below_minimum' => 'أقل مبلغ للشحن هو :amount :currency (:points نقاط).',
+
+        // The member's wallet history (WalletTransactionPresenter): what
+        // each row was, and the pool it moved.
+        'kinds' => [
+            'booking' => 'حجز',
+            'booking_extension' => 'تمديد حجز',
+            'coworking_session' => 'جلسة عمل مشترك',
+            'event_registration' => 'تسجيل في فعالية',
+            'plan_purchase' => 'شراء باقة',
+            'top_up' => 'شحن المحفظة',
+            'payment_received' => 'دفعة مستلمة',
+            'refund' => 'استرداد',
+            'reversal' => 'إلغاء دفعة بطاقة',
+            'subscription_grant' => 'نقاط الباقة',
+            'gift' => 'نقاط هدية',
+            'company_allocation' => 'تخصيص من الشركة',
+            'spend' => 'دفع',
+        ],
+        'categories' => [
+            'general' => 'الرصيد العام',
+            'cafe' => 'رصيد المقهى',
+            'printing_internet' => 'رصيد الطباعة والإنترنت',
+            'space_specific' => 'رصيد مساحة محددة',
+        ],
     ],
 
     'system' => [
@@ -49,6 +73,8 @@ return [
     ],
 
     'validation' => [
+        'amount_must_be_whole' => 'المبلغ بعملة :currency يجب أن يكون عدداً صحيحاً بدون فواصل عشرية.',
+        'amount_too_precise' => 'المبلغ بعملة :currency لا يقبل أكثر من :decimals منازل عشرية.',
         'reserved_field_key' => 'الحقل ":key" يؤخذ من حساب العضو ولا يمكن تعريفه في الفورم.',
         'vocabulary_not_an_object' => 'إعدادات التحقق يجب أن تكون كائناً.',
         'constraint_not_allowed_for_type' => '":key" ليس إعداداً يقبله حقل من نوع :type.',
@@ -62,6 +88,8 @@ return [
         'constraint_must_be_text' => '":key" يجب أن يكون نصاً.',
         'constraint_range_inverted' => '":min" يجب ألا يكون أكبر من ":max".',
         'amenity_not_available_for_space_type' => '":amenity" ليست من وسائل الراحة المتاحة لهذا النوع من المساحات.',
+        'registration_closes_after_start' => 'يجب أن يُغلق التسجيل قبل بدء الفعالية أو عند بدئها (:start).',
+        'registration_closes_before_it_opens' => 'يجب أن يكون إغلاق التسجيل بعد فتحه.',
         'failed' => 'البيانات المُرسلة غير صالحة.',
     ],
 
@@ -224,10 +252,27 @@ return [
         'rejected' => 'تم رفض الحجز.',
         'invalid_extension_duration' => 'مدة التمديد لا تستوفي الحد الأدنى للمدة أو متطلبات فترة الحجز.',
         'extension_conflict' => 'لا يمكن تمديد هذا الحجز إلى ما بعد :latest_end_at.',
+        'extension_past_closing' => 'لا يمكن تمديد هذا الحجز إلى ما بعد إغلاق الفرع عند :latest_end_at.',
+        'extension_not_allowed' => 'لا يمكن تمديد الحجوزات في هذه المساحة.',
+        'extension_outside_booking_time' => 'يمكن تمديد الحجز فقط أثناء وقته.',
+        'extension_seat_room_closes' => 'تعود الغرفة التي تجلس فيها من مساحة العمل المشتركة عند :latest_end_at، ولا يوجد مقعد آخر متاح بعدها.',
+        'extension_reasons' => [
+            'space_disallows' => 'لا يمكن تمديد الحجوزات في هذه المساحة.',
+            'not_checked_in' => 'يمكنك التمديد فقط وأنت مسجّل الدخول.',
+            'outside_booking_time' => 'يمكنك التمديد فقط أثناء وقت حجزك.',
+            'next_slot_booked' => 'الفترة التالية محجوزة، لذا لا يمكن تمديد حجزك.',
+            'branch_closing' => 'يُغلق الفرع عند انتهاء حجزك، لذا لا يمكن تمديده.',
+            'seat_room_closes' => 'تتوقف الغرفة التي تجلس فيها عن العمل كمساحة عمل مشتركة عند انتهاء حجزك، ولا يوجد مقعد آخر متاح.',
+        ],
         'extended' => 'تم تمديد الحجز.',
+        'extended_seat_moved' => 'تم تمديد الحجز. الغرفة التي تجلس فيها تعود من مساحة العمل المشتركة، لذا يرجى الانتقال إلى :place.',
         'wallet_not_owned' => 'أنت غير مخول بالسحب من هذه المحفظة.',
         'check_in_requires_approval' => 'يجب الموافقة على هذا الحجز قبل تسجيل دخوله.',
         'check_in_rejected' => 'تم رفض هذا الحجز ولا يمكن تسجيل دخوله.',
+        'check_in_no_show' => 'انتهى هذا الحجز دون تسجيل دخول ولم يعد بالإمكان تسجيل دخوله.',
+        'check_in_ended' => 'انتهى وقت هذا الحجز ولم يعد بالإمكان تسجيل دخوله.',
+        'not_cancellable' => 'هذا الحجز مغلق ولا يمكن إلغاؤه.',
+        'lapsed_unreviewed' => 'لم تتم مراجعة طلبك قبل موعد بدئه، فأُغلق تلقائياً.',
 
         // تقويم الإتاحة. المفتاحان الأولان يمثّلان حالتَي شريحة لا يقابلهما
         // خطأ في مسار الكتابة: الشريحة الماضية لا تُعرض أصلاً، والمساحة
@@ -246,6 +291,14 @@ return [
         'batch_partially_unavailable' => 'بعض التواريخ المختارة غير متاحة. لم يتم حجز أي منها.',
         'batch_created' => 'تم إنشاء :count حجز.',
         'cancellation_note' => 'يمكنك إلغاء هذا الحجز حتى :duration قبل وقت البدء.',
+        // سطرا اليوم والوقت في بطاقة القائمة.
+        'date_today' => 'اليوم، :date',
+        'date_tomorrow' => 'غداً، :date',
+        'time_range' => ':start - :end (:duration)',
+        // شاشة إلغاء الحجز في التفاصيل.
+        'cancel_until' => 'يمكنك إلغاء هذا الحجز حتى :at.',
+        'refund_to_own_wallet' => 'محفظتك',
+        'refund_to_company_wallet' => 'محفظة شركتك',
         'points_amount' => ':points نقطة',
         'vat_label' => 'ضريبة القيمة المضافة (:percent%)',
         'hours_times_rate' => ':duration × :rate / ساعة',
@@ -257,6 +310,15 @@ return [
             'pending' => 'قيد المراجعة',
             'rejected' => 'مرفوض',
             'cancelled' => 'ملغى',
+            'completed' => 'مكتمل',
+            'no_show' => 'لم يتم الحضور',
+        ],
+        // تظهر تحت الحالة فقط حين يختلف وضع المال بين حجزين لهما الحالة نفسها.
+        'status_notes' => [
+            'refunded' => 'أُعيدت النقاط إلى محفظتك.',
+            'payment_due' => 'يمكنك الدفع من التطبيق أو عند الاستقبال.',
+            'no_show_charged' => 'النقاط غير مستردة لأن الحجز لم يُلغَ قبل موعده النهائي.',
+            'no_show_free' => 'لا يترتب عليك أي مبلغ.',
         ],
         'steps' => [
             'submitted' => 'تم الإرسال',
@@ -298,6 +360,7 @@ return [
         'would_overbook' => 'مقاعد العمل المشترك في تلك الفترة محسوب عليها بالفعل؛ واسترجاعها سيتجاوز سعة مساحة العمل المشتركة.',
         'not_a_room' => 'يمكن إعارة الغرف فقط لمساحة العمل المشتركة.',
         'window_overlaps' => 'هذه الغرفة مُعارة بالفعل لمساحة العمل المشتركة في جزء من تلك الفترة.',
+        'window_in_past' => 'هذه الفترة انتهت بالفعل. تحقق من الأوقات، بما فيها صباحاً/مساءً.',
 
         'invalid_code' => 'هذا الرمز غير صالح. امسح الرمز الظاهر حالياً على الكشك.',
         'ticket_expired' => 'انتهت مهلة التأكيد. امسح رمز الكشك من جديد.',
@@ -308,6 +371,8 @@ return [
         'end_request_not_pending' => 'طلب الإنهاء هذا لم يعد قيد الانتظار.',
         'end_request_cancelled' => 'تم سحب طلب الإنهاء.',
         'session_ended' => 'تم إنهاء الجلسة.',
+        'session_ended_paid' => 'تم إنهاء الجلسة ودفعها.',
+        'session_ended_unpaid' => 'تم إنهاء الجلسة. الدفع ما زال مستحقاً.',
         'reasons' => [
             'no_plan' => 'لا توجد لديك باقة فعّالة',
             'plan_expired' => 'انتهت صلاحية باقتك',
@@ -366,7 +431,13 @@ return [
         'methods' => [
             'wallet' => 'نقاط المحفظة',
             'cash' => 'نقداً في الاستقبال',
-            'paymera' => 'بطاقة',
+            'paymera' => 'بيميرا - بطاقة بنكية',
+        ],
+
+        // What the member does next with a method, when its name alone
+        // does not say (PaymentMethodOptions `hint`).
+        'hints' => [
+            'cash_top_up' => 'سلّم المبلغ نقداً في الاستقبال وتُضاف النقاط إلى محفظتك فوراً.',
         ],
 
         'credit_description' => 'دفع بالبطاقة :reference',
@@ -505,6 +576,7 @@ return [
         'cancelled' => 'هذه الفعالية ملغاة ولا يمكن التسجيل فيها.',
         'not_available' => 'الفعالية غير متاحة للتسجيل حالياً.',
         'closed' => 'انتهى موعد التسجيل في هذه الفعالية.',
+        'not_yet_open' => 'يبدأ التسجيل في هذه الفعالية بتاريخ :date.',
         'already_registered' => 'أنت مسجل بالفعل في هذه الفعالية.',
         'full' => 'عذراً، هذه الفعالية ممتلئة وجميع المقاعد محجوزة بالكامل.',
         'insufficient_points' => 'رصيدك الحالي :current نقطة، بينما تكلفة التسجيل هي :required نقطة (ينقصك :shortage نقطة).',

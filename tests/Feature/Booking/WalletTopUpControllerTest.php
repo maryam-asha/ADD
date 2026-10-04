@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -122,9 +125,9 @@ class WalletTopUpControllerTest extends TestCase
     public function test_top_up_rejects_an_inactive_company(): void
     {
         $this->actingAsOperations();
-        $company = Company::factory()->create(['status' => \App\Domain\Identity\Enums\CompanyStatus::Active]);
+        $company = Company::factory()->create(['status' => CompanyStatus::Active]);
         Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        $company->update(['status' => \App\Domain\Identity\Enums\CompanyStatus::Inactive]);
+        $company->update(['status' => CompanyStatus::Inactive]);
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
@@ -179,25 +182,46 @@ class WalletTopUpControllerTest extends TestCase
         ])->assertForbidden();
     }
 
+    /** The pound has no piasters in use: an SYP amount is whole ("5000.00" is). */
+    public function test_a_syrian_amount_with_piasters_is_refused(): void
+    {
+        $this->actingAsOperations();
+        $member = User::factory()->create();
+        Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        ExchangeRate::create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000666667',
+            'source' => ExchangeRateSource::Manual,
+            'effective_from' => now()->subMinute(),
+        ]);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'amount' => '150000.50',
+            'currency' => 'SYP',
+            'payment_method' => 'cash',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['amount' => 'must be a whole number']);
+    }
+
     public function test_operations_can_top_up_in_foreign_currency_with_conversion(): void
     {
         $this->actingAsOperations();
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
 
-        \App\Domain\Finance\Models\Currency::firstOrCreate(
+        Currency::firstOrCreate(
             ['code' => 'USD'],
             ['name' => 'US Dollar', 'symbol' => '$', 'is_base' => true, 'is_active' => true]
         );
-        \App\Domain\Finance\Models\Currency::firstOrCreate(
+        Currency::firstOrCreate(
             ['code' => 'SYP'],
             ['name' => 'Syrian Pound', 'symbol' => 'LS', 'is_base' => false, 'is_active' => true]
         );
 
-        \App\Domain\Finance\Models\ExchangeRate::create([
+        ExchangeRate::create([
             'currency_code' => 'SYP',
             'rate_to_base' => '0.0000666667',
-            'source' => \App\Domain\Finance\Enums\ExchangeRateSource::Manual,
+            'source' => ExchangeRateSource::Manual,
             'effective_from' => now()->subMinute(),
         ]);
 

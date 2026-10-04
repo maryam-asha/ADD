@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Exceptions\PaymentPricingException;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Membership\Models\Plan;
 use InvalidArgumentException;
@@ -108,7 +109,9 @@ class PaymentAmountCalculator
         $factor = bcpow('10', (string) $this->exponent(), 0);
 
         // Half up to a whole unit: add half a unit, then truncate.
-        $whole = bcdiv(bcadd((string) $this->pointsToMinor($points), bcdiv($factor, '2', 0), 0), $factor, 0);
+        // From the exact amount, not pointsToMinor()'s rounded-up one: the
+        // minimum is the nearest whole unit, which may be just below it.
+        $whole = bcdiv(bcadd((string) $this->exactMinor($points), bcdiv($factor, '2', 0), 0), $factor, 0);
 
         return [
             'points' => $points,
@@ -127,6 +130,23 @@ class PaymentAmountCalculator
      * a fraction of a unit of value per purchase.
      */
     public function pointsToMinor(int $points): int
+    {
+        $minor = $this->exactMinor($points);
+
+        // The gateway counts in minor units its currency may not use: a card
+        // charge in Syrian pounds is a whole pound (currencies.decimal_places
+        // = 0), so it is rounded up to a whole number of the units it uses.
+        $decimals = (int) (Currency::query()->whereKey($this->currencyCode())->value('decimal_places') ?? $this->exponent());
+        $step = 10 ** max(0, $this->exponent() - $decimals);
+
+        return (int) (ceil($minor / $step) * $step);
+    }
+
+    /**
+     * Gateway minor units for a point count, rounded up to the minor unit
+     * only — before pointsToMinor() takes it to a unit the currency uses.
+     */
+    private function exactMinor(int $points): int
     {
         $usd = $this->points->pointsToUsd($points);
         $charged = $this->usdToCharged($usd);

@@ -21,7 +21,7 @@ class CurrencySeeder extends Seeder
             [
                 'name' => ['ar' => 'ليرة سورية', 'en' => 'Syrian Pound'],
                 'symbol' => 'ل.س',
-                'decimal_places' => 2,
+                'decimal_places' => 0,
                 'is_base' => false,
                 'is_active' => true,
                 'order' => 1,

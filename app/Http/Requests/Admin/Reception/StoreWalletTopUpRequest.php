@@ -9,6 +9,7 @@ use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
+use App\Rules\AmountFitsCurrency;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -26,7 +27,7 @@ class StoreWalletTopUpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'amount' => ['required', 'numeric', 'min:0.01', new AmountFitsCurrency($this->input('currency'))],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
