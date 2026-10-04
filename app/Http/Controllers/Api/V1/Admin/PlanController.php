@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanDiscount;
 use App\Http\Requests\Admin\StorePlanRequest;
 use App\Http\Requests\Admin\UpdatePlanRequest;
 use App\Http\Resources\PlanResource;
@@ -104,10 +105,7 @@ class PlanController extends AdminResourceController
             }
 
             if ($hasDiscounts) {
-                $plan->discounts()->delete();
-                if (! empty($discountsData)) {
-                    $plan->discounts()->createMany($discountsData);
-                }
+                $this->reconcileDiscounts($plan, $discountsData);
             }
 
             if ($hasResourceGrants) {
@@ -119,5 +117,38 @@ class PlanController extends AdminResourceController
         });
 
         return response()->json(['message' => __('api.admin.plan_updated')]);
+    }
+
+    /**
+     * Discounts named by `id` are edited in place and the rest created. One
+     * left out of the payload is deleted — unless a booking was priced with
+     * it: its redemption rows are the booking's record of what it got (what
+     * an extension and a check-out are priced from, and what `usage_limit`
+     * counts), so it is switched off instead (docs/decisions/plan-discounts-design.md).
+     *
+     * @param  list<array<string, mixed>>  $discountsData
+     */
+    private function reconcileDiscounts(Plan $plan, array $discountsData): void
+    {
+        $kept = [];
+
+        foreach ($discountsData as $data) {
+            $id = $data['id'] ?? null;
+            unset($data['id']);
+
+            if ($id !== null) {
+                $plan->discounts()->whereKey($id)->firstOrFail()->update($data);
+                $kept[] = (int) $id;
+            } else {
+                $kept[] = $plan->discounts()->create($data)->id;
+            }
+        }
+
+        $plan->discounts()
+            ->whereNotIn('id', $kept)
+            ->get()
+            ->each(fn (PlanDiscount $discount) => $discount->redemptions()->exists()
+                ? $discount->update(['is_active' => false])
+                : $discount->delete());
     }
 }

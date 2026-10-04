@@ -2,10 +2,15 @@
 
 namespace Tests\Feature\Membership;
 
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanDiscount;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Models\PlanModule;
 use App\Domain\Membership\Models\ResourceType;
 use Database\Seeders\RoleSeeder;
@@ -397,5 +402,92 @@ class PlanCatalogTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['discounts.0.space_id']);
+    }
+
+    /**
+     * A discount a booking was priced with is history: the redemption row
+     * that records it must survive the plan being edited, or the booking
+     * loses what its extension and check-out are priced from — and the
+     * discount's usage allowance silently resets
+     * (docs/decisions/plan-discounts-design.md).
+     */
+    public function test_updating_a_plan_deactivates_a_used_discount_instead_of_deleting_it(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $plan = Plan::factory()->create();
+        $used = $plan->discounts()->create(['percentage' => 30, 'space_type' => SpaceType::Room]);
+        $unused = $plan->discounts()->create(['percentage' => 10]);
+        $redemption = $this->redeem($used, $plan);
+
+        $this->putJson("/api/v1/admin/plans/{$plan->id}", $this->payload([
+            'discounts' => [
+                ['percentage' => 20, 'space_type' => SpaceType::Room->value],
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseHas('plan_discounts', ['id' => $used->id, 'is_active' => false]);
+        $this->assertDatabaseMissing('plan_discounts', ['id' => $unused->id]);
+        $this->assertDatabaseHas('plan_discount_redemptions', ['id' => $redemption->id]);
+        $this->assertDatabaseHas('plan_discounts', ['plan_id' => $plan->id, 'percentage' => 20, 'is_active' => true]);
+    }
+
+    public function test_updating_a_plan_discount_by_id_edits_it_in_place(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $plan = Plan::factory()->create();
+        $discount = $plan->discounts()->create(['percentage' => 30, 'usage_limit' => 3]);
+        $redemption = $this->redeem($discount, $plan);
+
+        $this->putJson("/api/v1/admin/plans/{$plan->id}", $this->payload([
+            'discounts' => [
+                ['id' => $discount->id, 'percentage' => 25, 'usage_limit' => 5],
+            ],
+        ]))->assertOk();
+
+        $this->assertDatabaseCount('plan_discounts', 1);
+        $this->assertDatabaseHas('plan_discounts', ['id' => $discount->id, 'percentage' => 25, 'usage_limit' => 5, 'is_active' => true]);
+        $this->assertDatabaseHas('plan_discount_redemptions', ['id' => $redemption->id]);
+    }
+
+    public function test_a_discount_id_from_another_plan_is_rejected(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $plan = Plan::factory()->create();
+        $foreign = Plan::factory()->create()->discounts()->create(['percentage' => 30]);
+
+        $this->putJson("/api/v1/admin/plans/{$plan->id}", $this->payload([
+            'discounts' => [
+                ['id' => $foreign->id, 'percentage' => 25],
+            ],
+        ]))->assertStatus(422)->assertJsonValidationErrors(['discounts.0.id']);
+
+        $this->assertDatabaseHas('plan_discounts', ['id' => $foreign->id, 'percentage' => 30]);
+    }
+
+    private function redeem(PlanDiscount $discount, Plan $plan): PlanDiscountRedemption
+    {
+        $member = User::factory()->create();
+        $membership = Membership::factory()->create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+        ]);
+        $booking = Booking::factory()->create(['user_id' => $member->id]);
+
+        return PlanDiscountRedemption::create([
+            'plan_discount_id' => $discount->id,
+            'membership_id' => $membership->id,
+            'booking_id' => $booking->id,
+            'points_discounted' => 30,
+        ]);
     }
 }
