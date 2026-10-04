@@ -315,6 +315,7 @@ class BookingController extends Controller
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
                 $request->validated('payment_method'),
+                $request->validated('coupon_code'),
             );
         } catch (BatchUnavailableException $e) {
             return response()->json([
