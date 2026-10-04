@@ -46,6 +46,30 @@ class PaymentMethodRegistry
     }
 
     /**
+     * Every registered method, enabled or not, in config order — what the
+     * dashboard lists. Nothing may be opened through a disabled one; use
+     * `enabled()`/`get()` for that.
+     *
+     * @return array<string, array{driver: PaymentMethodDriver, enabled: bool, gateway: bool}>
+     */
+    public function all(): array
+    {
+        $methods = [];
+
+        foreach ($this->definitions() as $key => $definition) {
+            $driver = $this->make($key, $definition);
+
+            $methods[$key] = [
+                'driver' => $driver,
+                'enabled' => $this->isEnabled($definition),
+                'gateway' => $driver instanceof PaymentGateway,
+            ];
+        }
+
+        return $methods;
+    }
+
+    /**
      * @throws UnknownPaymentMethodException when the key is not registered or is disabled
      */
     public function get(string $key): PaymentMethodDriver

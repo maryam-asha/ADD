@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
@@ -446,6 +447,10 @@ Route::middleware('role:admin')->group(function () {
  * paying and settled by the gateway, never edited by hand.
  */
 Route::get('payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+// Totals over the same filters as the list; before payments/{payment}, which would take it for an id.
+Route::get('payments/summary', [AdminPaymentController::class, 'summary'])->name('payments.summary');
+// Every payment method in config, enabled or not, with how it has been used. Read-only.
+Route::get('payment-methods', [AdminPaymentMethodController::class, 'index'])->name('payment-methods.index');
 Route::get('payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
 
 Route::withoutMiddleware('role:admin|operations')->group(function () {
