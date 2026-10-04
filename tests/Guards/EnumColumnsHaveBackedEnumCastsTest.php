@@ -66,6 +66,12 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Pricing\Enums\CouponDiscountType;
+use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\Models\CouponTarget;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
@@ -150,6 +156,18 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ExchangeRateSuggestion::class => [
             'source' => ExchangeRateSuggestionSource::class,
             'status' => ExchangeRateSuggestionStatus::class,
+        ],
+        Coupon::class => [
+            'source' => CouponSource::class,
+            'discount_type' => CouponDiscountType::class,
+        ],
+        CouponTarget::class => [
+            'purpose' => PricingPurpose::class,
+            'space_type' => SpaceType::class,
+        ],
+        CouponRedemption::class => [
+            'purpose' => PricingPurpose::class,
+            'discount_type' => CouponDiscountType::class,
         ],
         Payment::class => [
             'status' => PaymentStatus::class,
