@@ -52,7 +52,7 @@ reception columns `collected_via`, `received_amount`, `received_currency`,
 | key | class | pays for | `start()` |
 |---|---|---|---|
 | `wallet` | `WalletMethod` | everything but a top-up | picks the wallet, checks it covers the whole amount, settles now → `done` |
-| `cash` | `CashMethod` | everything but a top-up and an extension | a plan: pending hold with `expires_at`; anything else: **no row** → `pay_at_reception` |
+| `cash` | `CashMethod` | everything but an extension | a plan: pending hold with `expires_at`; anything else (a top-up included): **no row** → `pay_at_reception` |
 | `paymera` | `PaymeraGateway` | everything but an extension | freezes the card charge on the row, opens the hosted page → `redirect` |
 
 **Fulfillers** (`App\Domain\Finance\Payments\Fulfillers`), one per purpose,
@@ -90,7 +90,7 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 | multi-date booking (`/batch`) | one wallet for the total, one payment per booking | unpaid | refused (validation) |
 | event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens |
 | anything unpaid (`POST member/payments`) | yes | `pay_at_reception` | yes |
-| top-up | — | reception only (`wallet-top-ups`) | yes |
+| top-up | — | directions only (`pay_at_reception`, no row, no amount; `hint` in payment-methods); reception credits it through `wallet-top-ups` and the member is notified | yes |
 
 Reception: `POST admin/reception/payments/settle` settles any of the four with
 the amount received; `GET admin/reception/outstanding?user_id=` lists
@@ -105,6 +105,33 @@ It is the one place the app reads payment methods; `member/wallet/options`
 is kept only for the app version that still calls it. The app then reads a `payment` block
 (`PaymentStatePresenter`) on bookings, sessions, the session report and
 event registrations.
+
+## The member's wallet
+
+Added 2026-10-03. The ledger seen from the app, for the member's personal
+wallet only (company wallets are spent through the payment flows, never
+listed):
+
+- `GET member/wallet` — the balance per category (`WalletService::balances()`),
+  General first.
+- `GET member/wallet/transactions` — the rows, newest first, paginated;
+  filters `type` (credit/debit), `category`, `from`/`to` (local days).
+- `GET member/wallet/transactions/{id}` — one row as a receipt, with the
+  balance of its pool before and after it (`WalletService::balanceAfter()`:
+  the eligible rows up to it, less credits already expired by then). Another
+  wallet's row is a 404.
+
+Topping the wallet up stays `POST member/payments` with
+`purpose: wallet_top_up` — deliberately no wallet-specific alias, so there
+is one way to do it.
+
+A row is named by the payment it belongs to — `WalletTransaction`'s
+`creditPayment`/`debitPayment`/`refundPayment` (the reverse of
+`wallet_transaction_id`/`debit_transaction_id`/`refund_transaction_id`) — not
+by its stored English `description`, which only names rows no payment
+explains (`WalletTransactionPresenter`). Every payment carries
+`transaction_id` (its debit, else its credit), so the app can open the
+receipt for a payment it just made.
 
 ## Adding a gateway
 

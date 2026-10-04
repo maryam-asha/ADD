@@ -10,6 +10,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\SyncPaymentStatus;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -101,6 +102,35 @@ class PaymentNotificationsTest extends TestCase
         $notification = Notification::sent($member, GeneralNotification::class)->first();
         $data = $notification->toArray($member);
         $this->assertSame(Payment::sole()->id, $data['data']['payment_id'] ?? $data['payment_id'] ?? null);
+    }
+
+    public function test_a_wallet_topped_up_at_reception_is_announced(): void
+    {
+        $member = $this->member();
+        Sanctum::actingAs($this->operator(), ['*']);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id, 'amount' => '25.00', 'payment_method' => 'cash',
+        ])->assertCreated();
+
+        $this->assertTold($member, 'payment.received');
+        $data = Notification::sent($member, GeneralNotification::class)->first()->toArray($member);
+        $this->assertSame(Payment::sole()->id, $data['data']['payment_id'] ?? $data['payment_id'] ?? null);
+    }
+
+    public function test_a_company_wallet_topped_up_at_reception_tells_nobody(): void
+    {
+        $company = Company::factory()->create();
+        Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        $operator = $this->operator();
+        Sanctum::actingAs($operator, ['*']);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'company_id' => $company->id, 'amount' => '50.00', 'payment_method' => 'cash',
+        ])->assertCreated();
+
+        // The payer recorded for a company is whoever took the money.
+        $this->assertNotTold($operator, 'payment.received');
     }
 
     public function test_a_card_payment_accepted_by_the_gateway_is_announced(): void

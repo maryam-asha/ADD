@@ -43,6 +43,11 @@ class PaymentResource extends JsonResource
             // What the payment is worth in points, whatever the method.
             'amount_points' => $this->amount_points,
 
+            // The row it shows up as in the member's wallet history
+            // (member/wallet/transactions/{id}): the spend, or for money
+            // that only came in (a top-up), the credit. Null until settled.
+            'transaction_id' => $this->debit_transaction_id ?? $this->wallet_transaction_id,
+
             // What it pays for, as the morph alias plus the id — enough for
             // the client to find the booking or session without a second
             // model being loaded here.

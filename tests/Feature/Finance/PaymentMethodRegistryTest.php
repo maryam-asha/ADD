@@ -151,10 +151,10 @@ class PaymentMethodRegistryTest extends TestCase
     {
         config(['payments.methods.offline' => ['driver' => FakeOfflineMethod::class, 'enabled' => true]]);
 
-        // Paymera and the fake gateway take top-ups; the offline stub takes
-        // only bookings.
+        // Cash (as directions to the desk), Paymera and the fake gateway take
+        // top-ups; the offline stub takes only bookings.
         $this->assertSame(
-            ['paymera', 'fake'],
+            ['cash', 'paymera', 'fake'],
             array_keys($this->registry()->availableFor(PaymentPurpose::WalletTopUp))
         );
         // Paymera pays for anything but an extension; the fake gateway only

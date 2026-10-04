@@ -253,6 +253,51 @@ class WalletService
     }
 
     /**
+     * Unlocked read of what `$user` may spend from `$wallet` in each
+     * category, General first — the wallet screen's balances. Every
+     * category is listed, empty or not, so a client can rely on the keys.
+     *
+     * @return array<string, int> category value => points
+     */
+    public function balances(Wallet $wallet, User $user): array
+    {
+        $balances = [];
+
+        foreach (WalletTransactionCategory::cases() as $category) {
+            $balances[$category->value] = $this->eligibleBalance($wallet, $user, $category);
+        }
+
+        return $balances;
+    }
+
+    /**
+     * The balance of `$transaction`'s own pool (its category, as `$user`
+     * may spend it) the moment the row was written — the "balance after"
+     * of a receipt; subtract the row's amount for "before". Rows are
+     * append-only, so the pool then is every eligible row up to this one,
+     * less credits that had already expired by that moment.
+     */
+    public function balanceAfter(WalletTransaction $transaction, User $user): int
+    {
+        $transactions = WalletTransaction::query()
+            ->where('wallet_id', $transaction->wallet_id)
+            ->where('category', $transaction->category)
+            ->where('id', '<=', $transaction->id)
+            ->where(function ($query) use ($transaction) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', $transaction->created_at);
+            })
+            ->with('allowedUsers')
+            ->get();
+
+        $eligible = $transactions->filter(
+            fn (WalletTransaction $row) => $row->allowedUsers->isEmpty()
+                || $row->allowedUsers->contains('id', $user->id)
+        );
+
+        return $this->sumAmounts($eligible);
+    }
+
+    /**
      * Sums the wallet's non-expired General transactions with
      * `lockForUpdate()` — the row locking `debitGeneral()` uses to prevent
      * two concurrent debits from both reading the same balance.

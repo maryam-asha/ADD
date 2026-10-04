@@ -57,7 +57,12 @@ class PaymentStateBlockTest extends TestCase
         return app(PaymentStatePresenter::class);
     }
 
-    public function test_a_booking_reads_unpaid_then_paid_and_keeps_its_old_keys(): void
+    /**
+     * The detail keeps paid/unpaid and the payment to follow; the rest of
+     * the payment block left it on 2026-10-04
+     * (docs/decisions/booking-outcomes-and-extension.md).
+     */
+    public function test_a_booking_reads_unpaid_then_paid(): void
     {
         $member = $this->member(300);
         $booking = Booking::factory()->create([
@@ -71,25 +76,23 @@ class PaymentStateBlockTest extends TestCase
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}")
             ->assertOk()
-            ->assertJsonPath('data.payment.state', 'unpaid')
-            ->assertJsonPath('data.payment.source', null)
-            ->assertJsonPath('data.payment.amount_points', 100)
-            ->assertJsonPath('data.payment.awaiting_payment', false)
-            ->assertJsonPath('data.payment.payment_id', null);
+            ->assertJsonPath('data.payment_state', 'unpaid')
+            ->assertJsonPath('data.total.points', 100)
+            ->assertJsonPath('data.awaiting_payment', false)
+            ->assertJsonPath('data.payment_id', null);
 
         $this->postJson('/api/v1/member/payments', ['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
             ->assertCreated();
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}")
             ->assertOk()
-            ->assertJsonPath('data.payment.state', 'paid')
-            ->assertJsonPath('data.payment.method', 'wallet')
-            ->assertJsonPath('data.payment.payment_id', Payment::sole()->id);
+            ->assertJsonPath('data.payment_state', 'paid')
+            ->assertJsonPath('data.payment_id', Payment::sole()->id);
 
-        $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=all')
+        // The list card says paid or unpaid; the payment block is the detail's.
+        $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings')
             ->assertOk()
-            ->assertJsonPath('data.0.payment.state', 'paid')
-            ->assertJsonPath('data.0.payment.amount_points', 100);
+            ->assertJsonPath('data.0.payment_state', 'paid');
     }
 
     public function test_a_card_payment_in_flight_reads_pending(): void

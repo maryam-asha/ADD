@@ -28,33 +28,62 @@ class PriceLabelPresenter
     ) {}
 
     /**
-     * A space's hourly rate, e.g. `3.00 $ / hour` and `30 pts / hour`.
+     * A space's hourly rate: price and points as numbers along with labels.
      *
-     * @return array{price: string, price_point: string}
+     * @return array{
+     *     points: int,
+     *     points_label: string,
+     *     price: int|float,
+     *     price_label: string,
+     *     currency: string
+     * }
      */
-    public function hourly(int $points, ?User $user): array
+    public function hourly(int $points, ?User $user, ?string $locale = null): array
     {
-        $perHour = __('api.space.per_hour');
+        $locale ??= app()->getLocale();
+        $perHour = __('api.space.per_hour', [], $locale);
         [$amount, $currency] = $this->amountFor($points, $user);
+        $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
 
         return [
-            'price' => $this->currencyLabel($amount, $currency).' / '.$perHour,
-            'price_point' => __('api.space.price_points', ['points' => number_format($points)]).' / '.$perHour,
+            'points' => $points,
+            'points_label' => __('api.space.price_points', ['points' => number_format($points)], $locale).' / '.$perHour,
+            'price' => $numericPrice,
+            'price_label' => $this->currencyLabel($amount, $currency, $locale).' / '.$perHour,
+            'currency' => $currency,
         ];
     }
 
     /**
-     * A whole amount due, e.g. `10.00 $` and `100 pts`.
+     * A whole amount due: price and points as numbers along with labels.
      *
-     * @return array{price: string, price_point: string}
+     * @return array{
+     *     points: int,
+     *     points_label: string,
+     *     price: string,
+     *     price_numeric: int|float,
+     *     price_label: string,
+     *     price_point: string,
+     *     currency: string
+     * }
      */
-    public function total(int $points, ?User $user): array
+    public function total(int $points, ?User $user, ?string $locale = null): array
     {
+        $locale ??= app()->getLocale();
         [$amount, $currency] = $this->amountFor($points, $user);
+        $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
+
+        $priceLabel = $this->currencyLabel($amount, $currency, $locale);
+        $pointsLabel = __('api.space.price_points', ['points' => number_format($points)], $locale);
 
         return [
-            'price' => $this->currencyLabel($amount, $currency),
-            'price_point' => __('api.space.price_points', ['points' => number_format($points)]),
+            'points' => $points,
+            'points_label' => $pointsLabel,
+            'price' => $priceLabel,
+            'price_numeric' => $numericPrice,
+            'price_label' => $priceLabel,
+            'price_point' => $pointsLabel,
+            'currency' => $currency,
         ];
     }
 
@@ -69,19 +98,40 @@ class PriceLabelPresenter
      * number — the convention both `ل.س` and `$` read correctly in here,
      * and the one the dashboard already uses.
      *
-     * Falls back to the currency code when a row carries no symbol, so an
-     * admin adding a currency without one degrades to "1,000 EUR" rather
-     * than a bare number.
+     * When locale is English, Arabic symbols (e.g. `ل.س`) fall back to the
+     * ISO code (`SYP`) to avoid mixed-language labels.
      */
-    public function currencyLabel(string $amount, string $currencyCode): string
+    public function currencyLabel(string $amount, string $currencyCode, ?string $locale = null): string
     {
+        $locale ??= app()->getLocale();
+
         // Memoised for the request: a listing formats a price per card.
         $currency = $this->currencyRows[$currencyCode] ??= Currency::find($currencyCode);
 
-        $decimals = $currency?->decimal_places ?? 2;
-        $symbol = $currency?->symbol ?: $currencyCode;
+        $floatVal = (float) $amount;
+        $isWhole = $floatVal == (int) $floatVal;
+        $decimals = $isWhole ? 0 : ($currency?->decimal_places ?? 2);
+        $symbol = $this->resolveSymbol($currencyCode, $currency?->symbol, $locale);
 
-        return number_format((float) $amount, $decimals).' '.$symbol;
+        return number_format($floatVal, $decimals).' '.$symbol;
+    }
+
+    private function resolveSymbol(string $currencyCode, ?string $symbol, string $locale): string
+    {
+        if ($locale === 'ar') {
+            if ($currencyCode === 'SYP') {
+                return 'ل.س';
+            }
+
+            return $symbol ?: $currencyCode;
+        }
+
+        // Non-Arabic locales: if symbol is SYP or contains Arabic characters, use currency code.
+        if ($currencyCode === 'SYP' || ($symbol !== null && preg_match('/\p{Arabic}/u', $symbol))) {
+            return $currencyCode;
+        }
+
+        return $symbol ?: $currencyCode;
     }
 
     /**

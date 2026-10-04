@@ -17,8 +17,11 @@ use App\Domain\Finance\Payments\PaymentStart;
  * is no membership yet to be unpaid), so a plan bought with cash is held as
  * a pending payment that expires: see createsPendingRowFor().
  *
- * Not for a top-up: cash for points is taken at the desk, through the
- * reception top-up, never announced from the app.
+ * A top-up is offered too, but only as directions: choosing it writes
+ * nothing and answers `pay_at_reception`. The member hands the cash over at
+ * the desk, which credits it through the reception top-up — what they
+ * actually hand over is the amount, so a request made in advance would only
+ * hold a figure nobody uses, and a row someone has to expire.
  */
 class CashMethod implements PaymentMethodDriver
 {
@@ -35,12 +38,12 @@ class CashMethod implements PaymentMethodDriver
     }
 
     /**
-     * Not an extension either: it is settled from the wallet as it happens,
-     * or the booking is left owing it.
+     * Not an extension: it is settled from the wallet as it happens, or the
+     * booking is left owing it.
      */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return ! in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::BookingExtension], true);
+        return $purpose !== PaymentPurpose::BookingExtension;
     }
 
     /**

@@ -30,6 +30,15 @@ use Illuminate\Support\Facades\Route;
 // company member is still just a `member` role-wise (D.8), so this group
 // covers both individual and company-affiliated members with no split.
 
+// The member's own (personal) wallet: balances per category, the history
+// newest first, and one row as a receipt with the balance either side of
+// it. Topping it up is a payment like any other: POST payments with
+// purpose wallet_top_up (options and minimum from GET
+// payment-methods?purpose=wallet_top_up).
+Route::get('wallet', [WalletController::class, 'show']);
+Route::get('wallet/transactions', [WalletController::class, 'transactions']);
+Route::get('wallet/transactions/{transaction}', [WalletController::class, 'transaction'])->whereNumber('transaction');
+
 // docs/decisions/wallet-points-categorization.md ("Routing for a user with
 // both a personal wallet and a company membership") — the read side of the
 // hybrid-routing choice: every currently-spendable wallet for a category,
@@ -57,6 +66,9 @@ Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::cl
 // booking creation with slot granularity/buffer/approval rules.
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
+// How far a running booking can be extended, and at what price
+// (docs/decisions/booking-outcomes-and-extension.md).
+Route::get('bookings/{booking}/extension-options', [BookingController::class, 'extensionOptions']);
 
 // The member's own bookings: the list with its tab counts, one booking's
 // detail with the approval stepper, self-service cancellation (the same
@@ -65,6 +77,9 @@ Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
 // Static segments before the wildcard so `preview` is not swallowed by
 // `{booking}`.
 Route::get('bookings', [BookingController::class, 'index']);
+// The statuses and tabs the app draws badges and filters from
+// (docs/decisions/booking-outcomes-and-extension.md).
+Route::get('bookings/statuses', [BookingController::class, 'statuses']);
 Route::post('bookings/preview', [BookingController::class, 'preview']);
 // The multi-select date strip: several windows, one request, all or
 // nothing. Partial success would leave the member part-charged for a

@@ -8,6 +8,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Payments\PaymentNotifier;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
@@ -99,6 +100,7 @@ class WalletTopUpController extends Controller
         PointConversionService $points,
         CurrencyConversionService $conversion,
         ReceivedMoneyConverter $converter,
+        PaymentNotifier $notifier,
     ): JsonResponse {
         [$ownerType, $ownerId] = $request->validated('company_id')
             ? [OwnerType::Company, (int) $request->validated('company_id')]
@@ -127,7 +129,7 @@ class WalletTopUpController extends Controller
         // rate. Previously these were two writes with no transaction.
         $transaction = DB::transaction(function () use (
             $wallets, $wallet, $pointsCredited, $request,
-            $paymentCurrency, $paymentAmount, $exchangeRate, $pointRate
+            $paymentCurrency, $paymentAmount, $exchangeRate, $pointRate, $notifier
         ) {
             $transaction = $wallets->creditGeneral(
                 $wallet,
@@ -165,6 +167,14 @@ class WalletTopUpController extends Controller
                 'received_at' => now(),
                 'settled_at' => now(),
             ])->save();
+
+            // The member hears their wallet was topped up, as they do for a
+            // card top-up. Not for a company: the payer recorded there is
+            // whoever took the money, not anyone waiting on it. Sent after
+            // commit (PaymentNotifier), so a rolled-back top-up says nothing.
+            if ($wallet->owner_type === OwnerType::User) {
+                $notifier->received($payment);
+            }
 
             return $transaction;
         });

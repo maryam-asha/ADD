@@ -2,7 +2,6 @@
 
 namespace App\Domain\Finance\Payments\Fulfillers;
 
-use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\AmountCalculator;
@@ -67,7 +66,7 @@ class BookingFulfiller extends SessionPaymentFulfiller
     {
         $booking = $this->session($payment);
 
-        if (in_array($booking->status, [BookingStatus::Cancelled, BookingStatus::Rejected], true)) {
+        if (! $booking->status->isPayable()) {
             throw new ReceptionActionException('api.payment.booking_not_payable');
         }
 

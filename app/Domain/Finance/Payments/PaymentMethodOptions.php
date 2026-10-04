@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Payments;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -15,7 +16,8 @@ use Illuminate\Database\Eloquent\Model;
  * What the app shows before a member pays for something: how much it costs
  * in points, and every enabled method that can pay for it — in config order,
  * so a gateway added to config/payments.php appears here with no other
- * change — each saying whether it can pay right now and, if not, why.
+ * change — each saying whether it can pay right now and, if not, why, and
+ * `hint`: what the member does next, when the label alone does not say.
  *
  * The wallet method also lists the wallets the member may spend from, each
  * with its usable balance and whether it covers the amount, so the app can
@@ -46,10 +48,15 @@ class PaymentMethodOptions
         $methods = [];
 
         foreach ($drivers as $key => $driver) {
-            $option = ['key' => $key, 'label' => $driver->label(), 'available' => true, 'reason' => null];
+            $option = ['key' => $key, 'label' => $driver->label(), 'available' => true, 'reason' => null, 'hint' => null];
 
             if ($key === WalletMethod::KEY) {
                 $option = $this->walletOption($option, $purpose, $member, $points);
+            }
+
+            // Cash for a top-up starts nothing: it tells the member where to go.
+            if ($key === CashMethod::KEY && $purpose === PaymentPurpose::WalletTopUp) {
+                $option['hint'] = __('api.payment.hints.cash_top_up');
             }
 
             $methods[] = $option;
