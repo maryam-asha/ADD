@@ -18,6 +18,7 @@ use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Pricing\Services\CouponApplication;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
@@ -59,6 +60,7 @@ class PaymentController extends Controller
         MemberPayables $payables,
         CouponEligibility $coupons,
         PriceQuoteService $quotes,
+        CouponApplication $application,
     ): JsonResponse {
         $purpose = $request->purpose();
         $method = $request->paymentMethod();
@@ -79,7 +81,19 @@ class PaymentController extends Controller
             // that makes the plan free settles it at once, whatever the
             // method asked for.
             $code = $request->validated('coupon_code');
-            $coupon = $code !== null && $purpose === PaymentPurpose::PlanPurchase ? $coupons->resolve($code) : null;
+            $coupon = $code !== null ? $coupons->resolve($code) : null;
+            $payable = $payables->find($purpose, $request->validated('payable_id'), $member);
+
+            // On something already owed, the coupon lowers what it owes
+            // before the payment opens — and one that clears it leaves
+            // nothing to pay.
+            if ($coupon !== null && $payable !== null) {
+                if ($application->apply($payable, $member, $coupon)->finalPoints === 0) {
+                    return $this->started(null, PaymentStart::done());
+                }
+
+                $coupon = null;
+            }
 
             if ($coupon !== null && $quotes->forPlan(Plan::findOrFail($request->validated('plan_id')), $member, $coupon, now())->finalPoints === 0) {
                 $method = WalletMethod::KEY;
@@ -103,7 +117,7 @@ class PaymentController extends Controller
             }
 
             ['payment' => $payment, 'start' => $start] = $payments->start($purpose, $member, $method, array_filter([
-                'payable' => $payables->find($purpose, $request->validated('payable_id'), $member),
+                'payable' => $payable,
                 'plan' => $purpose === PaymentPurpose::PlanPurchase ? Plan::findOrFail($request->validated('plan_id')) : null,
                 // A plan paid from a wallet goes to that wallet's owner; from
                 // this endpoint that is always the member.

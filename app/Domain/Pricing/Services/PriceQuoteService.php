@@ -178,6 +178,40 @@ class PriceQuoteService
         );
     }
 
+    /**
+     * A coupon on something already priced — what an unpaid booking,
+     * session or registration owes: on its price as it stands. Whatever its
+     * price is below its list price was an offer, so a coupon that does not
+     * combine with offers is refused there.
+     *
+     * @throws CouponRejectedException
+     */
+    public function forCouponOn(int $list, int $price, Coupon $coupon, User $member, PricingTarget $target): PriceQuote
+    {
+        $this->eligibility->assertUsable($coupon, $member, $target);
+
+        $offerPriced = $price < $list;
+
+        if ($offerPriced && ! $coupon->combinable_with_offers) {
+            throw new CouponRejectedException(CouponRejection::NotCombinable);
+        }
+
+        $this->assertMinimum($coupon, $price);
+        $off = $this->coupons->discountFor(CouponTerms::fromCoupon($coupon), $price);
+
+        return new PriceQuote(
+            listPoints: $list,
+            choice: $offerPriced ? PriceChoice::Sale : PriceChoice::List,
+            automaticPoints: $list - $price,
+            planDiscount: null,
+            coupon: $coupon,
+            couponOutcome: CouponOutcome::Applied,
+            couponBasePoints: $price,
+            couponPoints: $off,
+            finalPoints: max(0, $price - $off),
+        );
+    }
+
     private function planSalePrice(Plan $plan, int $list, CarbonInterface $asOf): int
     {
         $sale = $plan->saleWindow();
