@@ -122,6 +122,8 @@ class PaymentService
                 'user_id' => $payer->id,
                 'wallet_id' => $this->openingWalletId($payer, $driver, $context),
                 'plan_id' => isset($context['plan']) ? $context['plan']->id : null,
+                // A plan bought: its price before any sale or coupon.
+                'list_price_points' => isset($context['plan']) ? (int) $context['plan']->price_points : null,
                 // The card path's own name for the points a payment buys;
                 // nothing is bought with money until funding arrives.
                 'points_to_credit' => 0,

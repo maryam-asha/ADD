@@ -11,6 +11,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -43,6 +44,7 @@ class StartPayment
         private readonly PaymentMethodRegistry $registry,
         private readonly WalletService $wallets,
         private readonly PaymentAmountCalculator $amounts,
+        private readonly PriceQuoteService $quotes,
     ) {}
 
     /**
@@ -63,8 +65,10 @@ class StartPayment
         // Points are the unit of account, so both purposes resolve to the
         // same pair: how many points are granted, and what that costs in
         // the gateway's minor units.
+        // A plan's price is PriceQuoteService's — its sale included — and
+        // the charge is derived from those points, as for anything else.
         [$points, $chargeMinor] = $purpose === PaymentPurpose::PlanPurchase
-            ? $this->amounts->forPlan($plan)
+            ? $this->amounts->forPoints($this->quotes->forPlan($plan, $user, null, now())->finalPoints)
             : $this->amounts->forTopUp($amountMinor);
 
         // Resolved before the row is written: a method that is switched off
@@ -89,6 +93,7 @@ class StartPayment
             'currency_exponent' => (int) config('paymera.currency_exponent'),
             'points_to_credit' => $points,
             'amount_points' => $points,
+            'list_price_points' => $plan !== null ? (int) $plan->price_points : null,
             'terminal_id' => (string) config('paymera.terminal_id'),
             'lang' => $lang ?? (string) config('paymera.default_lang'),
         ]));

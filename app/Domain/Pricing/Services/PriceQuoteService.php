@@ -5,8 +5,10 @@ namespace App\Domain\Pricing\Services;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\AmountCalculator;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
@@ -17,6 +19,7 @@ use App\Domain\Pricing\Enums\PriceChoice;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Models\CouponRedemption;
 use App\Domain\Pricing\ValueObjects\CouponTerms;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Pricing\ValueObjects\PricingTarget;
@@ -129,22 +132,79 @@ class PriceQuoteService
     public function forSession(Booking|WalkinSession $session, CarbonInterface $from, CarbonInterface $to): PriceQuote
     {
         $space = $session->space;
-        $list = $this->amounts->forRange($space, $from, $to);
-
         $planRedemption = $session instanceof Booking
             ? PlanDiscountRedemption::query()->where('booking_id', $session->id)->first()
             : null;
-        $couponRedemption = $this->ledger->forRedeemable($session);
+
+        return $this->atLockedTerms(
+            $this->amounts->forRange($space, $from, $to),
+            fn () => $this->amounts->forSegments($this->timeline->segments($space, $from, $to)),
+            $planRedemption?->discount,
+            $this->ledger->forRedeemable($session),
+        );
+    }
+
+    /**
+     * A plan bought now, or as of `$asOf`: its list price, its sale when
+     * the sale is live then, and a coupon on top. Never a plan discount —
+     * that is a benefit of holding a plan, not of buying one.
+     *
+     * @throws CouponRejectedException when `$coupon` cannot be used here
+     */
+    public function forPlan(Plan $plan, ?User $member, ?Coupon $coupon, CarbonInterface $asOf, ?UsageInFlight $inFlight = null): PriceQuote
+    {
+        $list = (int) $plan->price_points;
+
+        return $this->compose($list, $this->planSalePrice($plan, $list, $asOf), null, $list, $member, $coupon, PricingTarget::forPlan($plan), $inFlight ?? new UsageInFlight);
+    }
+
+    /**
+     * What a plan payment is due: the plan as it is now — so a plan
+     * repriced since is caught — at the sale that was live when the payment
+     * was opened, and the coupon locked on it at its copied terms. The
+     * payment is honoured as it was quoted, however long the desk or the
+     * card takes.
+     */
+    public function forPlanPayment(Payment $payment, Plan $plan): PriceQuote
+    {
+        $list = (int) $plan->price_points;
+        $asOf = $payment->created_at ?? now();
+
+        return $this->atLockedTerms(
+            $list,
+            fn () => $this->planSalePrice($plan, $list, $asOf),
+            null,
+            $payment->exists ? $this->ledger->forRedeemable($payment) : null,
+        );
+    }
+
+    private function planSalePrice(Plan $plan, int $list, CarbonInterface $asOf): int
+    {
+        $sale = $plan->saleWindow();
+
+        return $sale !== null && $sale->isLiveAt($asOf) && $sale->points < $list ? $sale->points : $list;
+    }
+
+    /**
+     * A price at terms already locked on a record: its plan discount when it
+     * was priced with one, else the sale; and its coupon at the copied
+     * terms — on the list price when it does not combine with offers.
+     * Nothing is re-checked: the coupon was valid when it was locked.
+     *
+     * @param  callable(): int  $salePrice
+     */
+    private function atLockedTerms(int $list, callable $salePrice, ?PlanDiscount $discount, ?CouponRedemption $couponRedemption): PriceQuote
+    {
         $onList = $couponRedemption !== null && ! $couponRedemption->coupon->combinable_with_offers;
 
-        [$choice, $automatic, $discount] = match (true) {
-            $onList => [PriceChoice::List, $list, null],
-            $planRedemption !== null => [PriceChoice::Plan, $this->planDiscounts->apply($list, $planRedemption->discount), $planRedemption->discount],
-            default => [PriceChoice::Sale, $this->amounts->forSegments($this->timeline->segments($space, $from, $to)), null],
+        [$choice, $automatic] = match (true) {
+            $onList => [PriceChoice::List, $list],
+            $discount !== null => [PriceChoice::Plan, $this->planDiscounts->apply($list, $discount)],
+            default => [PriceChoice::Sale, $salePrice()],
         };
 
         if ($automatic >= $list) {
-            [$choice, $automatic, $discount] = [PriceChoice::List, $list, null];
+            [$choice, $automatic] = [PriceChoice::List, $list];
         }
 
         $couponOff = $couponRedemption !== null
@@ -155,7 +215,7 @@ class PriceQuoteService
             listPoints: $list,
             choice: $choice,
             automaticPoints: $list - $automatic,
-            planDiscount: $discount,
+            planDiscount: $choice === PriceChoice::Plan ? $discount : null,
             coupon: $couponRedemption?->coupon,
             couponOutcome: $couponRedemption !== null ? CouponOutcome::Applied : CouponOutcome::None,
             couponBasePoints: $couponRedemption !== null ? $automatic : 0,
