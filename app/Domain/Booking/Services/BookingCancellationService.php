@@ -44,7 +44,7 @@ class BookingCancellationService
      */
     public function canCancel(Booking $booking): bool
     {
-        if (in_array($booking->status, [BookingStatus::Cancelled, BookingStatus::Rejected], true)) {
+        if (! $booking->status->isOpen()) {
             return false;
         }
 
@@ -80,6 +80,13 @@ class BookingCancellationService
 
             if ($locked->status === BookingStatus::Cancelled) {
                 throw new ReceptionActionException('api.reception.already_cancelled', 409);
+            }
+
+            // Rejected, completed or a no-show is already final: cancelling
+            // it would overwrite its outcome, and a rejected one would be
+            // refunded a second time.
+            if (! $locked->status->isOpen()) {
+                throw new ReceptionActionException('api.booking.not_cancellable', 409);
             }
 
             if ($locked->checked_in_at !== null) {

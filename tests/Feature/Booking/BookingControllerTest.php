@@ -152,6 +152,9 @@ class BookingControllerTest extends TestCase
 
     public function test_a_member_can_extend_their_own_checked_in_booking(): void
     {
+        // A booking extends only while it runs
+        // (docs/decisions/booking-outcomes-and-extension.md).
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus'));
         $member = $this->actingAsMember();
         $space = $this->openSpace(['slot_granularity_minutes' => 30]);
         $booking = Booking::factory()->checkedIn()->create([

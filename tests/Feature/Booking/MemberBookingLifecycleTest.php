@@ -112,44 +112,26 @@ class MemberBookingLifecycleTest extends TestCase
         $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings');
 
         $response->assertOk()->assertJsonCount(1, 'data');
-        $this->assertSame(1, $response->json('counts.total'));
+        $this->assertSame(1, $response->json('meta.total'));
     }
 
-    public function test_the_upcoming_and_past_filters_split_on_the_end_time(): void
+    /**
+     * The `filter` tabs are gone (user decision, 2026-10-03); the list says
+     * which bookings are still to come with `is_upcoming`, and puts them first.
+     */
+    public function test_the_list_marks_and_leads_with_the_bookings_still_to_come(): void
     {
         $member = $this->actingAsMember();
         $space = $this->openSpace();
 
-        // now() is 08:00, so 06:00-07:00 is past and 14:00-15:00 upcoming.
-        $this->bookingFor($member, $space, 6);
-        $this->bookingFor($member, $space, 14);
+        // now() is 08:00, so 06:00-07:00 is over and 14:00-15:00 still to come.
+        $earlier = $this->bookingFor($member, $space, 6);
+        $later = $this->bookingFor($member, $space, 14);
 
-        $upcoming = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=upcoming');
-        $upcoming->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.is_upcoming', true);
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings')->assertOk();
 
-        $past = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=past');
-        $past->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.is_upcoming', false);
-
-        $all = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=all');
-        $all->assertOk()->assertJsonCount(2, 'data');
-    }
-
-    public function test_the_counts_cover_every_tab_regardless_of_the_active_filter(): void
-    {
-        $member = $this->actingAsMember();
-        $space = $this->openSpace();
-
-        $this->bookingFor($member, $space, 6);
-        $this->bookingFor($member, $space, 14);
-        $this->bookingFor($member, $space, 16, ['status' => BookingStatus::Pending]);
-
-        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=past');
-
-        $response->assertOk()
-            ->assertJsonPath('counts.past', 1)
-            ->assertJsonPath('counts.upcoming', 2)
-            ->assertJsonPath('counts.pending', 1)
-            ->assertJsonPath('counts.total', 3);
+        $this->assertSame([$later->id, $earlier->id], array_column($response->json('data'), 'id'));
+        $this->assertSame([true, false], array_column($response->json('data'), 'is_upcoming'));
     }
 
     public function test_the_list_does_not_run_a_query_per_card(): void
@@ -166,9 +148,9 @@ class MemberBookingLifecycleTest extends TestCase
             $queries++;
         });
 
-        $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings?filter=all')->assertOk();
+        $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings')->assertOk();
 
-        // Four counts, the page itself, and the eager loads — bounded, and
+        // The page, its total and the space eager load — bounded, and
         // crucially not growing with the number of bookings.
         $this->assertLessThanOrEqual(15, $queries, "The list issued {$queries} queries for five bookings.");
     }
@@ -237,21 +219,23 @@ class MemberBookingLifecycleTest extends TestCase
             ->assertJsonPath('data.request_status.current', 'confirmed');
     }
 
-    public function test_the_detail_carries_the_price_breakdown_and_the_note(): void
+    /**
+     * The total and the window, as the screens draw them; the itemised
+     * breakdown and the note left the detail on 2026-10-04
+     * (docs/decisions/booking-outcomes-and-extension.md). A booking without
+     * its own `price_points` is priced from its window.
+     */
+    public function test_the_detail_carries_the_total_and_the_window(): void
     {
         $member = $this->actingAsMember();
         $space = $this->openSpace();
-        $booking = $this->bookingFor($member, $space, 14, ['note' => 'Need a projector']);
+        $booking = $this->bookingFor($member, $space, 14);
 
         $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
 
         $response->assertOk()
-            ->assertJsonPath('data.note', 'Need a projector')
-            ->assertJsonPath('data.breakdown.subtotal.points', 120)
-            ->assertJsonPath('data.breakdown.vat.rate_percent', 0)
-            ->assertJsonPath('data.breakdown.vat.points', 0)
-            ->assertJsonPath('data.breakdown.total.points', 120)
-            ->assertJsonPath('data.when.duration_label', '1h')
+            ->assertJsonPath('data.total.points', 120)
+            ->assertJsonPath('data.time_label', '02:00 PM - 03:00 PM (1h)')
             ->assertJsonPath('data.space.title', 'Meeting Room A');
     }
 

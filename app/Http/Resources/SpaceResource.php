@@ -43,6 +43,10 @@ class SpaceResource extends JsonResource
                 ? ($points->pointsToCurrency($rate, $targetCurrency) ?? $points->pointsToUsd($rate))
                 : null,
             'currency' => $targetCurrency,
+            // Null on a space not refreshed since creation: the column's
+            // database default (true) applies.
+            'allows_extension' => (bool) ($this->allows_extension ?? true),
+            'cancellation_window_minutes' => $this->cancellation_window_minutes,
             'amenities' => $this->amenities->pluck('amenity'),
             'status' => $this->status,
             'status_reason' => $this->status_reason,

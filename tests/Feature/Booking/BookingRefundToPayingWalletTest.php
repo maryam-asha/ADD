@@ -174,6 +174,9 @@ class BookingRefundToPayingWalletTest extends TestCase
     {
         $member = $this->member(500);
         $booking = $this->bookFrom($this->space(), $member);
+        // A booking extends only while it runs, its member inside
+        // (docs/decisions/booking-outcomes-and-extension.md).
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus')->utc());
         $booking->forceFill(['checked_in_at' => now()])->save();
 
         app(BookingExtensionService::class)->extend($booking, 60);

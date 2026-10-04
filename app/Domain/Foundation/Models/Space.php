@@ -31,6 +31,7 @@ class Space extends Model
         'slot_granularity_minutes',
         'buffer_minutes',
         'requires_approval',
+        'allows_extension',
         'status',
         'status_reason',
         'status_from',
@@ -46,11 +47,39 @@ class Space extends Model
             'is_lockable' => 'boolean',
             'hourly_rate_points' => 'integer',
             'requires_approval' => 'boolean',
+            'allows_extension' => 'boolean',
+            'cancellation_window_minutes' => 'integer',
             'status' => OperationalStatus::class,
             'status_from' => 'datetime',
             'status_until' => 'datetime',
             'images' => AsMediaUrlArray::class,
         ];
+    }
+
+    /**
+     * The title a member sees. A space's own `name` (translated) always wins;
+     * the per-`space_type` string only covers spaces created before that
+     * column was wired up (or seeded/factory-made without one), so they never
+     * regress to a blank title. One definition for the space browser and the
+     * booking screens, so one space never reads differently on two of them.
+     *
+     * Not `title()`: an Eloquent property read of that name would be taken
+     * for a relation.
+     */
+    public function displayTitle(?string $locale = null): string
+    {
+        $name = $this->translate('name', $locale);
+
+        if (! empty($name)) {
+            return $name;
+        }
+
+        return match ($this->space_type) {
+            SpaceType::CoSpace => 'Hot Desk',
+            SpaceType::Room => 'Meeting Room A',
+            SpaceType::Business => 'Private Office '.$this->id,
+            SpaceType::EventHall => 'Event Hall',
+        };
     }
 
     /**

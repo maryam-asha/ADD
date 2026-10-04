@@ -37,8 +37,19 @@ class BookingCheckInService
             throw new ReceptionActionException('api.booking.check_in_rejected', 409);
         }
 
+        if ($booking->status === BookingStatus::NoShow) {
+            throw new ReceptionActionException('api.booking.check_in_no_show', 409);
+        }
+
         if ($booking->checked_in_at !== null) {
             throw new ReceptionActionException('api.reception.already_checked_in', 409);
+        }
+
+        // An ended booking nobody came to is about to become a no-show
+        // (bookings:close-elapsed); refusing here as well keeps the two from
+        // racing into a no-show that was checked in.
+        if (! $booking->end_at->isFuture()) {
+            throw new ReceptionActionException('api.booking.check_in_ended', 409);
         }
 
         // At most one open coworking session per member, as for walk-ins

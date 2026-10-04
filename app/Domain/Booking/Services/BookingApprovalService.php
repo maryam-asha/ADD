@@ -63,6 +63,40 @@ class BookingApprovalService
         });
     }
 
+    /**
+     * A request still undecided when it starts can no longer be used — check-in
+     * needs it confirmed — so it is closed exactly like a rejection, refund
+     * included, with no operator and no reason: Booking::lapsedUnreviewed()
+     * tells the two apart, and the member sees a translated explanation
+     * rather than a stored string in the server's language.
+     *
+     * Returns false when the booking was decided in the meantime; the
+     * scheduled command treats that as nothing to do, not an error.
+     */
+    public function lapse(Booking $booking): bool
+    {
+        return DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== BookingStatus::Pending) {
+                return false;
+            }
+
+            $locked->forceFill([
+                'status' => BookingStatus::Rejected,
+                'rejection_reason' => null,
+                'approved_by' => null,
+                'approved_at' => now(),
+            ])->save();
+
+            $this->refunder->refund($locked, 'Booking lapsed unreviewed refund');
+            $this->discounts->voidFor($locked);
+            $this->notify($locked->user_id, 'booking.lapsed');
+
+            return true;
+        });
+    }
+
     private function lockPending(Booking $booking): Booking
     {
         $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();

@@ -463,7 +463,12 @@ Unchanged, pre-existing: `{ "additional_minutes": 60 }` → `{ "message": "Booki
 
 ## 3. Admin / operations
 
-### `GET /api/v1/admin/calendar?view=day|week|month&date=&branch_id=&space_type=&space_id=`
+### `GET /api/v1/admin/calendar?view=day|week|month&date=&branch_id=&space_type=&space_id=&member_id=`
+
+`member_id` (added 2026-10-02) narrows the bookings listed in each cell, and
+`totals.bookings`/`by_status`, to that member's; `meta.member_id` echoes it.
+Each cell's `occupancy` stays the space's own, from every booking, so a room
+others filled never reads as free. An unknown id is a `422` on `member_id`.
 
 Spaces as rows, days as cells. `view` defaults to `week` (Sunday–Saturday);
 `date` is any date inside the period. Defaults to the default branch.

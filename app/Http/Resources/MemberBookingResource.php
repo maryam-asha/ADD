@@ -8,11 +8,15 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * One card in the member's bookings list.
+ * One card in the member's bookings list: what the card shows and nothing
+ * more — the space's title and picture, the day and time lines, the status
+ * badge, and whether it is paid.
  *
- * Deliberately lighter than the detail resource: no breakdown, no
- * stepper, no note. The list renders dozens of these, and building a
- * price breakdown per row would mean a wallet lookup per row.
+ * Everything else (the breakdown, the payment details, `status_note`,
+ * cancel and extend) is MemberBookingDetailResource's. The list renders
+ * dozens of these, and every field here is one the app draws; the badge's
+ * "pending payment" is `confirmed` with `payment_state` unpaid, read by the
+ * app rather than a third value sent here.
  *
  * @property Booking $resource
  */
@@ -25,33 +29,22 @@ class MemberBookingResource extends JsonResource
     {
         $locale = app()->getLocale();
         $presentation = app(BookingPresentationService::class);
-        $space = $this->resource->space;
+        $booking = $this->resource;
+        $space = $booking->space;
 
         return [
-            'id' => $this->resource->id,
+            'id' => $booking->id,
             'space' => [
-                'id' => $space->id,
-                'title' => $space->translate('name', $locale),
-                'space_type' => $space->space_type->value,
+                'title' => $space->displayTitle($locale),
                 'main_image' => $space->main_image,
-                'location' => $this->location($locale),
             ],
-            'when' => $presentation->when($this->resource->start_at, $this->resource->end_at),
-            'status' => $this->resource->status->value,
-            'status_label' => __('api.booking.statuses.'.$this->resource->status->value, [], $locale),
-            'payment' => $presentation->payment($this->resource, $locale),
-            'is_upcoming' => $this->resource->end_at->isFuture(),
-            // Both come from the same predicates the write endpoints
-            // enforce, so a button shown here always works.
-            'can_cancel' => $presentation->actions($this->resource, $locale)['can_cancel'],
+            'date_label' => $presentation->dateLabel($booking->start_at, $locale),
+            'time_label' => $presentation->timeLabel($booking->start_at, $booking->end_at, $locale),
+            // Until it starts — a booking under way is no longer upcoming.
+            'is_upcoming' => $booking->start_at->isFuture(),
+            'status' => $booking->status->value,
+            'status_label' => $booking->status->label($locale),
+            'payment_state' => $booking->payment_state->value,
         ];
-    }
-
-    private function location(string $locale): string
-    {
-        $branch = $this->resource->space->building?->branch?->translate('name', $locale);
-        $floor = $this->resource->space->zone?->floor?->label;
-
-        return collect([$branch, $floor])->filter()->implode(' – ');
     }
 }

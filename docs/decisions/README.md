@@ -39,6 +39,7 @@ minimal version that gets reworked later.
 - [rbac-permission-pilot.md](rbac-permission-pilot.md) — dynamic roles + auto-derived `module.action` permissions replace `Gate::before`'s admin bypass and the coarse `role:admin|operations` check; Branches is the one pilot resource enforcing it today, inside D.8's existing flat-role constraints
 - [coworking-self-service-sessions.md](coworking-self-service-sessions.md) — scan-to-start coworking sessions with a TOTP kiosk, confirm-before-paid, member-requested end confirmed by reception, and the session report
 - [unified-payments.md](unified-payments.md) — every operation paid by wallet points, cash at reception or a gateway through one `payments` table and one points ledger; payment methods as config-registered drivers, one fulfiller per purpose
+- [booking-outcomes-and-extension.md](booking-outcomes-and-extension.md) — `completed`/`no_show` and the lapse of undecided requests once a booking's time passes, the app's status catalog and tabs, and per-space extension rules with one planner behind the options and the POST
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has

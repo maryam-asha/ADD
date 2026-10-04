@@ -401,4 +401,70 @@ class SpaceControllerTest extends TestCase
 
         $this->getJson('/api/v1/admin/spaces')->assertForbidden();
     }
+
+    // ---------------------------------------------------------------
+    // Booking rules set per space (docs/decisions/booking-outcomes-and-extension.md)
+    // ---------------------------------------------------------------
+
+    /**
+     * @param  array<string, mixed>  $overrides
+     * @return array<string, mixed>
+     */
+    private function roomPayload(Building $building, array $overrides = []): array
+    {
+        return array_merge([
+            'building_id' => $building->id,
+            'name' => ['ar' => 'غرفة', 'en' => 'Room'],
+            'space_type' => 'room',
+            'is_lockable' => true,
+            'capacity' => 4,
+        ], $overrides);
+    }
+
+    public function test_a_space_sets_whether_bookings_extend_and_its_cancellation_window(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/spaces', $this->roomPayload(Building::factory()->create(), [
+            'allows_extension' => false,
+            'cancellation_window_minutes' => 120,
+        ]))
+            ->assertCreated()
+            ->assertJsonPath('data.allows_extension', false)
+            ->assertJsonPath('data.cancellation_window_minutes', 120);
+    }
+
+    public function test_a_space_left_unset_allows_extension_and_falls_back_to_the_global_window(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/spaces', $this->roomPayload(Building::factory()->create()))
+            ->assertCreated()
+            ->assertJsonPath('data.allows_extension', true)
+            ->assertJsonPath('data.cancellation_window_minutes', null);
+    }
+
+    public function test_an_update_can_turn_extension_off_and_clear_the_window(): void
+    {
+        $this->actingAsAdmin();
+        $space = Space::factory()->room()->create(['cancellation_window_minutes' => 90]);
+
+        $this->putJson("/api/v1/admin/spaces/{$space->id}", $this->roomPayload($space->building, [
+            'allows_extension' => false,
+            'cancellation_window_minutes' => null,
+        ]))->assertOk();
+
+        $space->refresh();
+        $this->assertFalse($space->allows_extension);
+        $this->assertNull($space->cancellation_window_minutes);
+    }
+
+    public function test_a_negative_cancellation_window_is_refused(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/spaces', $this->roomPayload(Building::factory()->create(), [
+            'cancellation_window_minutes' => -5,
+        ]))->assertUnprocessable()->assertJsonValidationErrors('cancellation_window_minutes');
+    }
 }

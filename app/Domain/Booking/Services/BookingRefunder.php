@@ -11,7 +11,9 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use Illuminate\Support\Collection;
 
 /**
  * Gives a cancelled or rejected booking's points back — the one refund rule
@@ -38,20 +40,65 @@ class BookingRefunder
         $rows = Payment::query()->forPayable($booking)->get();
 
         if ($rows->isNotEmpty()) {
-            $rows
-                ->filter(fn (Payment $p) => $p->status === PaymentStatus::Accepted && $p->debit_transaction_id !== null && ! $p->isRefunded())
-                ->each(fn (Payment $p) => $this->payments->refund($p, $description));
+            $this->refundable($rows)->each(fn (Payment $p) => $this->payments->refund($p, $description));
 
             return;
         }
 
-        $this->refundWithoutPaymentRows($booking, $description);
+        $points = $this->pointsWithoutPaymentRows($booking);
+
+        if ($points > 0) {
+            $wallet = $this->wallets->walletFor(OwnerType::User, $booking->user_id);
+            $this->wallets->creditGeneral($wallet, $points, WalletTransactionSource::Refund, $description);
+        }
     }
 
-    private function refundWithoutPaymentRows(Booking $booking, string $description): void
+    /**
+     * What refund() would give back right now, and to which wallets, without
+     * giving it — the booking detail's cancellation screen. Same rows and
+     * same arithmetic as refund(), so what the screen promises is what comes
+     * back.
+     *
+     * @return array{points: int, wallets: list<Wallet>}
+     */
+    public function quote(Booking $booking): array
+    {
+        $rows = Payment::query()->forPayable($booking)->with('wallet')->get();
+
+        if ($rows->isNotEmpty()) {
+            $refundable = $this->refundable($rows);
+
+            return [
+                'points' => (int) $refundable->sum('amount_points'),
+                'wallets' => $refundable->pluck('wallet')->filter()->unique('id')->values()->all(),
+            ];
+        }
+
+        $points = $this->pointsWithoutPaymentRows($booking);
+
+        return [
+            'points' => $points,
+            'wallets' => $points > 0 ? [$this->wallets->walletFor(OwnerType::User, $booking->user_id)] : [],
+        ];
+    }
+
+    /**
+     * Every accepted payment that spent points on the booking and has not
+     * been given back.
+     *
+     * @param  Collection<int, Payment>  $rows
+     * @return Collection<int, Payment>
+     */
+    private function refundable(Collection $rows): Collection
+    {
+        return $rows->filter(fn (Payment $p) => $p->status === PaymentStatus::Accepted && $p->debit_transaction_id !== null && ! $p->isRefunded());
+    }
+
+    /** A booking paid before payment rows existed: its price, less any plan discount, if it was paid from the wallet. */
+    private function pointsWithoutPaymentRows(Booking $booking): int
     {
         if ($booking->payment_source !== PaymentSource::Wallet || $booking->payment_state !== PaymentState::Paid) {
-            return;
+            return 0;
         }
 
         $points = $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
@@ -59,9 +106,7 @@ class BookingRefunder
         // A discounted booking was only ever charged the net amount, so it is
         // only that net amount that gets refunded — not the raw rate.
         $redemption = PlanDiscountRedemption::where('booking_id', $booking->id)->first();
-        $refundPoints = $redemption !== null ? $points - $redemption->points_discounted : $points;
 
-        $wallet = $this->wallets->walletFor(OwnerType::User, $booking->user_id);
-        $this->wallets->creditGeneral($wallet, $refundPoints, WalletTransactionSource::Refund, $description);
+        return $redemption !== null ? $points - $redemption->points_discounted : $points;
     }
 }

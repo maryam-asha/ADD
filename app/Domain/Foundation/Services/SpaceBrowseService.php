@@ -241,27 +241,6 @@ class SpaceBrowseService
     }
 
     /**
-     * A space's own `name` (translated for the current locale) always wins;
-     * the per-`space_type` string below only covers spaces created before
-     * that column was wired up (or seeded/factory-made without one) — kept
-     * so those don't regress to a blank title.
-     */
-    private function resolveTitle(Space $space): string
-    {
-        $name = $space->translate('name');
-        if (! empty($name)) {
-            return $name;
-        }
-
-        return match ($space->space_type) {
-            SpaceType::CoSpace => 'Hot Desk',
-            SpaceType::Room => 'Meeting Room A',
-            SpaceType::Business => 'Private Office '.($space->id),
-            SpaceType::EventHall => 'Event Hall',
-        };
-    }
-
-    /**
      * @return array<string, mixed>
      */
     private function formatSpaceCard(Space $space, ?User $user): array
@@ -273,7 +252,7 @@ class SpaceBrowseService
             SpaceType::EventHall => 'EVENT HALL',
         };
 
-        $title = $this->resolveTitle($space);
+        $title = $space->displayTitle();
 
         $subtitle = match ($space->space_type) {
             SpaceType::CoSpace => 'Open Workspace',
@@ -294,9 +273,7 @@ class SpaceBrowseService
             'capacity_label' => $space->space_type === SpaceType::CoSpace
                 ? __('api.space.single_seat')
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
-            // The hourly rate, ready to print: in the member's currency and in
-            // points (PriceLabelPresenter).
-            ...$this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+            'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -464,7 +441,7 @@ class SpaceBrowseService
             SpaceType::EventHall => 'EVENT HALL',
         };
 
-        $title = $this->resolveTitle($space);
+        $title = $space->displayTitle();
 
         $subtitle = match ($space->space_type) {
             SpaceType::CoSpace => 'Open Workspace',
@@ -495,7 +472,7 @@ class SpaceBrowseService
             'details' => [
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
-                ...$this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+                'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

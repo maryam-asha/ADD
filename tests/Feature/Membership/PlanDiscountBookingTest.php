@@ -261,6 +261,9 @@ class PlanDiscountBookingTest extends TestCase
             'points_discounted' => 30,
         ]);
 
+        // A booking extends only while it runs
+        // (docs/decisions/booking-outcomes-and-extension.md).
+        Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus'));
         app(BookingExtensionService::class)->extend($booking, 60);
 
         // New duration is 2 hours: raw 200, 30% off leaves 140. The
@@ -396,19 +399,16 @@ class PlanDiscountBookingTest extends TestCase
 
         $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
         $response->assertOk();
-        $response->assertJsonPath('data.breakdown.total.points', 70);
+        $response->assertJsonPath('data.total.points', 70);
 
         // The discount becomes ineligible for any future booking...
         $discount->update(['is_active' => false]);
 
         // ...but this booking's own detail is unaffected, since it reads
-        // the historical redemption row rather than re-resolving.
+        // the historical redemption row rather than re-resolving. (The detail
+        // no longer itemises lines — only its total — since 2026-10-04.)
         $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
         $response->assertOk();
-        $response->assertJsonPath('data.breakdown.total.points', 70);
-
-        $discountLine = collect($response->json('data.breakdown.lines'))->firstWhere('key', 'discount');
-        $this->assertNotNull($discountLine);
-        $this->assertSame(-30, $discountLine['points']);
+        $response->assertJsonPath('data.total.points', 70);
     }
 }

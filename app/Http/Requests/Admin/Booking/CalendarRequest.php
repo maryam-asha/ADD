@@ -24,6 +24,9 @@ class CalendarRequest extends FormRequest
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
             'space_id' => ['nullable', 'integer', 'exists:spaces,id'],
             'space_type' => ['nullable', Rule::enum(SpaceType::class)],
+            // Only this member's bookings are listed and counted; each
+            // cell's occupancy stays the space's own.
+            'member_id' => ['nullable', 'integer', 'exists:users,id'],
         ];
     }
 }

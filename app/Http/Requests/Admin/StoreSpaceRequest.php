@@ -53,6 +53,12 @@ class StoreSpaceRequest extends FormRequest
                 'images.*' => ['string', 'max:2048'],
                 'image_url' => ['nullable', 'string', 'max:2048'],
                 'hourly_rate_points' => ['nullable', 'integer', 'min:0'],
+                // Booking rules set per space
+                // (docs/decisions/booking-outcomes-and-extension.md). Left
+                // out, a space keeps what it has; a null window falls back
+                // to the global booking.cancellation_window_minutes.
+                'allows_extension' => ['sometimes', 'boolean'],
+                'cancellation_window_minutes' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:10080'],
             ]
         );
     }

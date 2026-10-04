@@ -82,8 +82,13 @@ class BrowseSpacesTest extends TestCase
                     'space_type',
                     'capacity',
                     'capacity_label',
-                    'price',
-                    'price_point',
+                    'pricing' => [
+                        'points',
+                        'points_label',
+                        'price',
+                        'price_label',
+                        'currency',
+                    ],
                     'amenities' => [
                         '*' => ['key', 'label', 'icon'],
                     ],
@@ -248,14 +253,21 @@ class BrowseSpacesTest extends TestCase
 
         $card = collect($this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces')->assertOk()->json('data.spaces'))
             ->firstWhere('id', $space->id);
-        $this->assertSame('3.00 $ / hour', $card['price']);
-        $this->assertSame('30 pts / hour', $card['price_point']);
-        $this->assertArrayNotHasKey('pricing', $card);
+        $this->assertSame([
+            'points' => 30,
+            'points_label' => '30 pts / hour',
+            'price' => 3,
+            'price_label' => '3 $ / hour',
+            'currency' => 'USD',
+        ], $card['pricing']);
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
-            ->assertJsonPath('data.details.price', '3.00 $ / hour')
-            ->assertJsonPath('data.details.price_point', '30 pts / hour');
+            ->assertJsonPath('data.details.pricing.points', 30)
+            ->assertJsonPath('data.details.pricing.points_label', '30 pts / hour')
+            ->assertJsonPath('data.details.pricing.price', 3)
+            ->assertJsonPath('data.details.pricing.price_label', '3 $ / hour')
+            ->assertJsonPath('data.details.pricing.currency', 'USD');
     }
 
     /** The currency header (or the member's preference) picks the currency; points never change. */
@@ -268,8 +280,19 @@ class BrowseSpacesTest extends TestCase
 
         $this->withHeaders(['lang' => 'ar', 'currency' => 'SYP'])->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
-            ->assertJsonPath('data.details.price', '30,000.00 ل.س / ساعة')
-            ->assertJsonPath('data.details.price_point', '30 نقطة / ساعة');
+            ->assertJsonPath('data.details.pricing.points', 30)
+            ->assertJsonPath('data.details.pricing.points_label', '30 نقطة / ساعة')
+            ->assertJsonPath('data.details.pricing.price', 30000)
+            ->assertJsonPath('data.details.pricing.price_label', '30,000 ل.س / ساعة')
+            ->assertJsonPath('data.details.pricing.currency', 'SYP');
+
+        $this->withHeaders(['lang' => 'en', 'currency' => 'SYP'])->getJson("/api/v1/member/spaces/{$space->id}")
+            ->assertOk()
+            ->assertJsonPath('data.details.pricing.points', 30)
+            ->assertJsonPath('data.details.pricing.points_label', '30 pts / hour')
+            ->assertJsonPath('data.details.pricing.price', 30000)
+            ->assertJsonPath('data.details.pricing.price_label', '30,000 SYP / hour')
+            ->assertJsonPath('data.details.pricing.currency', 'SYP');
     }
 
     public function test_member_can_view_space_details_matching_design(): void
@@ -295,8 +318,13 @@ class BrowseSpacesTest extends TestCase
                 'details' => [
                     'status',
                     'status_label',
-                    'price',
-                    'price_point',
+                    'pricing' => [
+                        'points',
+                        'points_label',
+                        'price',
+                        'price_label',
+                        'currency',
+                    ],
                     'capacity' => [
                         'count',
                         'formatted',
@@ -331,8 +359,8 @@ class BrowseSpacesTest extends TestCase
         $response->assertJsonMissingPath('data.status');
         $response->assertJsonPath('data.badge', 'OPEN SPACE');
         $response->assertJsonPath('data.subtitle', 'Open Workspace');
-        $response->assertJsonPath('data.details.price', '3.00 $ / hour');
-        $response->assertJsonPath('data.details.price_point', '30 pts / hour');
+        $response->assertJsonPath('data.details.pricing.price_label', '3 $ / hour');
+        $response->assertJsonPath('data.details.pricing.points_label', '30 pts / hour');
         $response->assertJsonPath('data.cta.button_text', 'Book This Space');
         $response->assertJsonPath('data.cta.can_book', true);
     }
