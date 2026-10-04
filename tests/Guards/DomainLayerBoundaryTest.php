@@ -34,8 +34,8 @@ class DomainLayerBoundaryTest extends TestCase
 
     /** @var array<string, list<string>> domain => domains it may not import from */
     private const FORBIDDEN = [
-        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership', 'Finance'],
-        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership', 'Finance'],
+        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership', 'Finance', 'Pricing'],
+        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership', 'Finance', 'Pricing'],
     ];
 
     /** @var array<string, list<string>> file => domains it is cleared to import from, with why above */
