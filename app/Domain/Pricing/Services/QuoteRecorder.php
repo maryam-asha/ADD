@@ -4,6 +4,7 @@ namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Pricing\Enums\PricingPurpose;
@@ -34,6 +35,23 @@ class QuoteRecorder
 
         if (($coupon = $quote->appliedCoupon()) !== null) {
             $this->ledger->record($coupon, $member, $record, $purpose, $quote->couponBasePoints, $quote->couponPoints);
+        }
+    }
+
+    /**
+     * A record priced again — a session closed at the time actually used —
+     * keeps its redemptions describing the price it now has, so its
+     * breakdown still adds up: what the plan discount and the coupon took
+     * off the new price.
+     */
+    public function reprice(PriceQuote $quote, Model $record): void
+    {
+        if ($record instanceof Booking && $quote->appliedPlanDiscount() !== null) {
+            PlanDiscountRedemption::query()->where('booking_id', $record->id)->update(['points_discounted' => $quote->automaticPoints]);
+        }
+
+        if ($quote->appliedCoupon() !== null && ($redemption = $this->ledger->forRedeemable($record)) !== null) {
+            $redemption->update(['base_points' => $quote->couponBasePoints, 'points_discounted' => $quote->couponPoints]);
         }
     }
 }

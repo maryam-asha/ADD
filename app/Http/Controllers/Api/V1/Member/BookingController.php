@@ -266,12 +266,9 @@ class BookingController extends Controller
 
         $this->logSensitiveAction('booking_created', $booking);
 
-        // A booking a discount made free has nothing to pay by card.
         $method = $request->validated('payment_method');
         $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
-            ? ((int) $booking->price_points > 0
-                ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
-                : ['payment' => null, 'redirect_url' => null])
+            ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
             : [];
 
         $code = $request->validated('coupon_code');

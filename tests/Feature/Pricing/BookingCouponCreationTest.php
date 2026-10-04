@@ -223,7 +223,10 @@ class BookingCouponCreationTest extends TestCase
             ->assertJsonPath('message', __('api.coupon.not_found', [], 'en'));
     }
 
-    /** A booking a coupon makes free has no card payment to open. */
+    /**
+     * A booking a coupon makes free has no card payment to open — the same
+     * answer a free space's booking gets (CardStartFailureTest).
+     */
     public function test_a_free_booking_opens_no_card_payment(): void
     {
         Coupon::factory()->percentage(100)->create(['code' => 'FREE']);
@@ -239,6 +242,7 @@ class BookingCouponCreationTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('payment', null)
+            ->assertJsonPath('payment_error', __('api.payment.nothing_due', [], 'en'))
             ->assertJsonPath('coupon.points_discounted', 100);
 
         $this->assertSame(0, Booking::firstOrFail()->price_points);

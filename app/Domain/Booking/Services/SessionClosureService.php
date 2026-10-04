@@ -18,9 +18,10 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
-use App\Domain\Membership\Models\PlanDiscountRedemption;
-use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -31,10 +32,10 @@ class SessionClosureService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
-        private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly PlanHourCoverageService $planHours,
-        private readonly PlanDiscountService $discounts,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
     ) {}
 
     /**
@@ -189,12 +190,8 @@ class SessionClosureService
             ? $this->coverableBlocks($session, $session->membership, $at)
             : 0;
 
-        $points = $this->priceFor($session, $at, $covered);
-
-        // The same net price finalizeClosure() bills an unpaid booking at.
-        if ($session instanceof Booking) {
-            $points = $this->withBookingDiscount($session, $points);
-        }
+        // The same price finalizeClosure() bills, from the same quote.
+        $points = $this->priceFor($session, $at, $covered)->finalPoints;
 
         return ['points' => $points, 'covered_seconds' => $covered, 'already_paid' => false];
     }
@@ -211,18 +208,17 @@ class SessionClosureService
      * ceil-to-whole-points rounding (Invariant 2) is applied once, to the
      * real charge.
      */
-    private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): int
+    private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): PriceQuote
     {
         $billable = (int) $session->checked_in_at->diffInSeconds($checkedOutAt) - $coveredSeconds;
 
-        if ($billable <= 0) {
-            return 0;
-        }
-
         $block = $this->blockSeconds();
-        $billed = (int) (ceil($billable / $block) * $block);
+        $billed = $billable > 0 ? (int) (ceil($billable / $block) * $block) : 0;
 
-        return $this->amounts->forRange($session->space, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
+        // The billed stretch, from check-in: the space's sale by usage time,
+        // and the record's locked plan discount or coupon terms
+        // (PriceQuoteService, the one place a price is composed).
+        return $this->quotes->forSession($session, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
     }
 
     /** The billing block, in seconds: `coworking.billing_increment_minutes`, 15 by default. */
@@ -255,11 +251,8 @@ class SessionClosureService
         // of the charge and remain decimal USD — only the wallet ledger became
         // point-denominated. Converting the point charge back to USD here is
         // the intended direction, not leftover scaffolding.
-        $points = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
-
-        if ($session instanceof Booking) {
-            $points = $this->withBookingDiscount($session, $points);
-        }
+        $quote = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
+        $points = $quote->finalPoints;
 
         $amount = $this->points->pointsToUsd($points);
 
@@ -278,10 +271,12 @@ class SessionClosureService
         // The same price in points, what a payment settles. A walk-in is
         // priced only now; a booking keeps the price it was made (and
         // perhaps paid) at, unless it closes unpaid and is repriced here.
+        $repriced = $session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid;
+
         if ($session instanceof WalkinSession) {
-            $attributes['price_points'] = $points;
-        } elseif ($session->payment_state !== PaymentState::Paid) {
-            $attributes += $this->repriceUnpaidBooking($session, $points);
+            $attributes += $quote->attributes();
+        } elseif ($repriced) {
+            $attributes += $this->repriceUnpaidBooking($session, $points) + ['list_price_points' => $quote->listPoints];
         }
 
         // Checked out is the booking's outcome: it happened
@@ -306,6 +301,10 @@ class SessionClosureService
 
         $session->forceFill($attributes)->save();
 
+        if ($repriced) {
+            $this->recorder->reprice($quote, $session);
+        }
+
         // An end request still waiting on this session is moot once it is
         // closed — at the desk, by auto-close, or by a confirmation that
         // already marked its own request before calling here.
@@ -314,19 +313,6 @@ class SessionClosureService
             'resolved_at' => now(),
             'checked_out_at' => $attributes['checked_out_at'],
         ]);
-    }
-
-    /**
-     * A booking keeps the plan discount it was made with
-     * (PlanDiscountRedemption) when it is priced at check-out: the price it
-     * was quoted is the price, whenever it is paid. Read from the booking's
-     * own redemption, never re-resolved, like the booking's detail.
-     */
-    private function withBookingDiscount(Booking $booking, int $points): int
-    {
-        $discount = PlanDiscountRedemption::query()->where('booking_id', $booking->id)->first()?->discount;
-
-        return $discount === null ? $points : $this->discounts->apply($points, $discount);
     }
 
     /**

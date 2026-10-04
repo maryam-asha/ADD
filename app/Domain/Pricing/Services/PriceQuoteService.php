@@ -3,6 +3,7 @@
 namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\AmountCalculator;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -114,6 +115,53 @@ class PriceQuoteService
             'total' => $new,
             'undiscounted_total' => $newList,
         ];
+    }
+
+    /**
+     * Time used in a space, priced at check-out — a walk-in or co-working
+     * session, or a booking left unpaid — over the billed stretch
+     * [`$from`, `$to`). At the terms the record locked: a booking's plan
+     * discount when it was priced with one, else the sale by usage time;
+     * and a coupon already on the record, at its copied terms (on the list
+     * price when it does not combine with offers). Nothing is re-checked —
+     * the coupon was valid when it was locked.
+     */
+    public function forSession(Booking|WalkinSession $session, CarbonInterface $from, CarbonInterface $to): PriceQuote
+    {
+        $space = $session->space;
+        $list = $this->amounts->forRange($space, $from, $to);
+
+        $planRedemption = $session instanceof Booking
+            ? PlanDiscountRedemption::query()->where('booking_id', $session->id)->first()
+            : null;
+        $couponRedemption = $this->ledger->forRedeemable($session);
+        $onList = $couponRedemption !== null && ! $couponRedemption->coupon->combinable_with_offers;
+
+        [$choice, $automatic, $discount] = match (true) {
+            $onList => [PriceChoice::List, $list, null],
+            $planRedemption !== null => [PriceChoice::Plan, $this->planDiscounts->apply($list, $planRedemption->discount), $planRedemption->discount],
+            default => [PriceChoice::Sale, $this->amounts->forSegments($this->timeline->segments($space, $from, $to)), null],
+        };
+
+        if ($automatic >= $list) {
+            [$choice, $automatic, $discount] = [PriceChoice::List, $list, null];
+        }
+
+        $couponOff = $couponRedemption !== null
+            ? $this->coupons->discountFor(CouponTerms::fromRedemption($couponRedemption), $automatic)
+            : 0;
+
+        return new PriceQuote(
+            listPoints: $list,
+            choice: $choice,
+            automaticPoints: $list - $automatic,
+            planDiscount: $discount,
+            coupon: $couponRedemption?->coupon,
+            couponOutcome: $couponRedemption !== null ? CouponOutcome::Applied : CouponOutcome::None,
+            couponBasePoints: $couponRedemption !== null ? $automatic : 0,
+            couponPoints: $couponOff,
+            finalPoints: max(0, $automatic - $couponOff),
+        );
     }
 
     /**
