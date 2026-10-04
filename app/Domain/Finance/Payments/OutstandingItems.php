@@ -14,10 +14,12 @@ use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Everything one member still owes, for the reception desk to settle in one
- * visit: unpaid bookings (not cancelled or rejected), closed unpaid
+ * visit: unpaid bookings in a payable status (never cancelled, rejected or a
+ * no-show — docs/decisions/booking-outcomes-and-extension.md), closed unpaid
  * coworking sessions, approved unpaid registrations for paid events, and
  * plans they chose to pay for in cash whose hold is still open.
  *
@@ -60,12 +62,9 @@ class OutstandingItems
      */
     private function bookings(int $userId): array
     {
-        return Booking::query()
+        return $this->bookingsOwed()
             ->with('space')
             ->where('user_id', $userId)
-            ->whereNotIn('status', [BookingStatus::Cancelled, BookingStatus::Rejected])
-            ->where('payment_state', PaymentState::Unpaid)
-            ->where('price_points', '>', 0)
             ->orderBy('start_at')
             ->get()
             ->map(fn (Booking $b) => [
@@ -83,12 +82,9 @@ class OutstandingItems
      */
     private function sessions(int $userId): array
     {
-        return WalkinSession::query()
+        return $this->sessionsOwed()
             ->with('space')
             ->where('user_id', $userId)
-            ->whereNotNull('checked_out_at')
-            ->where('payment_state', PaymentState::Unpaid)
-            ->where('price_points', '>', 0)
             ->orderBy('checked_in_at')
             ->get()
             ->map(fn (WalkinSession $s) => [
@@ -106,12 +102,9 @@ class OutstandingItems
      */
     private function registrations(int $userId): array
     {
-        return EventAttendee::query()
+        return $this->registrationsOwed()
             ->with('event')
             ->where('user_id', $userId)
-            ->where('status', EventRegistrationStatus::Approved)
-            ->where('payment_state', EventPaymentState::Unpaid)
-            ->where('price_points', '>', 0)
             ->orderBy('id')
             ->get()
             ->map(fn (EventAttendee $a) => [
@@ -132,13 +125,9 @@ class OutstandingItems
      */
     private function heldPlans(int $userId): array
     {
-        return Payment::query()
+        return $this->plansHeld()
             ->with('plan')
             ->where('user_id', $userId)
-            ->where('method', CashMethod::KEY)
-            ->where('purpose', PaymentPurpose::PlanPurchase)
-            ->where('status', PaymentStatus::Pending)
-            ->where('expires_at', '>', now())
             ->orderBy('id')
             ->get()
             ->map(fn (Payment $p) => [
@@ -150,5 +139,54 @@ class OutstandingItems
                 'amount_points' => (int) ($p->plan?->price_points ?? $p->amount_points),
             ])
             ->all();
+    }
+
+    /**
+     * How many items are owed across every member — the reception desk's
+     * "pending payments" — by the same rules for() lists one member's by.
+     */
+    public function countAll(): int
+    {
+        return $this->bookingsOwed()->count()
+            + $this->sessionsOwed()->count()
+            + $this->registrationsOwed()->count()
+            + $this->plansHeld()->count();
+    }
+
+    /** @return Builder<Booking> */
+    private function bookingsOwed(): Builder
+    {
+        return Booking::query()
+            ->whereIn('status', BookingStatus::payable())
+            ->where('payment_state', PaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /** @return Builder<WalkinSession> */
+    private function sessionsOwed(): Builder
+    {
+        return WalkinSession::query()
+            ->whereNotNull('checked_out_at')
+            ->where('payment_state', PaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /** @return Builder<EventAttendee> */
+    private function registrationsOwed(): Builder
+    {
+        return EventAttendee::query()
+            ->where('status', EventRegistrationStatus::Approved)
+            ->where('payment_state', EventPaymentState::Unpaid)
+            ->where('price_points', '>', 0);
+    }
+
+    /** @return Builder<Payment> */
+    private function plansHeld(): Builder
+    {
+        return Payment::query()
+            ->where('method', CashMethod::KEY)
+            ->where('purpose', PaymentPurpose::PlanPurchase)
+            ->where('status', PaymentStatus::Pending)
+            ->where('expires_at', '>', now());
     }
 }

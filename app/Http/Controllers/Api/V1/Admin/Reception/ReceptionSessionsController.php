@@ -8,10 +8,18 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\Services\SessionReportBuilder;
+use App\Domain\Finance\Exceptions\PaymentPricingException;
+use App\Domain\Finance\Models\Currency;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\DedicatedDeskService;
+use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActiveReceptionSessionResource;
+use App\Http\Resources\SessionEndRequestResource;
+use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -25,10 +33,10 @@ class ReceptionSessionsController extends Controller
 
         $bookings = Booking::where('status', BookingStatus::Confirmed)
             ->whereNotNull('checked_in_at')->whereNull('checked_out_at')
-            ->with('space.building.branch', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
+            ->with('space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
 
         $walkins = WalkinSession::whereNotNull('checked_in_at')->whereNull('checked_out_at')
-            ->with('space.building.branch', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
+            ->with('space.building.branch', 'space.zone.floor', 'user.personalProfile', 'user.companies', 'pendingEndRequest')->get();
 
         $bookings->each(function (Booking $booking) use ($closures, $now): void {
             $booking->type = 'booking';
@@ -50,13 +58,70 @@ class ReceptionSessionsController extends Controller
         return ActiveReceptionSessionResource::collection($sessions);
     }
 
-    public function report(string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports): JsonResponse
+    /**
+     * The session's report, plus what the desk needs to end it: for a session
+     * still open, what closing it would charge — at the moment the member
+     * asked to end, else now — in points and in each currency cash is taken
+     * in, and the member's points, so the desk knows whether their wallet
+     * covers it.
+     */
+    public function report(string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports, SessionClosureService $closures, WalletService $wallets, ReceivedMoneyConverter $converter): JsonResponse
     {
         $session = $sessions->find($type, $id);
 
         abort_if($session === null, 404);
 
-        return response()->json(['data' => $reports->build($session)]);
+        $closing = null;
+
+        if ($session->checked_out_at === null) {
+            $endRequest = $session->pendingEndRequest()->first();
+            $at = $endRequest?->requested_at ?? now();
+            $quote = $closures->quote($session, $at);
+
+            $closing = [
+                'at' => app(LocalTime::class)->toLocal($at)->toIso8601String(),
+                'points' => $quote['points'],
+                'covered_seconds' => $quote['covered_seconds'],
+                'already_paid' => $quote['already_paid'],
+                'amounts' => $this->amountsFor($quote['points'], $converter),
+                'end_request' => $endRequest === null ? null : new SessionEndRequestResource($endRequest),
+            ];
+        }
+
+        $personal = collect($wallets->spendOptions($session->user, WalletTransactionCategory::SpaceSpecific))
+            ->firstWhere('owner_type', OwnerType::User->value);
+
+        return response()->json(['data' => [
+            ...$reports->build($session),
+            'member' => [
+                'id' => $session->user?->id,
+                'name' => $session->user?->name,
+                'phone' => $session->user?->phone,
+            ],
+            'closing' => $closing,
+            'wallet_points' => $personal['usable_balance'] ?? 0,
+        ]]);
+    }
+
+    /**
+     * `$points` in each active currency; one with no exchange rate yet is
+     * left out rather than failing the report.
+     *
+     * @return list<array{currency: string, value: string}>
+     */
+    private function amountsFor(int $points, ReceivedMoneyConverter $converter): array
+    {
+        return Currency::query()->where('is_active', true)->orderByDesc('is_base')->orderBy('order')->pluck('code')
+            ->map(function (string $code) use ($converter, $points) {
+                try {
+                    return ['currency' => $code, 'value' => $converter->pointsToAmount($points, $code)];
+                } catch (PaymentPricingException) {
+                    return null;
+                }
+            })
+            ->filter()
+            ->values()
+            ->all();
     }
 
     private function isOverdue(SessionClosureService $closures, Booking|WalkinSession $session, Carbon $now): bool

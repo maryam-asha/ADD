@@ -9,6 +9,7 @@ use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionEndService;
 use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\RequestSessionEndRequest;
 use App\Http\Requests\Member\StartCoworkingSessionRequest;
 use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\SessionCoverageResource;
@@ -75,10 +76,10 @@ class CoworkingSessionController extends Controller
         return response()->json(['data' => $reports->build($session)]);
     }
 
-    public function requestEnd(Request $request, SessionEndService $ends): JsonResponse
+    public function requestEnd(RequestSessionEndRequest $request, SessionEndService $ends): JsonResponse
     {
         try {
-            $endRequest = $ends->request($request->user());
+            $endRequest = $ends->request($request->user(), $request->validated('payment_method'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

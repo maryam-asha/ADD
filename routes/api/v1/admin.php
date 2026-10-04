@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSummaryController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
@@ -276,6 +277,9 @@ Route::get('reception/bookings/pending-approval', [BookingReceptionController::c
 // for them" action. Reuses BookingCreationService, so every availability
 // rule the member endpoint enforces applies here too.
 Route::post('reception/bookings', [BookingReceptionController::class, 'store']);
+// What that booking would cost — points and money, from the space's hourly
+// rate and the hours chosen — before the desk picks how it is paid.
+Route::post('reception/bookings/quote', [BookingReceptionController::class, 'quote']);
 Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController::class, 'checkIn']);
 Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
 Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
@@ -283,6 +287,7 @@ Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionCont
 Route::post('reception/bookings/{booking}/approve', [BookingReceptionController::class, 'approve']);
 Route::post('reception/bookings/{booking}/reject', [BookingReceptionController::class, 'reject']);
 Route::post('reception/bookings/{booking}/extend', [BookingReceptionController::class, 'extend']);
+Route::get('reception/bookings/{booking}/extension-options', [BookingReceptionController::class, 'extensionOptions']);
 // Access-grant read surface for reception (final-review C3b) — resolves the
 // grant a given booking needs activated, since there was previously no way
 // to discover a grant's id from its booking.
@@ -297,6 +302,9 @@ Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionC
 Route::post('reception/payments/settle', [ReceptionPaymentController::class, 'settle']);
 Route::get('reception/outstanding', [ReceptionPaymentController::class, 'outstanding']);
 
+// The desk's day at a glance: counts and what needs it next
+// (the reception desk screen).
+Route::get('reception/summary', [ReceptionSummaryController::class, 'show']);
 Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
 Route::get('reception/sessions/{type}/{id}/report', [ReceptionSessionsController::class, 'report'])
     ->whereIn('type', ['booking', 'walkin'])

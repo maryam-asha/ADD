@@ -28,6 +28,9 @@ class ConfirmSessionEndRequest extends FormRequest
     {
         return [
             'checked_out_at' => ['nullable', 'date', 'before_or_equal:now'],
+            // The desk has the money for a request the member chose to pay
+            // in cash: the session is closed and settled in one step.
+            'cash_collected' => ['nullable', 'boolean'],
         ];
     }
 }

@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class SessionEndRequest extends Model
 {
-    protected $fillable = ['user_id', 'requested_at', 'status'];
+    protected $fillable = ['user_id', 'requested_at', 'status', 'payment_method'];
 
     protected function casts(): array
     {
