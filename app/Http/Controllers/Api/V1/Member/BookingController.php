@@ -21,6 +21,7 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
@@ -32,6 +33,7 @@ use App\Http\Resources\BookingResource;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -235,6 +237,7 @@ class BookingController extends Controller
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
                 $request->validated('payment_method'),
+                $request->validated('coupon_code'),
             );
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
@@ -247,12 +250,20 @@ class BookingController extends Controller
 
         $this->logSensitiveAction('booking_created', $booking);
 
+        // A booking a discount made free has nothing to pay by card.
         $method = $request->validated('payment_method');
         $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
-            ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
+            ? ((int) $booking->price_points > 0
+                ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
+                : ['payment' => null, 'redirect_url' => null])
             : [];
 
-        return response()->json(['data' => new BookingResource($booking)] + $card, 201);
+        $code = $request->validated('coupon_code');
+        $coupon = $code !== null
+            ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->forRedeemable($booking))]
+            : [];
+
+        return response()->json(['data' => new BookingResource($booking)] + $card + $coupon, 201);
     }
 
     /**
