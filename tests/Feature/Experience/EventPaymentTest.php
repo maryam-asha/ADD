@@ -318,6 +318,6 @@ class EventPaymentTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.payment.state', 'unpaid')
             ->assertJsonPath('data.payment.method', 'cash')
-            ->assertJsonPath('data.payment.price_points', 100);
+            ->assertJsonPath('data.payment.amount_points', 100);
     }
 }

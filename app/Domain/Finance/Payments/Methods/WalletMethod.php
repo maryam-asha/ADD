@@ -6,7 +6,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\Contracts\PaymentMethodDriver;
+use App\Domain\Finance\Payments\Contracts\ChoosesWallet;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\FulfillerRegistry;
 use App\Domain\Finance\Payments\PaymentService;
@@ -27,7 +27,7 @@ use App\Domain\Membership\Services\WalletService;
  * the same 422 booking has always returned). The chosen wallet must cover
  * the whole amount — this method never leaves a payment half-paid.
  */
-class WalletMethod implements PaymentMethodDriver
+class WalletMethod implements ChoosesWallet
 {
     public const KEY = 'wallet';
 

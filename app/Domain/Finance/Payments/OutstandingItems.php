@@ -58,12 +58,15 @@ class OutstandingItems
     }
 
     /**
+     * What each booking still owes: its price less what was already paid
+     * for it — a paid booking that was then extended owes the extension.
+     *
      * @return list<array<string, mixed>>
      */
     private function bookings(int $userId): array
     {
         return $this->bookingsOwed()
-            ->with('space')
+            ->with(['space', 'payments'])
             ->where('user_id', $userId)
             ->orderBy('start_at')
             ->get()
@@ -72,8 +75,10 @@ class OutstandingItems
                 'payable_id' => $b->id,
                 'title' => $b->space?->translate('name'),
                 'starts_at' => $b->start_at?->toIso8601String(),
-                'amount_points' => (int) $b->price_points,
+                'amount_points' => max(0, (int) $b->price_points - $b->pointsPaid()),
             ])
+            ->filter(fn (array $item) => $item['amount_points'] > 0)
+            ->values()
             ->all();
     }
 

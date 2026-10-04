@@ -79,9 +79,16 @@ is routed — `routePayment()`, the booking's `amount_owed`, and the eventual
 calculator with no membership/discount awareness — the two concerns compose
 in `BookingCreationService`, not inside the rate calculator.
 
-A `PlanDiscountRedemption` row is only ever written when the booking's
-resulting `payment_state` is `Paid` — an unpaid booking never consumed any of
-the discount's usage allowance.
+A `PlanDiscountRedemption` row is written for every booking the discount
+priced, paid at creation or not (single and batch). Superseded: it used to be
+written only when the booking's resulting `payment_state` was `Paid`, but
+since unified payments (`docs/decisions/unified-payments.md`) a booking left
+unpaid — cash at the desk, a card, pay-now later — still carries the
+discounted `price_points` and is charged it, so not counting it let any
+member bypass `usage_limit` by choosing to pay later (final review I1).
+Check-out keeps the discount too: `SessionClosureService` prices the time
+used at the booking's own redemption discount, so a discounted booking paid
+after check-out costs the discounted price.
 
 ## Extension recomputes, cancellation/rejection void
 

@@ -15,6 +15,7 @@ use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Finance\Services\StartPayment;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
@@ -58,6 +59,16 @@ class PaymentController extends Controller
         $method = $request->paymentMethod();
         $member = $request->user();
 
+        // A plan bought here is the member's own. A company plan is bought
+        // by the company's admin, through POST member/memberships with
+        // `company_id`, where that is checked; nothing here checks it, and
+        // the plan goes to the paying wallet's owner.
+        if ($purpose === PaymentPurpose::PlanPurchase
+            && $request->validated('wallet_owner_type') !== null
+            && $request->validated('wallet_owner_type') !== OwnerType::User->value) {
+            return response()->json(['message' => __('api.payment.company_plan_not_allowed')], 422);
+        }
+
         try {
             if ($method === PaymeraGateway::KEY && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true)) {
                 ['payment' => $payment, 'url' => $url] = $card->handle(
@@ -94,6 +105,14 @@ class PaymentController extends Controller
         } catch (UnknownPaymentMethodException) {
             // The app's default method (a card) switched off in config.
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
+        } catch (SeatPoolExhaustedException $e) {
+            // A plan paid from the wallet is activated on the spot; its
+            // branch's co-working seats are all held for part of its period.
+            // Nothing was charged. The answer POST member/memberships gives.
+            return response()->json([
+                'message' => __('api.membership.seat_pool_full'),
+                'first_shortfall_at' => $e->firstShortfall->toIso8601String(),
+            ], 422);
         } catch (Throwable $e) {
             return $this->gatewayFailureResponse($e, $member->id) ?? throw $e;
         }

@@ -68,10 +68,13 @@ class StartPaymentRequest extends FormRequest
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
 
             // Required for a top-up, meaningless for a plan purchase — and for
-            // a top-up in cash, where reception enters what is handed over.
+            // a top-up in cash, where reception enters what is handed over. A
+            // plain decimal: `numeric` alone lets `1e3` through, which bcmath
+            // refuses (amountMinor()).
             'amount' => [
                 Rule::requiredIf(fn () => $this->input('purpose') === PaymentPurpose::WalletTopUp->value && ! $this->paysInCash()),
                 'numeric',
+                'regex:/^\d+(\.\d{1,6})?$/',
                 'min:0.01',
                 // In the card gateway's currency.
                 new AmountFitsCurrency((string) config('paymera.currency')),
@@ -106,12 +109,17 @@ class StartPaymentRequest extends FormRequest
      * uses, so a member can only pay for something they were actually
      * offered — a private or deactivated plan id guessed by hand is
      * rejected here.
+     *
+     * A one-time package is not a subscription, and no membership can be
+     * made of one — the rule POST member/memberships applies
+     * (StoreMembershipRequest). Refused here rather than after the money is
+     * taken.
      */
     private function validatePlan(Validator $validator): void
     {
         $plan = Plan::query()->publiclyListable()->find($this->input('plan_id'));
 
-        if ($plan === null) {
+        if ($plan === null || ! $plan->is_subscription) {
             $validator->errors()->add('plan_id', __('api.payment.plan_unavailable'));
 
             return;

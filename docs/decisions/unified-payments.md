@@ -26,7 +26,9 @@ The user's decisions the design records:
 - Reception enters the amount received; any overpayment becomes points.
 - Events and plans may be paid from the same wallets as bookings (personal,
   or a company the member belongs to), with an explicit choice when several
-  apply.
+  apply. For plans the user later ruled narrower: a company wallet pays only
+  for a company plan, bought by the company's admin (see Rulings, "Company
+  wallets pay for a company plan only").
 
 ## The model
 
@@ -63,7 +65,7 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 |---|---|---|---|---|
 | `wallet_top_up` | `WalletTopUpFulfiller` | 0 | — | nothing |
 | `plan_purchase` | `PlanPurchaseFulfiller` | `plans.price_points`, re-read | general | activate for the wallet's owner (`charge: false`, audited `charged: true`) |
-| `booking` | `BookingFulfiller` | `bookings.price_points` | space-specific | mark paid, source wallet/cash/gateway |
+| `booking` | `BookingFulfiller` | `bookings.price_points` less what was already paid for it | space-specific | mark paid, source wallet/cash/gateway |
 | `coworking_session` | `WalkinSessionFulfiller` | `walkin_sessions.price_points` (written at closure) | space-specific | mark paid |
 | `event_registration` | `EventRegistrationFulfiller` | `event_attendees.price_points` | general | `payment_state = paid` |
 | `booking_extension` | `BookingExtensionFulfiller` | the difference, passed in | space-specific | nothing |
@@ -89,7 +91,7 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 | booking (`POST member/bookings`) | pay now or 422 | unpaid | unpaid, then its card payment opens |
 | multi-date booking (`/batch`) | one wallet for the total, one payment per booking | unpaid | refused (validation) |
 | event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens |
-| anything unpaid (`POST member/payments`) | yes | `pay_at_reception` | yes |
+| anything unpaid (`POST member/payments`) | yes (a plan: the member's own only) | `pay_at_reception` (a plan: a hold on the member's own wallet) | yes, into the member's own wallet |
 | top-up | — | directions only (`pay_at_reception`, no row, no amount; `hint` in payment-methods); reception credits it through `wallet-top-ups` and the member is notified | yes |
 
 Reception: `POST admin/reception/payments/settle` settles any of the four with
@@ -104,7 +106,13 @@ optionally price what is being paid for) for each enabled method with
 It is the one place the app reads payment methods; `member/wallet/options`
 is kept only for the app version that still calls it. The app then reads a `payment` block
 (`PaymentStatePresenter`) on bookings, sessions, the session report and
-event registrations.
+event registrations. On the member's event detail and "my events" it is the
+presenter's block itself — `{state, method, amount_points, price,
+price_point, paid_at, payment_id}`, `state` null for a free event, the whole
+block null when the member has no registration (final review I3). The
+earlier `price_points`/`price_label` keys there were dropped rather than
+kept beside the new ones: they were added on this branch (052feee) and never
+reached a released app.
 
 ## The member's wallet
 
@@ -188,6 +196,45 @@ already open on it still sync and reverse.
   own unpaid state is the record until reception takes the money.
 - **An extension is `booking_extension`**, a purpose of its own, because its
   payable is an already-paid booking.
+- **What a booking owes is its price less what was paid for it** (final
+  review C2): `price_points` minus every accepted, settled, unrefunded
+  payment whose payable is the booking, whatever its purpose
+  (`Booking::pointsPaid()`). `BookingFulfiller::pointsDue` (pay-now, the
+  desk, `payment-methods`), `OutstandingItems` and the `payment` block all
+  read it. Extending a paid booking grows `price_points` by exactly the
+  extension: a booking paid from the wallet still pays it from the member's
+  own wallet when that covers it (a `booking_extension` row); any other
+  paid booking (a card, the desk), or one the wallet cannot cover, becomes
+  unpaid owing only the extension — never the whole booking again. At
+  check-out an unpaid booking is repriced for the time used, never below
+  what was already paid, and is paid once its payments cover it.
+- **A card start never leaves a payment pending** (final review I2): nothing
+  due (0 points) is refused with 422 `api.payment.nothing_due` before any
+  row is written — `BookingFulfiller::assertPayable` (every method, as the
+  session and registration fulfillers already did) and `PaymentService::start`
+  for any gateway. Once the row exists, `PaymeraGateway::start` prices the
+  charge inside the guard that marks it `failed`, so a missing exchange rate
+  fails the row like a call that never came back. `RespondsToGatewayFailures`
+  maps that pricing failure to 503 `gateway_unavailable`; a booking or a
+  registration made with a card therefore still answers 201 with
+  `payment: null` and `payment_error` (also `nothing_due` for a free
+  booking), and `POST member/payments` answers 503.
+- **A money amount is a plain decimal** (final review M4). `amount` on
+  reception settle, the reception top-up (and its preview) and the member's
+  card top-up is `numeric` plus `regex:/^\d+(\.\d{1,6})?$/`: an exponent
+  (`1e0`, `1.0E+2`) passes `numeric` but breaks bcmath, and is now a 422 on
+  `amount`. Padding never arrives (TrimStrings makes ` 5` the same money as
+  `5`). Behind the rules, `ReceivedMoneyConverter` accepts only a plain
+  decimal and refuses anything else with `InvalidMoneyAmountException`,
+  rendered 422 `api.payment.invalid_amount` — no spelling of an amount is a
+  500. (It used to rewrite such spellings through a float.)
+- **A plan discount is used up by every booking it priced**, paid at
+  creation or later (final review I1): the `PlanDiscountRedemption` is
+  written when the booking is made (single and batch), and voided on cancel
+  or reject as before, so `usage_limit` cannot be bypassed by paying later.
+  Check-out prices the time used at the booking's own discount, so the
+  discounted price quoted at booking is what the desk collects after
+  check-out (`docs/decisions/plan-discounts-design.md`).
 - **The cash register counts money, not points**, in the base currency
   (other currencies at the rate stored on the row); the session has no
   currency of its own.
@@ -197,6 +244,27 @@ already open on it still sync and reverse.
   settle endpoints never needed one.
 - **A company plan cannot be bought by card from the app** yet: card money
   lands in the member's own wallet.
+- **Whose wallet a payment touches** (final review C1; the user's ruling on
+  the spec's "plans paid from the same wallets as bookings"). Only a method
+  that picks the wallet itself and checks the payer may spend from it
+  (`ChoosesWallet`: `WalletMethod` — the member's own, or a company they
+  belong to) is given the `wallet_owner_type`/`wallet_owner_id` a client
+  sends. Every other method opens on the payer's **personal** wallet: card
+  and cash money always land in the payer's own wallet first, whatever the
+  request named. The one exception is a wallet the caller has already
+  authorized (`authorized_wallet` in the context, never built from request
+  input): `POST member/memberships` with `company_id` opens a company's cash
+  hold on the company's wallet after `CompanyPolicy::manageMembers`.
+- **Company wallets pay for a company plan only, bought by the company's
+  admin through `POST member/memberships` with `company_id`.** On
+  `POST member/payments` a `plan_purchase` is always the member's own plan: a
+  non-user `wallet_owner_type` is refused with 422
+  `api.payment.company_plan_not_allowed`, for every method. The endpoint
+  applies the plan rules memberships applies: a one-time package
+  (`is_subscription = false`) is a 422 on `plan_id`, and a full branch is
+  422 `api.membership.seat_pool_full` with `first_shortfall_at`, never a 500.
+  Bookings, sessions and events keep the full wallet choice (personal or a
+  company the member belongs to), checked by `WalletMethod`.
 
 ## Deploying
 
@@ -210,9 +278,10 @@ already open on it still sync and reverse.
 
 ## Explicitly not done here
 
-- The booking extension still flips a paid booking to unpaid when the
-  personal wallet cannot cover the difference; settling it then charges the
-  whole price again. A follow-up.
+- A booking paid before payment rows existed (before this deploy) has no
+  row saying it was paid; extended after the deploy beyond what the
+  personal wallet covers, it owes its whole new price. Only a booking
+  checked in across the deploy can reach this.
 - Refunds for a cancelled paid event.
 - Card refunds back to the card: refunds are always points.
 - Café orders.
@@ -232,3 +301,11 @@ already open on it still sync and reverse.
   `Booking/BookingPaymentMethodTest`, `Booking/BookingRefundToPayingWalletTest`,
   `Membership/PlanPurchasePaymentMethodTest`, `Experience/EventPaymentTest`,
   `Experience/EventCheckInTest`; unit `ReceivedMoneyConverterTest`.
+- Final-review fixes: `PayNowWalletOwnerTest` (C1),
+  `Booking/BookingExtensionOwedTest` (C2), `Membership/PlanDiscountUsageTest`
+  (I1), `CardStartFailureTest` (I2), `Experience/EventPaymentBlockTest`
+  (I3), `MoneyAmountSpellingTest` (M4), and
+  `PaymeraCreatePaymentPayloadTest`, which pins what a card payment asks
+  Paymera for: `callbackURL`/`triggerURL` from `route('paymera.callback'|
+  'paymera.trigger', token)`, and `savedCards`/`appUser` only when
+  `paymera.saved_cards_enabled` is on.

@@ -125,10 +125,19 @@ class MembershipController extends Controller
     /**
      * Asking again for the same plan and owner while a hold is open returns
      * that hold rather than a second one.
+     *
+     * The hold is opened on the owner's wallet — the company's, for a
+     * company purchase — handed to the payment as already authorized: this
+     * endpoint checked CompanyPolicy::manageMembers above, which the cash
+     * method itself cannot.
      */
     private function holdForCash(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId): JsonResponse
     {
         $wallet = Wallet::query()->where('owner_type', $ownerType)->where('owner_id', $ownerId)->first();
+
+        if ($wallet === null && $ownerType === OwnerType::Company) {
+            return response()->json(['message' => __('api.payment.no_wallet')], 422);
+        }
 
         $existing = $wallet === null ? null : $this->openCashHolds()
             ->where('plan_id', $plan->id)
@@ -136,11 +145,10 @@ class MembershipController extends Controller
             ->latest('id')
             ->first();
 
-        $payment = $existing ?? $payments->start(PaymentPurpose::PlanPurchase, $member, CashMethod::KEY, [
+        $payment = $existing ?? $payments->start(PaymentPurpose::PlanPurchase, $member, CashMethod::KEY, array_filter([
             'plan' => $plan,
-            'wallet_owner_type' => $ownerType,
-            'wallet_owner_id' => $ownerId,
-        ])['payment'];
+            'authorized_wallet' => $wallet,
+        ]))['payment'];
 
         return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]], 201);
     }

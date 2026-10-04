@@ -18,6 +18,8 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -32,6 +34,7 @@ class SessionClosureService
         private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly PlanHourCoverageService $planHours,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     /**
@@ -186,7 +189,14 @@ class SessionClosureService
             ? $this->coverableBlocks($session, $session->membership, $at)
             : 0;
 
-        return ['points' => $this->priceFor($session, $at, $covered), 'covered_seconds' => $covered, 'already_paid' => false];
+        $points = $this->priceFor($session, $at, $covered);
+
+        // The same net price finalizeClosure() bills an unpaid booking at.
+        if ($session instanceof Booking) {
+            $points = $this->withBookingDiscount($session, $points);
+        }
+
+        return ['points' => $points, 'covered_seconds' => $covered, 'already_paid' => false];
     }
 
     /**
@@ -246,6 +256,11 @@ class SessionClosureService
         // point-denominated. Converting the point charge back to USD here is
         // the intended direction, not leftover scaffolding.
         $points = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
+
+        if ($session instanceof Booking) {
+            $points = $this->withBookingDiscount($session, $points);
+        }
+
         $amount = $this->points->pointsToUsd($points);
 
         $attributes = [
@@ -263,8 +278,10 @@ class SessionClosureService
         // The same price in points, what a payment settles. A walk-in is
         // priced only now; a booking keeps the price it was made (and
         // perhaps paid) at, unless it closes unpaid and is repriced here.
-        if ($session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid) {
+        if ($session instanceof WalkinSession) {
             $attributes['price_points'] = $points;
+        } elseif ($session->payment_state !== PaymentState::Paid) {
+            $attributes += $this->repriceUnpaidBooking($session, $points);
         }
 
         // Checked out is the booking's outcome: it happened
@@ -297,6 +314,46 @@ class SessionClosureService
             'resolved_at' => now(),
             'checked_out_at' => $attributes['checked_out_at'],
         ]);
+    }
+
+    /**
+     * A booking keeps the plan discount it was made with
+     * (PlanDiscountRedemption) when it is priced at check-out: the price it
+     * was quoted is the price, whenever it is paid. Read from the booking's
+     * own redemption, never re-resolved, like the booking's detail.
+     */
+    private function withBookingDiscount(Booking $booking, int $points): int
+    {
+        $discount = PlanDiscountRedemption::query()->where('booking_id', $booking->id)->first()?->discount;
+
+        return $discount === null ? $points : $this->discounts->apply($points, $discount);
+    }
+
+    /**
+     * An unpaid booking is billed for the time it was used. Part of it may
+     * already be paid — a paid booking that was then extended — and what
+     * it owes is its price less those payments (Booking::pointsPaid), so
+     * nothing already paid is billed again. It is never repriced below what
+     * was paid (no refund for leaving early, as for any paid booking), and
+     * once what was paid covers the time used it is paid.
+     *
+     * @return array<string, mixed>
+     */
+    private function repriceUnpaidBooking(Booking $booking, int $points): array
+    {
+        $paid = $booking->pointsPaid();
+
+        if ($paid <= 0) {
+            return ['price_points' => $points];
+        }
+
+        $attributes = ['price_points' => max($points, $paid)];
+
+        if ($paid >= $points) {
+            $attributes['payment_state'] = PaymentState::Paid;
+        }
+
+        return $attributes;
     }
 
     /**

@@ -256,7 +256,9 @@ class BookingBatchCreationService
                     $this->payments->pay($booking, $member, $payingWallet);
                 }
 
-                if ($row['discount'] !== null && $booking->payment_state === PaymentState::Paid) {
+                // Used up whether the booking is paid now or later, as in
+                // BookingCreationService.
+                if ($row['discount'] !== null) {
                     $this->discounts->redeem($row['discount'], $membership, $booking, $row['points_discounted']);
                 }
 

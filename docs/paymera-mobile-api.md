@@ -64,7 +64,7 @@ POST /api/v1/member/payments
 | الحقل | إلزامي | الوصف |
 |---|---|---|
 | `purpose` | نعم | `wallet_top_up` أو `plan_purchase` |
-| `amount` | مع `wallet_top_up` فقط | نص/رقم، بالوحدات الكبرى، ≥ 0.01 |
+| `amount` | مع `wallet_top_up` فقط | نص/رقم، بالوحدات الكبرى، ≥ 0.01، رقم عشري عادي (`10` أو `10.50`) — صيغة الأُس مثل `1e3` ← 422 |
 | `plan_id` | مع `plan_purchase` فقط | معرّف باقة متاحة للبيع |
 
 ### الرد الناجح — 201
@@ -329,8 +329,16 @@ POST /api/v1/member/payments
 ```
 
 `method`: `wallet` | `cash` | `paymera` (أو أي مفتاح وصل في القائمة).
-`wallet_owner_type/id` اختياريان للمحفظة؛ إذا كان للعضو أكثر من محفظة ولم
-يحدد، يعود 422 مع `wallet_options` كما في الحجز.
+`wallet_owner_type/id` اختياريان، وتُقرأ **مع `wallet` فقط**: محفظتك
+الشخصية أو محفظة شركة أنت عضو فيها؛ إذا كان للعضو أكثر من محفظة ولم يحدد،
+يعود 422 مع `wallet_options` كما في الحجز. مع البطاقة أو النقد يذهب المال
+دائماً إلى محفظتك الشخصية أولاً، مهما أُرسل في هذين الحقلين.
+
+**الباقة (`plan_purchase`) هنا باقتك الشخصية دائماً:** `wallet_owner_type`
+غير `user` ← 422 `api.payment.company_plan_not_allowed`. باقة الشركة يشتريها
+مسؤول الشركة عبر `POST member/memberships` مع `company_id`. الباقة لمرة واحدة
+(ليست اشتراكاً) ← 422 على `plan_id`، والفرع الممتلئ ← 422 مع
+`first_shortfall_at` كما في `memberships`.
 
 الرد دائماً 201:
 
@@ -351,7 +359,9 @@ POST /api/v1/member/payments
 - **الحجز:** `POST member/bookings` يقبل `payment_method`. `wallet` يدفع
   الآن أو يرفض بـ 422 ولا يُنشأ الحجز؛ `cash` ينشئه غير مدفوع؛ `paymera`
   ينشئه غير مدفوع ويضيف بجانب `data` الحقلين `payment` و`redirect_url`. إن
-  تعذّر فتح صفحة البطاقة يبقى الحجز، مع `payment: null` و`payment_error`.
+  تعذّر فتح صفحة البطاقة (البوابة أو سعر الصرف غير متاحين) يبقى الحجز، مع
+  `payment: null` و`payment_error`. والحجز المجاني لا دفعة له: `payment: null`
+  و`payment_error` = "لا يوجد مبلغ مستحق".
   الحجز المتعدد (`/batch`) يقبل `wallet` أو `cash` فقط.
 - **الفعالية:** `POST member/events/{id}/register` يقبل `payment_method`
   و`wallet_owner_type/id`. البطاقة أو النقد يؤكدان المقعد **غير مدفوع**، ولا
@@ -373,6 +383,14 @@ POST /api/v1/member/payments
 
 `state`: `paid` | `unpaid` | `pending` (دفع بطاقة جارٍ أو باقة محجوزة للنقد)
 | `null` (لا شيء للدفع: فعالية مجانية أو جلسة ما زالت مفتوحة).
+
+`amount_points`: السعر كاملاً بعد الدفع، و**ما بقي مستحقاً** قبله. الحجز
+المدفوع ثم المُمدَّد يصبح `unpaid` بمبلغ التمديد وحده، لا بسعر الحجز كله،
+وهذا ما يدفعه "ادفع الآن" وما يحصّله الاستقبال.
+
+في الفعاليات (التفاصيل و"فعالياتي" تحت `registration.payment`) الكتلة بهذا
+الشكل نفسه، و`pending` يعني دفع بطاقة جارياً و`payment_id` هو ما تستعلم عنه؛
+وتكون `null` كلها إن لم يكن لك تسجيل في الفعالية.
 
 في الحجوزات بقي `state` كما كان (`paid`/`unpaid`) حفاظاً على التطبيق الحالي،
 والدفع الجاري يظهر في `awaiting_payment: true`.

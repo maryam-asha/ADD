@@ -9,7 +9,7 @@ use App\Http\Resources\Forms\FormFieldResource;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
-use App\Support\Presenters\PriceLabelPresenter;
+use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
@@ -882,25 +882,18 @@ class EventBrowseService
     }
 
     /**
-     * Whether this member's registration is paid for, and how they chose to
-     * pay — read off the registration itself. Null when there is nothing to
-     * pay (a free event) or no registration.
+     * This member's registration's `payment` block, in the one shape every
+     * payable shows the member (PaymentStatePresenter, spec section 6):
+     * {state, method, amount_points, price, price_point, paid_at,
+     * payment_id}. `state` is paid, unpaid, pending (a card payment in
+     * flight, `payment_id` the one to poll) or null when there is nothing to
+     * pay (a free event). Null when there is no registration.
      *
-     * @return array{state: string, method: string|null, price_points: int|null, price_label: string, paid_at: string|null}|null
+     * @return array{state: string|null, method: string|null, amount_points: int|null, price: string|null, price_point: string|null, paid_at: string|null, payment_id: int|null}|null
      */
     private function paymentBlock(?Model $attendee, ?User $user): ?array
     {
-        if ($attendee?->payment_state === null) {
-            return null;
-        }
-
-        return [
-            'state' => $attendee->payment_state->value,
-            'method' => $attendee->payment_method,
-            'price_points' => $attendee->price_points,
-            'price_label' => app(PriceLabelPresenter::class)->total((int) $attendee->price_points, $user)['price'],
-            'paid_at' => $attendee->paid_at?->toISOString(),
-        ];
+        return $attendee === null ? null : app(PaymentStatePresenter::class)->for($attendee, $user);
     }
 
     /**
