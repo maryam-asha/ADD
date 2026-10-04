@@ -28,6 +28,9 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\DetectsLostConnections;
 use Illuminate\Database\Eloquent\Model;
@@ -70,6 +73,8 @@ class PaymentService
         private readonly ReceivedMoneyConverter $converter,
         private readonly CurrencyConversionService $currencies,
         private readonly PaymentNotifier $notifier,
+        private readonly PriceQuoteService $quotes,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
@@ -112,8 +117,23 @@ class PaymentService
         }
 
         $fulfiller = $this->fulfillers->for($purpose);
+        $coupon = $context['coupon'] ?? null;
 
-        $open = function () use ($purpose, $payer, $driver, $fulfiller, $context) {
+        // A coupon is locked on the payment it prices, in the transaction
+        // that opens it — a plan's only, here: anything else already has its
+        // price, and takes a coupon through CouponApplication. A card opens
+        // through StartPayment, so a gateway never reaches this with one.
+        if ($coupon !== null && ($purpose !== PaymentPurpose::PlanPurchase || $driver instanceof PaymentGateway)) {
+            throw new LogicException('PaymentService::start() locks a coupon on a plan purchase paid in points or cash only.');
+        }
+
+        $open = function () use ($purpose, $payer, $driver, $fulfiller, $context, $coupon) {
+            // The coupon's row first, so its limits are counted from a fresh
+            // snapshot (CouponLedger), and the price it gives — eligibility
+            // checked — before anything is written.
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            $quote = $coupon !== null ? $this->quotes->forPlan($context['plan'], $payer, $coupon, now()) : null;
+
             $payment = new Payment;
             $payment->forceFill([
                 'method' => $driver->key(),
@@ -143,6 +163,15 @@ class PaymentService
                 return ['payment' => null, 'start' => PaymentStart::payAtReception()];
             }
 
+            // The coupon's use is filed on the row before what is due is read,
+            // so the fulfiller prices the payment with it — the wallet check,
+            // the debit and every later quote alike.
+            if (($applied = $quote?->appliedCoupon()) !== null) {
+                $payment->amount_points = 0;
+                $payment->save();
+                $this->couponLedger->record($applied, $payer, $payment, PricingPurpose::PlanPurchase, $quote->couponBasePoints, $quote->couponPoints);
+            }
+
             $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
 
             // A gateway cannot charge nothing; refused before the row exists,
@@ -152,6 +181,12 @@ class PaymentService
             }
 
             $payment->save();
+
+            // A plan a coupon made free has nothing to spend or collect:
+            // settled on the spot, by whatever method was asked for.
+            if ($applied !== null && $payment->amount_points === 0) {
+                return ['payment' => $this->settle($payment)->refresh(), 'start' => PaymentStart::done()];
+            }
 
             $start = $driver->start($payment, $context);
 

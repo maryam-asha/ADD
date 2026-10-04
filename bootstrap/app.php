@@ -3,6 +3,7 @@
 use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -187,6 +188,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'required' => $e->required,
             'shortage' => $e->shortage,
         ], 422));
+
+        // A coupon code that cannot be used, with its reason — the one answer
+        // every purchase path gives, wherever the refusal is raised
+        // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+        $exceptions->render(fn (CouponRejectedException $e) => response()->json([
+            'message' => __($e->messageKey, $e->params),
+            'reason' => $e->rejection->value,
+        ], $e->status));
 
         // Registered last: Throwable matches everything, so an earlier match
         // above always wins. Returning null in debug mode defers to Laravel's

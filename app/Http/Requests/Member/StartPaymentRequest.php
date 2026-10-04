@@ -85,6 +85,15 @@ class StartPaymentRequest extends FormRequest
                 'integer',
                 'exists:plans,id',
             ],
+
+            // A coupon code: on a plan, or on what an unpaid booking, session
+            // or registration owes — never on a top-up, which is not a price.
+            'coupon_code' => [
+                'nullable',
+                'string',
+                'max:40',
+                Rule::prohibitedIf(fn () => $this->input('purpose') === PaymentPurpose::WalletTopUp->value),
+            ],
         ];
     }
 
