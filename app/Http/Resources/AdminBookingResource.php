@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\BookingPresentationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -33,6 +34,9 @@ class AdminBookingResource extends JsonResource
                 'space_type' => $space?->space_type->value,
                 'branch' => $space?->building?->branch?->translate('name', $locale),
             ],
+            // Where the member sits: a co-working booking may be placed in a
+            // room lent to co-working (docs/decisions/coworking-seat-pool.md).
+            'seat' => $space !== null ? app(BookingPresentationService::class)->seat($this->resource->seatingSpace(), $locale) : null,
             'member' => [
                 'id' => $this->resource->user?->id,
                 'name' => $this->resource->user?->name,

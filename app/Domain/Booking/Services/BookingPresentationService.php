@@ -8,15 +8,19 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
+use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\AvailabilityPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
+use App\Support\Presenters\PriceLabelPresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonInterface;
 
@@ -40,6 +44,9 @@ class BookingPresentationService
         private readonly AvailabilityPresenter $presenter,
         private readonly MembershipResolver $membershipResolver,
         private readonly PlanDiscountService $discounts,
+        private readonly BookingExtensionPlanner $extensions,
+        private readonly PriceLabelPresenter $prices,
+        private readonly BookingRefunder $refunder,
     ) {}
 
     /**
@@ -222,8 +229,11 @@ class BookingPresentationService
             'at' => $this->time->toLocal($booking->created_at)?->toIso8601String(),
         ];
 
-        // Auto-confirmed: no approval was ever required or recorded.
-        if ($booking->status === BookingStatus::Confirmed && $booking->approved_at === null) {
+        // Auto-confirmed: no approval was ever required or recorded. A
+        // completed booking or a no-show went through the same door.
+        $wasConfirmed = in_array($booking->status, [BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow], true);
+
+        if ($wasConfirmed && $booking->approved_at === null) {
             return [
                 'current' => 'confirmed',
                 'steps' => [
@@ -243,7 +253,7 @@ class BookingPresentationService
 
         [$current, $decisionKey, $decisionState] = match ($booking->status) {
             BookingStatus::Pending => ['under_review', 'approved', 'upcoming'],
-            BookingStatus::Confirmed => ['decision', 'approved', 'complete'],
+            BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow => ['decision', 'approved', 'complete'],
             BookingStatus::Rejected => ['decision', 'rejected', 'complete'],
             BookingStatus::Cancelled => ['decision', 'cancelled', 'complete'],
         };
@@ -265,8 +275,48 @@ class BookingPresentationService
                     'at' => $decisionState === 'complete' ? $decidedAt : null,
                 ],
             ],
-            'rejection_reason' => $booking->rejection_reason,
+            // A lapsed request stores no reason; it is explained in the
+            // viewer's language rather than the server's at the time.
+            'rejection_reason' => $booking->lapsedUnreviewed()
+                ? __('api.booking.lapsed_unreviewed', [], $locale)
+                : $booking->rejection_reason,
         ];
+    }
+
+    /**
+     * One line under the status, only where two bookings with the same
+     * status differ in what happened to the money
+     * (docs/decisions/booking-outcomes-and-extension.md): a no-show that was
+     * paid keeps its charge while an unpaid one owes nothing, a completed one
+     * may still be owed, and a closed one that was paid was refunded.
+     * Everything else has nothing to add: null.
+     */
+    public function statusNote(Booking $booking, string $locale): ?string
+    {
+        $paid = $booking->payment_state === PaymentState::Paid;
+
+        $key = match ($booking->status) {
+            BookingStatus::NoShow => $paid ? 'no_show_charged' : 'no_show_free',
+            BookingStatus::Completed => ! $paid && (int) $booking->price_points > 0 ? 'payment_due' : null,
+            BookingStatus::Cancelled, BookingStatus::Rejected => $paid && $this->wasRefunded($booking) ? 'refunded' : null,
+            default => null,
+        };
+
+        return $key === null ? null : __("api.booking.status_notes.{$key}", [], $locale);
+    }
+
+    /**
+     * BookingRefunder's two paths, read back: the payment rows that paid it
+     * were refunded, or — paid before rows existed — it was paid from the
+     * member's wallet, which that path always credits back.
+     */
+    private function wasRefunded(Booking $booking): bool
+    {
+        $rows = $booking->payments;
+
+        return $rows->isEmpty()
+            ? $booking->payment_source === PaymentSource::Wallet
+            : $rows->contains(fn ($payment) => $payment->isRefunded());
     }
 
     /**
@@ -275,7 +325,8 @@ class BookingPresentationService
      *
      * `can_cancel` delegates to BookingCancellationService::canCancel() —
      * the same predicate cancel() enforces — so the button is never shown
-     * for an action that would come straight back as a 422.
+     * for an action that would come straight back as a 422. `can_extend`
+     * is BookingExtensionPlanner's, which the extend POST re-checks.
      *
      * @return array<string, mixed>
      */
@@ -283,12 +334,7 @@ class BookingPresentationService
     {
         $canCancel = $this->cancellations->canCancel($booking);
         $windowMinutes = $this->cancellations->windowMinutesFor($booking);
-
-        // Extension is only meaningful once the member is actually in the
-        // room (BookingExtensionService requires checked_in_at).
-        $canExtend = $booking->checked_in_at !== null
-            && $booking->checked_out_at === null
-            && $booking->status === BookingStatus::Confirmed;
+        $extension = $this->extensions->options($booking);
 
         return [
             'can_cancel' => $canCancel,
@@ -296,41 +342,159 @@ class BookingPresentationService
             'cancel_note' => __('api.booking.cancellation_note', [
                 'duration' => $this->presenter->durationLabel($windowMinutes),
             ], $locale),
-            'can_extend' => $canExtend,
-            'extend_disabled_reason' => $canExtend
-                ? null
-                : __('api.reception.not_checked_in', [], $locale),
+            'can_extend' => $extension->canExtend(),
+            'extend_disabled_reason' => $extension->reason?->label($locale),
         ];
     }
 
     /**
+     * GET .../extension-options: each length the booking can grow by, with
+     * the time it would end and what it costs — or why it cannot grow
+     * (docs/decisions/booking-outcomes-and-extension.md). `latest_end_at` is
+     * the latest the member can stay.
+     *
      * @return array<string, mixed>
      */
-    public function payment(Booking $booking, string $locale): array
+    public function extensionOptions(Booking $booking, string $locale, ?User $viewer): array
     {
-        // The block every payable shows (PaymentStatePresenter), added to the
-        // keys this one always had. `state` stays paid/unpaid for the apps
-        // already reading it; a card payment in flight is `awaiting_payment`.
+        $plan = $this->extensions->options($booking);
+
+        return [
+            'can_extend' => $plan->canExtend(),
+            'reason' => $plan->reason?->value,
+            'reason_label' => $plan->reason?->label($locale),
+            'current_end_at' => $this->time->toLocal($plan->currentEnd)?->toIso8601String(),
+            'latest_end_at' => $this->time->toLocal($plan->latestEnd)?->toIso8601String(),
+            'options' => array_map(function (array $option) use ($viewer, $locale) {
+                $localEnd = $this->time->toLocal($option['end_at']);
+                $labels = $option['points'] > 0
+                    ? $this->prices->total($option['points'], $viewer, $locale)
+                    : ['price' => null, 'price_point' => null];
+
+                return [
+                    'minutes' => $option['minutes'],
+                    'label' => $this->presenter->durationLabel($option['minutes']),
+                    'end_at' => $localEnd?->toIso8601String(),
+                    'end_time' => $localEnd?->format('h:i A'),
+                    'price_points' => $option['points'],
+                    'price' => $labels['price'],
+                    'price_point' => $labels['price_point'],
+                ];
+            }, $plan->options),
+        ];
+    }
+
+    /**
+     * The two fields of the payment block (PaymentStatePresenter) the detail
+     * keeps beside `payment_state`: the latest payment, for the app to poll,
+     * and whether a card payment for the booking is still in flight.
+     *
+     * @return array{payment_id: int|null, awaiting_payment: bool}
+     */
+    public function paymentTracking(Booking $booking): array
+    {
         $block = app(PaymentStatePresenter::class)->for($booking, $booking->user);
 
         return [
-            'state' => $booking->payment_state->value,
-            'source' => $booking->payment_source?->value,
-            'label' => match ($booking->payment_source) {
-                PaymentSource::Wallet => __('api.booking.payment_methods.wallet', [], $locale),
-                PaymentSource::Cash => __('api.booking.payment_methods.cash', [], $locale),
-                PaymentSource::Gateway => __('api.payment.methods.paymera', [], $locale),
-                default => $booking->payment_state === PaymentState::Paid
-                    ? __('api.booking.payment_methods.wallet', [], $locale)
-                    : __('api.booking.payment_methods.cash', [], $locale),
-            },
-            'method' => $block['method'],
-            'amount_points' => $block['amount_points'],
-            'price' => $block['price'],
-            'price_point' => $block['price_point'],
-            'paid_at' => $block['paid_at'],
             'payment_id' => $block['payment_id'],
             'awaiting_payment' => $block['state'] === 'pending',
+        ];
+    }
+
+    /**
+     * The cancel screen: until when the booking can be cancelled, what
+     * cancelling gives back and to which wallet. The amount is
+     * BookingRefunder's own quote — the same rows and arithmetic the refund
+     * runs — so what the screen promises is what comes back. Null when the
+     * booking cannot be cancelled.
+     *
+     * @return array{deadline_label: string, refund_points: int, refund_price: string|null, refund_to: string|null}|null
+     */
+    public function cancellation(Booking $booking, string $locale, ?User $viewer): ?array
+    {
+        if (! $this->cancellations->canCancel($booking)) {
+            return null;
+        }
+
+        $deadline = $this->time->toLocal($this->cancellations->deadlineFor($booking));
+        $quote = $this->refunder->quote($booking);
+        $points = $quote['points'];
+
+        return [
+            'deadline_label' => __('api.booking.cancel_until', [
+                'at' => $deadline->copy()->locale($locale)->translatedFormat($locale === 'ar' ? 'j F Y' : 'F j, Y')
+                    .($locale === 'ar' ? '، ' : ', ')
+                    .$deadline->format('h:i A'),
+            ], $locale),
+            'refund_points' => $points,
+            'refund_price' => $points > 0 ? $this->prices->total($points, $viewer, $locale)['price'] : null,
+            'refund_to' => $points > 0
+                ? implode($locale === 'ar' ? '، ' : ', ', array_map(fn (Wallet $wallet) => $this->walletLabel($wallet, $locale), $quote['wallets']))
+                : null,
+        ];
+    }
+
+    /** "Your wallet", or the company whose wallet paid. */
+    private function walletLabel(Wallet $wallet, string $locale): string
+    {
+        return $wallet->owner_type === OwnerType::Company
+            ? (Company::query()->whereKey($wallet->owner_id)->value('legal_name') ?? __('api.booking.refund_to_company_wallet', [], $locale))
+            : __('api.booking.refund_to_own_wallet', [], $locale);
+    }
+
+    /**
+     * The list card's day line: "Today, August 17, 2026", "Tomorrow, …", or
+     * just the date — in the district's calendar, not the server's, and with
+     * the month named in the viewer's language.
+     */
+    public function dateLabel(CarbonInterface $start, string $locale): string
+    {
+        $local = $this->time->toLocal($start);
+        $today = $this->time->toLocal(now());
+        $date = $local->copy()->locale($locale)->translatedFormat($locale === 'ar' ? 'j F Y' : 'F j, Y');
+
+        return match ($local->toDateString()) {
+            $today->toDateString() => __('api.booking.date_today', ['date' => $date], $locale),
+            $today->copy()->addDay()->toDateString() => __('api.booking.date_tomorrow', ['date' => $date], $locale),
+            default => $date,
+        };
+    }
+
+    /** The list card's time line: "01:00 PM - 02:00 PM (1h)". */
+    public function timeLabel(CarbonInterface $start, CarbonInterface $end, string $locale): string
+    {
+        $localStart = $this->time->toLocal($start);
+        $localEnd = $this->time->toLocal($end);
+
+        return __('api.booking.time_range', [
+            'start' => $localStart->format('h:i A'),
+            'end' => $localEnd->format('h:i A'),
+            'duration' => $this->presenter->durationLabel((int) $localStart->diffInMinutes($localEnd)),
+        ], $locale);
+    }
+
+    /**
+     * Where the member heads on arrival: the space they sit in and its
+     * floor — the lent room a co-working booking was placed in, else the
+     * booked space itself (docs/decisions/coworking-seat-pool.md,
+     * "Seating placement").
+     *
+     * @return array{space_id: int, title: string, building: ?string, floor: ?string, zone: ?string, formatted: string}
+     */
+    public function seat(Space $space, string $locale): array
+    {
+        $space->loadMissing(['building', 'zone.floor']);
+
+        $title = $space->displayTitle($locale);
+        $floor = $space->zone?->floor?->label;
+
+        return [
+            'space_id' => $space->id,
+            'title' => $title,
+            'building' => $space->building?->translate('name', $locale),
+            'floor' => $floor,
+            'zone' => $space->zone?->label,
+            'formatted' => collect([$title, $floor])->filter()->implode(' – '),
         ];
     }
 

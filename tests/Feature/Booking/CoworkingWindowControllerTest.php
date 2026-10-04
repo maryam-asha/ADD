@@ -74,6 +74,16 @@ class CoworkingWindowControllerTest extends TestCase
             ->assertJsonCount(1, 'data');
     }
 
+    /** 04:00–08:00 picked at 09:00 — a 12-hour picker left on AM — is refused, not saved. */
+    public function test_a_stretch_that_has_already_ended_cannot_be_lent(): void
+    {
+        $this->lend(['starts_at' => '2026-10-01 04:00', 'ends_at' => '2026-10-01 08:00'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['ends_at' => 'That stretch has already ended.']);
+
+        $this->assertSame(0, SpaceCoworkingWindow::query()->count());
+    }
+
     public function test_a_room_with_a_booking_in_the_stretch_cannot_be_lent(): void
     {
         Booking::factory()->create(['space_id' => $this->room->id, 'start_at' => $this->local('15:00'), 'end_at' => $this->local('16:00')]);

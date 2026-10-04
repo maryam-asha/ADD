@@ -14,6 +14,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Support\ReferenceSequence;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,6 +29,7 @@ class Booking extends Model
 
     protected $fillable = [
         'space_id',
+        'seat_space_id',
         'user_id',
         'start_at',
         'end_at',
@@ -74,15 +76,46 @@ class Booking extends Model
     }
 
     /**
-     * The statuses that hold a slot. A `pending` booking is itself the hold
-     * — there is no separate reservation mechanism — while `cancelled` and
-     * `rejected` fall outside, so the very next overlap check sees the slot
-     * free again with no explicit release step
+     * Every booking gets its human-readable number ("BK-2026-00041") here,
+     * whichever path creates it — the series restarts each calendar year, as
+     * service requests' "REQ-…" does (docs/decisions/booking-outcomes-and-extension.md).
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (self $booking) {
+            if ($booking->reference !== null) {
+                return;
+            }
+
+            $key = 'BK-'.($booking->created_at ?? now())->format('Y');
+
+            $booking->reference = sprintf('%s-%05d', $key, ReferenceSequence::next($key));
+        });
+    }
+
+    /**
+     * The statuses that hold a slot (BookingStatus::slotHolding()). A
+     * `pending` booking is itself the hold — there is no separate
+     * reservation mechanism — while `cancelled` and `rejected` fall outside,
+     * so the very next overlap check sees the slot free again with no
+     * explicit release step
      * (docs/decisions/booking-creation-approval-extension.md).
      */
     public function scopeBlocking(Builder $query): Builder
     {
-        return $query->whereIn('status', [BookingStatus::Confirmed, BookingStatus::Pending]);
+        return $query->whereIn('status', BookingStatus::slotHolding());
+    }
+
+    /**
+     * Rejected by the clock rather than by anyone: still pending when it
+     * started (bookings:close-elapsed), so no operator and no reason is
+     * recorded — a staff rejection always carries both.
+     */
+    public function lapsedUnreviewed(): bool
+    {
+        return $this->status === BookingStatus::Rejected
+            && $this->approved_by === null
+            && $this->rejection_reason === null;
     }
 
     /**
@@ -103,6 +136,22 @@ class Booking extends Model
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);
+    }
+
+    /**
+     * The room lent to co-working this booking was placed in, or null when
+     * it sits on its own space (docs/decisions/coworking-seat-pool.md,
+     * "Seating placement").
+     */
+    public function seatSpace(): BelongsTo
+    {
+        return $this->belongsTo(Space::class, 'seat_space_id');
+    }
+
+    /** Where the member actually sits: the lent room, else the booked space. */
+    public function seatingSpace(): Space
+    {
+        return $this->seatSpace ?? $this->space;
     }
 
     public function user(): BelongsTo

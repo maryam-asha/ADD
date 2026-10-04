@@ -11,6 +11,7 @@ use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
@@ -38,11 +39,152 @@ class CoworkingPoolService
 {
     public function timeline(Branch $branch, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate = null): PoolTimeline
     {
+        return $this->gather($branch, $from, $to, $candidate, baseOnly: false);
+    }
+
+    /**
+     * Where a co-working presence over [$start, $end) should sit
+     * (docs/decisions/coworking-seat-pool.md, "Seating placement"): null for
+     * the branch's own co-working seats while they last, else the first room
+     * lent to co-working whose window covers the whole stretch and still has
+     * a seat. Null too when no single place fits — the pool as a whole is
+     * the gate, this only tells the member where to go.
+     *
+     * With $stayInSpaceId — an extension of a booking already sitting in a
+     * lent room — that room is tried first, so nobody is moved while their
+     * own room still has them.
+     */
+    public function placeFor(Branch $branch, CarbonInterface $start, CarbonInterface $end, ?User $user, ?int $ignoreBookingId = null, ?int $stayInSpaceId = null): ?Space
+    {
+        $start = CarbonImmutable::instance($start)->utc();
+        $end = CarbonImmutable::instance($end)->utc();
+
+        $windows = SpaceCoworkingWindow::query()
+            ->with('space')
+            ->where('starts_at', '<=', $start)
+            ->where('ends_at', '>=', $end)
+            ->whereHas('space', fn (Builder $space) => $this->inBranch($space, $branch))
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
+        $current = $windows->firstWhere('space_id', $stayInSpaceId);
+
+        if ($current !== null && $this->roomHasSeat($current, $start, $end, $ignoreBookingId)) {
+            return $current->space;
+        }
+
+        $candidate = PoolDemand::presence($start, $end, $user, ignoreBookingId: $ignoreBookingId);
+
+        if ($this->gather($branch, $start, $end, $candidate, baseOnly: true)->minFree() >= 0) {
+            return null;
+        }
+
+        return $windows->first(fn (SpaceCoworkingWindow $window) => $this->roomHasSeat($window, $start, $end, $ignoreBookingId))?->space;
+    }
+
+    /**
+     * Whether one more person fits in a lent room over [$start, $end).
+     */
+    private function roomHasSeat(SpaceCoworkingWindow $window, CarbonImmutable $start, CarbonImmutable $end, ?int $ignoreBookingId): bool
+    {
+        return $this->roomTimeline($window, $start, $end, $ignoreBookingId, withCandidate: true)->minFree() >= 0;
+    }
+
+    /**
+     * A lent room's own seats over [$from, $to) (clipped to its window):
+     * the bookings placed in it and the walk-ins inside now, against its
+     * `seats` — with one more person when $withCandidate.
+     */
+    public function roomTimeline(SpaceCoworkingWindow $window, CarbonInterface $from, CarbonInterface $to, ?int $ignoreBookingId = null, bool $withCandidate = false): PoolTimeline
+    {
+        $start = CarbonImmutable::instance($from)->utc();
+        $end = CarbonImmutable::instance($to)->utc();
+
+        $seated = Booking::query()
+            ->blocking()
+            ->overlapping($start, $end)
+            ->where('seat_space_id', $window->space_id)
+            ->when($ignoreBookingId, fn (Builder $query, int $id) => $query->whereKeyNot($id))
+            ->get(['start_at', 'end_at'])
+            ->map(fn (Booking $booking) => ['start' => $booking->start_at, 'end' => $booking->end_at, 'membership' => null])
+            ->all();
+
+        $now = CarbonImmutable::now()->utc();
+
+        if ($now->greaterThanOrEqualTo($start) && $now->lessThan($end)) {
+            $walkIns = WalkinSession::query()->whereNull('checked_out_at')->where('space_id', $window->space_id)->count();
+
+            for ($i = 0; $i < $walkIns; $i++) {
+                $seated[] = ['start' => $now, 'end' => $now->addSecond(), 'membership' => null];
+            }
+        }
+
+        if ($withCandidate) {
+            $seated[] = ['start' => $start, 'end' => $end, 'membership' => null];
+        }
+
+        $supply = [['start' => $window->starts_at, 'end' => $window->ends_at, 'seats' => $window->seats]];
+
+        return PoolTimeline::build($start, $end, $supply, [], $seated);
+    }
+
+    /**
+     * The pool split by place at one instant, for the dashboard: the
+     * branch's own co-working seats, then each room lent to co-working then
+     * — seats open, seats taken, and until when a room is lent. Counted as
+     * placeFor() places people, so the two never disagree. The base's taken
+     * seats include those subscriptions hold.
+     *
+     * @return list<array{kind: string, spaces: Collection<int, Space>, seats: int, taken: int, until: ?CarbonImmutable}>
+     */
+    public function placesAt(Branch $branch, CarbonInterface $at): array
+    {
+        $at = CarbonImmutable::instance($at)->utc();
+        $next = $at->addSecond();
+        $base = $this->gather($branch, $at, $next, null, baseOnly: true);
+
+        $places = [[
+            'kind' => 'base',
+            'spaces' => Space::query()->whereKey($this->coSpaces($branch)->modelKeys())->with(['building', 'zone.floor'])->orderBy('id')->get(),
+            'seats' => $base->capacityAt($at),
+            'taken' => $base->usageAt($at),
+            'until' => null,
+        ]];
+
+        $windows = SpaceCoworkingWindow::query()
+            ->with(['space.building', 'space.zone.floor'])
+            ->overlapping($at, $next)
+            ->whereHas('space', fn (Builder $space) => $this->inBranch($space, $branch))
+            ->orderBy('starts_at')
+            ->orderBy('id')
+            ->get();
+
+        foreach ($windows as $window) {
+            $places[] = [
+                'kind' => 'lent_room',
+                'spaces' => new Collection([$window->space]),
+                'seats' => $window->seats,
+                'taken' => $this->roomTimeline($window, $at, $next)->usageAt($at),
+                'until' => CarbonImmutable::instance($window->ends_at)->utc(),
+            ];
+        }
+
+        return $places;
+    }
+
+    /**
+     * The pool's timeline; with $baseOnly, only the branch's own co-working
+     * seats and the people sitting in them — the rooms lent to co-working,
+     * and whoever was placed in one, left out.
+     */
+    private function gather(Branch $branch, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate, bool $baseOnly): PoolTimeline
+    {
         $from = CarbonImmutable::instance($from)->utc();
         $to = CarbonImmutable::instance($to)->utc();
 
         $coSpaces = $this->coSpaces($branch);
-        $windows = SpaceCoworkingWindow::query()
+        $windows = $baseOnly ? new Collection : SpaceCoworkingWindow::query()
             ->overlapping($from, $to)
             ->whereHas('space', fn (Builder $space) => $this->inBranch($space, $branch))
             ->get();
@@ -72,6 +214,9 @@ class CoworkingPoolService
             ->overlapping($from, $to)
             ->whereIn('space_id', $coSpaces->modelKeys())
             ->when($candidate?->ignoreBookingId, fn (Builder $query, int $id) => $query->whereKeyNot($id))
+            ->when($baseOnly, fn (Builder $query) => $query->where(fn (Builder $seat) => $seat
+                ->whereNull('seat_space_id')
+                ->orWhereIn('seat_space_id', $coSpaces->modelKeys())))
             ->get(['id', 'user_id', 'start_at', 'end_at']);
 
         $walkIns = $this->openWalkIns($coSpaces, $windows, $from, $to);

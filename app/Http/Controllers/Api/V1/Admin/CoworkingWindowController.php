@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
+use App\Domain\Booking\Services\CoworkingPoolService;
 use App\Domain\Booking\Services\CoworkingWindowService;
 use App\Domain\Foundation\Models\Space;
 use App\Http\Controllers\Controller;
@@ -11,6 +12,7 @@ use App\Http\Requests\Admin\Booking\StoreCoworkingWindowRequest;
 use App\Http\Requests\Admin\Booking\UpdateCoworkingWindowRequest;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -25,7 +27,10 @@ use Illuminate\Http\Request;
  */
 class CoworkingWindowController extends Controller
 {
-    public function __construct(private readonly LocalTime $time) {}
+    public function __construct(
+        private readonly LocalTime $time,
+        private readonly CoworkingPoolService $pool,
+    ) {}
 
     /** The room's stretches that have not ended yet, soonest first. */
     public function index(Space $space): JsonResponse
@@ -85,16 +90,28 @@ class CoworkingWindowController extends Controller
     }
 
     /**
-     * @return array{id: int, space_id: int, starts_at: string, ends_at: string, seats: int}
+     * With how full the lent room is: `taken_now` while it is lent (null
+     * before), and `taken_peak`, the most seats taken at once from now to
+     * its end — what staff weigh before shortening or taking it back.
+     *
+     * @return array{id: int, space_id: int, starts_at: string, ends_at: string, seats: int, taken_now: ?int, taken_peak: int}
      */
     private function present(SpaceCoworkingWindow $window): array
     {
+        $now = CarbonImmutable::now()->utc();
+        $from = max($now, CarbonImmutable::instance($window->starts_at)->utc());
+        $to = CarbonImmutable::instance($window->ends_at)->utc();
+        $remaining = $to->greaterThan($from) ? $this->pool->roomTimeline($window, $from, $to) : null;
+        $lentNow = $window->starts_at->lessThanOrEqualTo($now) && $window->ends_at->greaterThan($now);
+
         return [
             'id' => $window->id,
             'space_id' => $window->space_id,
             'starts_at' => $this->time->toLocal($window->starts_at)->toIso8601String(),
             'ends_at' => $this->time->toLocal($window->ends_at)->toIso8601String(),
             'seats' => $window->seats,
+            'taken_now' => $lentNow ? ($remaining?->usageAt($now) ?? 0) : null,
+            'taken_peak' => $remaining !== null ? $window->seats - min($window->seats, $remaining->minFree()) : 0,
         ];
     }
 }

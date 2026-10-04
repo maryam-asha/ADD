@@ -123,6 +123,7 @@ class BookingCreationService
 
             $booking = Booking::create([
                 'space_id' => $locked->id,
+                'seat_space_id' => $rules->usesBranchPool ? $this->availability->seatFor($locked, $startAt, $endAt, $member)?->id : null,
                 'user_id' => $member->id,
                 'start_at' => $startAt,
                 'end_at' => $endAt,

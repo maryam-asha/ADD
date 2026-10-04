@@ -6,8 +6,6 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Booking\Models\SpaceCoworkingWindow;
-use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
@@ -15,9 +13,6 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Domain\Membership\Models\PlanDiscountRedemption;
-use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Membership\Services\WalletService;
 use Illuminate\Support\Facades\DB;
 
@@ -27,26 +22,29 @@ use Illuminate\Support\Facades\DB;
  * Locks the Space row (same pattern as BookingCreationService) so this
  * serializes correctly against both a concurrent new booking and a
  * concurrent second extension attempt on the same booking.
+ *
+ * Whether, how far and at what price are BookingExtensionPlanner's, the
+ * same definition the extension options are offered from.
  */
 class BookingExtensionService
 {
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly AmountCalculator $amounts,
+        private readonly BookingExtensionPlanner $planner,
         private readonly WalletService $wallets,
         private readonly PaymentService $payments,
-        private readonly MembershipResolver $membershipResolver,
-        private readonly PlanDiscountService $discounts,
     ) {}
 
-    public function extend(Booking $booking, int $additionalMinutes): void
+    /**
+     * Returns where the member sits from now on when the extension moved
+     * them — their lent room went back to being a room
+     * (docs/decisions/coworking-seat-pool.md, "Seating placement") — and
+     * null when they stay where they are.
+     */
+    public function extend(Booking $booking, int $additionalMinutes): ?Space
     {
-        DB::transaction(function () use ($booking, $additionalMinutes) {
+        return DB::transaction(function () use ($booking, $additionalMinutes) {
             $lockedBooking = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
-
-            if ($lockedBooking->checked_in_at === null || $lockedBooking->checked_out_at !== null) {
-                throw new ReceptionActionException('api.reception.not_checked_in');
-            }
 
             $space = Space::query()->whereKey($lockedBooking->space_id)->with('building')->firstOrFail();
             $usesPool = $this->availability->usesBranchPool($space);
@@ -60,75 +58,43 @@ class BookingExtensionService
 
             $space = Space::query()->whereKey($lockedBooking->space_id)->lockForUpdate()->firstOrFail();
 
+            // The same rules the options endpoint offers from, re-checked on
+            // the locked rows (docs/decisions/booking-outcomes-and-extension.md).
+            if (($reason = $this->planner->blockReason($lockedBooking, $space)) !== null) {
+                throw new ReceptionActionException($reason->messageKey());
+            }
+
             $rules = $this->availability->rulesFor($space);
 
             if (! $this->availability->isValidDurationInMinutes($additionalMinutes, $rules)) {
                 throw new ReceptionActionException('api.booking.invalid_extension_duration');
             }
 
-            $previousEnd = $lockedBooking->end_at->copy();
             $newEndAt = $lockedBooking->end_at->copy()->addMinutes($additionalMinutes);
 
-            if ($usesPool) {
-                // A co_space's seat for the added stretch comes from its
-                // branch's pool, with the booking counted on its member's
-                // subscription as it is everywhere else.
-                $timeline = $this->availability->poolTimeline(
-                    $space,
-                    $previousEnd,
-                    $newEndAt,
-                    PoolDemand::presence($previousEnd, $newEndAt, $lockedBooking->user, ignoreBookingId: $lockedBooking->id),
-                );
+            // As far as the next booking (less its buffer), a co-working loan,
+            // the seat pool or the branch's closing allows — whichever is first.
+            [$latestEnd, $stop] = $this->planner->latestEnd($lockedBooking, $space, $rules);
 
-                if ($this->availability->exceedsPool($timeline, $previousEnd, $newEndAt)) {
-                    throw new ReceptionActionException('api.booking.extension_conflict', 422, [
-                        'latest_end_at' => $timeline->firstShortfall()?->toIso8601String(),
-                    ]);
-                }
-            } else {
-                // The interval being added is what must be free — the
-                // booking's own rows are excluded by ignoreBookingId rather
-                // than by a separate query shape, so this is the same overlap
-                // predicate the calendar and BookingCreationService use.
-                $existing = $this->availability->blockingBookings($space, $previousEnd, $newEndAt, $rules);
-
-                $conflicts = $existing
-                    ->reject(fn (Booking $row) => $row->getKey() === $lockedBooking->getKey())
-                    ->filter(fn (Booking $row) => $row->start_at < $newEndAt && $row->end_at > $previousEnd)
-                    ->map(fn (Booking $row) => $row->start_at);
-
-                // A room lent to co-working from some point on stops there too.
-                $lent = $this->availability->blockingCoworkingWindows($space, $previousEnd, $newEndAt)
-                    ->map(fn (SpaceCoworkingWindow $window) => $window->starts_at->greaterThan($previousEnd) ? $window->starts_at : $previousEnd);
-
-                $stops = $conflicts->concat($lent)->sort()->values();
-
-                if ($stops->isNotEmpty()) {
-                    throw new ReceptionActionException('api.booking.extension_conflict', 422, [
-                        'latest_end_at' => $stops->first()->toIso8601String(),
-                    ]);
-                }
+            if ($newEndAt->greaterThan($latestEnd)) {
+                throw new ReceptionActionException($stop->messageKey(), 422, [
+                    'latest_end_at' => $latestEnd->toIso8601String(),
+                ]);
             }
 
-            $oldPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $lockedBooking->end_at);
-            $newPoints = $this->amounts->forRange($space, $lockedBooking->start_at, $newEndAt);
+            // Where the added time is sat: the member's own lent room while
+            // it still has them, else the base seats, else another lent room.
+            $seatSpaceId = $usesPool
+                ? $this->availability->seatFor($space, $lockedBooking->end_at, $newEndAt, $lockedBooking->user, $lockedBooking->id, $lockedBooking->seat_space_id)?->id
+                : null;
 
             // A discounted booking keeps being discounted as it grows — the
             // additional time is charged at the same net rate as the rest
             // of the booking, not the raw undiscounted difference
             // (docs/decisions/plan-discounts-design.md).
-            $redemption = PlanDiscountRedemption::where('booking_id', $lockedBooking->id)->first();
-            $membership = $redemption !== null ? $this->membershipResolver->activeFor($lockedBooking->user) : null;
-            $discountedNew = null;
-
-            if ($redemption !== null && $membership !== null) {
-                $discount = $redemption->discount;
-                $discountedOld = $this->discounts->apply($oldPoints, $discount);
-                $discountedNew = $this->discounts->apply($newPoints, $discount);
-                $differencePoints = $discountedNew - $discountedOld;
-            } else {
-                $differencePoints = $newPoints - $oldPoints;
-            }
+            $redemption = $this->planner->activeRedemption($lockedBooking);
+            $price = $this->planner->price($lockedBooking, $space, $newEndAt, $redemption);
+            $differencePoints = $price['difference'];
 
             $paymentState = $lockedBooking->payment_state;
 
@@ -154,16 +120,21 @@ class BookingExtensionService
                 $paymentState = PaymentState::Unpaid;
             }
 
-            if ($redemption !== null && $discountedNew !== null) {
-                $redemption->update(['points_discounted' => $newPoints - $discountedNew]);
+            if ($redemption !== null) {
+                $redemption->update(['points_discounted' => $price['undiscounted_total'] - $price['total']]);
             }
+
+            $moved = $seatSpaceId !== $lockedBooking->seat_space_id;
 
             $lockedBooking->forceFill([
                 'end_at' => $newEndAt,
+                'seat_space_id' => $seatSpaceId,
                 'payment_state' => $paymentState,
                 // The booking's whole price in points, as creation records it.
-                'price_points' => $discountedNew ?? $newPoints,
+                'price_points' => $price['total'],
             ])->save();
+
+            return $moved ? $lockedBooking->fresh()->seatingSpace() : null;
         });
     }
 }

@@ -43,42 +43,59 @@ class BookingController extends Controller
     use RespondsToGatewayFailures;
 
     /**
-     * The member's own bookings, with the tab counts the list header shows.
+     * The member's own bookings, filtered on their `status` — one or several,
+     * none for all — as a page and its `meta`
+     * (docs/decisions/booking-outcomes-and-extension.md).
      *
-     * Follows EventBrowseService's {counts, data, meta} convention so the
-     * bookings tab and the events tab behave identically in the app.
+     * What has not started comes first, soonest first, then everything else,
+     * latest first: the design's "Upcoming" above the rest, whatever is asked
+     * for. No per-tab `counts`: the screen shows none, and each cost a query.
      */
-    public function index(ListBookingsRequest $request, BookingPresentationService $presentation): JsonResponse
+    public function index(ListBookingsRequest $request): JsonResponse
     {
-        $member = $request->user();
-        $filter = $request->validated('filter') ?? 'upcoming';
+        $statuses = $request->statuses();
         $perPage = (int) ($request->validated('per_page') ?? 15);
+        $now = now();
 
-        $base = fn () => Booking::query()->where('user_id', $member->id);
-
-        $paginator = $base()
-            // Without this the list runs a query per card for the space,
-            // its building, its branch and its floor.
-            ->with(['space.building.branch', 'space.zone.floor', 'user', 'payments'])
-            ->when($filter === 'upcoming', fn ($query) => $query->where('end_at', '>=', now())->orderBy('start_at'))
-            ->when($filter === 'past', fn ($query) => $query->where('end_at', '<', now())->orderByDesc('start_at'))
-            ->when($filter === 'all', fn ($query) => $query->orderByDesc('start_at'))
+        $paginator = Booking::query()
+            ->where('user_id', $request->user()->id)
+            ->when($statuses !== [], fn ($query) => $query->whereIn('status', $statuses))
+            ->orderByRaw('CASE WHEN start_at > ? THEN 0 ELSE 1 END', [$now])
+            ->orderByRaw('CASE WHEN start_at > ? THEN start_at END ASC', [$now])
+            ->orderByDesc('start_at')
+            // The card reads its space and nothing else; without this, that
+            // is a query per card.
+            ->with('space')
             ->paginate($perPage);
 
         return response()->json([
-            'counts' => [
-                'upcoming' => (clone $base())->where('end_at', '>=', now())->count(),
-                'past' => (clone $base())->where('end_at', '<', now())->count(),
-                'pending' => (clone $base())->where('status', BookingStatus::Pending)->count(),
-                'total' => (clone $base())->count(),
-            ],
             'data' => MemberBookingResource::collection($paginator->items())->resolve(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),
                 'per_page' => $paginator->perPage(),
                 'total' => $paginator->total(),
-                'filter' => $filter,
+                // What was filtered on; empty for every booking.
+                'status' => array_map(fn (BookingStatus $status) => $status->value, $statuses),
+            ],
+        ]);
+    }
+
+    /**
+     * Every booking status with its label in the requested language — what
+     * the app draws badges from and offers as `status` filters
+     * (docs/decisions/booking-outcomes-and-extension.md).
+     */
+    public function statuses(): JsonResponse
+    {
+        $locale = app()->getLocale();
+
+        return response()->json([
+            'data' => [
+                'statuses' => array_map(fn (BookingStatus $status) => [
+                    'key' => $status->value,
+                    'label' => $status->label($locale),
+                ], BookingStatus::cases()),
             ],
         ]);
     }
@@ -87,7 +104,7 @@ class BookingController extends Controller
     {
         $this->assertOwned($booking, $request);
 
-        $booking->loadMissing(['space.building.branch', 'space.zone.floor']);
+        $booking->loadMissing(['space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor']);
 
         return response()->json([
             'data' => new MemberBookingDetailResource($booking),
@@ -167,7 +184,7 @@ class BookingController extends Controller
             'data' => [
                 'space' => [
                     'id' => $space->id,
-                    'title' => $space->translate('name', $locale),
+                    'title' => $space->displayTitle($locale),
                     'space_type' => $space->space_type->value,
                     'capacity' => $space->capacity,
                     'main_image' => $space->main_image,
@@ -313,19 +330,39 @@ class BookingController extends Controller
         ], 201);
     }
 
+    /**
+     * How far the member's running booking can be extended and at what price
+     * — or why it cannot be (docs/decisions/booking-outcomes-and-extension.md).
+     * A read: extend() re-checks the same rules under its locks.
+     */
+    public function extensionOptions(Request $request, Booking $booking, BookingPresentationService $presentation): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        $booking->loadMissing('space.building.branch');
+
+        return response()->json([
+            'data' => $presentation->extensionOptions($booking, app()->getLocale(), $request->user()),
+        ]);
+    }
+
     public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
     {
         $this->assertOwned($booking, $request);
 
         try {
-            $extensions->extend($booking, $request->validated('additional_minutes'));
+            $movedTo = $extensions->extend($booking, $request->validated('additional_minutes'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_extended', $booking, ['additional_minutes' => $request->validated('additional_minutes')]);
 
-        return response()->json(['message' => __('api.booking.extended')]);
+        // The room the member sat in goes back to being a room: they are
+        // told where to move, the one time it matters.
+        return response()->json(['message' => $movedTo === null
+            ? __('api.booking.extended')
+            : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($movedTo, app()->getLocale())['formatted']])]);
     }
 
     /**

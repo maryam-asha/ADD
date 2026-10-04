@@ -17,6 +17,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Domain\Identity\Models\User;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -414,6 +415,17 @@ class AvailabilityService
     public function poolTimeline(Space $space, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate = null): PoolTimeline
     {
         return $this->pool->timeline($space->building->branch, $from, $to, $candidate);
+    }
+
+    /**
+     * Where a co_space presence over [$start, $end) sits: null for the
+     * co_space itself, or the room lent to co-working it was placed in once
+     * the base seats ran out. Asked under the branch lock, after the pool
+     * has said yes.
+     */
+    public function seatFor(Space $space, CarbonInterface $start, CarbonInterface $end, ?User $user, ?int $ignoreBookingId = null, ?int $stayInSpaceId = null): ?Space
+    {
+        return $this->pool->placeFor($space->building->branch, $start, $end, $user, $ignoreBookingId, $stayInSpaceId);
     }
 
     /**

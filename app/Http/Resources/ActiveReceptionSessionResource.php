@@ -2,7 +2,9 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\BookingPresentationService;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -31,6 +33,12 @@ class ActiveReceptionSessionResource extends JsonResource
             // The codes of the desks this member's Dedicated Desk
             // subscription (their own or their company's) ties them to.
             'desk_codes' => $this->desk_codes ?? [],
+            // Where to send them: the room lent to co-working a booking was
+            // placed in, else the session's own space (a walk-in into a lent
+            // room is already on it).
+            'seat' => $this->space !== null
+                ? app(BookingPresentationService::class)->seat($this->resource instanceof Booking ? $this->resource->seatingSpace() : $this->space, app()->getLocale())
+                : null,
             'started_via' => $this->resource->startSource()->value,
             // What reception checks against the person in front of them.
             'member' => [

@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
@@ -56,6 +57,8 @@ class CoworkingWindowService
                 'ends_at' => CarbonImmutable::instance($endsAt)->utc(),
                 'seats' => $seats,
             ]), min($window->starts_at, $startsAt), max($window->ends_at, $endsAt));
+
+            $this->reseat($room);
         });
     }
 
@@ -63,7 +66,43 @@ class CoworkingWindowService
     {
         $this->locked($window->space, function (Space $room) use ($window, $override) {
             $this->withoutOverbooking($room, $window, $override, fn () => $window->delete(), $window->starts_at, $window->ends_at);
+
+            $this->reseat($room);
         });
+    }
+
+    /**
+     * The bookings placed in the room that its lent time no longer holds,
+     * placed again — in it still if they fit, else the base seats or
+     * another lent room (docs/decisions/coworking-seat-pool.md, "Seating
+     * placement"). Only what is left of each: the past is not re-sat.
+     */
+    private function reseat(Space $room): void
+    {
+        $now = CarbonImmutable::now()->utc();
+
+        Booking::query()
+            ->blocking()
+            ->with(['space.building.branch', 'user'])
+            ->where('seat_space_id', $room->id)
+            ->where('end_at', '>', $now)
+            ->orderBy('start_at')
+            ->orderBy('id')
+            ->get()
+            ->each(function (Booking $booking) use ($room, $now) {
+                $seat = $this->pool->placeFor(
+                    $booking->space->building->branch,
+                    max(CarbonImmutable::instance($booking->start_at)->utc(), $now),
+                    $booking->end_at,
+                    $booking->user,
+                    $booking->id,
+                    $room->id,
+                );
+
+                if ($seat?->id !== $room->id) {
+                    $booking->forceFill(['seat_space_id' => $seat?->id])->save();
+                }
+            });
     }
 
     /**

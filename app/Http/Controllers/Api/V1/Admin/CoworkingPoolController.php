@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\Services\CoworkingPoolService;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Booking\CoworkingPoolRequest;
@@ -22,7 +24,7 @@ class CoworkingPoolController extends Controller
     /** The longest range read at once: two months ahead. */
     private const MAX_DAYS = 62;
 
-    public function show(CoworkingPoolRequest $request, Branch $branch, CoworkingPoolService $pool, LocalTime $time, BusinessHoursService $hours): JsonResponse
+    public function show(CoworkingPoolRequest $request, Branch $branch, CoworkingPoolService $pool, LocalTime $time, BusinessHoursService $hours, BookingPresentationService $presentation): JsonResponse
     {
         $now = CarbonImmutable::now()->utc();
         $from = $request->validated('from') !== null ? CarbonImmutable::parse($request->validated('from'), 'UTC') : $now;
@@ -42,6 +44,17 @@ class CoworkingPoolController extends Controller
             'usage_now' => $current->usageAt($now),
             'free_now' => $current->freeAt($now),
             'min_free' => $timeline->minFree(),
+            // The same seats now, split by place: the branch's own, then
+            // each room lent to co-working — where people sit
+            // (docs/decisions/coworking-seat-pool.md, "Seating placement").
+            'places_now' => array_map(fn (array $place) => [
+                'kind' => $place['kind'],
+                'spaces' => $place['spaces']->map(fn (Space $space) => $presentation->seat($space, app()->getLocale()))->values()->all(),
+                'seats' => $place['seats'],
+                'taken' => $place['taken'],
+                'free' => $place['seats'] - $place['taken'],
+                'until' => $place['until'] !== null ? $time->toLocal($place['until'])->toIso8601String() : null,
+            ], $pool->placesAt($branch, $now)),
             'segments' => array_map(fn (array $segment) => [
                 'start' => $time->toLocal($segment['start'])->toIso8601String(),
                 'end' => $time->toLocal($segment['end'])->toIso8601String(),

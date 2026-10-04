@@ -8,6 +8,8 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Services\BookingExtensionService;
+use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -37,12 +39,28 @@ class BookingExtensionServiceTest extends TestCase
         parent::tearDown();
     }
 
+    /**
+     * Open 08:00–20:00 on the test's Monday: an extension stops at the
+     * branch's closing (docs/decisions/booking-outcomes-and-extension.md).
+     */
+    private function open(Space $space): Space
+    {
+        BusinessHour::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'day_of_week' => DayOfWeek::Monday,
+            'open_time' => '08:00',
+            'close_time' => '20:00',
+        ]);
+
+        return $space;
+    }
+
     private function checkedInBooking(array $attributes = []): Booking
     {
-        $space = Space::factory()->room()->create([
+        $space = $this->open(Space::factory()->room()->create([
             'hourly_rate_points' => 100,
             'slot_granularity_minutes' => 30,
-        ]);
+        ]));
 
         // Normalized to UTC before persisting for the same reason
         // BookingCreationService::create() does: Eloquent's datetime cast
@@ -132,7 +150,7 @@ class BookingExtensionServiceTest extends TestCase
 
     private function checkedInCoSpaceBooking(int $capacity): Booking
     {
-        $space = Space::factory()->create(['capacity' => $capacity, 'hourly_rate_points' => 100, 'slot_granularity_minutes' => 30]);
+        $space = $this->open(Space::factory()->create(['capacity' => $capacity, 'hourly_rate_points' => 100, 'slot_granularity_minutes' => 30]));
 
         return $this->checkedInBooking(['space_id' => $space->id]);
     }

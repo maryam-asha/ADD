@@ -56,6 +56,14 @@ class StoreCoworkingWindowRequest extends FormRequest
                 return;
             }
 
+            // A stretch already over lends nothing — most often a 12-hour
+            // picker left on AM, which would otherwise be saved silently.
+            if ($this->date('ends_at', null, 'UTC')->lessThanOrEqualTo(now())) {
+                $validator->errors()->add('ends_at', __('api.coworking.window_in_past'));
+
+                return;
+            }
+
             $overlapping = SpaceCoworkingWindow::query()
                 ->where('space_id', $this->room()->id)
                 ->overlapping($this->date('starts_at', null, 'UTC'), $this->date('ends_at', null, 'UTC'))

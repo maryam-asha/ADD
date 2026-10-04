@@ -237,6 +237,10 @@ class BookingBatchCreationService
 
                 $booking = Booking::create([
                     'space_id' => $space->id,
+                    // Placed one by one, so each sees the ones before it.
+                    'seat_space_id' => $this->availability->usesBranchPool($space)
+                        ? $this->availability->seatFor($space, $row['start'], $row['end'], $member)?->id
+                        : null,
                     'user_id' => $member->id,
                     'start_at' => $row['start'],
                     'end_at' => $row['end'],

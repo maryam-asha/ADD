@@ -179,7 +179,8 @@ a desk is now a seat.
   branch row, like every other seat decision. An ended subscription keeps its
   row as history and frees the desk.
 - **The pool does not change.** The subscription already holds its seat; the
-  desk only says which. Walk-ins and co_space bookings never pick a desk.
+  desk only says which. Walk-ins and co_space bookings never pick a desk —
+  a booking is told only which *space* to sit in (see "Seating placement").
 - **What a held desk cannot lose:** a desk a live subscription holds cannot be
   deleted or moved to another space (`api.admin.seat_desk_held`), and its
   co_space cannot be deleted (`api.admin.co_space_desks_held`). A co_space with
@@ -202,6 +203,56 @@ a desk is now a seat.
   its owner's name and desks.
 - The Foundation domain stays free of Membership: the tie lives on
   `Membership::seatDesks()` and in `DedicatedDeskService`, never on `SeatDesk`.
+
+## Seating placement (2026-10-03)
+
+The pool is a count, but a member arriving needs to know where to go. So a
+co_space booking records the space it sits in, never a desk:
+`bookings.seat_space_id` is null for the co_space itself, or the room lent to
+co-working it was placed in.
+
+- **Base seats first.** `CoworkingPoolService::placeFor()` is the one place
+  that decides. It first tries the branch's own seats: the pool timeline
+  without the lent rooms and without the people placed in them. If the booking
+  fits there for its whole stretch, `seat_space_id` stays null. Otherwise it
+  takes the first lent room (earliest window, then id) whose window covers the
+  whole stretch and still has a seat, counting the bookings placed in it and
+  the walk-ins inside now.
+- **A guide, not a gate.** The pool as a whole still decides whether a booking
+  is accepted. When no single place fits (a base seat freeing halfway, say),
+  the booking stays on the co_space.
+- **Where it is set:** `BookingCreationService` and
+  `BookingBatchCreationService` (in order, so each booking in a batch sees the
+  ones before it), under the branch lock, through
+  `AvailabilityService::seatFor()`.
+- **Extension.** The added time is placed with the member's own lent room tried
+  first, so nobody is moved while their room still has them. If the room's loan
+  ends and another seat is free, the booking moves, and
+  `POST .../extend` answers `api.booking.extended_seat_moved` naming the new
+  space and floor. If the pool runs out exactly when that loan ends, the
+  extension stops there with `seat_room_closes`
+  (`api.booking.extension_seat_room_closes`) rather than "the next slot is
+  booked".
+- **Staff shortening or taking back a loan.** `CoworkingWindowService` places
+  again, in the same transaction, the bookings in that room which it no longer
+  holds. Only what is left of each booking is placed; past time is not.
+- **The member sees it.** The booking detail carries `seat`
+  (`space_id`, `title`, `building`, `floor`, `zone`, `formatted`), built by
+  `BookingPresentationService::seat()` from `Booking::seatingSpace()`.
+- **Staff see it.** `GET admin/branches/{branch}/coworking-pool` carries
+  `places_now[]`. The first entry is the base, then one entry per room lent now.
+  Each entry has `kind` (`base` | `lent_room`), `spaces[]` (the `seat` block),
+  `seats`, `taken`, `free` and `until` (when the loan ends). Rooms are counted
+  by `CoworkingPoolService::placesAt()`, in the way `placeFor()` places people.
+  The base's `taken` includes the seats subscriptions hold.
+  `GET admin/spaces/{space}/coworking-windows` adds two fields per window:
+  `taken_now` (null before the loan starts) and `taken_peak` (most seats taken
+  at once from now to the end).
+  `AdminBookingResource` (bookings index and show) and the active reception
+  sessions carry the same `seat` block. For a walk-in it is the session's own
+  space.
+- **Not done:** walk-ins in a lent room are not moved when the loan ends, and
+  availability slots do not say whether a time would be base or overflow.
 
 ## Endpoints
 

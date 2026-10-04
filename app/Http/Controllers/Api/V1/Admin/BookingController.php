@@ -26,7 +26,7 @@ class BookingController extends Controller
         $filters = $request->validated();
 
         $paginator = Booking::query()
-            ->with(['space.building.branch', 'user:id,name,phone'])
+            ->with(['space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor', 'user:id,name,phone'])
             ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
             ->when($filters['payment_state'] ?? null, fn ($query, $state) => $query->where('payment_state', $state))
             ->when($filters['space_id'] ?? null, fn ($query, $id) => $query->where('space_id', $id))
@@ -60,7 +60,7 @@ class BookingController extends Controller
 
     public function show(Booking $booking, BookingPresentationService $presentation): JsonResponse
     {
-        $booking->loadMissing(['space.building.branch', 'space.zone.floor', 'user:id,name,phone']);
+        $booking->loadMissing(['space.building.branch', 'space.zone.floor', 'seatSpace.building', 'seatSpace.zone.floor', 'user:id,name,phone']);
         $locale = app()->getLocale();
 
         return response()->json([
