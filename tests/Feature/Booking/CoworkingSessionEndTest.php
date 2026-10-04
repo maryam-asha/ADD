@@ -215,6 +215,40 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertSame(PaymentSource::Cash, $session->payment_source);
     }
 
+    /** The session's page says how it was paid: points and their worth, or the cash and its currency. */
+    public function test_the_session_report_explains_how_it_was_paid(): void
+    {
+        [$member, $session] = $this->memberInSession();
+        $this->walletWith($member, 500);
+        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->confirm(SessionEndRequest::sole())->assertOk();
+
+        $this->withHeader('lang', 'en')->getJson("/api/v1/admin/reception/sessions/walkin/{$session->id}/report")
+            ->assertOk()
+            ->assertJsonPath('data.payments.0.method', 'wallet')
+            ->assertJsonPath('data.payments.0.method_label', 'Wallet points')
+            ->assertJsonPath('data.payments.0.points', 200)
+            ->assertJsonPath('data.payments.0.points_value.0.currency', 'USD')
+            ->assertJsonPath('data.payments.0.points_value.0.value', '20.00')
+            ->assertJsonPath('data.payments.0.cash', null);
+
+        $other = $this->actingAsMember();
+        $cashSession = WalkinSession::factory()->create([
+            'space_id' => $this->space->id,
+            'user_id' => $other->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus')->utc(),
+        ]);
+        $this->walletWith($other, 0);
+        $this->requestEnd(['payment_method' => 'cash']);
+        $this->confirm(SessionEndRequest::where('user_id', $other->id)->sole(), ['cash_collected' => true])->assertOk();
+
+        $this->withHeader('lang', 'en')->getJson("/api/v1/admin/reception/sessions/walkin/{$cashSession->id}/report")
+            ->assertOk()
+            ->assertJsonPath('data.payments.0.method', 'cash')
+            ->assertJsonPath('data.payments.0.cash.amount', '20.00')
+            ->assertJsonPath('data.payments.0.cash.currency', 'USD');
+    }
+
     /** A card is paid in the app once the session is priced: the desk only ends it. */
     public function test_confirming_a_card_request_only_ends_the_session(): void
     {
