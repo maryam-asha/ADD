@@ -87,6 +87,27 @@ class MemberProfileTest extends TestCase
             ->assertJsonPath('data.last_visit_at', '2026-08-17T11:00:00+03:00');
     }
 
+    /** The whole profile: contact and preferences, both profiles and their links, devices. */
+    public function test_the_summary_carries_the_members_full_profile(): void
+    {
+        $this->member->update(['email' => 'layla@example.com', 'preferred_language' => 'ar', 'preferred_currency' => 'SYP']);
+        $this->member->personalProfile()->create(['bio' => 'Designer in Aleppo', 'city' => 'Aleppo']);
+        $this->member->professionalProfile()->create(['job_title' => 'Product designer', 'industry' => 'Tech', 'linkedin_url' => 'https://linkedin.com/in/layla']);
+        $this->member->deviceTokens()->create(['token' => str_repeat('a', 40), 'platform' => 'ios', 'last_used_at' => now()]);
+
+        $this->profile('summary')->assertOk()
+            ->assertJsonPath('data.profile.account.email', 'layla@example.com')
+            ->assertJsonPath('data.profile.account.preferred_language', 'ar')
+            ->assertJsonPath('data.profile.account.roles', ['member'])
+            ->assertJsonPath('data.profile.personal.bio', 'Designer in Aleppo')
+            ->assertJsonPath('data.profile.personal.city', 'Aleppo')
+            ->assertJsonPath('data.profile.professional.job_title', 'Product designer')
+            ->assertJsonPath('data.profile.links.linkedin_url', 'https://linkedin.com/in/layla')
+            ->assertJsonPath('data.profile.devices.0.platform', 'ios')
+            ->assertJsonPath('data.profile.companies', [])
+            ->assertJsonPath('data.profile.privacy_policy_agreed_at', null);
+    }
+
     public function test_sessions_list_walk_ins_and_checked_in_bookings_newest_first_with_filters(): void
     {
         WalkinSession::factory()->create(['user_id' => $this->member->id, 'checked_in_at' => $this->at('09:00'), 'checked_out_at' => $this->at('10:00')]);

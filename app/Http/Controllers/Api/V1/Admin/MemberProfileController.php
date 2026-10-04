@@ -64,7 +64,7 @@ class MemberProfileController extends Controller
         ResourceQuotaService $quotas,
         CurrencyConversionService $currencies,
     ): JsonResponse {
-        $user->loadMissing(['roles', 'companies', 'personalProfile', 'professionalProfile']);
+        $user->loadMissing(['roles', 'companies', 'personalProfile', 'professionalProfile', 'branches', 'deviceTokens', 'privacyPolicyConsents']);
 
         $wallet = $this->personalWallet($user);
         $balances = $wallet === null
@@ -89,6 +89,7 @@ class MemberProfileController extends Controller
         return response()->json(['data' => [
             'member' => new UserResource($user),
             'joined_at' => $this->local($user->created_at),
+            'profile' => $this->profile($user),
             'last_visit_at' => $this->local($lastVisit),
             'wallet' => [
                 'points' => $balances[WalletTransactionCategory::General->value],
@@ -250,6 +251,69 @@ class MemberProfileController extends Controller
             'registered_at' => $this->local($attendee->created_at),
             'checked_in_at' => $this->local($attendee->checked_in_at),
         ]);
+    }
+
+    /**
+     * Everything the member told us and everything their account holds:
+     * contact and preferences, their personal and professional profiles and
+     * links, their companies with what each lets them do, their branches,
+     * when they accepted the privacy policy, and the devices they use.
+     *
+     * @return array<string, mixed>
+     */
+    private function profile(User $user): array
+    {
+        $personal = $user->personalProfile;
+        $professional = $user->professionalProfile;
+        $consent = $user->privacyPolicyConsents->sortByDesc('agreed_at')->first();
+
+        return [
+            'account' => [
+                'phone' => $user->phone,
+                'email' => $user->email,
+                'preferred_language' => $user->preferred_language,
+                'preferred_currency' => $user->preferred_currency,
+                'status' => $user->status,
+                'roles' => $user->getRoleNames()->values(),
+                'joined_at' => $this->local($user->created_at),
+                'updated_at' => $this->local($user->updated_at),
+            ],
+            'personal' => [
+                'bio' => $personal?->bio,
+                'city' => $personal?->city,
+                'gender' => $personal?->gender?->value,
+                'avatar_url' => $personal?->avatar_url,
+            ],
+            'professional' => [
+                'job_title' => $professional?->job_title,
+                'company_name' => $professional?->company_name,
+                'industry' => $professional?->industry,
+            ],
+            'links' => [
+                'linkedin_url' => $professional?->linkedin_url,
+                'instagram_url' => $professional?->instagram_url,
+                'behance_url' => $professional?->behance_url,
+                'website_url' => $professional?->website_url,
+            ],
+            'companies' => $user->companies->map(fn ($company) => [
+                'id' => $company->id,
+                'legal_name' => $company->legal_name,
+                'status' => $company->status?->value ?? (string) $company->status,
+                'is_admin' => (bool) $company->pivot?->is_admin,
+                'door_access_enabled' => (bool) $company->pivot?->door_access_enabled,
+                'joined_at' => $this->local($company->pivot?->created_at),
+            ])->values(),
+            'branches' => $user->branches->map(fn ($branch) => [
+                'id' => $branch->id,
+                'name' => $branch->translate('name'),
+                'is_home_branch' => (bool) $branch->pivot?->is_home_branch,
+            ])->values(),
+            'privacy_policy_agreed_at' => $this->local($consent?->agreed_at),
+            'devices' => $user->deviceTokens->sortByDesc('last_used_at')->map(fn ($device) => [
+                'platform' => $device->platform,
+                'last_used_at' => $this->local($device->last_used_at),
+            ])->values(),
+        ];
     }
 
     private function personalWallet(User $user): ?Wallet
