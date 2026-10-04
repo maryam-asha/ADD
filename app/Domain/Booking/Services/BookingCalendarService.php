@@ -42,7 +42,12 @@ class BookingCalendarService
     ) {}
 
     /**
-     * @param  array{view?: ?string, date?: ?string, branch_id?: ?int, space_type?: ?string, space_id?: ?int}  $filters
+     * `member_id` narrows the bookings listed in each cell, and the totals'
+     * count of them, to that member's. A cell's occupancy stays the space's
+     * own, from every booking: a room others filled must not read as free
+     * because the desk is looking for one member.
+     *
+     * @param  array{view?: ?string, date?: ?string, branch_id?: ?int, space_type?: ?string, space_id?: ?int, member_id?: ?int}  $filters
      * @return array<string, mixed>
      */
     public function build(array $filters, string $locale): array
@@ -90,6 +95,8 @@ class BookingCalendarService
             ? $this->availability->poolTimeline($spaces->first(fn (Space $space) => $this->availability->usesBranchPool($space)), $from->utc(), $to->addDay()->utc())
             : null;
 
+        $memberId = isset($filters['member_id']) ? (int) $filters['member_id'] : null;
+
         $resources = $spaces
             ->map(fn (Space $space) => $this->resourceRow(
                 $space,
@@ -99,9 +106,14 @@ class BookingCalendarService
                 $to,
                 $locale,
                 $this->availability->usesBranchPool($space) ? $pool : null,
+                $memberId,
             ))
             ->values()
             ->all();
+
+        $listed = $memberId === null
+            ? $bookings
+            : $bookings->map(fn (Collection $rows) => $rows->where('user_id', $memberId)->values());
 
         $rules = $this->availability->rulesFor($spaces->first());
 
@@ -134,11 +146,12 @@ class BookingCalendarService
                 'max_days_ahead' => $rules->maxDaysAhead,
             ],
             'resources' => $resources,
-            'totals' => $this->totals($resources, $bookings),
+            'totals' => $this->totals($resources, $listed),
             'meta' => [
                 'view' => $view,
                 'date' => $anchor->format('Y-m-d'),
                 'branch_id' => $branch->id,
+                'member_id' => $memberId,
                 'spaces' => count($resources),
             ],
         ];
@@ -159,6 +172,7 @@ class BookingCalendarService
         CarbonImmutable $to,
         string $locale,
         ?PoolTimeline $pool = null,
+        ?int $memberId = null,
     ): array {
         $rules = $this->availability->rulesFor($space);
         $days = [];
@@ -189,7 +203,13 @@ class BookingCalendarService
                 'occupancy' => $pool !== null
                     ? $this->poolOccupancy($pool, $periods, $date)
                     : $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
-                'bookings' => $onThisDay->map(fn (Booking $booking) => $this->bookingCell($booking, $locale))->all(),
+                // Occupancy above counts every booking; the list is the
+                // member's alone when the calendar is narrowed to one.
+                'bookings' => $onThisDay
+                    ->when($memberId !== null, fn (Collection $rows) => $rows->where('user_id', $memberId))
+                    ->map(fn (Booking $booking) => $this->bookingCell($booking, $locale))
+                    ->values()
+                    ->all(),
             ];
         }
 
@@ -315,6 +335,8 @@ class BookingCalendarService
             'status_label' => __('api.booking.statuses.'.$booking->status->value, [], $locale),
             'payment_state' => $booking->payment_state->value,
             'checked_in_at' => $booking->checked_in_at?->toIso8601String(),
+            // When the member left; null while still inside or never arrived.
+            'checked_out_at' => $booking->checked_out_at?->toIso8601String(),
             'member' => [
                 'id' => $booking->user?->id,
                 'name' => $booking->user?->name,
@@ -396,6 +418,7 @@ class BookingCalendarService
                 'view' => $view,
                 'date' => $anchor->format('Y-m-d'),
                 'branch_id' => $filters['branch_id'] ?? null,
+                'member_id' => isset($filters['member_id']) ? (int) $filters['member_id'] : null,
                 'spaces' => 0,
             ],
         ];

@@ -153,7 +153,52 @@ class AdminBookingCalendarTest extends TestCase
             ->assertJsonCount(1, 'resources.0.days.0.bookings')
             ->assertJsonPath('resources.0.days.0.bookings.0.member.name', 'Layla Haddad')
             ->assertJsonPath('resources.0.days.0.bookings.0.start_time', '10:00 AM')
-            ->assertJsonPath('resources.0.days.0.bookings.0.status', 'confirmed');
+            ->assertJsonPath('resources.0.days.0.bookings.0.status', 'confirmed')
+            ->assertJsonPath('resources.0.days.0.bookings.0.checked_out_at', null);
+    }
+
+    /** The booking's detail shows when the member left, beside when they arrived. */
+    public function test_a_booking_carries_when_the_member_checked_in_and_out(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->space();
+        $this->book($space, '2026-08-17', 10, 60, [
+            'checked_in_at' => Carbon::parse('2026-08-17 10:02', 'Asia/Damascus')->utc(),
+            'checked_out_at' => Carbon::parse('2026-08-17 10:55', 'Asia/Damascus')->utc(),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/admin/calendar?view=day&date=2026-08-17')->assertOk();
+
+        $this->assertTrue(Carbon::parse($response->json('resources.0.days.0.bookings.0.checked_in_at'))->equalTo(Carbon::parse('2026-08-17 10:02', 'Asia/Damascus')));
+        $this->assertTrue(Carbon::parse($response->json('resources.0.days.0.bookings.0.checked_out_at'))->equalTo(Carbon::parse('2026-08-17 10:55', 'Asia/Damascus')));
+    }
+
+    /**
+     * Narrowed to one member, the calendar lists and counts only their
+     * bookings — but a cell's occupancy stays the space's own, so a room
+     * others filled is not shown as free.
+     */
+    public function test_the_calendar_can_be_narrowed_to_one_members_bookings(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->space();
+        $layla = User::factory()->create(['name' => 'Layla Haddad']);
+        $omar = User::factory()->create(['name' => 'Omar Nasri']);
+        $this->book($space, '2026-08-17', 10, 60, ['user_id' => $layla->id]);
+        $this->book($space, '2026-08-17', 12, 120, ['user_id' => $omar->id]);
+
+        $this->withHeader('lang', 'en')
+            ->getJson("/api/v1/admin/calendar?view=day&date=2026-08-17&member_id={$layla->id}")
+            ->assertOk()
+            ->assertJsonCount(1, 'resources.0.days.0.bookings')
+            ->assertJsonPath('resources.0.days.0.bookings.0.member.name', 'Layla Haddad')
+            ->assertJsonPath('resources.0.days.0.occupancy.booked_minutes', 180)
+            ->assertJsonPath('totals.bookings', 1)
+            ->assertJsonPath('meta.member_id', $layla->id);
+
+        $this->getJson('/api/v1/admin/calendar?member_id=999999')
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('member_id');
     }
 
     public function test_a_closed_day_is_marked_closed_and_reports_no_occupancy(): void
