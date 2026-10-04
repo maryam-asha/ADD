@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Pricing\Concerns\HasSalePrice;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -26,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Plan extends Model
 {
-    use HasFactory, HasTranslations;
+    use HasFactory, HasSalePrice, HasTranslations;
 
     private const MINUTES_PER_DAY = 1440;
 
@@ -36,6 +37,9 @@ class Plan extends Model
         'subtitle',
         'is_subscription',
         'price_points',
+        'sale_price_points',
+        'sale_starts_at',
+        'sale_ends_at',
         'duration_days',
         'access_window_start',
         'access_window_end',
@@ -51,9 +55,17 @@ class Plan extends Model
             'subtitle' => 'array',
             'is_subscription' => 'boolean',
             'price_points' => 'integer',
+            'sale_price_points' => 'integer',
+            'sale_starts_at' => 'datetime',
+            'sale_ends_at' => 'datetime',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
         ];
+    }
+
+    protected function salePriceColumn(): string
+    {
+        return 'sale_price_points';
     }
 
     /**
