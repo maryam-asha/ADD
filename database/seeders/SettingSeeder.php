@@ -22,6 +22,9 @@ class SettingSeeder extends Seeder
         $settings->setDefault('booking.min_duration_minutes', 60, SettingValueType::Int);
         $settings->setDefault('booking.overrun_grace_minutes', 10, SettingValueType::Int);
         $settings->setDefault('booking.buffer_minutes', 0, SettingValueType::Int);
+        // A closed session's time is billed in whole blocks of this many
+        // minutes, rounded up (SessionClosureService::priceFor()).
+        $settings->setDefault('coworking.billing_increment_minutes', 15, SettingValueType::Int);
         // Shown on the confirmation screen's price breakdown. Zero is a
         // decision, not a hardcoded literal — the arithmetic path handles a
         // non-zero rate even though it currently always evaluates to zero.

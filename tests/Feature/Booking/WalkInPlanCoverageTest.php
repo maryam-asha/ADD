@@ -143,6 +143,57 @@ class WalkInPlanCoverageTest extends TestCase
         $this->assertSame(PaymentState::Unpaid, $session->payment_state);
     }
 
+    /**
+     * Plan hours are spent in the same quarter-hour blocks the rest is billed
+     * in (product owner, 2026-10-04): 47 minutes all inside the window is a
+     * whole hour from the plan, and nothing to pay.
+     */
+    public function test_plan_hours_are_spent_in_whole_quarter_hours(): void
+    {
+        $space = $this->openSpace(100);
+        $member = $this->memberOn($this->eveningPlanWithHours(40));
+        $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
+
+        $this->closures->closeOut($session, $this->localToUtc('2026-08-17 21:47'));
+
+        $session->refresh();
+        $this->assertSame(3600, $session->plan_covered_seconds);
+        $this->assertSame('0.00', (string) $session->amount_owed);
+        $this->assertSame('1.00', (string) ResourceConsumption::where('membership_id', $session->membership_id)->value('quantity'));
+    }
+
+    /**
+     * 19:43–20:20 is 37 minutes, rounded to 45: the 20 in the window round to
+     * 30 from the plan, the 15 left are billed — 25 points.
+     */
+    public function test_a_straddling_session_splits_into_plan_and_billed_quarters(): void
+    {
+        $space = $this->openSpace(100);
+        $member = $this->memberOn($this->eveningPlanWithHours(40));
+        $session = $this->sessionFor($member, $space, '2026-08-17 19:43');
+
+        $this->closures->closeOut($session, $this->localToUtc('2026-08-17 20:20'));
+
+        $session->refresh();
+        $this->assertSame(30 * 60, $session->plan_covered_seconds);
+        $this->assertSame(25, (int) $session->price_points);
+    }
+
+    /** Ten minutes left in the quota cannot cover a quarter: they stay, and the quarter is billed. */
+    public function test_a_quota_remainder_smaller_than_a_quarter_stays_unspent(): void
+    {
+        $space = $this->openSpace(100);
+        $member = $this->memberOn($this->eveningPlanWithHours(0.17)); // ~10 minutes
+        $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
+
+        $this->closures->closeOut($session, $this->localToUtc('2026-08-17 21:10'));
+
+        $session->refresh();
+        $this->assertSame(0, $session->plan_covered_seconds);
+        $this->assertSame(25, (int) $session->price_points);
+        $this->assertSame(0, ResourceConsumption::where('membership_id', $session->membership_id)->count());
+    }
+
     public function test_a_session_entirely_outside_the_window_is_billed_in_full(): void
     {
         $space = $this->openSpace(100);

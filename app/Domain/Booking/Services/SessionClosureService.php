@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
@@ -16,6 +17,7 @@ use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -166,6 +168,75 @@ class SessionClosureService
         }
     }
 
+    /**
+     * What closing an open session at `$at` would charge, without closing it
+     * or spending any plan hours: the price finalizeClosure() writes, from
+     * the same pricing. A booking already paid keeps the price it was paid
+     * at, and owes nothing more.
+     *
+     * @return array{points: int, covered_seconds: int, already_paid: bool}
+     */
+    public function quote(Booking|WalkinSession $session, CarbonInterface $at): array
+    {
+        if ($session instanceof Booking && $session->payment_state === PaymentState::Paid) {
+            return ['points' => (int) $session->price_points, 'covered_seconds' => 0, 'already_paid' => true];
+        }
+
+        $covered = $session instanceof WalkinSession && $session->membership !== null
+            ? $this->coverableBlocks($session, $session->membership, $at)
+            : 0;
+
+        return ['points' => $this->priceFor($session, $at, $covered), 'covered_seconds' => $covered, 'already_paid' => false];
+    }
+
+    /**
+     * What a session is charged: the time the plan did not absorb, rounded UP
+     * to whole billing blocks — `coworking.billing_increment_minutes`, 15 by
+     * default — so the desk never bills an odd 47 minutes: 0–15 bills 15,
+     * 15–30 bills 30, 30–45 bills 45, 45–60 bills the hour (product owner,
+     * 2026-10-04). A block of 0 or 1 minute bills the time as it was.
+     *
+     * Priced from check-in over the rounded length, rather than pricing the
+     * whole thing and subtracting, so AmountCalculator's documented
+     * ceil-to-whole-points rounding (Invariant 2) is applied once, to the
+     * real charge.
+     */
+    private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): int
+    {
+        $billable = (int) $session->checked_in_at->diffInSeconds($checkedOutAt) - $coveredSeconds;
+
+        if ($billable <= 0) {
+            return 0;
+        }
+
+        $block = $this->blockSeconds();
+        $billed = (int) (ceil($billable / $block) * $block);
+
+        return $this->amounts->forRange($session->space, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
+    }
+
+    /** The billing block, in seconds: `coworking.billing_increment_minutes`, 15 by default. */
+    private function blockSeconds(): int
+    {
+        return 60 * max(1, (int) $this->settings->get('coworking.billing_increment_minutes', 15));
+    }
+
+    /**
+     * What the plan's hours cover of the session, in the same whole blocks
+     * the rest is billed in: its time in the plan's window rounded up, never
+     * more than the session's own rounded length, and spent from the quota
+     * only in whole blocks. So 47 minutes, 30 of them in the window, is two
+     * quarters from the plan and two billed; 47 all in the window is a
+     * whole hour from the plan.
+     */
+    private function coverableBlocks(WalkinSession $session, Membership $membership, CarbonInterface $checkedOutAt): int
+    {
+        $block = $this->blockSeconds();
+        $sessionLength = (int) (ceil(max(0, (int) $session->checked_in_at->diffInSeconds($checkedOutAt)) / $block) * $block);
+
+        return min($sessionLength, $this->planHours->coverableSeconds($membership, $session->checked_in_at, $checkedOutAt, $block));
+    }
+
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
         $coveredSeconds = $this->consumePlanCoverage($session, $checkedOutAt);
@@ -174,15 +245,7 @@ class SessionClosureService
         // of the charge and remain decimal USD — only the wallet ledger became
         // point-denominated. Converting the point charge back to USD here is
         // the intended direction, not leftover scaffolding.
-        $points = $this->amounts->forRange(
-            $session->space,
-            $session->checked_in_at,
-            // Bill only what the plan did not absorb. Shortening the range by
-            // the covered seconds, rather than pricing the whole thing and
-            // subtracting, keeps AmountCalculator's documented ceil-to-whole-
-            // points rounding (Invariant 2) applied once to the real charge.
-            $coveredSeconds > 0 ? $checkedOutAt->copy()->subSeconds($coveredSeconds) : $checkedOutAt,
-        );
+        $points = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
         $amount = $this->points->pointsToUsd($points);
 
         $attributes = [
@@ -202,6 +265,13 @@ class SessionClosureService
         // perhaps paid) at, unless it closes unpaid and is repriced here.
         if ($session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid) {
             $attributes['price_points'] = $points;
+        }
+
+        // Checked out is the booking's outcome: it happened
+        // (docs/decisions/booking-outcomes-and-extension.md). Still payable
+        // while unpaid, and still holding its slot to end_at.
+        if ($session instanceof Booking) {
+            $attributes['status'] = BookingStatus::Completed;
         }
 
         if ($session instanceof WalkinSession && $coveredSeconds > 0) {
@@ -250,7 +320,7 @@ class SessionClosureService
             return 0;
         }
 
-        $coverable = $this->planHours->coverableSeconds($membership, $session->checked_in_at, $checkedOutAt);
+        $coverable = $this->coverableBlocks($session, $membership, $checkedOutAt);
 
         if ($coverable <= 0) {
             return 0;

@@ -35,8 +35,13 @@ class PlanHourCoverageService
     /**
      * Seconds of [$from, $to) this membership's plan absorbs, already capped
      * at the remaining quota. Read-only — call consume() to actually spend it.
+     *
+     * With `$blockSeconds`, counted in whole billing blocks the way a closed
+     * session is billed (product owner, 2026-10-04): the time in the plan's
+     * window rounded UP to a block, and the quota spent only in whole blocks
+     * — a remainder smaller than a block stays in the quota.
      */
-    public function coverableSeconds(?Membership $membership, CarbonInterface $from, CarbonInterface $to): int
+    public function coverableSeconds(?Membership $membership, CarbonInterface $from, CarbonInterface $to, int $blockSeconds = 0): int
     {
         $grant = $this->hourGrantFor($membership);
 
@@ -56,7 +61,14 @@ class PlanHourCoverageService
             return 0;
         }
 
-        return min($inWindow, (int) floor($remainingHours * 3600));
+        $remaining = (int) floor($remainingHours * 3600);
+
+        if ($blockSeconds > 1) {
+            $inWindow = (int) (ceil($inWindow / $blockSeconds) * $blockSeconds);
+            $remaining = intdiv($remaining, $blockSeconds) * $blockSeconds;
+        }
+
+        return min($inWindow, $remaining);
     }
 
     /**

@@ -82,8 +82,9 @@ class SessionReportBuilder
         }
 
         if ($billable > 0) {
-            // Same range SessionClosureService priced, so the points match the bill.
-            $points = $this->amounts->forRange($session->space, $session->checked_in_at, $session->checked_out_at->copy()->subSeconds($covered));
+            // The bill itself, as closing stored it — billing blocks and all —
+            // rather than a second pricing that could disagree with it.
+            $points = $session->price_points ?? $this->amounts->forRange($session->space, $session->checked_in_at, $session->checked_out_at->copy()->subSeconds($covered));
             $lines[] = $this->timeLine('api.coworking.report.time_charged', $billable, 'charge', $points, (string) $session->amount_owed);
         }
 
