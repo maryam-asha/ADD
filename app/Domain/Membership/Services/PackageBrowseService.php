@@ -15,6 +15,7 @@ use App\Domain\Membership\Models\PlanFeature;
 use App\Domain\Membership\Models\PlanResourceGrant;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Support\Presenters\PriceLabelPresenter;
 
 class PackageBrowseService
 {
@@ -22,6 +23,7 @@ class PackageBrowseService
         private readonly PointConversionService $points,
         private readonly MembershipResolver $membershipResolver,
         private readonly ResourceQuotaService $resourceQuota,
+        private readonly PriceLabelPresenter $prices,
     ) {}
 
     /**
@@ -388,6 +390,8 @@ class PackageBrowseService
             'subtitle' => $subtitle,
             'formatted_price' => $formattedPrice,
             'formatted_point_price' => $formattedPointPrice,
+            // A sale live now: what a purchase opened now would cost.
+            'sale' => $this->prices->sale($plan->saleWindow(), $pricePoints, null, false, 'api.package.sale_ends'),
             'duration_days' => $plan->duration_days,
             'tags' => $tags,
             'features' => $features,

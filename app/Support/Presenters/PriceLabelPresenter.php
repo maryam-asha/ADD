@@ -6,6 +6,8 @@ use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Pricing\ValueObjects\SaleWindow;
+use App\Support\Time\LocalTime;
 use Illuminate\Http\Request;
 
 /**
@@ -84,6 +86,37 @@ class PriceLabelPresenter
             'price_label' => $priceLabel,
             'price_point' => $pointsLabel,
             'currency' => $currency,
+        ];
+    }
+
+    /**
+     * A sale live right now, as the member sees it: the original price
+     * (struck through by the app), the sale price, and when the sale ends.
+     * Null when nothing is on sale — before it starts, after it ends, or a
+     * "sale" no lower than the price. `$hourly` labels a space's rate;
+     * otherwise a total, such as a package's. `$endsKey` names the
+     * "ends …" sentence (`api.space.sale_ends`, `api.package.sale_ends`).
+     *
+     * @return array{points: int, original_label: string, sale_label: string, ends_at: string, ends_label: string}|null
+     */
+    public function sale(?SaleWindow $sale, int $originalPoints, ?User $user, bool $hourly, string $endsKey, ?string $locale = null): ?array
+    {
+        if ($sale === null || ! $sale->isLiveAt(now()) || $sale->points >= $originalPoints) {
+            return null;
+        }
+
+        $locale ??= app()->getLocale();
+        $label = fn (int $points) => $hourly
+            ? $this->hourly($points, $user, $locale)['price_label']
+            : $this->total($points, $user, $locale)['price'];
+        $endsAt = app(LocalTime::class)->toLocal($sale->endsAt);
+
+        return [
+            'points' => $sale->points,
+            'original_label' => $label($originalPoints),
+            'sale_label' => $label($sale->points),
+            'ends_at' => $endsAt->toIso8601String(),
+            'ends_label' => __($endsKey, ['date' => $endsAt->format('Y-m-d H:i')], $locale),
         ];
     }
 
