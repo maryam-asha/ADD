@@ -65,6 +65,13 @@ class PaymentResource extends JsonResource
             'created_at' => $this->created_at?->toISOString(),
 
             $this->mergeWhen($isAdmin, fn () => [
+                'method_label' => __("api.payment.methods.{$this->method}"),
+                // Who paid, when the list loaded them.
+                'user' => $this->whenLoaded('user', fn () => $this->user === null ? null : [
+                    'id' => $this->user->id,
+                    'name' => $this->user->name,
+                    'phone' => $this->user->phone,
+                ]),
                 'gateway_payment_id' => $this->payment_id,
                 'user_id' => $this->user_id,
                 'wallet_id' => $this->wallet_id,
@@ -83,6 +90,7 @@ class PaymentResource extends JsonResource
                 'received_amount' => $this->received_amount,
                 'received_currency' => $this->received_currency,
                 'received_by' => $this->received_by,
+                'received_by_name' => $this->whenLoaded('receivedBy', fn () => $this->receivedBy?->name),
                 'received_at' => $this->received_at?->toISOString(),
             ]),
         ];

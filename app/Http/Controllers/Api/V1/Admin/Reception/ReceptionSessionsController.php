@@ -10,6 +10,7 @@ use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Models\Currency;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -100,7 +101,55 @@ class ReceptionSessionsController extends Controller
             ],
             'closing' => $closing,
             'wallet_points' => $personal['usable_balance'] ?? 0,
+            'payments' => $this->paymentsFor($session, $converter),
         ]]);
+    }
+
+    /**
+     * How the session was paid, each payment as the desk explains it: the
+     * method; the points it paid and what they are worth in each currency;
+     * for cash, the money handed over, in what, and who took it; for a card,
+     * what was charged, in what, and its reference. Oldest first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function paymentsFor(Booking|WalkinSession $session, ReceivedMoneyConverter $converter): array
+    {
+        $time = app(LocalTime::class);
+
+        return Payment::query()
+            ->forPayable($session)
+            ->with(['receivedBy:id,name', 'wallet'])
+            ->orderBy('id')
+            ->get()
+            ->map(function (Payment $payment) use ($converter, $time) {
+                $points = (int) ($payment->amount_points ?? $payment->points_to_credit ?? 0);
+
+                return [
+                    'id' => $payment->id,
+                    'status' => $payment->status->value,
+                    'method' => $payment->method,
+                    'method_label' => __("api.payment.methods.{$payment->method}"),
+                    'points' => $points,
+                    'points_value' => $points > 0 ? $this->amountsFor($points, $converter) : [],
+                    'wallet' => $payment->wallet === null ? null : [
+                        'owner_type' => $payment->wallet->owner_type?->value ?? (string) $payment->wallet->owner_type,
+                    ],
+                    'cash' => $payment->received_amount === null ? null : [
+                        'amount' => (string) $payment->received_amount,
+                        'currency' => $payment->received_currency,
+                        'received_by' => $payment->receivedBy?->name,
+                    ],
+                    'card' => $payment->amount_minor === null ? null : [
+                        'amount' => bcdiv((string) $payment->amount_minor, bcpow('10', (string) ($payment->currency_exponent ?? 2), 0), (int) ($payment->currency_exponent ?? 2)),
+                        'currency' => $payment->currency,
+                        'reference' => $payment->rrn,
+                    ],
+                    'at' => $time->toLocal($payment->received_at ?? $payment->created_at)?->toIso8601String(),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

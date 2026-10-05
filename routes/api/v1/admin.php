@@ -34,9 +34,11 @@ use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
 use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
+use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
@@ -254,6 +256,19 @@ Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
 // reception routes below. Occupancy is computed from the same
 // BusinessHoursService periods the member calendar uses, so the two can
 // never disagree about what "open" means.
+// One member's whole file for the dashboard's member profile: a summary,
+// then sessions, wallet history, memberships, service requests and event
+// registrations. Bookings and payments use bookings?user_id= and
+// payments?user_id=. Read-only, for operations as well as admins.
+Route::prefix('members/{user}')->whereNumber('user')->group(function () {
+    Route::get('summary', [MemberProfileController::class, 'summary']);
+    Route::get('sessions', [MemberProfileController::class, 'sessions']);
+    Route::get('wallet-transactions', [MemberProfileController::class, 'walletTransactions']);
+    Route::get('memberships', [MemberProfileController::class, 'memberships']);
+    Route::get('service-requests', [MemberProfileController::class, 'serviceRequests']);
+    Route::get('event-registrations', [MemberProfileController::class, 'eventRegistrations']);
+});
+
 Route::get('bookings', [BookingController::class, 'index']);
 Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::get('calendar', [BookingCalendarController::class, 'index']);
@@ -444,6 +459,10 @@ Route::middleware('role:admin')->group(function () {
  * paying and settled by the gateway, never edited by hand.
  */
 Route::get('payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+// Totals over the same filters as the list; before payments/{payment}, which would take it for an id.
+Route::get('payments/summary', [AdminPaymentController::class, 'summary'])->name('payments.summary');
+// Every payment method in config, enabled or not, with how it has been used. Read-only.
+Route::get('payment-methods', [AdminPaymentMethodController::class, 'index'])->name('payment-methods.index');
 Route::get('payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
 
 Route::withoutMiddleware('role:admin|operations')->group(function () {
