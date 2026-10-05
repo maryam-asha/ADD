@@ -64,4 +64,17 @@ enum PaymentStatus: string
     {
         return $this === self::Accepted;
     }
+
+    /**
+     * The statuses in which a payment still holds the coupon locked on it:
+     * it may yet be paid, or it was. A failed, cancelled, expired or
+     * reversed payment gives the use back
+     * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+     *
+     * @return list<self>
+     */
+    public static function holdsRedemption(): array
+    {
+        return [self::Pending, self::Accepted, self::NeedsReview];
+    }
 }

@@ -5,7 +5,6 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
-use App\Domain\Membership\Models\Plan;
 use InvalidArgumentException;
 
 /**
@@ -32,31 +31,13 @@ class PaymentAmountCalculator
     ) {}
 
     /**
-     * What a plan costs, in points and in gateway minor units.
-     *
-     * The direction matters: the plan's price IS the point figure, and the
-     * charge is derived from it. Doing it the other way (charge first, then
-     * convert to points) could grant fewer points than the plan costs after
-     * flooring, leaving a member who paid the full price unable to afford
-     * the plan they just bought.
-     *
-     * @return array{0: int, 1: int} [points, amountMinor]
-     */
-    public function forPlan(Plan $plan): array
-    {
-        $points = (int) $plan->price_points;
-
-        if ($points <= 0) {
-            throw new InvalidArgumentException("Plan {$plan->id} has no positive price to charge.");
-        }
-
-        return [$points, $this->pointsToMinor($points)];
-    }
-
-    /**
-     * What a number of points due (a booking, a session) costs by card —
-     * the same direction and rounding as a plan: the points are the price,
-     * and the charge is derived from them, rounded up.
+     * What a number of points due (a plan, a booking, a session) costs by
+     * card. The direction matters: the points ARE the price, and the charge
+     * is derived from them, rounded up. Doing it the other way (charge
+     * first, then convert to points) could grant fewer points than the
+     * price after flooring, leaving a member who paid in full unable to
+     * afford what they just bought. A plan's points are
+     * PriceQuoteService's, its sale included.
      *
      * @return array{0: int, 1: int} [points, amountMinor]
      */

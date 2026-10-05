@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Domain\Finance;
 
+use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
@@ -105,19 +106,24 @@ class ReceivedMoneyConverterTest extends TestCase
     }
 
     /**
-     * `numeric` lets through spellings bcmath refuses. They are the same
-     * money, so they convert the same; anything that is not a number is a
-     * caller's bug, not a 500 from deep inside bcmath.
+     * Only a plain decimal is money here (final review M4). Every other
+     * spelling `numeric` would let through — an exponent, a sign, padding, a
+     * bare point — is refused as a domain error (422), never handed to
+     * bcmath, whose ValueError would be a 500.
      */
-    public function test_every_numeric_spelling_of_an_amount_converts(): void
+    public function test_only_a_plain_decimal_is_converted(): void
     {
-        foreach (['1e3', ' 1000 ', '1000.', '+1000', '1000.000'] as $amount) {
+        foreach (['1000', '1000.000'] as $amount) {
             $this->assertSame(10000, $this->converter()->toPoints($amount, 'USD')->points, $amount);
         }
 
-        $this->assertSame(5, $this->converter()->toPoints('.5', 'USD')->points);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->converter()->toPoints('ten dollars', 'USD');
+        foreach (['1e3', '1e0', '1.0E+2', ' 1000 ', ' 5', '1000.', '+1000', '.5', '-5', 'ten dollars', ''] as $amount) {
+            try {
+                $this->converter()->toPoints($amount, 'USD');
+                $this->fail("[{$amount}] was converted.");
+            } catch (InvalidMoneyAmountException) {
+                $this->addToAssertionCount(1);
+            }
+        }
     }
 }

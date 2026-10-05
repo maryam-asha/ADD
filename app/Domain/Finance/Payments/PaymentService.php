@@ -9,8 +9,10 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Contracts\ChoosesWallet;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\Contracts\PaymentGateway;
+use App\Domain\Finance\Payments\Contracts\PaymentMethodDriver;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
@@ -26,6 +28,9 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\DetectsLostConnections;
 use Illuminate\Database\Eloquent\Model;
@@ -68,6 +73,8 @@ class PaymentService
         private readonly ReceivedMoneyConverter $converter,
         private readonly CurrencyConversionService $currencies,
         private readonly PaymentNotifier $notifier,
+        private readonly PriceQuoteService $quotes,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
@@ -77,16 +84,24 @@ class PaymentService
      *
      * The target is checked before anything is written, and the row records
      * what is due at this moment — the quote the member is paying. It starts
-     * on the payer's personal wallet: the account money lands in first. A
-     * driver that spends from elsewhere (a company wallet) moves it.
+     * on the payer's personal wallet: the account money lands in first. Only
+     * a driver that picks the wallet itself and checks the payer may spend
+     * from it (ChoosesWallet) is given the wallet the client named; card and
+     * cash money never lands anywhere but the payer's own wallet.
      *
      * Everything but a gateway runs in one transaction, so a wallet payment
      * that falls short leaves no row behind. A gateway's start makes an HTTP
-     * call and records its own failure on the row; that record must survive.
+     * call and records its own failure on the row — pricing the charge
+     * included — so the row is Failed, never left Pending; that record must
+     * survive. Nothing due is refused (422 `api.payment.nothing_due`) before
+     * a gateway row is written.
      *
      * `$context`: `payable` (the Model paid for), `plan`, `points` (an amount
-     * fixed by the caller rather than the fulfiller), and whatever the driver
-     * reads (`wallet_owner_type`/`wallet_owner_id` for the wallet).
+     * fixed by the caller rather than the fulfiller), `authorized_wallet` (a
+     * Wallet the caller has already authorized the payer to buy for — a
+     * company admin's company, after CompanyPolicy; never built from request
+     * input), and whatever the driver reads (`wallet_owner_type` /
+     * `wallet_owner_id` for the wallet).
      *
      * @param  array<string, mixed>  $context
      * @return array{payment: ?Payment, start: PaymentStart} `payment` is null only for cash that writes no row (see CashMethod)
@@ -102,16 +117,33 @@ class PaymentService
         }
 
         $fulfiller = $this->fulfillers->for($purpose);
+        $coupon = $context['coupon'] ?? null;
 
-        $open = function () use ($purpose, $payer, $driver, $fulfiller, $context) {
+        // A coupon is locked on the payment it prices, in the transaction
+        // that opens it — a plan's only, here: anything else already has its
+        // price, and takes a coupon through CouponApplication. A card opens
+        // through StartPayment, so a gateway never reaches this with one.
+        if ($coupon !== null && ($purpose !== PaymentPurpose::PlanPurchase || $driver instanceof PaymentGateway)) {
+            throw new LogicException('PaymentService::start() locks a coupon on a plan purchase paid in points or cash only.');
+        }
+
+        $open = function () use ($purpose, $payer, $driver, $fulfiller, $context, $coupon) {
+            // The coupon's row first, so its limits are counted from a fresh
+            // snapshot (CouponLedger), and the price it gives — eligibility
+            // checked — before anything is written.
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            $quote = $coupon !== null ? $this->quotes->forPlan($context['plan'], $payer, $coupon, now()) : null;
+
             $payment = new Payment;
             $payment->forceFill([
                 'method' => $driver->key(),
                 'purpose' => $purpose,
                 'status' => PaymentStatus::Pending,
                 'user_id' => $payer->id,
-                'wallet_id' => $this->openingWalletId($payer, $context),
+                'wallet_id' => $this->openingWalletId($payer, $driver, $context),
                 'plan_id' => isset($context['plan']) ? $context['plan']->id : null,
+                // A plan bought: its price before any sale or coupon.
+                'list_price_points' => isset($context['plan']) ? (int) $context['plan']->price_points : null,
                 // The card path's own name for the points a payment buys;
                 // nothing is bought with money until funding arrives.
                 'points_to_credit' => 0,
@@ -131,8 +163,30 @@ class PaymentService
                 return ['payment' => null, 'start' => PaymentStart::payAtReception()];
             }
 
+            // The coupon's use is filed on the row before what is due is read,
+            // so the fulfiller prices the payment with it — the wallet check,
+            // the debit and every later quote alike.
+            if (($applied = $quote?->appliedCoupon()) !== null) {
+                $payment->amount_points = 0;
+                $payment->save();
+                $this->couponLedger->record($applied, $payer, $payment, PricingPurpose::PlanPurchase, $quote->couponBasePoints, $quote->couponPoints);
+            }
+
             $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
+
+            // A gateway cannot charge nothing; refused before the row exists,
+            // so a free target never leaves a payment behind.
+            if ($driver instanceof PaymentGateway && $payment->amount_points <= 0) {
+                throw new ReceptionActionException('api.payment.nothing_due');
+            }
+
             $payment->save();
+
+            // A plan a coupon made free has nothing to spend or collect:
+            // settled on the spot, by whatever method was asked for.
+            if ($applied !== null && $payment->amount_points === 0) {
+                return ['payment' => $this->settle($payment)->refresh(), 'start' => PaymentStart::done()];
+            }
 
             $start = $driver->start($payment, $context);
 
@@ -165,15 +219,25 @@ class PaymentService
     }
 
     /**
-     * The wallet a new payment starts on: the one the payer named (the
-     * driver still checks they may spend from it), else their own.
+     * The wallet a new payment starts on:
+     *
+     *  - one the caller has already authorized (`authorized_wallet`);
+     *  - for a driver that checks it (ChoosesWallet), the one the payer
+     *    named;
+     *  - otherwise the payer's own. A card's or the desk's money is never
+     *    credited to a wallet the request merely named — nothing would have
+     *    checked the payer has any right to it.
      *
      * @param  array<string, mixed>  $context
      */
-    private function openingWalletId(User $payer, array $context): int
+    private function openingWalletId(User $payer, PaymentMethodDriver $driver, array $context): int
     {
-        $ownerType = $context['wallet_owner_type'] ?? null;
-        $ownerId = $context['wallet_owner_id'] ?? null;
+        if (($context['authorized_wallet'] ?? null) instanceof Wallet) {
+            return $context['authorized_wallet']->id;
+        }
+
+        $ownerType = $driver instanceof ChoosesWallet ? ($context['wallet_owner_type'] ?? null) : null;
+        $ownerId = $driver instanceof ChoosesWallet ? ($context['wallet_owner_id'] ?? null) : null;
 
         $named = $ownerType !== null && $ownerId !== null
             ? Wallet::query()

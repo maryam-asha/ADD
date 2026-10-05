@@ -40,6 +40,8 @@ class StoreBookingBatchRequest extends FormRequest
             'windows.*.space_id' => ['required', 'integer', 'exists:spaces,id'],
             'windows.*.start_at' => ['required', 'date'],
             'windows.*.end_at' => ['required', 'date'],
+            // A coupon code the member typed: used on every date its limits allow.
+            'coupon_code' => ['nullable', 'string', 'max:40'],
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
             'note' => ['nullable', 'string', 'max:500'],

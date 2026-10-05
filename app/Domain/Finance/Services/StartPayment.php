@@ -11,6 +11,10 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -43,9 +47,14 @@ class StartPayment
         private readonly PaymentMethodRegistry $registry,
         private readonly WalletService $wallets,
         private readonly PaymentAmountCalculator $amounts,
+        private readonly PriceQuoteService $quotes,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
+     * A plan made free by its coupon has nothing to charge by card: the
+     * caller settles it through PaymentService instead.
+     *
      * @param  int|null  $amountMinor  required for a top-up, ignored for a plan purchase
      * @return array{payment: Payment, url: string}
      */
@@ -55,17 +64,11 @@ class StartPayment
         ?Plan $plan = null,
         ?int $amountMinor = null,
         ?string $lang = null,
+        ?Coupon $coupon = null,
     ): array {
         if ($purpose === PaymentPurpose::PlanPurchase && $plan === null) {
             throw new InvalidArgumentException('A plan purchase requires a plan.');
         }
-
-        // Points are the unit of account, so both purposes resolve to the
-        // same pair: how many points are granted, and what that costs in
-        // the gateway's minor units.
-        [$points, $chargeMinor] = $purpose === PaymentPurpose::PlanPurchase
-            ? $this->amounts->forPlan($plan)
-            : $this->amounts->forTopUp($amountMinor);
 
         // Resolved before the row is written: a method that is switched off
         // must refuse here, not after leaving a pending row with no id.
@@ -76,22 +79,44 @@ class StartPayment
         // allocation/top-up paths, which carry their own authorization.
         $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
 
-        $payment = DB::transaction(fn () => Payment::create([
-            'callback_token' => Payment::newCallbackToken(),
-            'method' => PaymeraGateway::KEY,
-            'purpose' => $purpose,
-            'status' => PaymentStatus::Pending,
-            'user_id' => $user->id,
-            'wallet_id' => $wallet->id,
-            'plan_id' => $plan?->id,
-            'amount_minor' => $chargeMinor,
-            'currency' => (string) config('paymera.currency'),
-            'currency_exponent' => (int) config('paymera.currency_exponent'),
-            'points_to_credit' => $points,
-            'amount_points' => $points,
-            'terminal_id' => (string) config('paymera.terminal_id'),
-            'lang' => $lang ?? (string) config('paymera.default_lang'),
-        ]));
+        $payment = DB::transaction(function () use ($user, $purpose, $plan, $amountMinor, $lang, $coupon, $wallet) {
+            // The coupon's row first (CouponLedger), then the price it gives.
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            $quote = $purpose === PaymentPurpose::PlanPurchase ? $this->quotes->forPlan($plan, $user, $coupon, now()) : null;
+
+            // Points are the unit of account, so both purposes resolve to the
+            // same pair: how many points are granted, and what that costs in
+            // the gateway's minor units. A plan's price is PriceQuoteService's
+            // — its sale and coupon included — and the charge is derived from
+            // those points, as for anything else.
+            [$points, $chargeMinor] = $quote !== null
+                ? $this->amounts->forPoints($quote->finalPoints)
+                : $this->amounts->forTopUp($amountMinor);
+
+            $payment = Payment::create([
+                'callback_token' => Payment::newCallbackToken(),
+                'method' => PaymeraGateway::KEY,
+                'purpose' => $purpose,
+                'status' => PaymentStatus::Pending,
+                'user_id' => $user->id,
+                'wallet_id' => $wallet->id,
+                'plan_id' => $plan?->id,
+                'amount_minor' => $chargeMinor,
+                'currency' => (string) config('paymera.currency'),
+                'currency_exponent' => (int) config('paymera.currency_exponent'),
+                'points_to_credit' => $points,
+                'amount_points' => $points,
+                'list_price_points' => $plan !== null ? (int) $plan->price_points : null,
+                'terminal_id' => (string) config('paymera.terminal_id'),
+                'lang' => $lang ?? (string) config('paymera.default_lang'),
+            ]);
+
+            if (($applied = $quote?->appliedCoupon()) !== null) {
+                $this->couponLedger->record($applied, $user, $payment, PricingPurpose::PlanPurchase, $quote->couponBasePoints, $quote->couponPoints);
+            }
+
+            return $payment;
+        });
 
         // The gateway creates the payment, records its id on the row, or
         // marks the row Failed and rethrows if the call does not come back.

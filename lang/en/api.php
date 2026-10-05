@@ -119,6 +119,9 @@ return [
         'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
         'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
+        'sale_not_below_price' => 'The sale price must be lower than the normal price.',
+        'coupon_updated' => 'Coupon updated.',
+        'coupon_target_invalid' => 'A coupon target names at most one item, and one its purpose can be bought with: a plan for a plan purchase, a space or space type for time in a space, an event for a registration.',
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
@@ -304,6 +307,8 @@ return [
         'vat_label' => 'VAT (:percent%)',
         'hours_times_rate' => ':duration × :rate / hour',
         'discount_label' => 'Discount (:percent%)',
+        'sale_label' => 'Offer',
+        'coupon_label' => 'Coupon (:code)',
         'note_label' => 'Add a Note (Optional)',
         'note_placeholder' => 'e.g. Meeting purpose, special requests…',
         'statuses' => [
@@ -425,9 +430,11 @@ return [
         'plan_unavailable' => 'This package is not available for purchase.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
         'method_not_supported' => 'This payment method cannot be used for this.',
+        'company_plan_not_allowed' => 'A company plan can only be bought by the company\'s admin, as a purchase for the company.',
         'already_paid' => 'This has already been paid.',
         'booking_not_payable' => 'A cancelled or rejected booking cannot be paid.',
         'nothing_due' => 'There is nothing to pay.',
+        'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
         'no_wallet' => 'There is no wallet to record this payment against.',
         'not_refundable' => 'Only a settled payment made with points can be refunded.',
         'payable_not_found' => 'We could not find what you are paying for.',
@@ -474,6 +481,7 @@ return [
         ],
         'price_points' => ':points pts',
         'per_hour' => 'hour',
+        'sale_ends' => 'Offer ends :date',
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
@@ -512,6 +520,7 @@ return [
     ],
 
     'package' => [
+        'sale_ends' => 'Offer ends :date',
         'title' => 'Packages & Subscription',
         'subtitle' => 'Choose the right plan for your business.',
         'tabs' => [
@@ -608,6 +617,23 @@ return [
         'identity_name' => 'Full name',
         'identity_phone' => 'Phone number',
         'identity_email' => 'Email',
+    ],
+
+    'coupon' => [
+        'not_found' => 'This code is not valid.',
+        'not_started' => 'This code is not active yet.',
+        'expired' => 'This code has expired.',
+        'usage_limit_reached' => 'This code has reached its usage limit.',
+        'per_user_limit_reached' => 'You have already used this code as many times as it allows.',
+        'not_eligible' => 'This code is not available to your account.',
+        'new_members_only' => 'This code is for new members, on their first purchase.',
+        'not_applicable' => 'This code cannot be used on this purchase.',
+        'min_amount_not_met' => 'This code needs a purchase of at least :points points.',
+        'not_combinable' => 'This code cannot be combined with the current offer.',
+        'already_applied' => 'A code has already been applied to this.',
+        'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
+        'offer_is_better' => 'The current offer already gives you a lower price, so the code was not applied.',
+        'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
     ],
 
 ];

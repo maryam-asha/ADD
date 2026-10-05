@@ -30,7 +30,9 @@ class SettleAtReceptionRequest extends FormRequest
             'payable_id' => ['required_unless:purpose,plan_purchase', 'nullable', 'integer'],
             'payment_id' => ['required_if:purpose,plan_purchase', 'nullable', 'integer'],
             'collected_via' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],
-            'amount' => ['nullable', 'numeric', 'min:0.01', new AmountFitsCurrency($this->input('currency'))],
+            // A plain decimal: `numeric` alone lets `1e3` through, which
+            // bcmath refuses (docs/decisions/unified-payments.md).
+            'amount' => ['nullable', 'numeric', 'regex:/^\d+(\.\d{1,6})?$/', 'min:0.01', new AmountFitsCurrency($this->input('currency'))],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
         ];
     }

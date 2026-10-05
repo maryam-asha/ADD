@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventBrowseService;
@@ -101,6 +102,7 @@ class EventController extends Controller
             $method,
             $request->validated('wallet_owner_type') ? OwnerType::from($request->validated('wallet_owner_type')) : null,
             $request->validated('wallet_owner_id'),
+            $request->validated('coupon_code'),
         );
 
         // A card pays once the seat is confirmed; a pending one is paid
@@ -127,6 +129,10 @@ class EventController extends Controller
                 'payable' => $attendee,
                 'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
             ]));
+        } catch (ReceptionActionException $e) {
+            // Nothing to open (nothing due): the seat stands, as for a
+            // gateway that cannot be reached.
+            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($e->messageKey, $e->params)];
         } catch (Throwable $e) {
             $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
 

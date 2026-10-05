@@ -10,16 +10,24 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
 use App\Domain\Finance\Payments\MemberPayables;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Finance\Services\StartPayment;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Services\CouponApplication;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StartPaymentRequest;
 use App\Http\Resources\Finance\PaymentResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -53,12 +61,52 @@ class PaymentController extends Controller
         StartPayment $card,
         PaymentService $payments,
         MemberPayables $payables,
+        CouponEligibility $coupons,
+        PriceQuoteService $quotes,
+        CouponApplication $application,
     ): JsonResponse {
         $purpose = $request->purpose();
         $method = $request->paymentMethod();
         $member = $request->user();
 
+        // A plan bought here is the member's own. A company plan is bought
+        // by the company's admin, through POST member/memberships with
+        // `company_id`, where that is checked; nothing here checks it, and
+        // the plan goes to the paying wallet's owner.
+        if ($purpose === PaymentPurpose::PlanPurchase
+            && $request->validated('wallet_owner_type') !== null
+            && $request->validated('wallet_owner_type') !== OwnerType::User->value) {
+            return response()->json(['message' => __('api.payment.company_plan_not_allowed')], 422);
+        }
+
         try {
+            // A coupon on a plan is locked on the payment as it opens; one
+            // that makes the plan free settles it at once, whatever the
+            // method asked for.
+            $code = $request->validated('coupon_code');
+            $coupon = $code !== null ? $coupons->resolve($code) : null;
+            $payable = $payables->find($purpose, $request->validated('payable_id'), $member);
+
+            // On something already owed, the coupon lowers what it owes
+            // before the payment opens — and one that clears it leaves
+            // nothing to pay.
+            $outcome = null;
+
+            if ($coupon !== null && $payable !== null) {
+                $quote = $application->apply($payable, $member, $coupon);
+                $outcome = app(CouponOutcomePresenter::class)->fromQuote($code, $quote);
+
+                if ($quote->finalPoints === 0) {
+                    return $this->started(null, PaymentStart::done(), $outcome);
+                }
+
+                $coupon = null;
+            }
+
+            if ($coupon !== null && $quotes->forPlan(Plan::findOrFail($request->validated('plan_id')), $member, $coupon, now())->finalPoints === 0) {
+                $method = WalletMethod::KEY;
+            }
+
             if ($method === PaymeraGateway::KEY && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true)) {
                 ['payment' => $payment, 'url' => $url] = $card->handle(
                     user: $member,
@@ -70,19 +118,21 @@ class PaymentController extends Controller
                     // The gateway page speaks the member's language: the
                     // `lang` header, already applied as the app locale.
                     lang: app()->getLocale(),
+                    coupon: $coupon,
                 );
 
-                return $this->started($payment, PaymentStart::redirect($url));
+                return $this->started($payment, PaymentStart::redirect($url), $outcome ?? $this->planOutcome($coupon, $payment));
             }
 
             ['payment' => $payment, 'start' => $start] = $payments->start($purpose, $member, $method, array_filter([
-                'payable' => $payables->find($purpose, $request->validated('payable_id'), $member),
+                'payable' => $payable,
                 'plan' => $purpose === PaymentPurpose::PlanPurchase ? Plan::findOrFail($request->validated('plan_id')) : null,
                 // A plan paid from a wallet goes to that wallet's owner; from
                 // this endpoint that is always the member.
                 'wallet_owner_type' => $request->validated('wallet_owner_type') ?? ($purpose === PaymentPurpose::PlanPurchase ? OwnerType::User->value : null),
                 'wallet_owner_id' => $request->validated('wallet_owner_id') ?? ($purpose === PaymentPurpose::PlanPurchase ? $member->id : null),
                 'lang' => app()->getLocale(),
+                'coupon' => $coupon,
             ], fn ($value) => $value !== null));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
@@ -94,14 +144,28 @@ class PaymentController extends Controller
         } catch (UnknownPaymentMethodException) {
             // The app's default method (a card) switched off in config.
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
+        } catch (SeatPoolExhaustedException $e) {
+            // A plan paid from the wallet is activated on the spot; its
+            // branch's co-working seats are all held for part of its period.
+            // Nothing was charged. The answer POST member/memberships gives.
+            return response()->json([
+                'message' => __('api.membership.seat_pool_full'),
+                'first_shortfall_at' => $e->firstShortfall->toIso8601String(),
+            ], 422);
         } catch (Throwable $e) {
             return $this->gatewayFailureResponse($e, $member->id) ?? throw $e;
         }
 
-        return $this->started($payment, $start);
+        return $this->started($payment, $start, $outcome ?? $this->planOutcome($coupon, $payment));
     }
 
-    private function started(?Payment $payment, PaymentStart $start): JsonResponse
+    /**
+     * `coupon`, beside `data` as on POST bookings, when a code was sent:
+     * what it took off, or why it was not used (D2).
+     *
+     * @param  array<string, mixed>|null  $coupon
+     */
+    private function started(?Payment $payment, PaymentStart $start, ?array $coupon = null): JsonResponse
     {
         return response()->json([
             'data' => [
@@ -110,7 +174,19 @@ class PaymentController extends Controller
                 'redirect_url' => $start->redirectUrl,
                 'next' => $start->kind,
             ],
-        ], 201);
+        ] + ($coupon !== null ? ['coupon' => $coupon] : []), 201);
+    }
+
+    /**
+     * A plan's coupon is locked on the payment it opened.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function planOutcome(?Coupon $coupon, ?Payment $payment): ?array
+    {
+        return $coupon !== null && $payment !== null
+            ? app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment))
+            : null;
     }
 
     /**

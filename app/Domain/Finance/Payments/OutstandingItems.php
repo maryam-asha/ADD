@@ -12,6 +12,7 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,7 +30,10 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class OutstandingItems
 {
-    public function __construct(private readonly ReceivedMoneyConverter $converter) {}
+    public function __construct(
+        private readonly ReceivedMoneyConverter $converter,
+        private readonly PriceQuoteService $quotes,
+    ) {}
 
     /**
      * @return array{items: list<array<string, mixed>>, total_points: int, total_amount: array{value: string, currency: string}}
@@ -58,12 +62,15 @@ class OutstandingItems
     }
 
     /**
+     * What each booking still owes: its price less what was already paid
+     * for it — a paid booking that was then extended owes the extension.
+     *
      * @return list<array<string, mixed>>
      */
     private function bookings(int $userId): array
     {
         return $this->bookingsOwed()
-            ->with('space')
+            ->with(['space', 'payments'])
             ->where('user_id', $userId)
             ->orderBy('start_at')
             ->get()
@@ -72,8 +79,10 @@ class OutstandingItems
                 'payable_id' => $b->id,
                 'title' => $b->space?->translate('name'),
                 'starts_at' => $b->start_at?->toIso8601String(),
-                'amount_points' => (int) $b->price_points,
+                'amount_points' => max(0, (int) $b->price_points - $b->pointsPaid()),
             ])
+            ->filter(fn (array $item) => $item['amount_points'] > 0)
+            ->values()
             ->all();
     }
 
@@ -135,8 +144,9 @@ class OutstandingItems
                 'payment_id' => $p->id,
                 'title' => $p->plan?->translate('name'),
                 'starts_at' => null,
-                // The plan's current price: what the desk will charge.
-                'amount_points' => (int) ($p->plan?->price_points ?? $p->amount_points),
+                // What the desk will charge: the plan as it is now, at the
+                // sale and coupon the hold was opened with.
+                'amount_points' => $p->plan !== null ? $this->quotes->forPlanPayment($p, $p->plan)->finalPoints : (int) $p->amount_points,
             ])
             ->all();
     }

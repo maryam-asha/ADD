@@ -16,6 +16,11 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
 use App\Services\Notification\NotificationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -32,6 +37,10 @@ class EventRegistrationService
     public function __construct(
         private readonly FormSubmissionService $forms,
         private readonly PaymentService $payments,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
+        private readonly CouponEligibility $coupons,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
@@ -51,8 +60,15 @@ class EventRegistrationService
         ?string $paymentMethod = null,
         ?OwnerType $walletOwnerType = null,
         ?int $walletOwnerId = null,
+        ?string $couponCode = null,
     ): array {
-        return DB::transaction(function () use ($event, $user, $fieldValues, $paymentMethod, $walletOwnerType, $walletOwnerId) {
+        // An unknown code is refused before anything is locked.
+        $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
+
+        return DB::transaction(function () use ($event, $user, $fieldValues, $paymentMethod, $walletOwnerType, $walletOwnerId, $coupon) {
+            // 0. The coupon's row before the event's (CouponLedger).
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+
             // 1. Lock event for update to prevent race conditions on capacity
             $lockedEvent = Event::query()
                 ->where('id', $event->id)
@@ -153,8 +169,15 @@ class EventRegistrationService
             // one paid by cash or card is confirmed unpaid and cannot be
             // checked in until it is paid.
             $isFree = (bool) ($lockedEvent->is_free ?? true);
-            $pricePoints = (int) ($lockedEvent->price_points ?? 0);
-            $isPaidEvent = ! $isFree && $pricePoints > 0;
+            $listPoints = (int) ($lockedEvent->price_points ?? 0);
+            $isPaidEvent = ! $isFree && $listPoints > 0;
+
+            // Priced by PriceQuoteService — a coupon on top of the price. A
+            // registration a coupon makes free is paid: the door admits only
+            // a paid one.
+            $quote = $this->quotes->forEvent($lockedEvent, $user, $coupon);
+            $pricePoints = $quote->finalPoints;
+            $madeFree = $isPaidEvent && $pricePoints === 0;
             $method = $paymentMethod ?? WalletMethod::KEY;
             $pointsDeducted = 0;
 
@@ -173,19 +196,23 @@ class EventRegistrationService
                     : null,
                 'attended' => null,
                 'price_points' => $isPaidEvent ? $pricePoints : null,
-                'payment_state' => $isPaidEvent ? EventPaymentState::Unpaid : null,
+                'list_price_points' => $isPaidEvent ? $listPoints : null,
+                'payment_state' => $isPaidEvent ? ($madeFree ? EventPaymentState::Paid : EventPaymentState::Unpaid) : null,
+                'paid_at' => $madeFree ? now() : null,
                 'payment_method' => $isPaidEvent ? $method : null,
                 'payment_wallet_owner_type' => $isPaidEvent ? $walletOwnerType?->value : null,
                 'payment_wallet_owner_id' => $isPaidEvent ? $walletOwnerId : null,
             ]);
 
-            if ($status === EventRegistrationStatus::Approved && $isPaidEvent && $method === WalletMethod::KEY) {
+            $this->recorder->record($quote, $attendee, $user, PricingPurpose::EventRegistration);
+
+            if ($status === EventRegistrationStatus::Approved && $isPaidEvent && ! $madeFree && $method === WalletMethod::KEY) {
                 $pointsDeducted = $this->payFromWallet($attendee, $user, $pricePoints, $paymentMethod === null, $walletOwnerType, $walletOwnerId);
             }
 
             // Cash confirms the seat unpaid: the member is told they owe it.
             // A card is being paid right now, so it is not.
-            if ($status === EventRegistrationStatus::Approved && $method === CashMethod::KEY) {
+            if ($status === EventRegistrationStatus::Approved && ! $madeFree && $method === CashMethod::KEY) {
                 $this->tellPaymentDue($attendee, $lockedEvent);
             }
 
@@ -207,6 +234,7 @@ class EventRegistrationService
 
             $this->logSensitiveAction('event_registered', $attendee, [
                 'price_points' => $isPaidEvent ? $pricePoints : 0,
+                'list_price_points' => $isPaidEvent ? $listPoints : 0,
                 'payment_method' => $isPaidEvent ? $method : null,
             ]);
 
@@ -220,7 +248,9 @@ class EventRegistrationService
                     'title' => $lockedEvent->translate('title', $locale),
                     'start_at' => $lockedEvent->start_at?->format('Y-m-d'),
                     'location' => app(EventLocationService::class)->displayLocation($lockedEvent, $locale),
-                    'price_points' => $pricePoints,
+                    // The event's own price; what this registration costs is
+                    // the attendee's.
+                    'price_points' => $listPoints,
                 ],
             ];
         });

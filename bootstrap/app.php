@@ -1,7 +1,9 @@
 <?php
 
+use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -164,6 +166,14 @@ return Application::configure(basePath: dirname(__DIR__))
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);
         });
 
+        // An amount of money that is not a plain decimal (`1e3`, ` 5`):
+        // refused by ReceivedMoneyConverter before bcmath can throw a
+        // ValueError. The request rules on payment endpoints already refuse
+        // it; this keeps any other caller's answer a 422, never a 500.
+        $exceptions->render(fn (InvalidMoneyAmountException $e) => response()->json([
+            'message' => __('api.payment.invalid_amount'),
+        ], 422));
+
         // Paying with points from a wallet that does not hold enough — the
         // one shape every pay-with-points path answers with, so a client can
         // show "you have X, it costs Y, you are Z short" without parsing the
@@ -178,6 +188,14 @@ return Application::configure(basePath: dirname(__DIR__))
             'required' => $e->required,
             'shortage' => $e->shortage,
         ], 422));
+
+        // A coupon code that cannot be used, with its reason — the one answer
+        // every purchase path gives, wherever the refusal is raised
+        // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+        $exceptions->render(fn (CouponRejectedException $e) => response()->json([
+            'message' => __($e->messageKey, $e->params),
+            'reason' => $e->rejection->value,
+        ], $e->status));
 
         // Registered last: Throwable matches everything, so an earlier match
         // above always wins. Returning null in debug mode defers to Laravel's

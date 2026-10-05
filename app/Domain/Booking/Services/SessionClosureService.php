@@ -19,6 +19,9 @@ use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -29,9 +32,10 @@ class SessionClosureService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
-        private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly PlanHourCoverageService $planHours,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
     ) {}
 
     /**
@@ -186,7 +190,10 @@ class SessionClosureService
             ? $this->coverableBlocks($session, $session->membership, $at)
             : 0;
 
-        return ['points' => $this->priceFor($session, $at, $covered), 'covered_seconds' => $covered, 'already_paid' => false];
+        // The same price finalizeClosure() bills, from the same quote.
+        $points = $this->priceFor($session, $at, $covered)->finalPoints;
+
+        return ['points' => $points, 'covered_seconds' => $covered, 'already_paid' => false];
     }
 
     /**
@@ -201,18 +208,17 @@ class SessionClosureService
      * ceil-to-whole-points rounding (Invariant 2) is applied once, to the
      * real charge.
      */
-    private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): int
+    private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): PriceQuote
     {
         $billable = (int) $session->checked_in_at->diffInSeconds($checkedOutAt) - $coveredSeconds;
 
-        if ($billable <= 0) {
-            return 0;
-        }
-
         $block = $this->blockSeconds();
-        $billed = (int) (ceil($billable / $block) * $block);
+        $billed = $billable > 0 ? (int) (ceil($billable / $block) * $block) : 0;
 
-        return $this->amounts->forRange($session->space, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
+        // The billed stretch, from check-in: the space's sale by usage time,
+        // and the record's locked plan discount or coupon terms
+        // (PriceQuoteService, the one place a price is composed).
+        return $this->quotes->forSession($session, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
     }
 
     /** The billing block, in seconds: `coworking.billing_increment_minutes`, 15 by default. */
@@ -245,7 +251,9 @@ class SessionClosureService
         // of the charge and remain decimal USD — only the wallet ledger became
         // point-denominated. Converting the point charge back to USD here is
         // the intended direction, not leftover scaffolding.
-        $points = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
+        $quote = $this->priceFor($session, $checkedOutAt, $coveredSeconds);
+        $points = $quote->finalPoints;
+
         $amount = $this->points->pointsToUsd($points);
 
         $attributes = [
@@ -263,8 +271,12 @@ class SessionClosureService
         // The same price in points, what a payment settles. A walk-in is
         // priced only now; a booking keeps the price it was made (and
         // perhaps paid) at, unless it closes unpaid and is repriced here.
-        if ($session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid) {
-            $attributes['price_points'] = $points;
+        $repriced = $session instanceof WalkinSession || $session->payment_state !== PaymentState::Paid;
+
+        if ($session instanceof WalkinSession) {
+            $attributes += $quote->attributes();
+        } elseif ($repriced) {
+            $attributes += $this->repriceUnpaidBooking($session, $points) + ['list_price_points' => $quote->listPoints];
         }
 
         // Checked out is the booking's outcome: it happened
@@ -289,6 +301,10 @@ class SessionClosureService
 
         $session->forceFill($attributes)->save();
 
+        if ($repriced) {
+            $this->recorder->reprice($quote, $session);
+        }
+
         // An end request still waiting on this session is moot once it is
         // closed — at the desk, by auto-close, or by a confirmation that
         // already marked its own request before calling here.
@@ -297,6 +313,33 @@ class SessionClosureService
             'resolved_at' => now(),
             'checked_out_at' => $attributes['checked_out_at'],
         ]);
+    }
+
+    /**
+     * An unpaid booking is billed for the time it was used. Part of it may
+     * already be paid — a paid booking that was then extended — and what
+     * it owes is its price less those payments (Booking::pointsPaid), so
+     * nothing already paid is billed again. It is never repriced below what
+     * was paid (no refund for leaving early, as for any paid booking), and
+     * once what was paid covers the time used it is paid.
+     *
+     * @return array<string, mixed>
+     */
+    private function repriceUnpaidBooking(Booking $booking, int $points): array
+    {
+        $paid = $booking->pointsPaid();
+
+        if ($paid <= 0) {
+            return ['price_points' => $points];
+        }
+
+        $attributes = ['price_points' => max($points, $paid)];
+
+        if ($paid >= $points) {
+            $attributes['payment_state'] = PaymentState::Paid;
+        }
+
+        return $attributes;
     }
 
     /**

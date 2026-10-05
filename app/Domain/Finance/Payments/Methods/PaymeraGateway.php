@@ -24,7 +24,8 @@ use App\Domain\Identity\Models\User;
  * `start()` runs AFTER the payment row has been written, on purpose. If the
  * create call times out after Paymera committed, the local record still
  * exists for the reconciler; it simply has no `payment_id` yet, and is
- * failed here explicitly if the call does not come back.
+ * failed here explicitly if the call does not come back — or if the charge
+ * cannot be priced in the first place.
  */
 class PaymeraGateway implements PaymentGateway
 {
@@ -63,11 +64,19 @@ class PaymeraGateway implements PaymentGateway
 
     public function start(Payment $payment, array $context = []): PaymentStart
     {
-        if ($payment->callback_token === null) {
-            $this->prepare($payment, $context['lang'] ?? null);
-        }
+        // Priced inside the same guard as the call: the row already exists,
+        // and a charge that cannot be priced (no exchange rate for the
+        // charge currency) must fail it like a call that does not come back
+        // — never leave it Pending with no gateway id, which the reconciler
+        // skips and nobody would ever resolve.
+        $stage = 'pricing';
 
         try {
+            if ($payment->callback_token === null) {
+                $this->prepare($payment, $context['lang'] ?? null);
+            }
+
+            $stage = 'create-payment';
             $created = $this->createPayment($payment, $payment->user);
         } catch (\Throwable $e) {
             // The local row must not linger as Pending: the reconciler would
@@ -75,7 +84,7 @@ class PaymeraGateway implements PaymentGateway
             // failed here, and never retried automatically.
             $payment->forceFill([
                 'status' => PaymentStatus::Failed,
-                'review_reason' => 'create-payment failed: '.$e->getMessage(),
+                'review_reason' => "{$stage} failed: ".$e->getMessage(),
             ])->save();
 
             throw $e;

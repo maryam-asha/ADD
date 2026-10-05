@@ -21,6 +21,9 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
@@ -32,6 +35,7 @@ use App\Http\Resources\BookingResource;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -142,6 +146,8 @@ class BookingController extends Controller
         PreviewBookingRequest $request,
         AvailabilityService $availability,
         BookingPresentationService $presentation,
+        PriceQuoteService $quotes,
+        CouponEligibility $coupons,
     ): JsonResponse {
         $space = Space::with(['building.branch', 'zone.floor'])->findOrFail($request->validated('space_id'));
         $locale = app()->getLocale();
@@ -178,10 +184,22 @@ class BookingController extends Controller
             default => null,
         };
 
-        $breakdown = $presentation->breakdown($space, $start, $end, $locale, member: $request->user());
+        // Priced exactly as POST bookings will price it — a coupon included —
+        // so the preview and the charge cannot disagree.
+        $code = $request->validated('coupon_code');
+
+        try {
+            $coupon = $code !== null ? $coupons->resolve($code) : null;
+            $quote = $quotes->forBooking($space, $start, $end, $request->user(), $coupon);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        $breakdown = $presentation->breakdownOf($quote, $space, $start, $end, $locale);
 
         return response()->json([
             'data' => [
+                ...($code !== null ? ['coupon' => app(CouponOutcomePresenter::class)->fromQuote($code, $quote, $locale)] : []),
                 'space' => [
                     'id' => $space->id,
                     'title' => $space->displayTitle($locale),
@@ -235,6 +253,7 @@ class BookingController extends Controller
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
                 $request->validated('payment_method'),
+                $request->validated('coupon_code'),
             );
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
@@ -252,14 +271,21 @@ class BookingController extends Controller
             ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
             : [];
 
-        return response()->json(['data' => new BookingResource($booking)] + $card, 201);
+        $code = $request->validated('coupon_code');
+        $coupon = $code !== null
+            ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->forRedeemable($booking))]
+            : [];
+
+        return response()->json(['data' => new BookingResource($booking)] + $card + $coupon, 201);
     }
 
     /**
      * A booking paid by card is made first, unpaid — it holds its slot like
      * any unpaid booking — and then its payment is opened. If the gateway
-     * cannot be reached the booking stands, still unpaid, and the member is
-     * told the payment did not start: they can pay again, or at the desk.
+     * cannot be reached (or the charge cannot be priced) the booking stands,
+     * still unpaid, and the member is told the payment did not start: they
+     * can pay again, or at the desk. A booking that costs nothing has no
+     * payment to open, and says so the same way.
      *
      * @return array{payment: PaymentResource|null, redirect_url: string|null, payment_error?: string}
      */
@@ -270,6 +296,8 @@ class BookingController extends Controller
                 'payable' => $booking,
                 'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
             ]));
+        } catch (ReceptionActionException $e) {
+            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($e->messageKey, $e->params)];
         } catch (Throwable $e) {
             $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
 
@@ -300,6 +328,7 @@ class BookingController extends Controller
                 $request->validated('wallet_owner_id'),
                 $request->validated('note'),
                 $request->validated('payment_method'),
+                $request->validated('coupon_code'),
             );
         } catch (BatchUnavailableException $e) {
             return response()->json([

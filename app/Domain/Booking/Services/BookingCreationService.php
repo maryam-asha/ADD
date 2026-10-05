@@ -15,8 +15,11 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanDiscountService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
@@ -35,12 +38,13 @@ class BookingCreationService
 {
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly SettingService $settings,
-        private readonly MembershipResolver $membershipResolver,
-        private readonly PlanDiscountService $discounts,
         private readonly BookingPaymentRouter $payments,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
+        private readonly CouponEligibility $coupons,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     public function create(
@@ -52,6 +56,7 @@ class BookingCreationService
         ?int $walletOwnerId = null,
         ?string $note = null,
         ?string $paymentMethod = null,
+        ?string $couponCode = null,
     ): Booking {
         // Normalize to UTC: Eloquent's datetime cast stores the Carbon
         // value's current wall-clock as-is and reinterprets it as UTC on
@@ -70,7 +75,14 @@ class BookingCreationService
         $this->assertValidGranularity($startAt, $rules);
         $this->assertValidDuration($startAt, $endAt, $rules);
 
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod) {
+        // An unknown code is refused before anything is locked.
+        $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
+
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod, $coupon) {
+            // The coupon's row first — before the branch and the space — so
+            // its limits are counted from a fresh snapshot (CouponLedger).
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+
             if ($rules->usesBranchPool) {
                 // Every decision about a branch's co-working seats — bookings,
                 // walk-ins, subscriptions — is serialized on the branch row,
@@ -99,15 +111,12 @@ class BookingCreationService
 
             $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
-            $points = $this->amounts->forRange($locked, $startAt, $endAt);
-
-            // Applied automatically, never an opt-in the member triggers
-            // (docs/decisions/plan-discounts-design.md) — the member's
-            // active membership plan is consulted the same way as any
-            // other benefit.
-            $membership = $this->membershipResolver->activeFor($member);
-            $discount = $membership !== null ? $this->discounts->resolveFor($membership, $locked) : null;
-            $finalPoints = $discount !== null ? $this->discounts->apply($points, $discount) : $points;
+            // The list price, the better of the space's sale and the
+            // member's plan discount (applied automatically, never an opt-in
+            // — docs/decisions/plan-discounts-design.md), and the coupon on
+            // top: PriceQuoteService, the one place a price is composed.
+            $quote = $this->quotes->forBooking($locked, $startAt, $endAt, $member, $coupon);
+            $finalPoints = $quote->finalPoints;
 
             // Decided before the booking is made, so a refusal (a wallet
             // choice, a strict wallet payment that falls short) makes none.
@@ -130,7 +139,7 @@ class BookingCreationService
                 'status' => $status,
                 'amount_owed' => $amount,
                 'currency' => 'USD',
-                'price_points' => $finalPoints,
+                ...$quote->attributes(),
                 'payment_state' => PaymentState::Unpaid,
                 'note' => $note,
             ]);
@@ -139,9 +148,11 @@ class BookingCreationService
                 $this->payments->pay($booking, $member, $payingWallet);
             }
 
-            if ($discount !== null && $booking->payment_state === PaymentState::Paid) {
-                $this->discounts->redeem($discount, $membership, $booking, $points - $finalPoints);
-            }
+            // A plan discount or a coupon is used up by the booking it
+            // priced, paid now or later (cash, card, pay-now, the desk):
+            // `price_points` is the reduced price whenever it is paid, so the
+            // limits count it either way. Cancelling or rejecting gives it back.
+            $this->recorder->record($quote, $booking, $member, PricingPurpose::Booking);
 
             if ($status === BookingStatus::Pending) {
                 $this->notifyOperationsOfPendingBooking($booking);

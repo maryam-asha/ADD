@@ -40,9 +40,11 @@ class PaymentMethodOptions
      *
      * @return array{amount_points: int|null, methods: list<array<string, mixed>>}
      */
-    public function for(?PaymentPurpose $purpose, ?User $member, ?Model $payable = null, ?Plan $plan = null): array
+    public function for(?PaymentPurpose $purpose, ?User $member, ?Model $payable = null, ?Plan $plan = null, ?int $points = null): array
     {
-        $points = $this->pointsDue($purpose, $member, $payable, $plan);
+        // `$points`: a price the caller already quoted — with a coupon the
+        // member is about to use (CouponPreview).
+        $points ??= $this->pointsDue($purpose, $member, $payable, $plan);
         $drivers = $purpose === null ? $this->methods->enabled() : $this->methods->availableFor($purpose);
 
         $methods = [];

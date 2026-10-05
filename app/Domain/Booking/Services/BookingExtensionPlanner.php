@@ -13,7 +13,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanDiscountService;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -33,9 +33,8 @@ class BookingExtensionPlanner
     public function __construct(
         private readonly AvailabilityService $availability,
         private readonly BusinessHoursService $businessHours,
-        private readonly AmountCalculator $amounts,
         private readonly MembershipResolver $membershipResolver,
-        private readonly PlanDiscountService $discounts,
+        private readonly PriceQuoteService $quotes,
     ) {}
 
     /**
@@ -162,24 +161,15 @@ class BookingExtensionPlanner
     }
 
     /**
-     * What growing the booking to $newEnd costs: the difference between its
-     * old and new price, at the same net rate as the rest of it.
+     * What growing the booking to $newEnd costs — PriceQuoteService's, the
+     * one place a price is composed: the booking's plan discount while it
+     * is still active, else the space's sale by usage time; never a coupon.
      *
-     * @return array{difference: int, total: int, undiscounted_total: int}
+     * @return array{difference: int, list_difference: int, total: int, undiscounted_total: int}
      */
     public function price(Booking $booking, Space $space, CarbonInterface $newEnd, ?PlanDiscountRedemption $redemption): array
     {
-        $old = $this->amounts->forRange($space, $booking->start_at, $booking->end_at);
-        $new = $this->amounts->forRange($space, $booking->start_at, $newEnd);
-
-        if ($redemption === null) {
-            return ['difference' => $new - $old, 'total' => $new, 'undiscounted_total' => $new];
-        }
-
-        $discountedOld = $this->discounts->apply($old, $redemption->discount);
-        $discountedNew = $this->discounts->apply($new, $redemption->discount);
-
-        return ['difference' => $discountedNew - $discountedOld, 'total' => $discountedNew, 'undiscounted_total' => $new];
+        return $this->quotes->forExtension($booking, $space, $newEnd, $redemption);
     }
 
     /**

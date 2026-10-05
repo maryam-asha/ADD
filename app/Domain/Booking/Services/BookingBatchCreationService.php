@@ -14,9 +14,14 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Models\PlanDiscount;
-use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanDiscountService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Exceptions\CouponRejectedException;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Domain\Pricing\ValueObjects\PriceQuote;
+use App\Domain\Pricing\ValueObjects\UsageInFlight;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -58,11 +63,12 @@ class BookingBatchCreationService
 
     public function __construct(
         private readonly AvailabilityService $availability,
-        private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
-        private readonly MembershipResolver $membershipResolver,
-        private readonly PlanDiscountService $discounts,
         private readonly BookingPaymentRouter $payments,
+        private readonly PriceQuoteService $quotes,
+        private readonly QuoteRecorder $recorder,
+        private readonly CouponEligibility $coupons,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
@@ -76,6 +82,7 @@ class BookingBatchCreationService
         ?int $walletOwnerId = null,
         ?string $note = null,
         ?string $paymentMethod = null,
+        ?string $couponCode = null,
     ): array {
         $normalized = $this->normalize($windows);
 
@@ -87,7 +94,13 @@ class BookingBatchCreationService
             throw new BatchUnavailableException($failures);
         }
 
-        return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note, $paymentMethod) {
+        // An unknown code is refused before anything is locked.
+        $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
+
+        return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note, $paymentMethod, $coupon) {
+            // The coupon's row is the first lock (CouponLedger).
+            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+
             // Lock every distinct space in ascending id order. Two
             // concurrent batches touching the same pair of spaces would
             // otherwise be free to grab them in opposite orders and
@@ -113,20 +126,20 @@ class BookingBatchCreationService
                     $id => Space::query()->whereKey($id)->lockForUpdate()->firstOrFail(),
                 ]);
 
-            // Same member for the whole batch, resolved once rather than
-            // per window (docs/decisions/plan-discounts-design.md).
-            $membership = $this->membershipResolver->activeFor($member);
+            // Uses a plan discount or the coupon has already been earmarked
+            // for earlier in this same not-yet-persisted batch — none of them
+            // has a redemption row yet for the limits' own count to see.
+            $inFlight = new UsageInFlight;
 
-            // Usage a usage-limited discount has already been earmarked
-            // for earlier in this same not-yet-persisted batch — none of it
-            // has a PlanDiscountRedemption row yet for resolveFor()'s own
-            // ledger count to see, so it must be tracked here instead.
-            $consumedInBatch = [];
+            // Why the coupon could not be used, kept until the end: a date
+            // it cannot cover is booked without it, but a coupon no date
+            // could use at all is refused (D1).
+            $couponRejection = null;
 
             $failures = [];
             /** @var array<int, Collection<int, Booking>> $blocking */
             $blocking = [];
-            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, points: int, discount: ?PlanDiscount, points_discounted: int}> $accepted */
+            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, quote: PriceQuote}> $accepted */
             $accepted = [];
 
             foreach ($normalized as $window) {
@@ -183,28 +196,23 @@ class BookingBatchCreationService
                     continue;
                 }
 
-                $rawPoints = $this->amounts->forRange($space, $window['start'], $window['end']);
-
-                // Applied automatically, same as the single-booking path
-                // (docs/decisions/plan-discounts-design.md). $consumedInBatch
-                // stops a usage_limit of e.g. 1 from being claimed by more
-                // than one window in this same batch, since none of them
-                // have a redemption row yet for resolveFor()'s own count.
-                $discount = $membership !== null ? $this->discounts->resolveFor($membership, $space, $consumedInBatch) : null;
-                $finalPoints = $discount !== null ? $this->discounts->apply($rawPoints, $discount) : $rawPoints;
-
-                if ($discount !== null) {
-                    $consumedInBatch[$discount->id] = ($consumedInBatch[$discount->id] ?? 0) + 1;
+                // Priced as the single-booking path prices (PriceQuoteService),
+                // with the coupon on every date its limits still allow.
+                try {
+                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, $coupon, $inFlight);
+                } catch (CouponRejectedException $e) {
+                    $couponRejection ??= $e;
+                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, null, $inFlight);
                 }
+
+                $quote->earmark($inFlight);
 
                 $accepted[] = [
                     'index' => $window['index'],
                     'space' => $space,
                     'start' => $window['start'],
                     'end' => $window['end'],
-                    'points' => $finalPoints,
-                    'discount' => $discount,
-                    'points_discounted' => $rawPoints - $finalPoints,
+                    'quote' => $quote,
                 ];
             }
 
@@ -214,7 +222,11 @@ class BookingBatchCreationService
                 throw new BatchUnavailableException($failures);
             }
 
-            $totalPoints = collect($accepted)->sum('points');
+            if ($couponRejection !== null && $inFlight->coupon($coupon) === 0) {
+                throw $couponRejection;
+            }
+
+            $totalPoints = collect($accepted)->sum(fn (array $row) => $row['quote']->finalPoints);
 
             // Routed once for the summed total, so a member with two
             // eligible wallets is asked to choose once rather than N times,
@@ -245,20 +257,20 @@ class BookingBatchCreationService
                     'start_at' => $row['start'],
                     'end_at' => $row['end'],
                     'status' => $status,
-                    'amount_owed' => $this->points->pointsToUsd($row['points']),
+                    'amount_owed' => $this->points->pointsToUsd($row['quote']->finalPoints),
                     'currency' => 'USD',
-                    'price_points' => $row['points'],
+                    ...$row['quote']->attributes(),
                     'payment_state' => PaymentState::Unpaid,
                     'note' => $note,
                 ]);
 
-                if ($payingWallet !== null && $row['points'] > 0) {
+                if ($payingWallet !== null && $row['quote']->finalPoints > 0) {
                     $this->payments->pay($booking, $member, $payingWallet);
                 }
 
-                if ($row['discount'] !== null && $booking->payment_state === PaymentState::Paid) {
-                    $this->discounts->redeem($row['discount'], $membership, $booking, $row['points_discounted']);
-                }
+                // Used up whether the booking is paid now or later, as in
+                // BookingCreationService.
+                $this->recorder->record($row['quote'], $booking, $member, PricingPurpose::Booking);
 
                 if ($status === BookingStatus::Pending) {
                     $this->notifyOperations();

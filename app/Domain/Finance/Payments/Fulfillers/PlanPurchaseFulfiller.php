@@ -11,6 +11,7 @@ use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +29,7 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
         private readonly MembershipActivationService $activations,
         private readonly DedicatedDeskService $desks,
         private readonly PaymentMethodRegistry $methods,
+        private readonly PriceQuoteService $quotes,
     ) {}
 
     public function purpose(): PaymentPurpose
@@ -35,9 +37,14 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
         return PaymentPurpose::PlanPurchase;
     }
 
+    /**
+     * The plan as it is now — a repriced plan is caught — at the sale live
+     * when the payment was opened and the coupon locked on it
+     * (PriceQuoteService, the one place a price is composed).
+     */
     public function pointsDue(Payment $payment): int
     {
-        return (int) $this->plan($payment)->price_points;
+        return $this->quotes->forPlanPayment($payment, $this->plan($payment))->finalPoints;
     }
 
     public function walletCategory(): WalletTransactionCategory
@@ -79,7 +86,9 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
             (int) $wallet->owner_id,
             charge: false,
             auditAction: $this->auditAction($payment),
-            auditProperties: ['charged' => true, 'payment_id' => $payment->id],
+            // What was actually paid, a sale or coupon included — not the
+            // plan's list price activation would otherwise record.
+            auditProperties: ['charged' => true, 'payment_id' => $payment->id, 'price_points' => (int) $payment->amount_points],
         );
 
         // Activation tells staff about a desk-less Dedicated Desk plan only

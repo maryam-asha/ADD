@@ -9,6 +9,8 @@ use App\Domain\Finance\Payments\MemberPayables;
 use App\Domain\Finance\Payments\PaymentMethodOptions;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponPreview;
 use App\Http\Controllers\Controller;
 use App\Support\Presenters\PriceLabelPresenter;
 use Illuminate\Http\JsonResponse;
@@ -35,11 +37,16 @@ class PaymentMethodsController extends Controller
         MemberPayables $payables,
         PriceLabelPresenter $prices,
         PaymentAmountCalculator $amounts,
+        CouponEligibility $coupons,
+        CouponPreview $preview,
     ): JsonResponse {
         $validated = $request->validate([
             'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration'])],
             'payable_id' => ['nullable', 'integer'],
             'plan_id' => ['nullable', 'integer'],
+            // A coupon the member is about to use: the methods are weighed
+            // against the price it leaves.
+            'coupon_code' => ['nullable', 'string', 'max:40'],
         ]);
 
         $member = $request->user();
@@ -54,7 +61,14 @@ class PaymentMethodsController extends Controller
             : null;
 
         try {
-            $result = $options->for($purpose, $member, $payable, $plan);
+            $points = null;
+
+            if (isset($validated['coupon_code']) && ($plan !== null || $payable !== null)) {
+                $coupon = $coupons->resolve($validated['coupon_code']);
+                $points = ($plan !== null ? $preview->plan($member, $coupon, $plan) : $preview->owed($member, $coupon, $payable))->finalPoints;
+            }
+
+            $result = $options->for($purpose, $member, $payable, $plan, $points);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

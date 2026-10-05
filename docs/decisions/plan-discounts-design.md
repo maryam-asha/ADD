@@ -79,9 +79,16 @@ is routed — `routePayment()`, the booking's `amount_owed`, and the eventual
 calculator with no membership/discount awareness — the two concerns compose
 in `BookingCreationService`, not inside the rate calculator.
 
-A `PlanDiscountRedemption` row is only ever written when the booking's
-resulting `payment_state` is `Paid` — an unpaid booking never consumed any of
-the discount's usage allowance.
+A `PlanDiscountRedemption` row is written for every booking the discount
+priced, paid at creation or not (single and batch). Superseded: it used to be
+written only when the booking's resulting `payment_state` was `Paid`, but
+since unified payments (`docs/decisions/unified-payments.md`) a booking left
+unpaid — cash at the desk, a card, pay-now later — still carries the
+discounted `price_points` and is charged it, so not counting it let any
+member bypass `usage_limit` by choosing to pay later (final review I1).
+Check-out keeps the discount too: `SessionClosureService` prices the time
+used at the booking's own redemption discount, so a discounted booking paid
+after check-out costs the discounted price.
 
 ## Extension recomputes, cancellation/rejection void
 
@@ -110,3 +117,25 @@ permanently spends a limited discount's usage.
 no new permission. `PlanController`'s `store()`/`update()` extract a
 `discounts` array the same way they already extract `balances`/`features`,
 and `PlanResource` projects it back the same way.
+
+## Since sale prices and coupons (2026-10-05)
+
+Where this doc says a discount is resolved and applied in
+`BookingCreationService`, or recomputed in `BookingExtensionService`, read
+`App\Domain\Pricing\Services\PriceQuoteService`
+([pricing-offers-and-coupons.md](pricing-offers-and-coupons.md)). The rules
+above are unchanged — specificity, no stacking between plan discounts, the
+floored discount, a redemption written for every booking it priced — with
+two additions:
+
+- **A plan discount is weighed against a live sale.** The member gets the
+  lower of the two, never both; on a tie the sale wins, so no plan-discount
+  use is spent. A `PlanDiscountRedemption` is written only when the plan
+  discount was the one chosen.
+- **A coupon applies on top** of whichever won, unless it is marked not
+  combinable with offers.
+
+`PlanDiscountService::resolveFor()`/`apply()` may now only be called from the
+Pricing domain (`tests/Guards/PricingIsCentralizedTest`). Editing a plan
+reconciles its discounts by id instead of deleting and recreating them, so a
+discount a booking was priced with keeps its redemption rows.

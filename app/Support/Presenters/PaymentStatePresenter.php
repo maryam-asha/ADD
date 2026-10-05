@@ -20,7 +20,9 @@ use Illuminate\Database\Eloquent\Model;
  *
  * `state` is `paid`, `unpaid`, `pending` (a card payment in flight, or a
  * plan held for cash), or null when there is nothing to pay — a free event,
- * a session still running, a session the plan covered in full. `method` is
+ * a session still running, a session the plan covered in full.
+ * `amount_points` is the price once paid, and what is still owed while
+ * unpaid (a paid booking that was extended owes the extension). `method` is
  * how it was paid (or, for a registration or a hold, how the member chose
  * to pay). `payment_id` is the latest payment made for it, for polling.
  */
@@ -82,6 +84,12 @@ class PaymentStatePresenter
         }
 
         $points = (int) ($session->price_points ?? 0);
+
+        // What is still owed: a booking paid and then extended owes only
+        // the extension, never what was already paid.
+        if ($session instanceof Booking) {
+            $points = max(0, $points - $session->pointsPaid());
+        }
 
         return $points > 0 ? ['unpaid', null, $points, null] : [null, null, null, null];
     }

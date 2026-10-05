@@ -35,6 +35,9 @@ class StoreMembershipRequest extends FormRequest
                 ['wallet', 'cash', 'paymera'],
                 array_keys(app(PaymentMethodRegistry::class)->enabled()),
             )))],
+            // A coupon is the member's own: not on a purchase for a company
+            // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md, D5).
+            'coupon_code' => ['nullable', 'string', 'max:40', 'prohibits:company_id'],
         ];
     }
 

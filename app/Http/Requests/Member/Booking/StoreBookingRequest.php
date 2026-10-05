@@ -35,6 +35,8 @@ class StoreBookingRequest extends FormRequest
             'note' => ['nullable', 'string', 'max:500'],
             // Required: the member chooses how to pay before booking.
             'payment_method' => ['required', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
+            // A coupon code the member typed; checked by the booking itself.
+            'coupon_code' => ['nullable', 'string', 'max:40'],
         ];
     }
 }

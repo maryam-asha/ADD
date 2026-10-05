@@ -32,6 +32,7 @@ use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Notifications\GeneralNotification;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Database\DeadlockException;
@@ -679,7 +680,7 @@ class PaymentServiceTest extends TestCase
         $plan = $this->plan(100);
         $payment = $this->cardPayment($member, ['status' => PaymentStatus::Accepted], $plan);
 
-        $this->app->bind(PlanPurchaseFulfiller::class, fn ($app) => new class($app->make(MembershipActivationService::class), $app->make(DedicatedDeskService::class), $app->make(PaymentMethodRegistry::class)) extends PlanPurchaseFulfiller
+        $this->app->bind(PlanPurchaseFulfiller::class, fn ($app) => new class($app->make(MembershipActivationService::class), $app->make(DedicatedDeskService::class), $app->make(PaymentMethodRegistry::class), $app->make(PriceQuoteService::class)) extends PlanPurchaseFulfiller
         {
             public function fulfil(Payment $payment): void
             {

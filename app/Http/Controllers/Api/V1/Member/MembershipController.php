@@ -19,11 +19,16 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\PackageBrowseService;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
+use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -70,6 +75,8 @@ class MembershipController extends Controller
         StoreMembershipRequest $request,
         PaymentService $payments,
         StartPayment $card,
+        CouponEligibility $coupons,
+        PriceQuoteService $quotes,
     ): JsonResponse {
         $plan = Plan::findOrFail($request->validated('plan_id'));
         $member = $request->user();
@@ -86,21 +93,29 @@ class MembershipController extends Controller
             $ownerId = $member->id;
         }
 
-        return match ($request->validated('payment_method') ?? WalletMethod::KEY) {
-            CashMethod::KEY => $this->holdForCash($payments, $member, $plan, $ownerType, $ownerId),
-            PaymeraGateway::KEY => $this->startCard($card, $member, $plan, $ownerType, app()->getLocale()),
-            default => $this->payWithPoints($payments, $member, $plan, $ownerType, $ownerId),
+        // A coupon is checked — and its price known — before any method is
+        // chosen: one that makes the plan free settles it at once, whatever
+        // the member asked to pay with.
+        $code = $request->validated('coupon_code');
+        $coupon = $code !== null ? $coupons->resolve($code) : null;
+        $free = $coupon !== null && $quotes->forPlan($plan, $member, $coupon, now())->finalPoints === 0;
+
+        return match ($free ? WalletMethod::KEY : ($request->validated('payment_method') ?? WalletMethod::KEY)) {
+            CashMethod::KEY => $this->holdForCash($payments, $member, $plan, $ownerType, $ownerId, $coupon),
+            PaymeraGateway::KEY => $this->startCard($card, $member, $plan, $ownerType, app()->getLocale(), $coupon),
+            default => $this->payWithPoints($payments, $member, $plan, $ownerType, $ownerId, $coupon),
         };
     }
 
-    private function payWithPoints(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId): JsonResponse
+    private function payWithPoints(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId, ?Coupon $coupon = null): JsonResponse
     {
         try {
-            ['payment' => $payment] = $payments->start(PaymentPurpose::PlanPurchase, $member, WalletMethod::KEY, [
+            ['payment' => $payment] = $payments->start(PaymentPurpose::PlanPurchase, $member, WalletMethod::KEY, array_filter([
                 'plan' => $plan,
                 'wallet_owner_type' => $ownerType,
                 'wallet_owner_id' => $ownerId,
-            ]);
+                'coupon' => $coupon,
+            ]));
         } catch (InsufficientPointsException) {
             // The message this endpoint has always given, without the
             // numbers the newer payment endpoints add.
@@ -119,30 +134,43 @@ class MembershipController extends Controller
 
         // 201 as before, when the resource was built from the model activation
         // had just created.
-        return (new MembershipResource($membership->load(['plan', 'seatDesks'])))->response()->setStatusCode(201);
+        return (new MembershipResource($membership->load(['plan', 'seatDesks'])))
+            ->additional($this->couponOutcome($coupon, $payment))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
      * Asking again for the same plan and owner while a hold is open returns
      * that hold rather than a second one.
+     *
+     * The hold is opened on the owner's wallet — the company's, for a
+     * company purchase — handed to the payment as already authorized: this
+     * endpoint checked CompanyPolicy::manageMembers above, which the cash
+     * method itself cannot.
      */
-    private function holdForCash(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId): JsonResponse
+    private function holdForCash(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId, ?Coupon $coupon = null): JsonResponse
     {
         $wallet = Wallet::query()->where('owner_type', $ownerType)->where('owner_id', $ownerId)->first();
 
-        $existing = $wallet === null ? null : $this->openCashHolds()
+        if ($wallet === null && $ownerType === OwnerType::Company) {
+            return response()->json(['message' => __('api.payment.no_wallet')], 422);
+        }
+
+        // A coupon opens a hold of its own, at its price.
+        $existing = $wallet === null || $coupon !== null ? null : $this->openCashHolds()
             ->where('plan_id', $plan->id)
             ->where('wallet_id', $wallet->id)
             ->latest('id')
             ->first();
 
-        $payment = $existing ?? $payments->start(PaymentPurpose::PlanPurchase, $member, CashMethod::KEY, [
+        $payment = $existing ?? $payments->start(PaymentPurpose::PlanPurchase, $member, CashMethod::KEY, array_filter([
             'plan' => $plan,
-            'wallet_owner_type' => $ownerType,
-            'wallet_owner_id' => $ownerId,
-        ])['payment'];
+            'authorized_wallet' => $wallet,
+            'coupon' => $coupon,
+        ]))['payment'];
 
-        return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]], 201);
+        return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]] + $this->couponOutcome($coupon, $payment), 201);
     }
 
     /**
@@ -151,7 +179,7 @@ class MembershipController extends Controller
      * its points land in the member's wallet, and the plan goes to that
      * wallet's owner.
      */
-    private function startCard(StartPayment $card, User $member, Plan $plan, OwnerType $ownerType, ?string $lang): JsonResponse
+    private function startCard(StartPayment $card, User $member, Plan $plan, OwnerType $ownerType, ?string $lang, ?Coupon $coupon = null): JsonResponse
     {
         if ($ownerType !== OwnerType::User) {
             return response()->json(['message' => __('api.payment.method_not_supported')], 422);
@@ -163,6 +191,7 @@ class MembershipController extends Controller
                 purpose: PaymentPurpose::PlanPurchase,
                 plan: $plan,
                 lang: $lang,
+                coupon: $coupon,
             );
         } catch (Throwable $e) {
             return $this->gatewayFailureResponse($e, $member->id) ?? throw $e;
@@ -174,7 +203,21 @@ class MembershipController extends Controller
                 'redirect_url' => $url,
                 'next' => 'redirect',
             ],
-        ], 201);
+        ] + $this->couponOutcome($coupon, $payment), 201);
+    }
+
+    /**
+     * What became of the code sent with the purchase, beside `data` as on
+     * POST bookings: used on the payment, or not because the plan's sale was
+     * already lower (D2).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function couponOutcome(?Coupon $coupon, Payment $payment): array
+    {
+        return $coupon === null ? [] : [
+            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment)),
+        ];
     }
 
     /**
