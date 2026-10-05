@@ -327,6 +327,8 @@ return [
             'rejected' => 'مرفوض',
             'confirmed' => 'مؤكد',
             'cancelled' => 'ملغى',
+            'completed' => 'مكتمل',
+            'no_show' => 'لم يحضر',
         ],
         'payment_methods' => [
             'wallet' => 'استخدام رصيد المحفظة',

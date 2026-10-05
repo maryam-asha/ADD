@@ -273,6 +273,9 @@ class MemberBookingStatusesTest extends TestCase
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}")
             ->assertOk()
             ->assertJsonPath('data.status', 'completed')
-            ->assertJsonPath('data.request_status.current', 'confirmed');
+            ->assertJsonPath('data.request_status.current', 'outcome')
+            ->assertJsonPath('data.request_status.steps.1.key', 'confirmed')
+            ->assertJsonPath('data.request_status.steps.1.state', 'complete')
+            ->assertJsonPath('data.request_status.steps.2.key', 'completed');
     }
 }

@@ -216,7 +216,9 @@ class BookingPresentationService
      * Derived from `status` and `approved_at`, never stored. A booking on
      * a space that auto-confirms never had a review, so its stepper
      * collapses to a single completed step rather than showing a review
-     * stage that never happened.
+     * stage that never happened. Once the booking has played out — completed
+     * or a no-show — that outcome follows as one more step, with `current`
+     * set to `outcome`.
      *
      * @return array<string, mixed>
      */
@@ -233,10 +235,12 @@ class BookingPresentationService
         // completed booking or a no-show went through the same door.
         $wasConfirmed = in_array($booking->status, [BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow], true);
 
+        $outcome = $this->outcomeStep($booking, $locale);
+
         if ($wasConfirmed && $booking->approved_at === null) {
             return [
-                'current' => 'confirmed',
-                'steps' => [
+                'current' => $outcome === null ? 'confirmed' : 'outcome',
+                'steps' => array_values(array_filter([
                     $submitted,
                     [
                         'key' => 'confirmed',
@@ -244,7 +248,8 @@ class BookingPresentationService
                         'state' => 'complete',
                         'at' => $this->time->toLocal($booking->created_at)?->toIso8601String(),
                     ],
-                ],
+                    $outcome,
+                ])),
                 'rejection_reason' => null,
             ];
         }
@@ -259,8 +264,8 @@ class BookingPresentationService
         };
 
         return [
-            'current' => $current,
-            'steps' => [
+            'current' => $outcome === null ? $current : 'outcome',
+            'steps' => array_values(array_filter([
                 $submitted,
                 [
                     'key' => 'under_review',
@@ -274,12 +279,43 @@ class BookingPresentationService
                     'state' => $decisionState,
                     'at' => $decisionState === 'complete' ? $decidedAt : null,
                 ],
-            ],
+                $outcome,
+            ])),
             // A lapsed request stores no reason; it is explained in the
             // viewer's language rather than the server's at the time.
             'rejection_reason' => $booking->lapsedUnreviewed()
                 ? __('api.booking.lapsed_unreviewed', [], $locale)
                 : $booking->rejection_reason,
+        ];
+    }
+
+    /**
+     * The step after approval/confirmation once the booking has played out:
+     * completed at check-out (or its scheduled end when reception closed it
+     * without one), or a no-show at the end it was never used through. Null
+     * while it is still ahead, or when it never got that far.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function outcomeStep(Booking $booking, string $locale): ?array
+    {
+        $key = match ($booking->status) {
+            BookingStatus::Completed => 'completed',
+            BookingStatus::NoShow => 'no_show',
+            default => null,
+        };
+
+        if ($key === null) {
+            return null;
+        }
+
+        $at = $key === 'completed' ? ($booking->checked_out_at ?? $booking->end_at) : $booking->end_at;
+
+        return [
+            'key' => $key,
+            'label' => __("api.booking.steps.{$key}", [], $locale),
+            'state' => 'complete',
+            'at' => $this->time->toLocal($at)?->toIso8601String(),
         ];
     }
 

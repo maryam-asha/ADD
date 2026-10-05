@@ -220,6 +220,50 @@ class MemberBookingLifecycleTest extends TestCase
     }
 
     /**
+     * Once an approved booking has played out, its outcome follows the
+     * approval as a fourth step.
+     */
+    public function test_a_completed_booking_adds_its_outcome_after_the_approval(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace();
+        $booking = $this->bookingFor($member, $space, 14, [
+            'status' => BookingStatus::Completed,
+            'approved_at' => now(),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
+
+        $response->assertOk()
+            ->assertJsonCount(4, 'data.request_status.steps')
+            ->assertJsonPath('data.request_status.current', 'outcome')
+            ->assertJsonPath('data.request_status.steps.2.key', 'approved')
+            ->assertJsonPath('data.request_status.steps.3.key', 'completed')
+            ->assertJsonPath('data.request_status.steps.3.label', 'Completed')
+            ->assertJsonPath('data.request_status.steps.3.state', 'complete');
+    }
+
+    /** An auto-confirmed no-show: its outcome follows the confirmation. */
+    public function test_an_auto_confirmed_no_show_adds_its_outcome_after_the_confirmation(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace();
+        $booking = $this->bookingFor($member, $space, 14, [
+            'status' => BookingStatus::NoShow,
+            'approved_at' => null,
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
+
+        $response->assertOk()
+            ->assertJsonCount(3, 'data.request_status.steps')
+            ->assertJsonPath('data.request_status.current', 'outcome')
+            ->assertJsonPath('data.request_status.steps.1.key', 'confirmed')
+            ->assertJsonPath('data.request_status.steps.2.key', 'no_show')
+            ->assertJsonPath('data.request_status.steps.2.label', 'No-show');
+    }
+
+    /**
      * The total and the window, as the screens draw them; the itemised
      * breakdown and the note left the detail on 2026-10-04
      * (docs/decisions/booking-outcomes-and-extension.md). A booking without

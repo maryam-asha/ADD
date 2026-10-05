@@ -329,6 +329,8 @@ return [
             'rejected' => 'Rejected',
             'confirmed' => 'Confirmed',
             'cancelled' => 'Cancelled',
+            'completed' => 'Completed',
+            'no_show' => 'No-show',
         ],
         'payment_methods' => [
             'wallet' => 'Use Wallet Balance',
