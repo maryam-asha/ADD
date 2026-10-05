@@ -18,6 +18,7 @@ use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
+use App\Http\Controllers\Api\V1\Admin\CouponController;
 use App\Http\Controllers\Api\V1\Admin\CoworkingPoolController;
 use App\Http\Controllers\Api\V1\Admin\CoworkingWindowController;
 use App\Http\Controllers\Api\V1\Admin\CurrencyController;
@@ -151,6 +152,13 @@ Route::apiResource('partners', PartnerController::class);
 Route::apiResource('plans', PlanController::class);
 Route::apiResource('plan-modules', PlanModuleController::class)
     ->parameters(['plan-modules' => 'planModule']);
+
+// Discount coupons (docs/decisions/pricing-offers-and-coupons.md): anyone on
+// the dashboard can look one up, and who used it; creating, changing and
+// deleting one sits in the role:admin group below — a code is money off.
+Route::get('coupons', [CouponController::class, 'index']);
+Route::get('coupons/{coupon}', [CouponController::class, 'show']);
+Route::get('coupons/{coupon}/redemptions', [CouponController::class, 'redemptions']);
 
 // Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
 // segment is `resource-types`, not `resources` — that name is already taken
@@ -389,6 +397,10 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('business-hour-exceptions/{businessHourException}', [BusinessHourExceptionController::class, 'destroy']);
 
     Route::patch('settings/{key}', [SettingController::class, 'update']);
+
+    Route::post('coupons', [CouponController::class, 'store']);
+    Route::match(['put', 'patch'], 'coupons/{coupon}', [CouponController::class, 'update']);
+    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy']);
 
     // Notification broadcast — admin-only, sends push + in-app notifications
     // to targeted users (all, by role, or specific user IDs).

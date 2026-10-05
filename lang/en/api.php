@@ -120,6 +120,8 @@ return [
         'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
         'sale_not_below_price' => 'The sale price must be lower than the normal price.',
+        'coupon_updated' => 'Coupon updated.',
+        'coupon_target_invalid' => 'A coupon target names at most one item, and one its purpose can be bought with: a plan for a plan purchase, a space or space type for time in a space, an event for a registration.',
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
@@ -609,6 +611,10 @@ return [
         'identity_name' => 'Full name',
         'identity_phone' => 'Phone number',
         'identity_email' => 'Email',
+    ],
+
+    'coupon' => [
+        'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
     ],
 
 ];

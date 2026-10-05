@@ -35,27 +35,36 @@ class CouponTarget extends Model
         ];
     }
 
+    /** The columns that name an item; a target sets at most one. */
+    public const ITEM_COLUMNS = ['plan_id', 'space_id', 'space_type', 'event_id'];
+
+    /**
+     * The item columns a target for this purpose may name.
+     *
+     * @return list<string>
+     */
+    public static function itemsFor(PricingPurpose $purpose): array
+    {
+        return match ($purpose) {
+            PricingPurpose::PlanPurchase => ['plan_id'],
+            PricingPurpose::Booking, PricingPurpose::CoworkingSession => ['space_id', 'space_type'],
+            PricingPurpose::EventRegistration => ['event_id'],
+        };
+    }
+
     protected static function booted(): void
     {
         static::saving(function (self $target) {
-            $items = array_keys(array_filter([
-                'plan_id' => $target->plan_id,
-                'space_id' => $target->space_id,
-                'space_type' => $target->space_type,
-                'event_id' => $target->event_id,
-            ], fn ($value) => $value !== null));
+            $items = array_values(array_filter(
+                self::ITEM_COLUMNS,
+                fn (string $column) => $target->getAttribute($column) !== null,
+            ));
 
             if (count($items) > 1) {
                 throw new InvalidArgumentException('A coupon target names at most one item.');
             }
 
-            $allowed = match ($target->purpose) {
-                PricingPurpose::PlanPurchase => ['plan_id'],
-                PricingPurpose::Booking, PricingPurpose::CoworkingSession => ['space_id', 'space_type'],
-                PricingPurpose::EventRegistration => ['event_id'],
-            };
-
-            if ($items !== [] && ! in_array($items[0], $allowed, true)) {
+            if ($items !== [] && ! in_array($items[0], self::itemsFor($target->purpose), true)) {
                 throw new InvalidArgumentException("A {$target->purpose->value} target cannot name {$items[0]}.");
             }
         });
