@@ -275,7 +275,7 @@ class SpaceBrowseService
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
             'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
             // A sale live now: the rate struck through, the sale rate, when it ends.
-            'sale' => $this->prices->sale($space->saleWindow(), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space.sale_ends'),
+            'sale' => $this->prices->sale($space->saleWindow(), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -475,7 +475,7 @@ class SpaceBrowseService
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
                 'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
-                'sale' => $this->prices->sale($space->saleWindow(), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space.sale_ends'),
+                'sale' => $this->prices->sale($space->saleWindow(), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

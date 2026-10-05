@@ -465,6 +465,8 @@ return [
         'price_points' => ':points نقطة',
         'per_hour' => 'ساعة',
         'sale_ends' => 'ينتهي العرض في :date',
+        'sale_discount_percent' => 'خصم :percent%',
+        'sale_discount_amount' => 'وفّر :amount',
         'per_day' => 'يوم',
         'up_to_people' => 'حتى :count أشخاص',
         'single_seat' => 'مقعد واحد',
@@ -504,6 +506,8 @@ return [
 
     'package' => [
         'sale_ends' => 'ينتهي العرض في :date',
+        'sale_discount_percent' => 'خصم :percent%',
+        'sale_discount_amount' => 'وفّر :amount',
         'title' => 'الباقات والاشتراكات',
         'subtitle' => 'اختر الباقة المناسبة لأعمالك.',
         'tabs' => [

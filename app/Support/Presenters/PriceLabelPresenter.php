@@ -91,15 +91,16 @@ class PriceLabelPresenter
 
     /**
      * A sale live right now, as the member sees it: the original price
-     * (struck through by the app), the sale price, and when the sale ends.
-     * Null when nothing is on sale — before it starts, after it ends, or a
-     * "sale" no lower than the price. `$hourly` labels a space's rate;
-     * otherwise a total, such as a package's. `$endsKey` names the
-     * "ends …" sentence (`api.space.sale_ends`, `api.package.sale_ends`).
+     * (struck through by the app), the sale price, how much it takes off,
+     * and when the sale ends. Null when nothing is on sale — before it
+     * starts, after it ends, or a "sale" no lower than the price. `$hourly`
+     * labels a space's rate (the discount is then per hour too); otherwise
+     * a total, such as a package's. `$group` holds the sentences
+     * (`api.space`, `api.package`: `sale_ends`, `sale_discount_*`).
      *
-     * @return array{points: int, original_label: string, sale_label: string, ends_at: string, ends_label: string}|null
+     * @return array{points: int, original_points: int, original_label: string, sale_label: string, discount_points: int, discount_amount_label: string, discount_percent: int, discount_label: string, ends_at: string, ends_label: string}|null
      */
-    public function sale(?SaleWindow $sale, int $originalPoints, ?User $user, bool $hourly, string $endsKey, ?string $locale = null): ?array
+    public function sale(?SaleWindow $sale, int $originalPoints, ?User $user, bool $hourly, string $group, ?string $locale = null): ?array
     {
         if ($sale === null || ! $sale->isLiveAt(now()) || $sale->points >= $originalPoints) {
             return null;
@@ -111,12 +112,25 @@ class PriceLabelPresenter
             : $this->total($points, $user, $locale)['price'];
         $endsAt = app(LocalTime::class)->toLocal($sale->endsAt);
 
+        $discount = $originalPoints - $sale->points;
+        // Rounded down: the discount announced is never more than the real one.
+        $percent = intdiv($discount * 100, $originalPoints);
+        $discountLabel = $label($discount);
+
         return [
             'points' => $sale->points,
+            'original_points' => $originalPoints,
             'original_label' => $label($originalPoints),
             'sale_label' => $label($sale->points),
+            'discount_points' => $discount,
+            'discount_amount_label' => $discountLabel,
+            'discount_percent' => $percent,
+            // Under one percent, "0% off" would say nothing: the amount instead.
+            'discount_label' => $percent >= 1
+                ? __("{$group}.sale_discount_percent", ['percent' => $percent], $locale)
+                : __("{$group}.sale_discount_amount", ['amount' => $discountLabel], $locale),
             'ends_at' => $endsAt->toIso8601String(),
-            'ends_label' => __($endsKey, ['date' => $endsAt->format('Y-m-d H:i')], $locale),
+            'ends_label' => __("{$group}.sale_ends", ['date' => $endsAt->format('Y-m-d H:i')], $locale),
         ];
     }
 

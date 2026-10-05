@@ -88,8 +88,9 @@ throttled 20/min) prices without writing. A code that cannot be used answers
 purchases and payments return `coupon: {code, applied, points_discounted,
 message}` beside `data`; a registration's price after the code is its own
 `price_points`. A live sale shows as a
-`sale` block (original label, sale label, when it ends) on the space and
-package listings and details — labels only.
+`sale` block (original and sale price, how much it takes off — points,
+amount and a percentage rounded down, with a ready badge — and when it
+ends) on the space and package listings and details.
 
 **Admin** — the sale fields on the existing space and plan forms: all three
 or none, local times, below the price sent or stored. `admin/coupons` CRUD

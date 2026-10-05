@@ -475,6 +475,8 @@ return [
         'price_points' => ':points pts',
         'per_hour' => 'hour',
         'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
@@ -514,6 +516,8 @@ return [
 
     'package' => [
         'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
         'title' => 'Packages & Subscription',
         'subtitle' => 'Choose the right plan for your business.',
         'tabs' => [

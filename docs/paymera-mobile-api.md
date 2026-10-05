@@ -428,16 +428,24 @@ POST /api/v1/member/bookings/preview
 
 ```json
 "sale": {
-  "points": 80,
+  "original_points": 100,
   "original_label": "10 $ / ساعة",
+  "points": 80,
   "sale_label": "8 $ / ساعة",
+  "discount_points": 20,
+  "discount_amount_label": "2 $ / ساعة",
+  "discount_percent": 20,
+  "discount_label": "خصم 20%",
   "ends_at": "2026-10-12T09:00:00+03:00",
   "ends_label": "ينتهي العرض في 2026-10-12 09:00"
 }
 ```
 
-اعرض `original_label` مشطوباً وبجانبه `sale_label`، و`ends_label` تحتهما.
-النصوص جاهزة بلغة الهيدر `lang` وعملة الهيدر `currency`.
+اعرض `original_label` مشطوباً، وبجانبه `sale_label`، و`discount_label` شارة
+الحسم، و`ends_label` تحتها. النصوص جاهزة بلغة الهيدر `lang` وعملة الهيدر
+`currency`. النسبة تُقرَّب للأسفل فلا تُعلن خصماً أكبر من الحقيقي، والحسم الأقل
+من 1% تعرضه `discount_label` بالمبلغ ("وفّر …") بدل "خصم 0%". في المساحات
+الحسم للساعة، مثل السعر.
 
 ### ج. زر "تطبيق" للكوبون
 
