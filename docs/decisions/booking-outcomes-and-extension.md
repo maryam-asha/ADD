@@ -221,3 +221,20 @@ main_image, branch, capacity, hourly_price}`, `seat`, `date_label`,
   later succeeds, lands as points in the wallet with the payment in
   `NeedsReview` — the existing "payable already settled" path — rather than
   paying for a booking that no longer owes anything.
+
+## Since sale prices and coupons (2026-10-05)
+
+See [pricing-offers-and-coupons.md](pricing-offers-and-coupons.md).
+
+- **An extension keeps the booking's locked pricing choice:** its plan
+  discount if that was applied, otherwise the space's sale by usage time —
+  the extra minutes inside a sale window at the sale rate, the rest at the
+  normal rate. Best-of is not re-run and no coupon applies to an extension.
+  `BookingExtensionPlanner::price()` delegates to
+  `PriceQuoteService::forExtension()`, so the options and the POST still
+  quote the same number. The extension adds to both `price_points` and
+  `list_price_points`.
+- **The space form also takes a sale:** `sale_hourly_rate_points`,
+  `sale_starts_at`, `sale_ends_at` on `StoreSpaceRequest`/`UpdateSpaceRequest`
+  (all three or none, below `hourly_rate_points`), returned by
+  `SpaceResource`.

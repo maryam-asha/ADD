@@ -117,3 +117,25 @@ permanently spends a limited discount's usage.
 no new permission. `PlanController`'s `store()`/`update()` extract a
 `discounts` array the same way they already extract `balances`/`features`,
 and `PlanResource` projects it back the same way.
+
+## Since sale prices and coupons (2026-10-05)
+
+Where this doc says a discount is resolved and applied in
+`BookingCreationService`, or recomputed in `BookingExtensionService`, read
+`App\Domain\Pricing\Services\PriceQuoteService`
+([pricing-offers-and-coupons.md](pricing-offers-and-coupons.md)). The rules
+above are unchanged — specificity, no stacking between plan discounts, the
+floored discount, a redemption written for every booking it priced — with
+two additions:
+
+- **A plan discount is weighed against a live sale.** The member gets the
+  lower of the two, never both; on a tie the sale wins, so no plan-discount
+  use is spent. A `PlanDiscountRedemption` is written only when the plan
+  discount was the one chosen.
+- **A coupon applies on top** of whichever won, unless it is marked not
+  combinable with offers.
+
+`PlanDiscountService::resolveFor()`/`apply()` may now only be called from the
+Pricing domain (`tests/Guards/PricingIsCentralizedTest`). Editing a plan
+reconciles its discounts by id instead of deleting and recreating them, so a
+discount a booking was priced with keeps its redemption rows.

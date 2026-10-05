@@ -309,3 +309,26 @@ already open on it still sync and reverse.
   Paymera for: `callbackURL`/`triggerURL` from `route('paymera.callback'|
   'paymera.trigger', token)`, and `savedCards`/`appUser` only when
   `paymera.saved_cards_enabled` is on.
+
+## Since sale prices and coupons (2026-10-05)
+
+See [pricing-offers-and-coupons.md](pricing-offers-and-coupons.md).
+
+- **`POST member/payments` takes `coupon_code`** for a plan purchase, or on
+  an existing unpaid booking, session or registration (`payable_id`); never
+  for `wallet_top_up`. `GET payment-methods` takes it too, so `amount_points`
+  is the price after the code.
+- **A plan's amount comes from `PriceQuoteService::forPlanPayment()`** — the
+  plan as it is now, its sale as of `payment.created_at`, the coupon from the
+  copy of its terms locked on the payment. `PlanPurchaseFulfiller`,
+  `StartPayment` and `OutstandingItems` all read it;
+  `PaymentAmountCalculator::forPlan()` is gone.
+- **`PaymentService::start` locks the coupon first**, then checks the payable,
+  saves the payment, records the use and sets `amount_points` before the
+  driver starts. A plan a coupon makes free settles at once — no gateway, no
+  cash hold.
+- **`payments.list_price_points`** records the price before any offer or
+  coupon, for display; refunds still read `amount_points`.
+- A coupon's use on a payment counts while the payment is pending, accepted
+  or in review (`PaymentStatus::holdsRedemption()`): a failed card, an expired
+  cash hold or a reversal gives it back.

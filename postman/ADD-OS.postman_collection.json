@@ -248,6 +248,14 @@
         {
             "key": "wallet_transaction_id",
             "value": "1"
+        },
+        {
+            "key": "coupon_id",
+            "value": ""
+        },
+        {
+            "key": "coupon_code",
+            "value": ""
         }
     ],
     "event": [
@@ -1521,7 +1529,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner — the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here — they set up the booking calendar, so they come with Get Space Details → data.booking.upcoming_closures. hours/periods are TODAY's only — show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination: a top-level `meta`, beside `data` — the response is {data: {working_hours_banner, spaces}, meta}\n\nPrice (changed 2026-10-02): `price` is the hourly rate in the member's currency with its symbol (`currency` header, else their preference, else the base currency), e.g. \"3.00 $ / hour\"; `price_point` is the same rate in points, e.g. \"30 pts / hour\". Both are display-ready; the old `pricing` object (starting_from, hourly_rate, currency, currency_symbol, formatted) is gone."
+                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner — the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here — they set up the booking calendar, so they come with Get Space Details → data.booking.upcoming_closures. hours/periods are TODAY's only — show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination: a top-level `meta`, beside `data` — the response is {data: {working_hours_banner, spaces}, meta}\n\nPrice (changed 2026-10-02): `price` is the hourly rate in the member's currency with its symbol (`currency` header, else their preference, else the base currency), e.g. \"3.00 $ / hour\"; `price_point` is the same rate in points, e.g. \"30 pts / hour\". Both are display-ready; the old `pricing` object (starting_from, hourly_rate, currency, currency_symbol, formatted) is gone.\n\n### Sale\n`sale` — null, or while a sale on the hourly rate runs `{points, original_label, sale_label, ends_at, ends_label}`: show the original rate struck through. Price a booking with `bookings/preview`, never rate × duration."
                                     },
                                     "response": []
                                 },
@@ -1563,7 +1571,7 @@
                                                 "{{space_id}}"
                                             ]
                                         },
-                                        "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)\n- `booking`: this space's own setup for the booking screen, sent once here — `upcoming_closures` (every date from today on that the branch is closed all day, as ISO-8601 date-times at local midnight with NO offset, e.g. \"2026-09-30T00:00:00\", to pass straight to DateTime.parse: without an offset it parses as local time, so the 30th stays the 30th on any device — with +03:00 a device in another timezone would move it to the 29th), and `rules` (granularity; min_duration_minutes = the shortest booking LENGTH, with no maximum; min_notice_minutes = the minimum NOTICE before a booking's start, 0 = none — slots inside it are not sent; max_days_ahead = how many days ahead a booking may be made, null = no limit — grey out later dates. The member picks a run of consecutive slots at least min_duration_minutes long; there is no list of lengths). No legend — the app draws its own. The slots endpoint then carries only what changes per date; call it again on each date change. The indicative price of a run of slots is details.price.hourly_rate_points × hours. The branch's week (today's hours and `schedule`) is NOT here — they are the same for every space and come once with the spaces list, in `working_hours_banner`.\n\nPrice (changed 2026-10-02): `price` is the hourly rate in the member's currency with its symbol (`currency` header, else their preference, else the base currency), e.g. \"3.00 $ / hour\"; `price_point` is the same rate in points, e.g. \"30 pts / hour\". Both are display-ready; the old `pricing` object (starting_from, hourly_rate, currency, currency_symbol, formatted) is gone."
+                                        "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)\n- `booking`: this space's own setup for the booking screen, sent once here — `upcoming_closures` (every date from today on that the branch is closed all day, as ISO-8601 date-times at local midnight with NO offset, e.g. \"2026-09-30T00:00:00\", to pass straight to DateTime.parse: without an offset it parses as local time, so the 30th stays the 30th on any device — with +03:00 a device in another timezone would move it to the 29th), and `rules` (granularity; min_duration_minutes = the shortest booking LENGTH, with no maximum; min_notice_minutes = the minimum NOTICE before a booking's start, 0 = none — slots inside it are not sent; max_days_ahead = how many days ahead a booking may be made, null = no limit — grey out later dates. The member picks a run of consecutive slots at least min_duration_minutes long; there is no list of lengths). No legend — the app draws its own. The slots endpoint then carries only what changes per date; call it again on each date change. The indicative price of a run of slots is details.price.hourly_rate_points × hours. The branch's week (today's hours and `schedule`) is NOT here — they are the same for every space and come once with the spaces list, in `working_hours_banner`.\n\nPrice (changed 2026-10-02): `price` is the hourly rate in the member's currency with its symbol (`currency` header, else their preference, else the base currency), e.g. \"3.00 $ / hour\"; `price_point` is the same rate in points, e.g. \"30 pts / hour\". Both are display-ready; the old `pricing` object (starting_from, hourly_rate, currency, currency_symbol, formatted) is gone.\n\n### Sale\n`sale` — null, or while a sale on the hourly rate runs `{points, original_label, sale_label, ends_at, ends_label}`: show the original rate struck through. Price a booking with `bookings/preview`, never rate × duration."
                                     },
                                     "response": [
                                         {
@@ -1714,7 +1722,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2026-09-24 10:00\",\n  \"end_at\": \"2026-09-24 12:00\"\n}",
+                                            "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2026-09-24 10:00\",\n  \"end_at\": \"2026-09-24 12:00\",\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -1734,7 +1742,7 @@
                                                 "preview"
                                             ]
                                         },
-                                        "description": "Builds the confirmation screen WITHOUT creating anything: price breakdown (N hours × rate, subtotal, VAT from booking.vat_percent, total), the payment methods, and the note field. Every spendable wallet is listed — one that cannot cover the cost comes back with sufficient:false rather than being omitted — plus a synthetic `cash` option, which is what PaymentState::Unpaid plus reception settlement already means. `unavailable_reason` is the exact message POST bookings would return for the same window."
+                                        "description": "Builds the confirmation screen WITHOUT creating anything: price breakdown (N hours × rate, subtotal, VAT from booking.vat_percent, total), the payment methods, and the note field. Every spendable wallet is listed — one that cannot cover the cost comes back with sufficient:false rather than being omitted — plus a synthetic `cash` option, which is what PaymentState::Unpaid plus reception settlement already means. `unavailable_reason` is the exact message POST bookings would return for the same window.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. The breakdown gains `sale` and `coupon` lines. **The app should show this total rather than computing rate × duration itself** — a sale can cover part of a booking."
                                     }
                                 },
                                 {
@@ -1776,7 +1784,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"payment_method\": \"wallet\",\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:00:00+03:00\",\n  \"end_at\": \"2026-08-24T11:00:00+03:00\"\n}",
+                                            "raw": "{\n  \"payment_method\": \"wallet\",\n  \"space_id\": {{space_id}},\n  \"start_at\": \"2026-08-24T10:00:00+03:00\",\n  \"end_at\": \"2026-08-24T11:00:00+03:00\",\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -1795,7 +1803,7 @@
                                                 "bookings"
                                             ]
                                         },
-                                        "description": "docs/decisions/booking-creation-approval-extension.md. Creates a confirmed+unpaid booking when the space has no wallet balance and requires_approval = false. 201 returns the created booking and auto-captures booking_id.\n\n### Cases — see this request's saved examples\n- **Error: Invalid Start Time** — 422 `{\"message\": \"The start time does not match this space's slot granularity.\"}`\n- **Error: Slot Unavailable** — 422 `{\"message\": \"This space is not available for the requested time.\"}` when a confirmed or pending booking already covers this window.\n- **Error: Multiple Wallets, Choice Required** — 422 `{\"message\": \"More than one wallet can cover this booking. Please choose one.\", \"wallet_options\": [...]}` when both a personal and a company balance apply -- resubmit with wallet_owner_type/wallet_owner_id from the list (see Wallet > Get Wallet Options).\n- **Error: Start in the Past** — 422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting.\n- **Error: Outside the Booking Window** — The booking window, two rules (a booking's length has no maximum):\n• booking.max_days_ahead → 422 api.booking.too_far_ahead (start date beyond today + N local days). 0 = no limit, the default.\n• booking.min_notice_minutes → 422 api.booking.too_soon (start closer to now than N minutes). Seeded at 60; 0 turns it off.\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range.\n\nAlso 422 api.booking.space_not_bookable when the space is under maintenance or retired (e.g. taken out of service after the booking screen opened) — on create, on bookings/batch (per-window reason space_not_bookable) and on bookings/preview (as unavailable_reason). The read endpoints 404 such a space.\n\n### Paying (unified payments)\n`payment_method` (required): wallet (pay now, or 422 with current/required/shortage and no booking), cash (unpaid, settled at reception), paymera (unpaid, then its card payment opens: `payment` and `redirect_url` beside `data`).\n\nIf the card cannot be started, the booking still stands, unpaid, with `payment: null` and `payment_error` — the member can pay again or at the desk. `bookings/batch` takes wallet or cash only.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked."
+                                        "description": "docs/decisions/booking-creation-approval-extension.md. Creates a confirmed+unpaid booking when the space has no wallet balance and requires_approval = false. 201 returns the created booking and auto-captures booking_id.\n\n### Cases — see this request's saved examples\n- **Error: Invalid Start Time** — 422 `{\"message\": \"The start time does not match this space's slot granularity.\"}`\n- **Error: Slot Unavailable** — 422 `{\"message\": \"This space is not available for the requested time.\"}` when a confirmed or pending booking already covers this window.\n- **Error: Multiple Wallets, Choice Required** — 422 `{\"message\": \"More than one wallet can cover this booking. Please choose one.\", \"wallet_options\": [...]}` when both a personal and a company balance apply -- resubmit with wallet_owner_type/wallet_owner_id from the list (see Wallet > Get Wallet Options).\n- **Error: Start in the Past** — 422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting.\n- **Error: Outside the Booking Window** — The booking window, two rules (a booking's length has no maximum):\n• booking.max_days_ahead → 422 api.booking.too_far_ahead (start date beyond today + N local days). 0 = no limit, the default.\n• booking.min_notice_minutes → 422 api.booking.too_soon (start closer to now than N minutes). Seeded at 60; 0 turns it off.\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range.\n\nAlso 422 api.booking.space_not_bookable when the space is under maintenance or retired (e.g. taken out of service after the booking screen opened) — on create, on bookings/batch (per-window reason space_not_bookable) and on bookings/preview (as unavailable_reason). The read endpoints 404 such a space.\n\n### Paying (unified payments)\n`payment_method` (required): wallet (pay now, or 422 with current/required/shortage and no booking), cash (unpaid, settled at reception), paymera (unpaid, then its card payment opens: `payment` and `redirect_url` beside `data`).\n\nIf the card cannot be started, the booking still stands, unpaid, with `payment: null` and `payment_error` — the member can pay again or at the desk. `bookings/batch` takes wallet or cash only.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. The coupon is used once the booking holds its slot; cancelling gives it back."
                                     },
                                     "response": [
                                         {
@@ -2290,7 +2298,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"payment_method\": \"wallet\",\n  \"windows\": [\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-24 10:00\",\n      \"end_at\": \"2026-09-24 11:00\"\n    },\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-25 10:00\",\n      \"end_at\": \"2026-09-25 11:00\"\n    }\n  ],\n  \"note\": \"Weekly standup\"\n}",
+                                            "raw": "{\n  \"payment_method\": \"wallet\",\n  \"windows\": [\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-24 10:00\",\n      \"end_at\": \"2026-09-24 11:00\"\n    },\n    {\n      \"space_id\": \"{{space_id}}\",\n      \"start_at\": \"2026-09-25 10:00\",\n      \"end_at\": \"2026-09-25 11:00\"\n    }\n  ],\n  \"note\": \"Weekly standup\",\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -2310,7 +2318,7 @@
                                                 "batch"
                                             ]
                                         },
-                                        "description": "**Multi-date** (the request as saved). The multi-select date strip: up to 10 windows, ALL OR NOTHING. Partial success would leave the member part-charged for a booking they never got, so any failure rolls the whole batch back and nothing is debited. Windows already accepted earlier in the same batch are checked against each other too. The wallet is debited ONCE for the summed total.\n\n### Cases — see this request's saved examples\n- **Batch Error: One Date Taken** — 422 with a per-window `errors` array naming each bad window by its index in the submitted list, so the app can mark the offending chip. These two windows overlap EACH OTHER — neither is in the database yet, so a check against stored rows alone would pass both. Nothing is created.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked."
+                                        "description": "**Multi-date** (the request as saved). The multi-select date strip: up to 10 windows, ALL OR NOTHING. Partial success would leave the member part-charged for a booking they never got, so any failure rolls the whole batch back and nothing is debited. Windows already accepted earlier in the same batch are checked against each other too. The wallet is debited ONCE for the summed total.\n\n### Cases — see this request's saved examples\n- **Batch Error: One Date Taken** — 422 with a per-window `errors` array naming each bad window by its index in the submitted list, so the app can mark the offending chip. These two windows overlap EACH OTHER — neither is in the database yet, so a check against stored rows alone would pass both. Nothing is created.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. One use per window, while the code's limits allow (a limit of 2 over 3 windows refuses the request)."
                                     },
                                     "response": [
                                         {
@@ -2765,7 +2773,7 @@
                                         "packages"
                                     ]
                                 },
-                                "description": "Returns the package catalog for the \"Packages\" tab — every active subscription plan, as a lightweight browsing list.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here — see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `features`: capped at the first 3, plus `more_features_count` for the remainder (e.g. 5 total → 3 returned + `more_features_count: 2`).\n- `tags`, `balances_grant`, `discounts`, `resources_grant` are NOT included here — they're all \"View details\" data. See \"Get Package Details\" below, which returns them plus the full, untruncated `features` list for one plan."
+                                "description": "Returns the package catalog for the \"Packages\" tab — every active subscription plan, as a lightweight browsing list.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here — see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `features`: capped at the first 3, plus `more_features_count` for the remainder (e.g. 5 total → 3 returned + `more_features_count: 2`).\n- `tags`, `balances_grant`, `discounts`, `resources_grant` are NOT included here — they're all \"View details\" data. See \"Get Package Details\" below, which returns them plus the full, untruncated `features` list for one plan.\n\n### Sale\n`sale` — null, or while a sale runs `{points, original_label, sale_label, ends_at, ends_label}`: show the original price struck through."
                             },
                             "response": [
                                 {
@@ -2860,7 +2868,7 @@
                                     ],
                                     "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
                                 },
-                                "description": "One plan's full details for the \"View details\" screen — same base fields as a catalog entry, plus `tags`, `balances_grant`, `discounts`, `resources_grant` (none of which are on the catalog card), and `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) — the same visibility rule the catalog list applies."
+                                "description": "One plan's full details for the \"View details\" screen — same base fields as a catalog entry, plus `tags`, `balances_grant`, `discounts`, `resources_grant` (none of which are on the catalog card), and `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) — the same visibility rule the catalog list applies.\n\n### Sale\n`sale` — null, or while a sale runs `{points, original_label, sale_label, ends_at, ends_label}`: show the original price struck through."
                             },
                             "response": [
                                 {
@@ -3015,7 +3023,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_id\": {{plan_id}}\n}",
+                                    "raw": "{\n  \"plan_id\": {{plan_id}},\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -3034,7 +3042,7 @@
                                         "memberships"
                                     ]
                                 },
-                                "description": "Gap found in the Task 15 Postman audit. Debits the buyer's personal wallet (or, with an optional company_id, the company's wallet -- requires CompanyPolicy::manageMembers) for plan.price and creates the Membership in one transaction. The plan must be a subscription (is_subscription = true) and currently active.\n\nA Dedicated Desk plan bought here has no desk yet (`desks: []`); operations and admins are notified (membership.desk_needed) to tie one.\n\n### Paying (unified payments)\n`payment_method`: wallet (default — returns the membership as before), cash, or paymera (the member's own plan only; answers {payment, redirect_url, next}).\n\nCash holds the plan for 48 h (`PAYMENTS_CASH_PLAN_HOLD_HOURS`) with **no membership** until reception settles it; asking again returns the same hold. The hold also appears on Get Current Membership as `pending_purchase`."
+                                "description": "Gap found in the Task 15 Postman audit. Debits the buyer's personal wallet (or, with an optional company_id, the company's wallet -- requires CompanyPolicy::manageMembers) for plan.price and creates the Membership in one transaction. The plan must be a subscription (is_subscription = true) and currently active.\n\nA Dedicated Desk plan bought here has no desk yet (`desks: []`); operations and admins are notified (membership.desk_needed) to tie one.\n\n### Paying (unified payments)\n`payment_method`: wallet (default — returns the membership as before), cash, or paymera (the member's own plan only; answers {payment, redirect_url, next}).\n\nCash holds the plan for 48 h (`PAYMENTS_CASH_PLAN_HOLD_HOURS`) with **no membership** until reception settles it; asking again returns the same hold. The hold also appears on Get Current Membership as `pending_purchase`.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. Works with wallet, cash and paymera; not with `company_id` yet. A 100% coupon activates the plan with nothing to pay."
                             },
                             "response": [
                                 {
@@ -4133,7 +4141,7 @@
                                                 "payment-methods"
                                             ]
                                         },
-                                        "description": "The payment methods the member may use, in config/payments.php order — a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | coworking_session | event_registration) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` — the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say (today only cash for a top-up — \"hand the cash to reception\"), otherwise null.\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet › Get Top-up Options**."
+                                        "description": "The payment methods the member may use, in config/payments.php order — a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | coworking_session | event_registration) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` — the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say (today only cash for a top-up — \"hand the cash to reception\"), otherwise null.\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet › Get Top-up Options**.\n\n`coupon_code` (optional, with `plan_id` or `payable_id`) — `amount_points`/`price` and whether the wallet covers it are worked out after the code."
                                     },
                                     "response": [
                                         {
@@ -4184,6 +4192,60 @@
                                     ]
                                 },
                                 {
+                                    "name": "Preview a Coupon",
+                                    "request": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"{{coupon_code}}\",\n  \"purpose\": \"plan_purchase\",\n  \"plan_id\": {{plan_id}}\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coupons/preview",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coupons",
+                                                "preview"
+                                            ]
+                                        },
+                                        "description": "The app's \"Apply\" button: what a code takes off what the member is about to buy — the same price the purchase will charge, writing and spending nothing. Throttled to 20 a minute.\n\n`purpose` and what it is for:\n- `plan_purchase` + `plan_id`\n- `booking` + `space_id`, `start_at`, `end_at` (local times) — or `payable_id` of an unpaid booking\n- `coworking_session` + `payable_id` (a closed, unpaid session)\n- `event_registration` + `event_id` — or `payable_id` of an unpaid registration\n\n200: `{coupon: {code, applied, points_discounted, message}, list_points, list_price, price_points, price, lines: [{key, points}]}` (`key` = base | sale | plan_discount | coupon). 422 `{message, reason}` when the code cannot be used."
+                                    }
+                                },
+                                {
                                     "name": "Start Payment",
                                     "event": [
                                         {
@@ -4214,6 +4276,10 @@
                                         "method": "POST",
                                         "header": [
                                             {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
                                                 "key": "lang",
                                                 "value": "{{lang}}",
                                                 "type": "text"
@@ -4221,7 +4287,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"purpose\": \"booking\",\n  \"method\": \"wallet\",\n  \"payable_id\": \"{{booking_id}}\"\n}",
+                                            "raw": "{\n  \"purpose\": \"booking\",\n  \"method\": \"wallet\",\n  \"payable_id\": \"{{booking_id}}\",\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -4240,7 +4306,7 @@
                                                 "payments"
                                             ]
                                         },
-                                        "description": "Opens a payment for anything the member pays for — `purpose`: `plan_purchase` | `booking` | `coworking_session` | `event_registration` | `wallet_top_up` — by `method`: `wallet` | `cash` | `paymera` (default `paymera`, the card). The request as saved pays an existing booking from the wallet. **Wallet top-ups are saved under Wallet** (Top Up by Card, Top Up — Cash at Reception); they call this same endpoint.\n\n`payable_id` is the booking, the closed coworking session, or the event registration's `ticket_id`. `wallet_owner_type`/`wallet_owner_id` pick a company wallet.\n\nAlways 201 `{data: {payment, redirect_url, next}}`; `next` is `redirect` (open redirect_url in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (payment may be null). `payment.transaction_id` is the payment's row in the wallet history once it settles (Wallet › Get Wallet Transaction).\n\nErrors: 409 already paid; 422 `{message, current, required, shortage}` when the wallet is short; 422 `wallet_options` when several wallets could pay and none was named; 422 for an open session. 503 = card payment unavailable (our misconfiguration); 502 = could not start — neither is a declined card, nothing was charged.\n\n### Cases — see this request's saved examples\n- **Buy a Plan** — Buys a plan by card. Do NOT send `amount` — the price is read from plans.price_points in the database and any amount in the request is ignored outright, so a client can never name its own price.\n\nThe plan must be active and publicly listable; anything else is a 422 on plan_id.\n\nOn success the points are credited AND the membership is activated. If activation fails after the charge (plan withdrawn or repriced mid-payment), status becomes needs_review with membership_id null and the member KEEPS the points — that is not a failed payment."
+                                        "description": "Opens a payment for anything the member pays for — `purpose`: `plan_purchase` | `booking` | `coworking_session` | `event_registration` | `wallet_top_up` — by `method`: `wallet` | `cash` | `paymera` (default `paymera`, the card). The request as saved pays an existing booking from the wallet. **Wallet top-ups are saved under Wallet** (Top Up by Card, Top Up — Cash at Reception); they call this same endpoint.\n\n`payable_id` is the booking, the closed coworking session, or the event registration's `ticket_id`. `wallet_owner_type`/`wallet_owner_id` pick a company wallet.\n\nAlways 201 `{data: {payment, redirect_url, next}}`; `next` is `redirect` (open redirect_url in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (payment may be null). `payment.transaction_id` is the payment's row in the wallet history once it settles (Wallet › Get Wallet Transaction).\n\nErrors: 409 already paid; 422 `{message, current, required, shortage}` when the wallet is short; 422 `wallet_options` when several wallets could pay and none was named; 422 for an open session. 503 = card payment unavailable (our misconfiguration); 502 = could not start — neither is a declined card, nothing was charged.\n\n### Cases — see this request's saved examples\n- **Buy a Plan** — Buys a plan by card. Do NOT send `amount` — the price is read from plans.price_points in the database and any amount in the request is ignored outright, so a client can never name its own price.\n\nThe plan must be active and publicly listable; anything else is a 422 on plan_id.\n\nOn success the points are credited AND the membership is activated. If activation fails after the charge (plan withdrawn or repriced mid-payment), status becomes needs_review with membership_id null and the member KEEPS the points — that is not a failed payment.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. For `plan_purchase`, or on an existing unpaid booking / session / registration (`payable_id`) — refused if a payment for it is in progress, anything was paid toward it, or it already has a code. Not for `wallet_top_up`."
                                     },
                                     "response": [
                                         {
@@ -5312,6 +5378,10 @@
                                 "method": "POST",
                                 "header": [
                                     {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
                                         "key": "Accept",
                                         "value": "application/json",
                                         "type": "text"
@@ -5336,7 +5406,16 @@
                                         "register"
                                     ]
                                 },
-                                "description": "تسجيل العضو الحالي في الفعالية. تؤخذ بيانات العضو تلقائياً من حسابه (الاسم، البريد، الهاتف). في الفعاليات المجانية يتم التسجيل الفوري، وفي الفعاليات المدفوعة يتم خصم سعر الفعالية بالنقاط (price_points) مباشرة من محفظة العضو.\n\n### Cases — see this request's saved examples\n- **answering the form** — Answers are validated against the event's stored field definitions. Submitting name/phone/email is refused with 422 — they come from the token.\n- **profile only** — Most events need nothing the account does not already hold. An empty body is valid; check has_registration_form on the details endpoint first.\n\n### Paying (unified payments)\n`payment_method` (optional, default the member's own wallet as before) and `wallet_owner_type`/`wallet_owner_id`. For a paid event: wallet pays now (short = the old `points` validation error); cash or paymera confirm the seat **unpaid** — the door refuses check-in until it is paid. With paymera the response adds `payment` and `redirect_url`. An event that needs approval stores the choice and charges the wallet at approval."
+                                "description": "تسجيل العضو الحالي في الفعالية. تؤخذ بيانات العضو تلقائياً من حسابه (الاسم، البريد، الهاتف). في الفعاليات المجانية يتم التسجيل الفوري، وفي الفعاليات المدفوعة يتم خصم سعر الفعالية بالنقاط (price_points) مباشرة من محفظة العضو.\n\n### Cases — see this request's saved examples\n- **answering the form** — Answers are validated against the event's stored field definitions. Submitting name/phone/email is refused with 422 — they come from the token.\n- **profile only** — Most events need nothing the account does not already hold. An empty body is valid; check has_registration_form on the details endpoint first.\n\n### Paying (unified payments)\n`payment_method` (optional, default the member's own wallet as before) and `wallet_owner_type`/`wallet_owner_id`. For a paid event: wallet pays now (short = the old `points` validation error); cash or paymera confirm the seat **unpaid** — the door refuses check-in until it is paid. With paymera the response adds `payment` and `redirect_url`. An event that needs approval stores the choice and charges the wallet at approval.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). What the registration costs after the code is the registration's own `price_points`; the event's `price_points` stays its list price. A coupon that makes the event free confirms the seat as paid.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             },
                             "response": [
                                 {
@@ -10286,7 +10365,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated +\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³\"\n  },\n  \"subtitle\": {\n    \"en\": \"Premium dedicated desk with printing and rooms\",\n    \"ar\": \"ظ…ظƒطھط¨ ظ…ط®طµطµ ظ…ط¹ ط­طµطµ ط·ط¨ط§ط¹ط© ظˆط؛ط±ظپ ط§ط¬طھظ…ط§ط¹ط§طھ\"\n  },\n  \"is_subscription\": true,\n  \"price\": 250.0,\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": 8.0,\n  \"overage_rate\": 1.5,\n  \"is_active\": true,\n  \"order\": 1,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 50.0,\n      \"description\": {\n        \"en\": \"Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ظƒط§ظپظٹظ‡\"\n      },\n      \"order\": 1\n    },\n    {\n      \"category\": \"printing_internet\",\n      \"amount\": 35.0,\n      \"description\": {\n        \"en\": \"Printing Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ط·ط¨ط§ط¹ط©\"\n      },\n      \"order\": 2\n    },\n    {\n      \"category\": \"space_specific\",\n      \"amount\": 8.0,\n      \"description\": {\n        \"en\": \"Meeting Room Hours\",\n        \"ar\": \"ط³ط§ط¹ط§طھ ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ\"\n      },\n      \"order\": 3\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"1 Month access\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ط¯ط© ط´ظ‡ط±\"\n      },\n      \"value\": {\n        \"en\": \"1 Month\",\n        \"ar\": \"ط´ظ‡ط± ظˆط§ط­ط¯\"\n      },\n      \"icon\": \"calendar\",\n      \"is_included\": true,\n      \"order\": 1\n    },\n    {\n      \"name\": {\n        \"en\": \"Access to a Dedicated Desk\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ظƒطھط¨ ظ…ط®طµطµ\"\n      },\n      \"value\": null,\n      \"icon\": \"briefcase\",\n      \"is_included\": true,\n      \"order\": 2\n    },\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 3\n    },\n    {\n      \"name\": {\n        \"en\": \"Printing: 100 B&W, 50 Colored\",\n        \"ar\": \"ط·ط¨ط§ط¹ط©: 100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯طŒ 50 ظ…ظ„ظˆظ†\"\n      },\n      \"value\": {\n        \"en\": \"100 B&W, 50 Colored\",\n        \"ar\": \"100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯\"\n      },\n      \"icon\": \"printer\",\n      \"is_included\": true,\n      \"order\": 4\n    },\n    {\n      \"name\": {\n        \"en\": \"Meeting Rooms: 8 Hours\",\n        \"ar\": \"ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ: 8 ط³ط§ط¹ط§طھ\"\n      },\n      \"value\": {\n        \"en\": \"8 Hours\",\n        \"ar\": \"8 ط³ط§ط¹ط§طھ\"\n      },\n      \"icon\": \"clock\",\n      \"is_included\": true,\n      \"order\": 5\n    }\n  ]\n}",
+                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated +\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³\"\n  },\n  \"subtitle\": {\n    \"en\": \"Premium dedicated desk with printing and rooms\",\n    \"ar\": \"ظ…ظƒطھط¨ ظ…ط®طµطµ ظ…ط¹ ط­طµطµ ط·ط¨ط§ط¹ط© ظˆط؛ط±ظپ ط§ط¬طھظ…ط§ط¹ط§طھ\"\n  },\n  \"is_subscription\": true,\n  \"price\": 250.0,\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": 8.0,\n  \"overage_rate\": 1.5,\n  \"is_active\": true,\n  \"order\": 1,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 50.0,\n      \"description\": {\n        \"en\": \"Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ظƒط§ظپظٹظ‡\"\n      },\n      \"order\": 1\n    },\n    {\n      \"category\": \"printing_internet\",\n      \"amount\": 35.0,\n      \"description\": {\n        \"en\": \"Printing Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ط·ط¨ط§ط¹ط©\"\n      },\n      \"order\": 2\n    },\n    {\n      \"category\": \"space_specific\",\n      \"amount\": 8.0,\n      \"description\": {\n        \"en\": \"Meeting Room Hours\",\n        \"ar\": \"ط³ط§ط¹ط§طھ ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ\"\n      },\n      \"order\": 3\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"1 Month access\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ط¯ط© ط´ظ‡ط±\"\n      },\n      \"value\": {\n        \"en\": \"1 Month\",\n        \"ar\": \"ط´ظ‡ط± ظˆط§ط­ط¯\"\n      },\n      \"icon\": \"calendar\",\n      \"is_included\": true,\n      \"order\": 1\n    },\n    {\n      \"name\": {\n        \"en\": \"Access to a Dedicated Desk\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ظƒطھط¨ ظ…ط®طµطµ\"\n      },\n      \"value\": null,\n      \"icon\": \"briefcase\",\n      \"is_included\": true,\n      \"order\": 2\n    },\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 3\n    },\n    {\n      \"name\": {\n        \"en\": \"Printing: 100 B&W, 50 Colored\",\n        \"ar\": \"ط·ط¨ط§ط¹ط©: 100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯طŒ 50 ظ…ظ„ظˆظ†\"\n      },\n      \"value\": {\n        \"en\": \"100 B&W, 50 Colored\",\n        \"ar\": \"100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯\"\n      },\n      \"icon\": \"printer\",\n      \"is_included\": true,\n      \"order\": 4\n    },\n    {\n      \"name\": {\n        \"en\": \"Meeting Rooms: 8 Hours\",\n        \"ar\": \"ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ: 8 ط³ط§ط¹ط§طھ\"\n      },\n      \"value\": {\n        \"en\": \"8 Hours\",\n        \"ar\": \"8 ط³ط§ط¹ط§طھ\"\n      },\n      \"icon\": \"clock\",\n      \"is_included\": true,\n      \"order\": 5\n    }\n  ],\n  \"sale_price_points\": 100,\n  \"sale_starts_at\": \"2026-10-05 10:00\",\n  \"sale_ends_at\": \"2026-10-07 10:00\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -10304,7 +10383,8 @@
                                         "admin",
                                         "plans"
                                     ]
-                                }
+                                },
+                                "description": "### Sale (optional)\n`sale_price_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `price_points` — as sent, or as stored. A plan is charged the sale price when its payment opens inside the window."
                             }
                         },
                         {
@@ -10360,7 +10440,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated + (Updated)\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³ (ظ…ط¹ط¯ظ„)\"\n  },\n  \"subtitle\": {\n    \"en\": \"Updated subtitle\",\n    \"ar\": \"ط´ط±ط­ ظ…ط¹ط¯ظ„\"\n  },\n  \"price\": 260.0,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 60.0,\n      \"description\": {\n        \"en\": \"Updated Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ظƒط§ظپظٹظ‡ ظ…ط¹ط¯ظ„\"\n      },\n      \"order\": 1\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 1\n    }\n  ]\n}",
+                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated + (Updated)\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³ (ظ…ط¹ط¯ظ„)\"\n  },\n  \"subtitle\": {\n    \"en\": \"Updated subtitle\",\n    \"ar\": \"ط´ط±ط­ ظ…ط¹ط¯ظ„\"\n  },\n  \"price\": 260.0,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 60.0,\n      \"description\": {\n        \"en\": \"Updated Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ظƒط§ظپظٹظ‡ ظ…ط¹ط¯ظ„\"\n      },\n      \"order\": 1\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 1\n    }\n  ],\n  \"sale_price_points\": 100,\n  \"sale_starts_at\": \"2026-10-05 10:00\",\n  \"sale_ends_at\": \"2026-10-07 10:00\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -10380,7 +10460,7 @@
                                         "{{plan_id}}"
                                     ]
                                 },
-                                "description": "Returns `{\"message\": \"...\"}` on success, not the updated plan resource."
+                                "description": "Returns `{\"message\": \"...\"}` on success, not the updated plan resource.\n\n### Sale (optional)\n`sale_price_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `price_points` — as sent, or as stored. A plan is charged the sale price when its payment opens inside the window."
                             }
                         },
                         {
@@ -10412,6 +10492,239 @@
                                         "{{plan_id}}"
                                     ]
                                 }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Coupons",
+                    "description": "Discount coupons (docs/decisions/pricing-offers-and-coupons.md). Reads are open to admin and operations; create, update and delete are admin-only and audited (`coupon_created` / `coupon_updated` / `coupon_deleted`).\n\n- `code`: letters, digits, `-` and `_`, stored upper-case; members type it in any case.\n- `discount_type`: `percentage` (1–100) or `amount_off` (points). `max_discount_points` caps a percentage; `min_amount_points` is compared with the price after any offer.\n- `combinable_with_offers: false` — the code is weighed against the list price instead of stacking on a sale/plan discount; when the offer is already lower the purchase goes through at the offer price with `coupon.applied: false`.\n- Who: `user_ids` (none = anyone), `company_id` (that company's members), `new_members_only`, `usage_limit` (first N uses), `per_user_limit` (defaults to 1 on create; send null for unlimited).\n- What: `targets` (none = every purchase a coupon can be spent on — never a wallet top-up). Each target is a `purpose` (`booking` | `coworking_session` | `plan_purchase` | `event_registration`) and at most one item: `plan_id` for a plan, `space_id` or `space_type` for time in a space, `event_id` for an event.\n- `starts_at`/`ends_at` are local (Damascus) wall-clock times, like every other typed time.\n\nUses are counted live from the record they are on: cancelling a booking, a failed card or an expired cash hold gives the use back.",
+                    "item": [
+                        {
+                            "name": "List Coupons",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons?search=WELCOME&is_active=1&state=running&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "search",
+                                            "value": "WELCOME",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "is_active",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "state",
+                                            "value": "running",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15"
+                                        }
+                                    ]
+                                },
+                                "description": "Paginated, newest first. `search` matches the code; `is_active` 1/0; `state` = running | scheduled | ended. Each row carries `used` — the uses that still count against its limits."
+                            }
+                        },
+                        {
+                            "name": "Create Coupon",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    pm.collectionVariables.set('coupon_id', pm.response.json().data.id);",
+                                            "    pm.collectionVariables.set('coupon_code', pm.response.json().data.code);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"WELCOME20\",\n  \"name\": {\n    \"en\": \"Welcome offer\",\n    \"ar\": \"عرض الترحيب\"\n  },\n  \"description\": {\n    \"en\": \"20% off your first booking or plan\",\n    \"ar\": \"خصم 20% على أول حجز أو باقة\"\n  },\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 20,\n  \"max_discount_points\": 200,\n  \"min_amount_points\": null,\n  \"combinable_with_offers\": true,\n  \"usage_limit\": 10,\n  \"per_user_limit\": 1,\n  \"new_members_only\": false,\n  \"company_id\": null,\n  \"starts_at\": \"2026-10-05 09:00\",\n  \"ends_at\": \"2026-10-12 09:00\",\n  \"is_active\": true,\n  \"targets\": [\n    { \"purpose\": \"booking\", \"space_type\": \"room\" },\n    { \"purpose\": \"plan_purchase\", \"plan_id\": {{plan_id}} }\n  ],\n  \"user_ids\": []\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons"
+                                    ]
+                                },
+                                "description": "Admin only. Returns the coupon (201) with its `targets` and `user_ids`. A target naming an item its purpose cannot buy, or two items, is a 422 on `targets.N`."
+                            }
+                        },
+                        {
+                            "name": "Get Coupon",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Coupon Redemptions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}/redemptions?per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}",
+                                        "redemptions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "per_page",
+                                            "value": "15"
+                                        }
+                                    ]
+                                },
+                                "description": "Who used the code, on what (`booking_id` / `walkin_session_id` / `event_attendee_id` / `payment_id`), the terms it was locked in on and `points_discounted`. `counts: false` — the record was cancelled, rejected, failed or reversed, so the use was given back."
+                            }
+                        },
+                        {
+                            "name": "Update Coupon",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"WELCOME20\",\n  \"name\": {\n    \"en\": \"Welcome offer\",\n    \"ar\": \"عرض الترحيب\"\n  },\n  \"description\": {\n    \"en\": \"20% off your first booking or plan\",\n    \"ar\": \"خصم 20% على أول حجز أو باقة\"\n  },\n  \"discount_type\": \"percentage\",\n  \"discount_value\": 20,\n  \"max_discount_points\": 200,\n  \"min_amount_points\": null,\n  \"combinable_with_offers\": true,\n  \"usage_limit\": 50,\n  \"per_user_limit\": 1,\n  \"new_members_only\": false,\n  \"company_id\": null,\n  \"starts_at\": \"2026-10-05 09:00\",\n  \"ends_at\": \"2026-10-12 09:00\",\n  \"is_active\": true,\n  \"targets\": [\n    { \"purpose\": \"booking\", \"space_type\": \"room\" },\n    { \"purpose\": \"plan_purchase\", \"plan_id\": {{plan_id}} }\n  ],\n  \"user_ids\": []\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}"
+                                    ]
+                                },
+                                "description": "Admin only. Returns `{\"message\": \"...\"}`. `targets` and `user_ids` are replaced when sent and kept when left out. Uses already made keep the terms they were made on."
+                            }
+                        },
+                        {
+                            "name": "Delete Coupon",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}"
+                                    ]
+                                },
+                                "description": "Admin only. 204 for a coupon nobody used; 409 (`api.coupon.has_redemptions`) once used — deactivate it with `is_active: false` instead."
                             }
                         }
                     ]
@@ -15870,7 +16183,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"allows_extension\": true,\n  \"cancellation_window_minutes\": 120\n}",
+                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"allows_extension\": true,\n  \"cancellation_window_minutes\": 120,\n  \"sale_hourly_rate_points\": 80,\n  \"sale_starts_at\": \"2026-10-05 09:00\",\n  \"sale_ends_at\": \"2026-10-12 09:00\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -15889,7 +16202,7 @@
                                                 "spaces"
                                             ]
                                         },
-                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one.\n\nA co_space takes no `capacity` (422 if sent): its capacity is the number of its desks, starting at 0 — add them under Seats & Desks. Other types send their capacity as before. A branch has one co_space at most: a second one (or turning another space into one via Update Space) is 422 on `space_type` — add desks to the existing one instead.\n\n`allows_extension` (bool, optional, default true): whether bookings on this space may be extended. `cancellation_window_minutes` (int ≥ 0 or null, optional): how long before its start a booking may still be cancelled; null falls back to the global `booking.cancellation_window_minutes`. See docs/decisions/booking-outcomes-and-extension.md."
+                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one.\n\nA co_space takes no `capacity` (422 if sent): its capacity is the number of its desks, starting at 0 — add them under Seats & Desks. Other types send their capacity as before. A branch has one co_space at most: a second one (or turning another space into one via Update Space) is 422 on `space_type` — add desks to the existing one instead.\n\n`allows_extension` (bool, optional, default true): whether bookings on this space may be extended. `cancellation_window_minutes` (int ≥ 0 or null, optional): how long before its start a booking may still be cancelled; null falls back to the global `booking.cancellation_window_minutes`. See docs/decisions/booking-outcomes-and-extension.md.\n\n### Sale (optional)\n`sale_hourly_rate_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `hourly_rate_points` — as sent, or as stored. Members are charged the sale rate for the seconds of a booking inside the window and the normal rate for the rest."
                                     }
                                 },
                                 {
@@ -15945,7 +16258,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 25,\n  \"allows_extension\": false,\n  \"cancellation_window_minutes\": null\n}",
+                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 25,\n  \"allows_extension\": false,\n  \"cancellation_window_minutes\": null,\n  \"sale_hourly_rate_points\": 80,\n  \"sale_starts_at\": \"2026-10-05 09:00\",\n  \"sale_ends_at\": \"2026-10-12 09:00\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -15965,7 +16278,7 @@
                                                 "{{space_id}}"
                                             ]
                                         },
-                                        "description": "Structural fields only أ¢â‚¬â€‌ status/status_reason/status_from/status_until are rejected here even if sent; use Update Space Status. Returns `{\"message\": \"...\"}` on success.\n\n`allows_extension` and `cancellation_window_minutes` as on Create Space; left out, a space keeps what it has, and `null` puts the window back on the global setting. See docs/decisions/booking-outcomes-and-extension.md."
+                                        "description": "Structural fields only أ¢â‚¬â€‌ status/status_reason/status_from/status_until are rejected here even if sent; use Update Space Status. Returns `{\"message\": \"...\"}` on success.\n\n`allows_extension` and `cancellation_window_minutes` as on Create Space; left out, a space keeps what it has, and `null` puts the window back on the global setting. See docs/decisions/booking-outcomes-and-extension.md.\n\n### Sale (optional)\n`sale_hourly_rate_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `hourly_rate_points` — as sent, or as stored. Members are charged the sale rate for the seconds of a booking inside the window and the normal rate for the rest."
                                     }
                                 },
                                 {

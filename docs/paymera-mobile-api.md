@@ -1,7 +1,7 @@
 # الدفع بالبطاقة — دليل تطبيق الموبايل
 
 مرجع مطوّر التطبيق لتنفيذ الدفع بالبطاقة عبر Paymera eGate، ولدفع أي عملية
-(حجز، جلسة، فعالية، باقة) بالمحفظة أو في الاستقبال — انظر القسم 11.
+(حجز، جلسة، فعالية، باقة) بالمحفظة أو في الاستقبال — انظر القسم 11، وللعروض وكوبونات الحسم القسم 12.
 
 > **الخلاصة في ثلاث خطوات:** اطلب رابط دفع من الـAPI ← افتحه في WebView ←
 > اسأل الـAPI عن النتيجة. التطبيق **لا يتصل بـPaymera إطلاقاً**، ولا يرى
@@ -399,3 +399,110 @@ POST /api/v1/member/payments
 
 كل ما هو `unpaid` في الكتلة أعلاه يُدفع لاحقاً بالمسار نفسه (ب) باستخدام
 `payable_id`. الجلسة المفتوحة لا تُدفع قبل إغلاقها (422).
+
+---
+
+## 12. العروض وكوبونات الحسم
+
+التصميم كاملاً في `docs/decisions/pricing-offers-and-coupons.md`. ما يحتاجه
+التطبيق:
+
+### أ. لا تحسب السعر بنفسك
+
+**لا تحسب سعر الحجز من `سعر الساعة × المدة` بعد الآن.** العرض على مساحة
+يُطبَّق على الدقائق الواقعة داخل فترته فقط، فقد يغطي جزءاً من الحجز. السعر
+الصحيح، بالعرض وخصم الباقة والكوبون، يأتي دائماً من الخادم:
+
+```http
+POST /api/v1/member/bookings/preview
+{"space_id": 4, "start_at": "2026-10-06 10:00", "end_at": "2026-10-06 12:00", "coupon_code": "WELCOME20"}
+```
+
+التفصيل (`breakdown`) يضيف سطرين جديدين بجانب سطر خصم الباقة (`discount`):
+`sale` (توفير العرض) و`coupon` (خصم الكوبون).
+
+### ب. كتلة `sale` في المساحات والباقات
+
+تظهر في قائمة المساحات وتفاصيلها (`details.sale`) وفي قائمة الباقات
+وتفاصيلها (`sale`). قيمتها `null` إذا لم يكن هناك عرض قائم الآن:
+
+```json
+"sale": {
+  "points": 80,
+  "original_label": "10 $ / ساعة",
+  "sale_label": "8 $ / ساعة",
+  "ends_at": "2026-10-12T09:00:00+03:00",
+  "ends_label": "ينتهي العرض في 2026-10-12 09:00"
+}
+```
+
+اعرض `original_label` مشطوباً وبجانبه `sale_label`، و`ends_label` تحتهما.
+النصوص جاهزة بلغة الهيدر `lang` وعملة الهيدر `currency`.
+
+### ج. زر "تطبيق" للكوبون
+
+```http
+POST /api/v1/member/coupons/preview
+```
+
+| `purpose` | مع |
+|---|---|
+| `plan_purchase` | `plan_id` |
+| `booking` | `space_id` + `start_at` + `end_at`، أو `payable_id` لحجز غير مدفوع |
+| `coworking_session` | `payable_id` لجلسة مغلقة غير مدفوعة |
+| `event_registration` | `event_id`، أو `payable_id` لتسجيل غير مدفوع |
+
+```json
+{
+  "data": {
+    "coupon": {"code": "WELCOME20", "applied": true, "points_discounted": 24, "message": null},
+    "list_points": 120,
+    "list_price": "12 $",
+    "price_points": 96,
+    "price": "9.60 $",
+    "lines": [{"key": "base", "points": 120}, {"key": "coupon", "points": -24}]
+  }
+}
+```
+
+لا يُنشئ شيئاً ولا يستهلك الكوبون. مفاتيح `lines`:
+`base` | `sale` | `plan_discount` | `coupon`. الحد 20 طلباً في الدقيقة.
+
+### د. إرسال الكوبون مع الشراء
+
+حقل اختياري واحد `coupon_code` على:
+- `POST bookings` و`bookings/batch` و`bookings/preview`
+- `POST memberships` (لا يُقبل مع `company_id` حالياً)
+- `POST payments`: لشراء باقة، أو على حجز / جلسة / تسجيل غير مدفوع
+  بـ`payable_id`. لا يُقبل مع شحن المحفظة.
+- `POST events/{id}/register`
+- `GET payment-methods` (مع `plan_id` أو `payable_id`)، فيصير `amount_points`
+  هو السعر بعد الكوبون.
+
+ردّ الحجز والباقة والدفع يحمل:
+
+```json
+"coupon": {"code": "WELCOME20", "applied": false, "points_discounted": 0,
+           "message": "العرض الحالي يمنحك سعراً أقل، لذلك لم يُطبَّق الكود."}
+```
+
+`applied: false` مع رسالة يعني أن الكوبون لا يُجمع مع العروض وأن العرض الحالي
+أرخص، فتمّت العملية بسعر العرض. اعرض `message` كما هي.
+
+في الفعالية لا توجد كتلة `coupon`: السعر بعد الكوبون هو `price_points`
+للتسجيل نفسه. والكوبون الذي يجعل الفعالية مجانية يؤكد المقعد مدفوعاً.
+
+### هـ. رفض الكوبون — 422
+
+```json
+{"message": "انتهت صلاحية هذا الكود.", "reason": "expired"}
+```
+
+اعرض `message` كما هي، واستخدم `reason` للمنطق فقط:
+`not_found` | `not_started` | `expired` | `usage_limit_reached` |
+`per_user_limit_reached` | `not_eligible` | `new_members_only` |
+`not_applicable` | `min_amount_not_met` | `not_combinable` |
+`already_applied` | `payment_in_progress`.
+
+الكوبون الذي يجعل الباقة مجانية يفعّلها فوراً بلا دفع. وإلغاء الحجز، أو فشل
+البطاقة، أو انتهاء مهلة الدفع النقدي، يعيد استخدام الكوبون للعضو تلقائياً.
