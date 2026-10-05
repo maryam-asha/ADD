@@ -21,12 +21,14 @@ use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\PackageBrowseService;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -132,7 +134,10 @@ class MembershipController extends Controller
 
         // 201 as before, when the resource was built from the model activation
         // had just created.
-        return (new MembershipResource($membership->load(['plan', 'seatDesks'])))->response()->setStatusCode(201);
+        return (new MembershipResource($membership->load(['plan', 'seatDesks'])))
+            ->additional($this->couponOutcome($coupon, $payment))
+            ->response()
+            ->setStatusCode(201);
     }
 
     /**
@@ -165,7 +170,7 @@ class MembershipController extends Controller
             'coupon' => $coupon,
         ]))['payment'];
 
-        return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]], 201);
+        return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]] + $this->couponOutcome($coupon, $payment), 201);
     }
 
     /**
@@ -198,7 +203,21 @@ class MembershipController extends Controller
                 'redirect_url' => $url,
                 'next' => 'redirect',
             ],
-        ], 201);
+        ] + $this->couponOutcome($coupon, $payment), 201);
+    }
+
+    /**
+     * What became of the code sent with the purchase, beside `data` as on
+     * POST bookings: used on the payment, or not because the plan's sale was
+     * already lower (D2).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function couponOutcome(?Coupon $coupon, Payment $payment): array
+    {
+        return $coupon === null ? [] : [
+            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment)),
+        ];
     }
 
     /**

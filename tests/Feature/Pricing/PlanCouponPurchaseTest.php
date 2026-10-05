@@ -95,7 +95,11 @@ class PlanCouponPurchaseTest extends TestCase
         $coupon = Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
         $member = $this->member(500);
 
-        $this->buy('half')->assertCreated();
+        $this->buy('half')
+            ->assertCreated()
+            ->assertJsonPath('coupon.code', 'HALF')
+            ->assertJsonPath('coupon.applied', true)
+            ->assertJsonPath('coupon.points_discounted', 60);
 
         $payment = Payment::sole();
         $this->assertSame(60, $payment->amount_points);
@@ -125,7 +129,8 @@ class PlanCouponPurchaseTest extends TestCase
 
         $this->buy('HALF', 'cash')
             ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.amount_points', 60);
+            ->assertJsonPath('data.pending_purchase.amount_points', 60)
+            ->assertJsonPath('coupon.points_discounted', 60);
 
         $operator = User::factory()->create();
         $operator->assignRole('operations');
@@ -154,7 +159,10 @@ class PlanCouponPurchaseTest extends TestCase
         $coupon = Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
         $this->member();
 
-        $this->buy('HALF', 'paymera')->assertCreated()->assertJsonPath('data.next', 'redirect');
+        $this->buy('HALF', 'paymera')
+            ->assertCreated()
+            ->assertJsonPath('data.next', 'redirect')
+            ->assertJsonPath('coupon.points_discounted', 60);
 
         $payment = Payment::sole();
         $this->assertSame(60, $payment->amount_points);
@@ -213,6 +221,28 @@ class PlanCouponPurchaseTest extends TestCase
         $this->assertSame(0, Payment::count());
     }
 
+    /**
+     * A coupon that does not combine with offers, beaten by the sale: the
+     * plan is bought at the sale price and the response says why the code
+     * was not used (D2) — the use is not spent.
+     */
+    public function test_a_coupon_beaten_by_the_sale_says_so(): void
+    {
+        $this->plan->update(['sale_price_points' => 100, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay()]);
+        $coupon = Coupon::factory()->percentage(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
+        $this->member(500);
+
+        $this->buy('solo')
+            ->assertCreated()
+            ->assertJsonPath('coupon.code', 'SOLO')
+            ->assertJsonPath('coupon.applied', false)
+            ->assertJsonPath('coupon.points_discounted', 0)
+            ->assertJsonPath('coupon.message', __('api.coupon.offer_is_better', [], 'en'));
+
+        $this->assertSame(100, Payment::sole()->amount_points);
+        $this->assertSame(0, app(CouponLedger::class)->liveUsage($coupon));
+    }
+
     public function test_the_payments_endpoint_takes_a_coupon_for_a_plan(): void
     {
         Coupon::factory()->amountOff(20)->create(['code' => 'TWENTY']);
@@ -223,7 +253,7 @@ class PlanCouponPurchaseTest extends TestCase
             'method' => 'wallet',
             'plan_id' => $this->plan->id,
             'coupon_code' => 'TWENTY',
-        ])->assertCreated();
+        ])->assertCreated()->assertJsonPath('coupon.points_discounted', 20);
 
         $this->assertSame(100, Payment::sole()->amount_points);
         $this->assertSame(400, $this->balance($member));

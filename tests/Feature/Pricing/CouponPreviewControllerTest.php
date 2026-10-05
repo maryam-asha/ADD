@@ -122,6 +122,18 @@ class CouponPreviewControllerTest extends TestCase
             ->assertJsonPath('message', __('api.coupon.not_found', [], 'en'));
     }
 
+    /** Only a plan the member could buy is priced — as the purchase itself requires. */
+    public function test_a_plan_that_cannot_be_bought_is_not_previewed(): void
+    {
+        foreach ([['is_public' => false], ['is_active' => false]] as $state) {
+            $plan = Plan::factory()->create(['price_points' => 120, ...$state]);
+
+            $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase', 'plan_id' => $plan->id])
+                ->assertStatus(422)
+                ->assertJsonValidationErrors(['plan_id']);
+        }
+    }
+
     public function test_the_target_must_be_named(): void
     {
         $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase'])

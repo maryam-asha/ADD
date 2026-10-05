@@ -18,13 +18,16 @@ use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponApplication;
 use App\Domain\Pricing\Services\CouponEligibility;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StartPaymentRequest;
 use App\Http\Resources\Finance\PaymentResource;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -87,9 +90,14 @@ class PaymentController extends Controller
             // On something already owed, the coupon lowers what it owes
             // before the payment opens — and one that clears it leaves
             // nothing to pay.
+            $outcome = null;
+
             if ($coupon !== null && $payable !== null) {
-                if ($application->apply($payable, $member, $coupon)->finalPoints === 0) {
-                    return $this->started(null, PaymentStart::done());
+                $quote = $application->apply($payable, $member, $coupon);
+                $outcome = app(CouponOutcomePresenter::class)->fromQuote($code, $quote);
+
+                if ($quote->finalPoints === 0) {
+                    return $this->started(null, PaymentStart::done(), $outcome);
                 }
 
                 $coupon = null;
@@ -113,7 +121,7 @@ class PaymentController extends Controller
                     coupon: $coupon,
                 );
 
-                return $this->started($payment, PaymentStart::redirect($url));
+                return $this->started($payment, PaymentStart::redirect($url), $outcome ?? $this->planOutcome($coupon, $payment));
             }
 
             ['payment' => $payment, 'start' => $start] = $payments->start($purpose, $member, $method, array_filter([
@@ -148,10 +156,16 @@ class PaymentController extends Controller
             return $this->gatewayFailureResponse($e, $member->id) ?? throw $e;
         }
 
-        return $this->started($payment, $start);
+        return $this->started($payment, $start, $outcome ?? $this->planOutcome($coupon, $payment));
     }
 
-    private function started(?Payment $payment, PaymentStart $start): JsonResponse
+    /**
+     * `coupon`, beside `data` as on POST bookings, when a code was sent:
+     * what it took off, or why it was not used (D2).
+     *
+     * @param  array<string, mixed>|null  $coupon
+     */
+    private function started(?Payment $payment, PaymentStart $start, ?array $coupon = null): JsonResponse
     {
         return response()->json([
             'data' => [
@@ -160,7 +174,19 @@ class PaymentController extends Controller
                 'redirect_url' => $start->redirectUrl,
                 'next' => $start->kind,
             ],
-        ], 201);
+        ] + ($coupon !== null ? ['coupon' => $coupon] : []), 201);
+    }
+
+    /**
+     * A plan's coupon is locked on the payment it opened.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function planOutcome(?Coupon $coupon, ?Payment $payment): ?array
+    {
+        return $coupon !== null && $payment !== null
+            ? app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment))
+            : null;
     }
 
     /**

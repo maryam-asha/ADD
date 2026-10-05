@@ -111,6 +111,44 @@ class EventRegistrationCouponTest extends TestCase
         $this->assertSame(0, app(CouponLedger::class)->liveUsage($coupon));
     }
 
+    private function approve(EventAttendee $attendee)
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        return $this->withHeader('lang', 'en')->postJson("/api/v1/admin/events/{$attendee->event_id}/attendees/{$attendee->id}/approve");
+    }
+
+    /** Approval charges what the registration costs with its coupon, not the event's price. */
+    public function test_an_approved_registration_is_charged_its_coupon_price(): void
+    {
+        Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
+        $this->register($this->event(['requires_approval' => true]), 'HALF')->assertCreated();
+        $this->assertSame(500, $this->balance());
+
+        $this->approve(EventAttendee::sole())->assertOk();
+
+        $attendee = EventAttendee::sole();
+        $this->assertSame(EventRegistrationStatus::Approved, $attendee->status);
+        $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
+        $this->assertSame(450, $this->balance());
+    }
+
+    /** A registration a coupon made free has nothing to charge when it is approved. */
+    public function test_a_registration_made_free_is_approved_without_a_charge(): void
+    {
+        Coupon::factory()->percentage(100)->create(['code' => 'GUEST']);
+        $this->register($this->event(['requires_approval' => true]), 'GUEST')->assertCreated();
+
+        $this->approve(EventAttendee::sole())->assertOk();
+
+        $attendee = EventAttendee::sole();
+        $this->assertSame(EventRegistrationStatus::Approved, $attendee->status);
+        $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
+        $this->assertSame(500, $this->balance());
+    }
+
     public function test_a_coupon_on_a_free_event_is_refused(): void
     {
         Coupon::factory()->create(['code' => 'FREEBIE']);

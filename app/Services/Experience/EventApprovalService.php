@@ -211,6 +211,12 @@ class EventApprovalService
             ])->save();
         }
 
+        // A registration a coupon made free was confirmed paid when it was
+        // made (docs/decisions/pricing-offers-and-coupons.md): nothing is due.
+        if ($attendee->payment_state === EventPaymentState::Paid || (int) $attendee->price_points <= 0) {
+            return;
+        }
+
         if (($attendee->payment_method ?? WalletMethod::KEY) !== WalletMethod::KEY) {
             return;
         }

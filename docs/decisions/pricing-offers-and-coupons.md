@@ -84,8 +84,10 @@ this protocol is held by review, not by a test.
 booking / session / registration), `events/{event}/register` and
 `GET payment-methods`. `POST member/coupons/preview` ("Apply" in the app,
 throttled 20/min) prices without writing. A code that cannot be used answers
-422 `{message, reason}` with a `CouponRejection` reason. Purchases return
-`coupon: {code, applied, points_discounted, message}`. A live sale shows as a
+422 `{message, reason}` with a `CouponRejection` reason. Bookings, plan
+purchases and payments return `coupon: {code, applied, points_discounted,
+message}` beside `data`; a registration's price after the code is its own
+`price_points`. A live sale shows as a
 `sale` block (original label, sale label, when it ends) on the space and
 package listings and details — labels only.
 
@@ -110,6 +112,8 @@ and whether each use still counts. A used coupon is deactivated, not deleted
 - **An extension** keeps the booking's locked choice (plan discount, else the
   sale by usage time), adds to `price_points` and `list_price_points`, and
   never takes a coupon.
+- **A registration a coupon made free** is confirmed paid; if the event
+  needs approval, approving it charges nothing.
 - **A coupon on something already owed** is refused while a payment for it
   is pending, once anything was paid toward it, or if it already has a code.
 - **`list_price_points`** on bookings, walk-ins, registrations and payments

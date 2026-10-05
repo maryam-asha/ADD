@@ -35,7 +35,14 @@ class PreviewCouponRequest extends FormRequest
         return [
             'code' => ['required', 'string', 'max:40'],
             'purpose' => ['required', Rule::enum(PricingPurpose::class)],
-            'plan_id' => ['required_if:purpose,'.PricingPurpose::PlanPurchase->value, 'nullable', 'integer', 'exists:plans,id'],
+            // Only a plan the member could buy — active and public, as both
+            // purchase paths require.
+            'plan_id' => [
+                'required_if:purpose,'.PricingPurpose::PlanPurchase->value,
+                'nullable',
+                'integer',
+                Rule::exists('plans', 'id')->where('is_active', true)->where('is_public', true),
+            ],
             'payable_id' => ['required_if:purpose,'.PricingPurpose::CoworkingSession->value, 'nullable', 'integer'],
             'space_id' => ['nullable', 'integer', 'exists:spaces,id', 'required_with:start_at,end_at'],
             'start_at' => ['nullable', 'date', 'required_with:space_id'],

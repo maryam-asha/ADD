@@ -85,7 +85,11 @@ class CouponApplicationTest extends TestCase
         $coupon = Coupon::factory()->percentage(20)->create(['code' => 'LATE20']);
         $booking = $this->unpaidBooking();
 
-        $this->pay('booking', $booking->id, 'late20')->assertCreated();
+        $this->pay('booking', $booking->id, 'late20')
+            ->assertCreated()
+            ->assertJsonPath('coupon.code', 'LATE20')
+            ->assertJsonPath('coupon.applied', true)
+            ->assertJsonPath('coupon.points_discounted', 20);
 
         $booking->refresh();
         $this->assertSame(80, $booking->price_points);
@@ -148,7 +152,8 @@ class CouponApplicationTest extends TestCase
         $this->pay('coworking_session', $walkin->id, 'CLEAR')
             ->assertCreated()
             ->assertJsonPath('data.payment', null)
-            ->assertJsonPath('data.next', 'done');
+            ->assertJsonPath('data.next', 'done')
+            ->assertJsonPath('coupon.points_discounted', 40);
 
         $this->assertSame(0, $walkin->refresh()->price_points);
         $this->assertSame(0, Payment::count());
