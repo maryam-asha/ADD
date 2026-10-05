@@ -8,6 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Booking\IndexBookingsRequest;
 use App\Http\Resources\AdminBookingResource;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Arr;
 
 /**
  * The general operations view of bookings.
@@ -65,7 +66,11 @@ class BookingController extends Controller
 
         return response()->json([
             'data' => [
-                ...(new AdminBookingResource($booking))->resolve(),
+                // The list row's window and rejection reason are left out:
+                // `when` carries the window in the district's time, and
+                // `request_status` the reason — including the one a lapsed
+                // request is explained by — so neither appears twice.
+                ...Arr::except((new AdminBookingResource($booking))->resolve(), ['start_at', 'end_at', 'rejection_reason']),
                 // The same blocks the member sees, so operations and the
                 // member never disagree about what a booking cost or where
                 // its approval stands.

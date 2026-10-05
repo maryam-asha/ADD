@@ -35,6 +35,7 @@ class Booking extends Model
         'start_at',
         'end_at',
         'status',
+        'required_approval',
         'payment_state',
         'payment_source',
         'checked_in_at',
@@ -75,6 +76,7 @@ class Booking extends Model
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'approved_at' => 'datetime',
+            'required_approval' => 'boolean',
         ];
     }
 

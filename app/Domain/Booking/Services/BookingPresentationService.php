@@ -196,14 +196,18 @@ class BookingPresentationService
     }
 
     /**
-     * The Submitted → Under Review → Approved/Rejected stepper.
+     * The Submitted → Under Review → Confirmed/Rejected stepper.
      *
-     * Derived from `status` and `approved_at`, never stored. A booking on
-     * a space that auto-confirms never had a review, so its stepper
-     * collapses to a single completed step rather than showing a review
-     * stage that never happened. Once the booking has played out — completed
-     * or a no-show — that outcome follows as one more step, with `current`
-     * set to `outcome`.
+     * Derived from `status` and `approved_at`, never stored. Every step past
+     * `submitted` is keyed by a BookingStatus value and labelled by its
+     * label(), so the stepper never names or words a status differently from
+     * `status`/`status_label`. There is no `current` field: where the booking
+     * stands is its `status`, and each step's `state` already marks it.
+     *
+     * A booking on a space that auto-confirms never had a review, so its
+     * stepper skips that stage rather than showing one that never happened.
+     * Once the booking has played out — completed or a no-show — that
+     * outcome follows as one more step.
      *
      * @return array<string, mixed>
      */
@@ -216,56 +220,59 @@ class BookingPresentationService
             'at' => $this->time->toLocal($booking->created_at)?->toIso8601String(),
         ];
 
-        // Auto-confirmed: no approval was ever required or recorded. A
-        // completed booking or a no-show went through the same door.
-        $wasConfirmed = in_array($booking->status, [BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow], true);
+        $step = fn (BookingStatus $status, string $state, ?CarbonInterface $at) => [
+            'key' => $status->value,
+            'label' => $status->label($locale),
+            'state' => $state,
+            'at' => $this->time->toLocal($at)?->toIso8601String(),
+        ];
 
         $outcome = $this->outcomeStep($booking, $locale);
 
-        if ($wasConfirmed && $booking->approved_at === null) {
+        // Auto-confirmed: its space needed no approval when it was booked,
+        // so it was confirmed on submission — whatever came after, cancelled
+        // or played out, there was no review to show. A recorded decision or
+        // a pending/rejected status proves a review regardless of the flag.
+        $reviewed = $booking->required_approval
+            || $booking->approved_at !== null
+            || in_array($booking->status, [BookingStatus::Pending, BookingStatus::Rejected], true);
+
+        if (! $reviewed) {
             return [
-                'current' => $outcome === null ? 'confirmed' : 'outcome',
                 'steps' => array_values(array_filter([
                     $submitted,
-                    [
-                        'key' => 'confirmed',
-                        'label' => __('api.booking.steps.confirmed', [], $locale),
-                        'state' => 'complete',
-                        'at' => $this->time->toLocal($booking->created_at)?->toIso8601String(),
-                    ],
-                    $outcome,
+                    $step(BookingStatus::Confirmed, 'complete', $booking->created_at),
+                    $booking->status === BookingStatus::Cancelled
+                        ? $step(BookingStatus::Cancelled, 'complete', $booking->cancelled_at)
+                        : $outcome,
                 ])),
                 'rejection_reason' => null,
             ];
         }
 
-        $decidedAt = $this->time->toLocal($booking->approved_at)?->toIso8601String();
-
-        [$current, $decisionKey, $decisionState] = match ($booking->status) {
-            BookingStatus::Pending => ['under_review', 'approved', 'upcoming'],
-            BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow => ['decision', 'approved', 'complete'],
-            BookingStatus::Rejected => ['decision', 'rejected', 'complete'],
-            BookingStatus::Cancelled => ['decision', 'cancelled', 'complete'],
-        };
+        // The review began the moment the request was submitted. Each later
+        // step is dated by what recorded it: `approved_at` is stamped by an
+        // approval and a rejection alike, `cancelled_at` by a cancellation —
+        // and a booking approved before it was cancelled keeps its approval.
+        $steps = [
+            $submitted,
+            $step(BookingStatus::Pending, $booking->status === BookingStatus::Pending ? 'current' : 'complete', $booking->created_at),
+            ...match ($booking->status) {
+                BookingStatus::Pending => [$step(BookingStatus::Confirmed, 'upcoming', null)],
+                BookingStatus::Rejected => [$step(BookingStatus::Rejected, 'complete', $booking->approved_at)],
+                BookingStatus::Cancelled => array_filter([
+                    $booking->approved_at !== null ? $step(BookingStatus::Confirmed, 'complete', $booking->approved_at) : null,
+                    $step(BookingStatus::Cancelled, 'complete', $booking->cancelled_at),
+                ]),
+                BookingStatus::Confirmed, BookingStatus::Completed, BookingStatus::NoShow => array_filter([
+                    $step(BookingStatus::Confirmed, 'complete', $booking->approved_at),
+                    $outcome,
+                ]),
+            },
+        ];
 
         return [
-            'current' => $outcome === null ? $current : 'outcome',
-            'steps' => array_values(array_filter([
-                $submitted,
-                [
-                    'key' => 'under_review',
-                    'label' => __('api.booking.steps.under_review', [], $locale),
-                    'state' => $booking->status === BookingStatus::Pending ? 'current' : 'complete',
-                    'at' => null,
-                ],
-                [
-                    'key' => $decisionKey,
-                    'label' => __("api.booking.steps.{$decisionKey}", [], $locale),
-                    'state' => $decisionState,
-                    'at' => $decisionState === 'complete' ? $decidedAt : null,
-                ],
-                $outcome,
-            ])),
+            'steps' => array_values($steps),
             // A lapsed request stores no reason; it is explained in the
             // viewer's language rather than the server's at the time.
             'rejection_reason' => $booking->lapsedUnreviewed()
@@ -284,21 +291,19 @@ class BookingPresentationService
      */
     private function outcomeStep(Booking $booking, string $locale): ?array
     {
-        $key = match ($booking->status) {
-            BookingStatus::Completed => 'completed',
-            BookingStatus::NoShow => 'no_show',
+        $at = match ($booking->status) {
+            BookingStatus::Completed => $booking->checked_out_at ?? $booking->end_at,
+            BookingStatus::NoShow => $booking->end_at,
             default => null,
         };
 
-        if ($key === null) {
+        if ($at === null) {
             return null;
         }
 
-        $at = $key === 'completed' ? ($booking->checked_out_at ?? $booking->end_at) : $booking->end_at;
-
         return [
-            'key' => $key,
-            'label' => __("api.booking.steps.{$key}", [], $locale),
+            'key' => $booking->status->value,
+            'label' => $booking->status->label($locale),
             'state' => 'complete',
             'at' => $this->time->toLocal($at)?->toIso8601String(),
         ];

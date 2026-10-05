@@ -329,13 +329,6 @@ return [
         ],
         'steps' => [
             'submitted' => 'Submitted',
-            'under_review' => 'Under Review',
-            'approved' => 'Approved',
-            'rejected' => 'Rejected',
-            'confirmed' => 'Confirmed',
-            'cancelled' => 'Cancelled',
-            'completed' => 'Completed',
-            'no_show' => 'No-show',
         ],
         'payment_methods' => [
             'wallet' => 'Use Wallet Balance',

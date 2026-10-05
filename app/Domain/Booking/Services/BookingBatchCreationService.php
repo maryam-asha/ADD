@@ -257,6 +257,7 @@ class BookingBatchCreationService
                     'start_at' => $row['start'],
                     'end_at' => $row['end'],
                     'status' => $status,
+                    'required_approval' => $status === BookingStatus::Pending,
                     'amount_owed' => $this->points->pointsToUsd($row['quote']->finalPoints),
                     'currency' => 'USD',
                     ...$row['quote']->attributes(),

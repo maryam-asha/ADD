@@ -180,9 +180,13 @@ class AdminBookingIndexTest extends TestCase
         $this->withHeader('lang', 'en')
             ->getJson("/api/v1/admin/bookings/{$booking->id}")
             ->assertOk()
-            ->assertJsonPath('data.request_status.current', 'under_review')
             ->assertJsonPath('data.breakdown.total.points', 100)
-            ->assertJsonPath('data.status', 'pending');
+            ->assertJsonPath('data.status', 'pending')
+            ->assertJsonMissingPath('data.start_at')
+            ->assertJsonMissingPath('data.end_at')
+            ->assertJsonMissingPath('data.rejection_reason')
+            ->assertJsonPath('data.request_status.rejection_reason', null)
+            ->assertJsonStructure(['data' => ['when' => ['start_at', 'end_at']]]);
     }
 
     public function test_a_member_cannot_reach_the_operations_index(): void

@@ -137,6 +137,7 @@ class BookingCreationService
                 'start_at' => $startAt,
                 'end_at' => $endAt,
                 'status' => $status,
+                'required_approval' => $status === BookingStatus::Pending,
                 'amount_owed' => $amount,
                 'currency' => 'USD',
                 ...$quote->attributes(),

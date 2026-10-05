@@ -20,6 +20,7 @@ use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
+use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -175,10 +176,13 @@ class MemberBookingLifecycleTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data.status', 'pending')
             ->assertJsonPath('data.status_label', 'Under Review')
-            ->assertJsonPath('data.request_status.current', 'under_review')
             ->assertJsonPath('data.request_status.steps.0.state', 'complete')
+            ->assertJsonPath('data.request_status.steps.1.key', 'pending')
+            ->assertJsonPath('data.request_status.steps.1.label', 'Under Review')
             ->assertJsonPath('data.request_status.steps.1.state', 'current')
-            ->assertJsonPath('data.request_status.steps.2.state', 'upcoming');
+            ->assertJsonPath('data.request_status.steps.2.key', 'confirmed')
+            ->assertJsonPath('data.request_status.steps.2.state', 'upcoming')
+            ->assertJsonMissingPath('data.request_status.current');
     }
 
     public function test_a_rejected_booking_shows_its_reason_on_a_completed_decision_step(): void
@@ -215,8 +219,7 @@ class MemberBookingLifecycleTest extends TestCase
         $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
 
         $response->assertOk()
-            ->assertJsonCount(2, 'data.request_status.steps')
-            ->assertJsonPath('data.request_status.current', 'confirmed');
+            ->assertJsonCount(2, 'data.request_status.steps');
     }
 
     /**
@@ -236,10 +239,10 @@ class MemberBookingLifecycleTest extends TestCase
 
         $response->assertOk()
             ->assertJsonCount(4, 'data.request_status.steps')
-            ->assertJsonPath('data.request_status.current', 'outcome')
-            ->assertJsonPath('data.request_status.steps.2.key', 'approved')
+            ->assertJsonPath('data.request_status.steps.2.key', 'confirmed')
             ->assertJsonPath('data.request_status.steps.3.key', 'completed')
             ->assertJsonPath('data.request_status.steps.3.label', 'Completed')
+            ->assertJsonPath('data.request_status.steps.2.label', 'Confirmed')
             ->assertJsonPath('data.request_status.steps.3.state', 'complete');
     }
 
@@ -257,10 +260,79 @@ class MemberBookingLifecycleTest extends TestCase
 
         $response->assertOk()
             ->assertJsonCount(3, 'data.request_status.steps')
-            ->assertJsonPath('data.request_status.current', 'outcome')
             ->assertJsonPath('data.request_status.steps.1.key', 'confirmed')
             ->assertJsonPath('data.request_status.steps.2.key', 'no_show')
-            ->assertJsonPath('data.request_status.steps.2.label', 'No-show');
+            ->assertJsonPath('data.request_status.steps.2.label', 'Not Attended');
+    }
+
+    /**
+     * Cancelled while still under review: the review is dated from the
+     * submission, and the cancellation from when it happened.
+     */
+    public function test_a_request_cancelled_under_review_dates_both_steps(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace(['requires_approval' => true]);
+        $booking = $this->bookingFor($member, $space, 14, ['status' => BookingStatus::Pending, 'required_approval' => true]);
+        $booking->forceFill(['status' => BookingStatus::Cancelled, 'cancelled_at' => now()->addHours(2)])->save();
+
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
+
+        $local = fn ($at) => app(LocalTime::class)->toLocal($at)->toIso8601String();
+
+        $response->assertOk()
+            ->assertJsonCount(3, 'data.request_status.steps')
+            ->assertJsonPath('data.request_status.steps.1.key', 'pending')
+            ->assertJsonPath('data.request_status.steps.1.state', 'complete')
+            ->assertJsonPath('data.request_status.steps.1.at', $local($booking->created_at))
+            ->assertJsonPath('data.request_status.steps.2.key', 'cancelled')
+            ->assertJsonPath('data.request_status.steps.2.at', $local($booking->cancelled_at));
+    }
+
+    /**
+     * Booked on a space that needs no approval, then cancelled: it was
+     * confirmed on submission, so no review stage is shown.
+     */
+    public function test_an_auto_confirmed_booking_cancelled_later_shows_no_review(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace();
+        $booking = $this->bookingFor($member, $space, 14, [
+            'status' => BookingStatus::Cancelled,
+            'required_approval' => false,
+            'cancelled_at' => now(),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
+
+        $response->assertOk()
+            ->assertJsonCount(3, 'data.request_status.steps')
+            ->assertJsonPath('data.request_status.steps.0.key', 'submitted')
+            ->assertJsonPath('data.request_status.steps.1.key', 'confirmed')
+            ->assertJsonPath('data.request_status.steps.2.key', 'cancelled');
+        $this->assertNotNull($response->json('data.request_status.steps.2.at'));
+    }
+
+    /** Approved, then cancelled: the approval stays in the history. */
+    public function test_a_booking_cancelled_after_its_approval_keeps_the_approval_step(): void
+    {
+        $member = $this->actingAsMember();
+        $space = $this->openSpace(['requires_approval' => true]);
+        $booking = $this->bookingFor($member, $space, 14, [
+            'status' => BookingStatus::Cancelled,
+            'approved_at' => now()->subHour(),
+            'cancelled_at' => now(),
+        ]);
+
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}");
+
+        $response->assertOk()
+            ->assertJsonCount(4, 'data.request_status.steps')
+            ->assertJsonPath('data.request_status.steps.2.key', 'confirmed')
+            ->assertJsonPath('data.request_status.steps.3.key', 'cancelled')
+            ->assertJsonPath('data.request_status.steps.3.label', 'Cancelled');
+        $this->assertNotNull($response->json('data.request_status.steps.2.at'));
+        $this->assertNotNull($response->json('data.request_status.steps.3.at'));
     }
 
     /**
