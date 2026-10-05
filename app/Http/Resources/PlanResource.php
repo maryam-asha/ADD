@@ -34,6 +34,12 @@ class PlanResource extends JsonResource
             'is_active' => $this->is_active,
             'is_public' => $this->is_public,
             'order' => $this->order,
+            // The sale as the admin entered it, live or not — dashboard only,
+            // so a sale scheduled for next week is not announced early;
+            // members see a running one as labels (PackageBrowseService).
+            'sale_price_points' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_price_points),
+            'sale_starts_at' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_starts_at?->toISOString()),
+            'sale_ends_at' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_ends_at?->toISOString()),
             'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
                 'id' => $b->id,
                 'category' => $b->category->value,

@@ -119,6 +119,7 @@ return [
         'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
         'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
+        'sale_not_below_price' => 'The sale price must be lower than the normal price.',
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
