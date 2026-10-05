@@ -307,6 +307,8 @@ return [
         'vat_label' => 'VAT (:percent%)',
         'hours_times_rate' => ':duration × :rate / hour',
         'discount_label' => 'Discount (:percent%)',
+        'sale_label' => 'Offer',
+        'coupon_label' => 'Coupon (:code)',
         'note_label' => 'Add a Note (Optional)',
         'note_placeholder' => 'e.g. Meeting purpose, special requests…',
         'statuses' => [
@@ -477,6 +479,7 @@ return [
         ],
         'price_points' => ':points pts',
         'per_hour' => 'hour',
+        'sale_ends' => 'Offer ends :date',
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
@@ -515,6 +518,7 @@ return [
     ],
 
     'package' => [
+        'sale_ends' => 'Offer ends :date',
         'title' => 'Packages & Subscription',
         'subtitle' => 'Choose the right plan for your business.',
         'tabs' => [
@@ -614,6 +618,19 @@ return [
     ],
 
     'coupon' => [
+        'not_found' => 'This code is not valid.',
+        'not_started' => 'This code is not active yet.',
+        'expired' => 'This code has expired.',
+        'usage_limit_reached' => 'This code has reached its usage limit.',
+        'per_user_limit_reached' => 'You have already used this code as many times as it allows.',
+        'not_eligible' => 'This code is not available to your account.',
+        'new_members_only' => 'This code is for new members, on their first purchase.',
+        'not_applicable' => 'This code cannot be used on this purchase.',
+        'min_amount_not_met' => 'This code needs a purchase of at least :points points.',
+        'not_combinable' => 'This code cannot be combined with the current offer.',
+        'already_applied' => 'A code has already been applied to this.',
+        'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
+        'offer_is_better' => 'The current offer already gives you a lower price, so the code was not applied.',
         'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
     ],
 

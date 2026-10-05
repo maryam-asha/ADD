@@ -306,6 +306,8 @@ return [
         'vat_label' => 'ضريبة القيمة المضافة (:percent%)',
         'hours_times_rate' => ':duration × :rate / ساعة',
         'discount_label' => 'خصم (:percent%)',
+        'sale_label' => 'عرض',
+        'coupon_label' => 'كوبون (:code)',
         'note_label' => 'أضف ملاحظة (اختياري)',
         'note_placeholder' => 'مثال: غرض الاجتماع، طلبات خاصة…',
         'statuses' => [
@@ -467,6 +469,7 @@ return [
         ],
         'price_points' => ':points نقطة',
         'per_hour' => 'ساعة',
+        'sale_ends' => 'ينتهي العرض في :date',
         'per_day' => 'يوم',
         'up_to_people' => 'حتى :count أشخاص',
         'single_seat' => 'مقعد واحد',
@@ -505,6 +508,7 @@ return [
     ],
 
     'package' => [
+        'sale_ends' => 'ينتهي العرض في :date',
         'title' => 'الباقات والاشتراكات',
         'subtitle' => 'اختر الباقة المناسبة لأعمالك.',
         'tabs' => [
@@ -604,6 +608,19 @@ return [
     ],
 
     'coupon' => [
+        'not_found' => 'هذا الكود غير صالح.',
+        'not_started' => 'هذا الكود لم يبدأ بعد.',
+        'expired' => 'انتهت صلاحية هذا الكود.',
+        'usage_limit_reached' => 'وصل هذا الكود إلى الحد الأقصى لعدد الاستخدامات.',
+        'per_user_limit_reached' => 'لقد استخدمت هذا الكود العدد الأقصى من المرات المسموح به.',
+        'not_eligible' => 'هذا الكود غير متاح لحسابك.',
+        'new_members_only' => 'هذا الكود مخصص للأعضاء الجدد عند أول عملية شراء.',
+        'not_applicable' => 'لا يمكن استخدام هذا الكود في هذه العملية.',
+        'min_amount_not_met' => 'يتطلب هذا الكود عملية شراء لا تقل عن :points نقطة.',
+        'not_combinable' => 'لا يمكن الجمع بين هذا الكود والعرض الحالي.',
+        'already_applied' => 'تم تطبيق كود على هذا الطلب مسبقاً.',
+        'payment_in_progress' => 'هناك عملية دفع جارية لهذا الطلب؛ أكملها أو ألغها قبل تطبيق الكود.',
+        'offer_is_better' => 'العرض الحالي يمنحك سعراً أقل، لذلك لم يُطبَّق الكود.',
         'has_redemptions' => 'هذا الكوبون مُستخدَم؛ عطّله بدلاً من حذفه.',
     ],
 
