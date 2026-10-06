@@ -27,9 +27,14 @@ class StoreBookingRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'space_id' => ['required', 'integer', 'exists:spaces,id'],
-            'start_at' => ['required', 'date'],
-            'end_at' => ['required', 'date', 'after:start_at'],
+            // With the id of a booking already made, nothing is created: only
+            // how it is paid changes — so the creation fields are optional,
+            // and any sent must be that booking's
+            // (docs/superpowers/specs/2026-10-06-prepayment-all-or-nothing-design.md).
+            'booking_id' => ['nullable', 'integer'],
+            'space_id' => ['required_without:booking_id', 'integer', 'exists:spaces,id'],
+            'start_at' => ['required_without:booking_id', 'date'],
+            'end_at' => ['required_without:booking_id', 'date', 'after:start_at'],
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],
             'note' => ['nullable', 'string', 'max:500'],

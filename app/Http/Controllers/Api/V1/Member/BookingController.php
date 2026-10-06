@@ -16,15 +16,14 @@ use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
-use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
-use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
+use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
 use App\Http\Requests\Member\Booking\ListBookingsRequest;
@@ -32,7 +31,6 @@ use App\Http\Requests\Member\Booking\PreviewBookingRequest;
 use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
-use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
 use App\Support\Presenters\CouponOutcomePresenter;
@@ -43,8 +41,8 @@ use Throwable;
 
 class BookingController extends Controller
 {
+    use AnswersPayments;
     use LogsSensitiveActions;
-    use RespondsToGatewayFailures;
 
     /**
      * The member's own bookings, filtered on their `status` — one or several,
@@ -234,9 +232,13 @@ class BookingController extends Controller
     public function store(
         StoreBookingRequest $request,
         BookingCreationService $creations,
-        PaymentService $payments,
+        PayableCheckout $checkout,
         PaymentMethodRegistry $methods,
     ): JsonResponse {
+        if ($request->validated('booking_id') !== null) {
+            return $this->payExisting($request, $checkout);
+        }
+
         $space = Space::findOrFail($request->validated('space_id'));
 
         $walletOwnerType = $request->validated('wallet_owner_type')
@@ -268,7 +270,7 @@ class BookingController extends Controller
 
         $method = $request->validated('payment_method');
         $card = $method !== null && in_array($method, $methods->gatewayKeys(), true)
-            ? $this->startCardPayment($payments, $booking, $request->user(), $method, app()->getLocale())
+            ? $this->payBesideNewRecord($checkout, PaymentPurpose::Booking, $booking, $request->user(), $method)
             : [];
 
         $code = $request->validated('coupon_code');
@@ -280,31 +282,49 @@ class BookingController extends Controller
     }
 
     /**
-     * A booking paid by card is made first, unpaid — it holds its slot like
-     * any unpaid booking — and then its payment is opened. If the gateway
-     * cannot be reached (or the charge cannot be priced) the booking stands,
-     * still unpaid, and the member is told the payment did not start: they
-     * can pay again, or at the desk. A booking that costs nothing has no
-     * payment to open, and says so the same way.
-     *
-     * @return array{payment: PaymentResource|null, redirect_url: string|null, payment_error?: string}
+     * The confirm screen sent again with the booking it made: nothing is
+     * created and no creation rule runs — the booking exists and holds its
+     * slot, and its price was fixed when it was made. Only how it is paid
+     * changes, through the same checkout every operation uses.
      */
-    private function startCardPayment(PaymentService $payments, Booking $booking, User $member, string $method, ?string $lang): array
+    private function payExisting(StoreBookingRequest $request, PayableCheckout $checkout): JsonResponse
     {
-        try {
-            ['payment' => $payment, 'start' => $start] = $payments->start(PaymentPurpose::Booking, $member, $method, array_filter([
-                'payable' => $booking,
-                'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
-            ]));
-        } catch (ReceptionActionException $e) {
-            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($e->messageKey, $e->params)];
-        } catch (Throwable $e) {
-            $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
+        $member = $request->user();
+        $booking = Booking::query()->where('user_id', $member->id)->findOrFail($request->validated('booking_id'));
 
-            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($failure['key'])];
+        if (! $this->sentValuesMatch($booking, $request)) {
+            return response()->json(['message' => __('api.booking.booking_mismatch')], 422);
         }
 
-        return ['payment' => new PaymentResource($payment), 'redirect_url' => $start->redirectUrl];
+        try {
+            $outcome = $checkout->pay(PaymentPurpose::Booking, $booking, $member, $request->validated('payment_method'), [
+                'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ], $request->validated('coupon_code'));
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        return response()->json(
+            ['data' => new BookingResource($booking->refresh())]
+                + $this->checkoutFields($outcome)
+                + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : [])
+        );
+    }
+
+    /**
+     * The confirm screen may send its values unchanged; any it sends must
+     * be this booking's — a stale id in the app is refused, never paid.
+     */
+    private function sentValuesMatch(Booking $booking, StoreBookingRequest $request): bool
+    {
+        $space = $request->validated('space_id');
+        $start = $request->validated('start_at');
+        $end = $request->validated('end_at');
+
+        return ($space === null || (int) $space === $booking->space_id)
+            && ($start === null || Carbon::parse($start, 'UTC')->equalTo($booking->start_at))
+            && ($end === null || Carbon::parse($end, 'UTC')->equalTo($booking->end_at));
     }
 
     /**

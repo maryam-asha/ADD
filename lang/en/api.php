@@ -249,6 +249,7 @@ return [
         'room_in_coworking_mode' => 'This room is part of the co-working space at that time, so it cannot be booked as a room.',
         'buffer_conflict' => 'This booking is too close to another booking on this space.',
         'wallet_choice_required' => 'More than one wallet can cover this booking. Please choose one.',
+        'booking_mismatch' => 'These details do not match the booking being paid. Start the booking again.',
         'not_pending' => 'This booking is not awaiting approval.',
         'rejection_reason_required' => 'A rejection reason is required.',
         'approved' => 'Booking approved.',
