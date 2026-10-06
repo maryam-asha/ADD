@@ -8,8 +8,13 @@ namespace App\Domain\Booking\ValueObjects;
  */
 final class RateSegment
 {
+    /** The hourly rate in points, exact: an offer's 10% off 15 is 13.5. */
+    public readonly string $rate;
+
     public function __construct(
         public readonly int $seconds,
-        public readonly int $ratePoints,
-    ) {}
+        int|string $rate,
+    ) {
+        $this->rate = (string) $rate;
+    }
 }

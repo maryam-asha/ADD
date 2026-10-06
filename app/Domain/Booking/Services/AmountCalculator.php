@@ -36,9 +36,9 @@ class AmountCalculator
 
     /**
      * Several stretches at their own rates — a range part of which falls in
-     * a sale — summed exactly and rounded up once over the whole, so a
-     * partial point is never charged twice. A stretch with no time or no
-     * rate costs nothing.
+     * an offer, at an exact rate such as 13.5 — summed exactly and rounded
+     * up once over the whole, so a partial point is never charged twice. A
+     * stretch with no time or no rate costs nothing.
      *
      * @param  list<RateSegment>  $segments
      */
@@ -47,16 +47,16 @@ class AmountCalculator
         $points = '0';
 
         foreach ($segments as $segment) {
-            if ($segment->seconds <= 0 || $segment->ratePoints <= 0) {
+            if ($segment->seconds <= 0 || bccomp($segment->rate, '0', 2) <= 0) {
                 continue;
             }
 
-            $points = bcadd($points, bcmul((string) $segment->seconds, (string) $segment->ratePoints));
+            $points = bcadd($points, bcmul((string) $segment->seconds, $segment->rate, 2), 2);
         }
 
+        // Seconds × rate is point-seconds: divided by 3600 once, rounded up once.
         $whole = bcdiv($points, (string) self::SECONDS_PER_HOUR, 0);
-        $remainder = bcmod($points, (string) self::SECONDS_PER_HOUR);
 
-        return (int) (bccomp($remainder, '0') > 0 ? bcadd($whole, '1') : $whole);
+        return (int) (bccomp($points, bcmul($whole, (string) self::SECONDS_PER_HOUR, 2), 2) > 0 ? bcadd($whole, '1') : $whole);
     }
 }

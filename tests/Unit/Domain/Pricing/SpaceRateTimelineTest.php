@@ -29,7 +29,7 @@ class SpaceRateTimelineTest extends TestCase
     private function segments(Space $space, string $from, string $to): array
     {
         return array_map(
-            fn (RateSegment $s) => [$s->seconds, $s->ratePoints],
+            fn (RateSegment $s) => [$s->seconds, (int) $s->rate],
             (new SpaceRateTimeline)->segments($space, CarbonImmutable::parse($from), CarbonImmutable::parse($to)),
         );
     }
