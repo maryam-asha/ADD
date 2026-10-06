@@ -507,6 +507,55 @@ POST /api/v1/member/coupons/preview
 لا يُنشئ شيئاً ولا يستهلك الكوبون. مفاتيح `lines`:
 `base` | `sale` | `plan_discount` | `coupon`. الحد 20 طلباً في الدقيقة.
 
+### ج-2. كوبوناتي: ما يمكن للعضو تطبيقه
+
+```http
+GET /api/v1/member/coupons
+GET /api/v1/member/coupons?purpose=booking&space_id=5
+GET /api/v1/member/coupons?purpose=plan_purchase&plan_id=3
+GET /api/v1/member/coupons?purpose=event_registration&event_id=8
+```
+
+يعيد الكوبونات المخصّصة لهذا العضو باسمه أو لشركته، الفعّالة الآن (داخل
+مدتها ولم يستنفدها). مع `purpose` وعنصر يعيد فقط ما ينطبق عليه. لا يظهر
+الكوبون العام غير المخصّص لأحد: يبقى كوداً يُوزَّع خارج التطبيق. والعروض لا
+تظهر هنا، فهي تظهر في السعر نفسه (كتلة `sale`).
+
+| `purpose` | العنصر |
+|---|---|
+| `booking` أو `coworking_session` | `space_id` (اختياري) |
+| `plan_purchase` | `plan_id` (اختياري) |
+| `event_registration` | `event_id` (اختياري) |
+
+```json
+{
+  "data": [
+    {
+      "code": "ROOM20",
+      "name": "خصم الغرف",
+      "description": null,
+      "discount_type": "percentage",
+      "discount_value": 20,
+      "max_discount_points": 50,
+      "min_amount_points": null,
+      "combinable_with_offers": true,
+      "starts_at": null,
+      "ends_at": "2026-08-30T21:00:00.000000Z",
+      "uses_left": 1,
+      "targets": [{"purpose": "booking", "plan_id": null, "space_id": 5, "space_type": null, "event_id": null}]
+    }
+  ]
+}
+```
+
+- الترتيب: الأقرب انتهاءً أولاً.
+- `discount_type`: `percentage` (قيمة `discount_value` نسبة) أو `amount_off` (نقاط).
+- `uses_left`: كم مرة بقيت له، و`null` تعني بلا حد.
+- `targets` فارغة تعني أنه ينطبق على كل شيء ما عدا شحن المحفظة.
+- لا يضمن الظهور هنا أن يُطبَّق الكوبون: قد يكون السعر أقل من
+  `min_amount_points`، أو يكون العرض أفضل. للسعر النهائي استخدم زر "تطبيق"
+  (ج) بالكود نفسه.
+
 ### د. إرسال الكوبون مع الشراء
 
 حقل اختياري واحد `coupon_code` على:

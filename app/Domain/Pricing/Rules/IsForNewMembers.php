@@ -15,7 +15,7 @@ class IsForNewMembers implements CouponRule
 {
     public function __construct(private readonly FirstPurchasePolicy $firstPurchase) {}
 
-    public function rejection(Coupon $coupon, User $member, PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
     {
         return $coupon->new_members_only && ! $this->firstPurchase->isFirstPurchase($member)
             ? CouponRejection::NewMembersOnly

@@ -17,8 +17,12 @@ use Carbon\CarbonInterface;
  */
 class AppliesToTarget implements CouponRule
 {
-    public function rejection(Coupon $coupon, User $member, PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
     {
+        if ($target === null) {
+            return null;
+        }
+
         $targets = $coupon->relationLoaded('targets') ? $coupon->targets : $coupon->targets()->get();
 
         if ($targets->isEmpty()) {

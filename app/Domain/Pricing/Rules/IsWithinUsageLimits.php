@@ -19,7 +19,7 @@ class IsWithinUsageLimits implements CouponRule
 {
     public function __construct(private readonly CouponLedger $ledger) {}
 
-    public function rejection(Coupon $coupon, User $member, PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
     {
         $pending = $inFlight->coupon($coupon);
 

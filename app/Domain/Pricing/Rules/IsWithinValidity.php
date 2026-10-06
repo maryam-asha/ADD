@@ -16,7 +16,7 @@ use Carbon\CarbonInterface;
  */
 class IsWithinValidity implements CouponRule
 {
-    public function rejection(Coupon $coupon, User $member, PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
     {
         return match (true) {
             ! $coupon->is_active => CouponRejection::NotFound,

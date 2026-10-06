@@ -4246,6 +4246,71 @@
                                     }
                                 },
                                 {
+                                    "name": "My Coupons",
+                                    "request": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coupons?purpose=booking&space_id={{space_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coupons"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "purpose",
+                                                    "value": "booking",
+                                                    "description": "Optional: booking | coworking_session | plan_purchase | event_registration. Required with an item."
+                                                },
+                                                {
+                                                    "key": "space_id",
+                                                    "value": "{{space_id}}",
+                                                    "description": "Optional, for booking / coworking_session."
+                                                },
+                                                {
+                                                    "key": "plan_id",
+                                                    "value": "{{plan_id}}",
+                                                    "description": "Optional, for plan_purchase.",
+                                                    "disabled": true
+                                                },
+                                                {
+                                                    "key": "event_id",
+                                                    "value": "{{event_id}}",
+                                                    "description": "Optional, for event_registration.",
+                                                    "disabled": true
+                                                }
+                                            ]
+                                        },
+                                        "description": "The coupons given to this member, by name or through their company, usable now (inside their dates, not used up). With `purpose` and a space, plan or event, only those that apply to it. A code given to no one in particular is never listed; offers show on the price itself. `uses_left` is null for no limit; empty `targets` = applies to everything but wallet top-ups. Soonest-ending first."
+                                    },
+                                    "response": []
+                                },
+                                {
                                     "name": "Start Payment",
                                     "event": [
                                         {
