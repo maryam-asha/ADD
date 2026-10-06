@@ -85,4 +85,16 @@ class ReceptionSummaryTest extends TestCase
             ->assertJsonPath('data.upcoming.2.id', $expected->id)
             ->assertJsonPath('data.upcoming.2.at', '2026-08-17T14:00:00+03:00');
     }
+
+    /** A booking held for its card payment is not expected at the desk: it is neither paid nor confirmed. */
+    public function test_a_booking_held_for_its_payment_is_not_an_expected_arrival(): void
+    {
+        $confirmed = Booking::factory()->create(['start_at' => $this->at('14:00'), 'end_at' => $this->at('15:00'), 'status' => BookingStatus::Confirmed]);
+        Booking::factory()->create(['start_at' => $this->at('16:00'), 'end_at' => $this->at('17:00'), 'status' => BookingStatus::AwaitingPayment]);
+
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/admin/reception/summary')->assertOk();
+
+        $response->assertJsonPath('data.stats.expected_bookings', 1);
+        $this->assertSame([$confirmed->id], array_column($response->json('data.upcoming'), 'id'));
+    }
 }

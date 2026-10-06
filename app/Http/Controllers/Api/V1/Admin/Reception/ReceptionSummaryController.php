@@ -35,9 +35,10 @@ class ReceptionSummaryController extends Controller
         $locale = app()->getLocale();
 
         // Today's bookings not yet arrived: still to start, or started
-        // without a check-in and not yet over.
+        // without a check-in and not yet over. A booking held for its payment
+        // is not expected until it is paid or switched to another method.
         $expected = Booking::query()
-            ->whereIn('status', BookingStatus::open())
+            ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])
             ->whereNull('checked_in_at')
             ->where('end_at', '>', $now)
             ->where('start_at', '<=', $endOfToday);

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Identity;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -85,6 +86,17 @@ class MemberProfileTest extends TestCase
             ->assertJsonPath('data.counts.upcoming_bookings', 1)
             ->assertJsonPath('data.counts.sessions', 2)
             ->assertJsonPath('data.last_visit_at', '2026-08-17T11:00:00+03:00');
+    }
+
+    /** A booking held for its card payment is the member's booking, but not yet one to come. */
+    public function test_a_booking_held_for_its_payment_is_not_counted_as_upcoming(): void
+    {
+        Booking::factory()->create(['user_id' => $this->member->id, 'start_at' => $this->at('15:00', '2026-08-20'), 'end_at' => $this->at('16:00', '2026-08-20'), 'status' => BookingStatus::Confirmed]);
+        Booking::factory()->create(['user_id' => $this->member->id, 'start_at' => $this->at('15:00', '2026-08-21'), 'end_at' => $this->at('16:00', '2026-08-21'), 'status' => BookingStatus::AwaitingPayment]);
+
+        $this->profile('summary')->assertOk()
+            ->assertJsonPath('data.counts.bookings', 2)
+            ->assertJsonPath('data.counts.upcoming_bookings', 1);
     }
 
     /** The whole profile: contact and preferences, both profiles and their links, devices. */

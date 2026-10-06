@@ -118,8 +118,9 @@ class MemberProfileController extends Controller
             ],
             'counts' => [
                 'bookings' => Booking::query()->where('user_id', $user->id)->count(),
+                // A booking held for its payment is not upcoming until it is paid or switched to another method.
                 'upcoming_bookings' => Booking::query()->where('user_id', $user->id)
-                    ->whereIn('status', BookingStatus::open())->where('start_at', '>', now())->count(),
+                    ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])->where('start_at', '>', now())->count(),
                 'sessions' => WalkinSession::query()->where('user_id', $user->id)->count()
                     + Booking::query()->where('user_id', $user->id)->whereNotNull('checked_in_at')->count(),
                 'points_spent' => $wallet === null ? 0 : (int) abs((int) WalletTransaction::query()
