@@ -594,3 +594,34 @@ GET /api/v1/member/coupons?purpose=event_registration&event_id=8
 
 الكوبون الذي يجعل الباقة مجانية يفعّلها فوراً بلا دفع. وإلغاء الحجز، أو فشل
 البطاقة، أو انتهاء مهلة الدفع النقدي، يعيد استخدام الكوبون للعضو تلقائياً.
+
+### و. ما طُبِّق على العملية: `discounts`
+
+تفاصيل الحجز (`GET bookings/{id}`) والدفعة (`GET payments` و`payments/{id}`)
+وجلسة العمل المشترك تحمل `discounts`: كل ما حُسم منها، كما كان لحظة تثبيت
+السعر. تغيير العرض أو إعادة تسميته لاحقاً لا يغيّر ما يظهر هنا.
+
+```json
+"discounts": [
+  {
+    "kind": "offer",
+    "offer_id": 12,
+    "coupon_id": null,
+    "plan_discount_id": null,
+    "name": "أسبوع الغرف",
+    "code": null,
+    "discount_type": "percentage",
+    "discount_value": 20,
+    "max_discount_points": null,
+    "base_points": 100,
+    "points": 20,
+    "percent": 20
+  }
+]
+```
+
+- `kind`: `offer` (عرض تلقائي، يُعرَّف بـ`offer_id`)، أو `coupon` (كوبون،
+  بـ`coupon_id` و`code`)، أو `plan_discount` (خصم الباقة)، أو
+  `duration_saving` (توفير باقة طويلة؛ لا يُنقص السعر، و`name` هو ما قورنت به).
+- `points` ما حُسم من `base_points`، و`percent` نسبته مقرّبة للأسفل.
+- قائمة فارغة: لم يُحسم شيء.

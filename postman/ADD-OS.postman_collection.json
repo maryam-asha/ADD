@@ -10726,6 +10726,41 @@
                             }
                         },
                         {
+                            "name": "Coupon Revisions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}/revisions?per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}",
+                                        "revisions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "per_page",
+                                            "value": "15"
+                                        }
+                                    ]
+                                },
+                                "description": "Every version of an offer or coupon an admin saved (created / updated / deleted), newest first: terms, dates, is_active, targets, user_ids, recorded_at, changed_by. Paginated (per_page)."
+                            },
+                            "response": []
+                        },
+                        {
                             "name": "Update Coupon",
                             "request": {
                                 "method": "PUT",
@@ -10904,6 +10939,52 @@
                                 },
                                 "description": "Every operation with a discount or saving in the period, with its status. Filters: `from`, `to` (local dates), `kind` (offer|plan_discount|coupon|duration_saving), `purpose`, `status` (counted|void), `per_page`. `meta.totals` is over counted operations only; savings are totalled apart. Admin and operations."
                             }
+                        },
+                        {
+                            "name": "Offer Report",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reports/offers?from=2026-10-01&to=2026-10-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reports",
+                                        "offers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-10-01",
+                                            "description": "Required, local date Y-m-d."
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-10-31",
+                                            "description": "Required, local date, inclusive."
+                                        },
+                                        {
+                                            "key": "type",
+                                            "value": "coupon",
+                                            "description": "offer (default) | coupon",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Which offers (or coupons) ran in the period: per offer {id, name, code, deleted, periods:[{from, to, discount_type, discount_value, max_discount_points, min_amount_points, targets}], operations, points}. Periods are the stretches it was switched on and inside its dates, clipped to the period, on the terms it had then (from coupon_revisions). operations/points: counted uses in the period."
+                            },
+                            "response": []
                         }
                     ]
                 },

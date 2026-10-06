@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Pricing\Enums\CouponRevisionAction;
 use App\Domain\Pricing\Enums\CouponSource;
 use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Models\CouponRevision;
+use App\Domain\Pricing\Services\CouponHistory;
 use App\Http\Requests\Admin\StoreCouponRequest;
 use App\Http\Requests\Admin\UpdateCouponRequest;
 use App\Http\Resources\CouponRedemptionResource;
 use App\Http\Resources\CouponResource;
+use App\Http\Resources\CouponRevisionResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -94,11 +98,11 @@ class CouponController extends AdminResourceController
         );
     }
 
-    public function store(StoreCouponRequest $request): CouponResource
+    public function store(StoreCouponRequest $request, CouponHistory $history): CouponResource
     {
         $validated = $request->validated();
 
-        $coupon = DB::transaction(function () use ($validated, $request) {
+        $coupon = DB::transaction(function () use ($validated, $request, $history) {
             $coupon = Coupon::create(array_merge(
                 // One use per member unless the admin says otherwise (D11) —
                 // a coupon's default; an offer is limited only when set.
@@ -108,6 +112,7 @@ class CouponController extends AdminResourceController
             ));
 
             $this->syncAudience($coupon, $validated);
+            $history->record($coupon, CouponRevisionAction::Created, $request->user());
 
             return $coupon;
         });
@@ -117,14 +122,15 @@ class CouponController extends AdminResourceController
         return new CouponResource($coupon->refresh()->load(['targets', 'users']));
     }
 
-    public function update(UpdateCouponRequest $request, Coupon $coupon): JsonResponse
+    public function update(UpdateCouponRequest $request, Coupon $coupon, CouponHistory $history): JsonResponse
     {
         $validated = $request->validated();
         $before = $coupon->only(array_keys($this->couponAttributes($validated)));
 
-        DB::transaction(function () use ($coupon, $validated) {
+        DB::transaction(function () use ($coupon, $validated, $history, $request) {
             $coupon->update($this->couponAttributes($validated));
             $this->syncAudience($coupon, $validated);
+            $history->record($coupon, CouponRevisionAction::Updated, $request->user());
         });
 
         $this->logSensitiveAction('coupon_updated', $coupon, ['before' => $before, 'after' => $validated]);
@@ -144,10 +150,22 @@ class CouponController extends AdminResourceController
             throw new HttpResponseException(response()->json(['message' => __('api.coupon.has_redemptions')], 409));
         }
 
-        $coupon->delete();
+        // Its history outlives it: a period it ran in still lists it.
+        DB::transaction(function () use ($coupon) {
+            app(CouponHistory::class)->record($coupon, CouponRevisionAction::Deleted, request()->user());
+            $coupon->delete();
+        });
         $this->logSensitiveAction('coupon_deleted', $coupon, ['code' => $coupon->code, 'name' => $coupon->name]);
 
         return response()->noContent();
+    }
+
+    /** Every version of it an admin saved, newest first (CouponHistory). */
+    public function revisions(Request $request, Coupon $coupon): AnonymousResourceCollection
+    {
+        return CouponRevisionResource::collection(
+            CouponRevision::query()->where('coupon_id', $coupon->id)->latest('recorded_at')->latest('id')->paginate($request->integer('per_page', 15))
+        );
     }
 
     /** Who used it, newest first, and whether each use still counts. */

@@ -106,6 +106,17 @@ saving is not an offer.
   point, like an offer rate.
 - **Breakdown lines** keep their keys: `sale` (now labelled with the
   offer's name, or "Offer"), `discount`, `coupon`.
+- **`discounts`** on a booking (member detail, dashboard list and detail),
+  a payment, a co-working session and an event registration: each ledger
+  row as it was locked — `kind`, `offer_id` / `coupon_id` /
+  `plan_discount_id`, the `name` and `code` copied then, the terms, and
+  `base_points` / `points` / `percent`. Renaming or changing the offer
+  later does not rewrite it (`AppliedDiscountPresenter`; a list loads the
+  rows of a page in one query). Not a relation on the models: an event
+  registration is Ecosystem, which may not import Pricing.
+- **`GET member/coupons`**: the codes given to this member by name or
+  through their company, usable now, optionally for one purpose and item.
+  A code given to no one in particular is still never listed (D11).
 
 ## What the admin sees
 
@@ -123,6 +134,18 @@ saving is not an offer.
   saving, its record status, and `counted`. `meta.totals` covers counted
   operations only: count, list, final, points per kind,
   `effective_percent` (rounded down), and `saving_points` totalled apart.
+- **Offer history.** Every create, change and delete of an offer or a
+  coupon on the dashboard writes a `coupon_revisions` copy
+  (`CouponHistory`; no foreign key, so a deleted offer keeps its history).
+  `GET admin/coupons/{coupon}/revisions` lists them newest first.
+  **`GET admin/reports/offers`** (`from`/`to` local dates, required;
+  `type=coupon` for coupons) lists what ran in the period: each stretch it
+  was switched on and inside its own dates, clipped to the period, on the
+  terms it had then (a change that kept the terms — a new name — does not
+  split a stretch), plus `operations` and `points` from the ledger's
+  counted rows in the period. Coupons that existed before the table get one
+  copy of what they are now, dated when they were created: their earlier
+  states are not known.
 
 ## Rulings made while implementing
 
@@ -144,6 +167,8 @@ saving is not an offer.
    code nullable and add `is_automatic`; rename the ledger table and
    backfill it (percent, plus a `plan_discount` row per plan-discount
    redemption); drop the sale columns; and add plan references.
+   `2026_10_07_100000` adds `coupon_revisions` and gives every existing
+   coupon its first copy.
 2. **Tell the dashboard team:** remove the sale fields from the space and
    plan forms; add an Offers screen on `admin/coupons?is_automatic=1`, the
    plan reference fields, and the report.

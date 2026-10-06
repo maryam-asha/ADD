@@ -37,6 +37,7 @@ use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
+use App\Http\Controllers\Api\V1\Admin\OfferReportController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
@@ -162,11 +163,17 @@ Route::apiResource('plan-modules', PlanModuleController::class)
 Route::get('coupons', [CouponController::class, 'index']);
 Route::get('coupons/{coupon}', [CouponController::class, 'show']);
 Route::get('coupons/{coupon}/redemptions', [CouponController::class, 'redemptions']);
+Route::get('coupons/{coupon}/revisions', [CouponController::class, 'revisions']);
 
 // What was given off, and saved, over a period — every operation with its
 // status; totals over the ones that count
 // (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
 Route::get('reports/discounts', [DiscountReportController::class, 'index']);
+
+// Which offers (or, `type=coupon`, coupons) ran in a period, on the terms
+// they had then, and what each gave — from every version an admin saved
+// (CouponHistory), so a changed or deleted offer still shows where it ran.
+Route::get('reports/offers', [OfferReportController::class, 'index']);
 
 // Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
 // segment is `resource-types`, not `resources` — that name is already taken
