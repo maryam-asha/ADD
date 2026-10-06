@@ -111,6 +111,11 @@ Route::delete('coworking-sessions/current/end-request', [CoworkingSessionControl
 Route::get('coworking-sessions/{type}/{id}/report', [CoworkingSessionController::class, 'report'])
     ->whereIn('type', ['booking', 'walkin'])
     ->whereNumber('id');
+// A closed session paid from the app (the card chosen when ending it, or
+// another method) — docs/superpowers/specs/2026-10-06-prepayment-all-or-nothing-design.md.
+Route::post('coworking-sessions/{type}/{id}/pay', [CoworkingSessionController::class, 'pay'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
 
 // Self-service for a company admin managing their own company's members
 // (CompanyPolicy::manageMembers) — checked in the controller, not by role

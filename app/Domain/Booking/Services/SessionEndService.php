@@ -148,9 +148,9 @@ class SessionEndService
      * Once closed, the session has its price, and is paid as the member
      * asked: from their points, or in cash the desk says it holds. A wallet
      * that no longer covers it leaves the session unpaid — closing is not
-     * undone for it — and a card is paid by the member in the app. Anything
-     * already paid (a booking paid when made, a plan-covered walk-in) is
-     * left alone.
+     * undone for it — and a card is paid by the member in the app through
+     * POST member/coworking-sessions/{type}/{id}/pay. Anything already paid
+     * (a booking paid when made, a plan-covered walk-in) is left alone.
      */
     private function settleAsChosen(Booking|WalkinSession $session, ?string $method, bool $cashCollected, User $operator): void
     {
