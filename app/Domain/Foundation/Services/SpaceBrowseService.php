@@ -11,6 +11,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\BranchHoursPresenter;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -25,6 +26,7 @@ class SpaceBrowseService
         private readonly PointConversionService $points,
         private readonly BranchHoursPresenter $hours,
         private readonly PriceLabelPresenter $prices,
+        private readonly OfferResolver $offers,
     ) {}
 
     /**
@@ -274,8 +276,9 @@ class SpaceBrowseService
                 ? __('api.space.single_seat')
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
             'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
-            // A sale live now: the rate struck through, the sale rate, when it ends.
-            'sale' => $this->prices->sale(null, (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
+            // The best offer live now for this member: the rate struck
+            // through, the offer rate, when it ends.
+            'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -475,7 +478,7 @@ class SpaceBrowseService
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
                 'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
-                'sale' => $this->prices->sale(null, (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
+                'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

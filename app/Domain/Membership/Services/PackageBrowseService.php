@@ -15,6 +15,7 @@ use App\Domain\Membership\Models\PlanFeature;
 use App\Domain\Membership\Models\PlanResourceGrant;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Pricing\Services\OfferResolver;
 use App\Support\Presenters\PriceLabelPresenter;
 
 class PackageBrowseService
@@ -24,6 +25,7 @@ class PackageBrowseService
         private readonly MembershipResolver $membershipResolver,
         private readonly ResourceQuotaService $resourceQuota,
         private readonly PriceLabelPresenter $prices,
+        private readonly OfferResolver $offers,
     ) {}
 
     /**
@@ -39,7 +41,7 @@ class PackageBrowseService
     {
         $activeMembership = $this->membershipResolver->activeFor($user);
 
-        return $this->formatAvailablePackages($activeMembership, $moduleFilter);
+        return $this->formatAvailablePackages($activeMembership, $user, $moduleFilter);
     }
 
     /**
@@ -254,7 +256,7 @@ class PackageBrowseService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function formatAvailablePackages(?Membership $activeMembership, ?string $moduleFilter = null): array
+    private function formatAvailablePackages(?Membership $activeMembership, ?User $user, ?string $moduleFilter = null): array
     {
         $query = Plan::query()
             ->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType'])
@@ -281,9 +283,9 @@ class PackageBrowseService
         // `tags`/`balances_grant`/`discounts`/`resources_grant` are dropped
         // entirely — the card UI shows none of them, only "View details".
         // `getPackageDetails()` is the one place a client reads the full set.
-        return $plans->map(function (Plan $plan) use ($activeMembership) {
+        return $plans->map(function (Plan $plan) use ($activeMembership, $user) {
             $isCurrent = $activeMembership !== null && $activeMembership->plan_id === $plan->id;
-            $details = $this->formatPackage($plan, $isCurrent);
+            $details = $this->formatPackage($plan, $isCurrent, $user);
 
             $allFeatures = $details['features'];
             $details['features'] = array_slice($allFeatures, 0, 3);
@@ -324,13 +326,13 @@ class PackageBrowseService
             return null;
         }
 
-        return $this->formatPackage($plan, $isCurrent);
+        return $this->formatPackage($plan, $isCurrent, $user);
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function formatPackage(Plan $plan, bool $isCurrent): array
+    private function formatPackage(Plan $plan, bool $isCurrent, ?User $user): array
     {
         $pricePoints = (int) $plan->price_points;
         $price = (float) $this->points->pointsToUsd($pricePoints);
@@ -390,8 +392,9 @@ class PackageBrowseService
             'subtitle' => $subtitle,
             'formatted_price' => $formattedPrice,
             'formatted_point_price' => $formattedPointPrice,
-            // A sale live now: what a purchase opened now would cost.
-            'sale' => $this->prices->sale(null, $pricePoints, null, false, 'api.package'),
+            // The best offer live now for this member: what a purchase
+            // opened now would cost them.
+            'sale' => $this->prices->sale($this->offers->planNow($plan, $user), $pricePoints, $user, false, 'api.package'),
             'duration_days' => $plan->duration_days,
             'tags' => $tags,
             'features' => $features,
