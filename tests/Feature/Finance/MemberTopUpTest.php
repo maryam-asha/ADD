@@ -4,6 +4,7 @@ namespace Tests\Feature\Finance;
 
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
@@ -83,6 +84,24 @@ class MemberTopUpTest extends TestCase
         $this->topUp(['amount' => '10000', 'payment_method' => 'wallet'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('payment_method');
+    }
+
+    /**
+     * StartPayment opens Paymera only: a second gateway would be accepted
+     * here and charged through Paymera, so it is refused until StartPayment
+     * takes the method's key.
+     */
+    public function test_only_the_gateway_the_top_up_charges_is_accepted(): void
+    {
+        config(['payments.methods.other_card' => ['driver' => PaymeraGateway::class, 'enabled' => true]]);
+
+        $this->topUp(['amount' => '10000', 'payment_method' => 'other_card'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('payment_method');
+
+        $this->assertSame(0, Payment::count());
+
+        $this->topUp(['amount' => '10000', 'payment_method' => 'paymera'])->assertCreated();
     }
 
     public function test_the_minimum_is_named_in_money(): void

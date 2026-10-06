@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Member;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Rules\AmountFitsCurrency;
@@ -29,10 +30,14 @@ class StoreTopUpRequest extends FormRequest
     {
         return [
             // Omitted: the card. Only methods that can top up (cash cannot,
-            // nor can points buy points).
-            'payment_method' => ['nullable', 'string', Rule::in(array_keys(
-                app(PaymentMethodRegistry::class)->availableFor(PaymentPurpose::WalletTopUp)
-            ))],
+            // nor can points buy points) — and of those, only the gateway the
+            // top-up actually charges: StartPayment opens Paymera and nothing
+            // else, so another gateway would be accepted here and charged
+            // through Paymera. It needs StartPayment to take its key first.
+            'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
+                array_keys(app(PaymentMethodRegistry::class)->availableFor(PaymentPurpose::WalletTopUp)),
+                [PaymeraGateway::KEY],
+            )))],
             // A plain decimal: `numeric` alone lets `1e3` through, which
             // bcmath refuses (amountMinor()).
             'amount' => [
