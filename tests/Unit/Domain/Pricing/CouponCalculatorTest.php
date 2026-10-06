@@ -46,4 +46,20 @@ class CouponCalculatorTest extends TestCase
         $this->assertSame(40, $this->discount(CouponDiscountType::AmountOff, 100, 40));
         $this->assertSame(0, $this->discount(CouponDiscountType::AmountOff, 100, 0));
     }
+
+    public function test_a_fixed_price_takes_off_the_difference(): void
+    {
+        $this->assertSame(20, $this->discount(CouponDiscountType::FixedPrice, 100, 120));
+    }
+
+    public function test_a_fixed_price_at_or_above_the_price_takes_nothing(): void
+    {
+        $this->assertSame(0, $this->discount(CouponDiscountType::FixedPrice, 120, 120));
+        $this->assertSame(0, $this->discount(CouponDiscountType::FixedPrice, 150, 120));
+    }
+
+    public function test_a_fixed_price_is_capped_by_max_discount_points(): void
+    {
+        $this->assertSame(10, $this->discount(CouponDiscountType::FixedPrice, 50, 120, 10));
+    }
 }

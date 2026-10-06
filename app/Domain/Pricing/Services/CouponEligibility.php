@@ -49,6 +49,7 @@ class CouponEligibility
     public function resolve(string $code): Coupon
     {
         return Coupon::query()
+            ->where('is_automatic', false)
             ->where('code', Coupon::normalizeCode($code))
             ->where('is_active', true)
             ->first()

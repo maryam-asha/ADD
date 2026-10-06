@@ -14,7 +14,9 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\Services\CouponEligibility;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use InvalidArgumentException;
@@ -132,5 +134,36 @@ class CouponModelTest extends TestCase
             'base_points' => 100,
             'points_discounted' => 10,
         ], $attachment));
+    }
+
+    public function test_an_offer_has_no_code(): void
+    {
+        $offer = Coupon::factory()->automatic()->percentage(20)->create();
+
+        $this->assertNull($offer->fresh()->code);
+        $this->assertTrue($offer->fresh()->is_automatic);
+    }
+
+    public function test_two_offers_without_codes_coexist(): void
+    {
+        Coupon::factory()->automatic()->count(2)->create();
+
+        $this->assertSame(2, Coupon::query()->automatic()->count());
+    }
+
+    public function test_a_typed_code_never_resolves_to_an_offer(): void
+    {
+        Coupon::factory()->automatic()->create();
+
+        $this->expectException(CouponRejectedException::class);
+
+        app(CouponEligibility::class)->resolve('');
+    }
+
+    public function test_a_fixed_price_is_for_offers_only(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        Coupon::factory()->fixedPrice(100)->create();
     }
 }

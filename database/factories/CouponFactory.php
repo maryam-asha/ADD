@@ -39,6 +39,17 @@ class CouponFactory extends Factory
         return $this->state(['discount_type' => CouponDiscountType::Percentage, 'discount_value' => $percent]);
     }
 
+    /** An offer: no code, applies itself, no per-member limit unless a test sets one. */
+    public function automatic(): static
+    {
+        return $this->state(['is_automatic' => true, 'code' => null, 'per_user_limit' => null]);
+    }
+
+    public function fixedPrice(int $points): static
+    {
+        return $this->state(['discount_type' => CouponDiscountType::FixedPrice, 'discount_value' => $points]);
+    }
+
     public function amountOff(int $points): static
     {
         return $this->state(['discount_type' => CouponDiscountType::AmountOff, 'discount_value' => $points]);

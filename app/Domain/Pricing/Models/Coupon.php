@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\CouponSource;
 use Database\Factories\CouponFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,10 @@ use InvalidArgumentException;
 
 /**
  * A code a member types for a discount
- * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+ * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md) —
+ * or, `is_automatic`, an offer: no code, it applies itself wherever it is
+ * the best for the member
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  *
  * What it is for is `targets` (none: everything a coupon can be spent on);
  * who may use it is the rest — named members (`users`), a company's
@@ -31,6 +35,7 @@ class Coupon extends Model
 
     protected $fillable = [
         'code',
+        'is_automatic',
         'name',
         'description',
         'source',
@@ -52,6 +57,7 @@ class Coupon extends Model
     protected function casts(): array
     {
         return [
+            'is_automatic' => 'boolean',
             'name' => 'array',
             'description' => 'array',
             'source' => CouponSource::class,
@@ -81,6 +87,10 @@ class Coupon extends Model
             if ($value < 1 || ($coupon->discount_type === CouponDiscountType::Percentage && $value > 100)) {
                 throw new InvalidArgumentException('A coupon takes off between 1 and 100 percent, or at least one point.');
             }
+
+            if ($coupon->discount_type === CouponDiscountType::FixedPrice && ! $coupon->is_automatic) {
+                throw new InvalidArgumentException('A fixed price is for automatic offers only.');
+            }
         });
     }
 
@@ -90,9 +100,15 @@ class Coupon extends Model
         return mb_strtoupper(trim($code));
     }
 
-    public function setCodeAttribute(string $value): void
+    /** An offer has no code. */
+    public function setCodeAttribute(?string $value): void
     {
-        $this->attributes['code'] = self::normalizeCode($value);
+        $this->attributes['code'] = $value === null ? null : self::normalizeCode($value);
+    }
+
+    public function scopeAutomatic(Builder $query): Builder
+    {
+        return $query->where('is_automatic', true);
     }
 
     public function appliesToEverything(): bool
