@@ -23,6 +23,7 @@ use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
 use App\Http\Controllers\Api\V1\Member\SpaceController;
+use App\Http\Controllers\Api\V1\Member\TopUpController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
 
@@ -33,12 +34,13 @@ use Illuminate\Support\Facades\Route;
 
 // The member's own (personal) wallet: balances per category, the history
 // newest first, and one row as a receipt with the balance either side of
-// it. Topping it up is a payment like any other: POST payments with
-// purpose wallet_top_up (options and minimum from GET
-// payment-methods?purpose=wallet_top_up).
+// it. Topping it up is POST wallet/top-ups, by a prepaid method only (the
+// methods and the minimum from GET payment-methods?purpose=wallet_top_up);
+// cash for points is taken by reception.
 Route::get('wallet', [WalletController::class, 'show']);
 Route::get('wallet/transactions', [WalletController::class, 'transactions']);
 Route::get('wallet/transactions/{transaction}', [WalletController::class, 'transaction'])->whereNumber('transaction');
+Route::post('wallet/top-ups', [TopUpController::class, 'store']);
 
 // docs/decisions/wallet-points-categorization.md ("Routing for a user with
 // both a personal wallet and a company membership") — the read side of the

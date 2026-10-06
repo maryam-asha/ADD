@@ -18,7 +18,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * The member's own wallet: its balances, its history, and one row of it.
- * Topping it up is a payment (POST member/payments, purpose wallet_top_up).
+ * Topping it up is POST member/wallet/top-ups (TopUpController).
  *
  * `options()` is the read side of the hybrid wallet-routing decision
  * (docs/decisions/wallet-points-categorization.md, "Routing for a user with

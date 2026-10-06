@@ -446,12 +446,6 @@ return [
             'paymera' => 'Paymera - Bank card',
         ],
 
-        // What the member does next with a method, when its name alone
-        // does not say (PaymentMethodOptions `hint`).
-        'hints' => [
-            'cash_top_up' => 'Hand the cash to reception and the points are added to your wallet on the spot.',
-        ],
-
         // Ledger descriptions — these land in the member's wallet history.
         'credit_description' => 'Card payment :reference',
         'reversal_description' => 'Reversal of card payment :reference',

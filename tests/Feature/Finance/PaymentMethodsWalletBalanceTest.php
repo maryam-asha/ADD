@@ -111,12 +111,13 @@ class PaymentMethodsWalletBalanceTest extends TestCase
             ->assertJsonPath('data.methods.0.wallets.0.sufficient', false);
     }
 
-    public function test_a_top_up_offers_cash_at_reception_and_the_card_never_points(): void
+    public function test_a_top_up_offers_the_card_only_never_points_or_cash(): void
     {
         [, $token] = $this->memberWithToken(0);
 
+        // Cash for points is reception's, not the app's.
         $this->assertSame(
-            ['cash', 'paymera'],
+            ['paymera'],
             array_column($this->methods(['purpose' => 'wallet_top_up'], $token)->assertOk()->json('data.methods'), 'key'),
         );
     }

@@ -333,27 +333,6 @@ class MemberWalletTest extends TestCase
         $this->getJson("/api/v1/member/wallet/transactions/{$row->id}")->assertNotFound();
     }
 
-    public function test_a_cash_top_up_from_the_app_only_sends_the_member_to_reception(): void
-    {
-        $member = $this->member(300);
-        $this->actingAsMember($member);
-
-        // No amount: reception enters what is actually handed over.
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up', 'method' => 'cash'])
-            ->assertCreated()
-            ->assertJsonPath('data.payment', null)
-            ->assertJsonPath('data.redirect_url', null)
-            ->assertJsonPath('data.next', 'pay_at_reception');
-
-        // An amount, if sent, changes nothing — not even the card's floor.
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up', 'method' => 'cash', 'amount' => '10'])
-            ->assertCreated()
-            ->assertJsonPath('data.next', 'pay_at_reception');
-
-        $this->assertSame(0, Payment::count());
-        $this->assertSame(300, app(WalletService::class)->generalBalance($this->walletOf($member)));
-    }
-
     public function test_a_card_top_up_still_needs_an_amount(): void
     {
         $this->actingAsMember($this->member());

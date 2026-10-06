@@ -134,7 +134,7 @@ class MemberPaymentMethodsTest extends TestCase
         $this->assertSame(['wallet', 'cash'], $keys);
     }
 
-    public function test_a_top_up_lists_cash_with_directions_and_the_card_and_no_amount(): void
+    public function test_a_top_up_lists_the_card_only_and_no_amount(): void
     {
         $this->member();
 
@@ -142,13 +142,11 @@ class MemberPaymentMethodsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.amount_points', null)
             ->assertJsonPath('data.price', null)
-            ->assertJsonPath('data.methods.0.key', 'cash')
-            ->assertJsonPath('data.methods.0.available', true)
-            ->assertJsonPath('data.methods.0.hint', __('api.payment.hints.cash_top_up', [], 'en'))
-            ->assertJsonPath('data.methods.1.hint', null);
+            ->assertJsonPath('data.methods.0.key', 'paymera')
+            ->assertJsonPath('data.methods.0.hint', null);
 
-        // Points cannot buy points.
-        $this->assertSame(['cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
+        // Points cannot buy points; cash for points is reception's.
+        $this->assertSame(['paymera'], array_column($response->json('data.methods'), 'key'));
     }
 
     public function test_a_plan_is_priced_from_the_plan(): void

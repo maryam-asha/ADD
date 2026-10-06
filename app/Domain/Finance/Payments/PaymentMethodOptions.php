@@ -3,7 +3,6 @@
 namespace App\Domain\Finance\Payments;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
-use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -54,11 +53,6 @@ class PaymentMethodOptions
 
             if ($key === WalletMethod::KEY) {
                 $option = $this->walletOption($option, $purpose, $member, $points);
-            }
-
-            // Cash for a top-up starts nothing: it tells the member where to go.
-            if ($key === CashMethod::KEY && $purpose === PaymentPurpose::WalletTopUp) {
-                $option['hint'] = __('api.payment.hints.cash_top_up');
             }
 
             $methods[] = $option;

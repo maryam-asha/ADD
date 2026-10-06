@@ -437,12 +437,6 @@ return [
             'paymera' => 'بيميرا - بطاقة بنكية',
         ],
 
-        // What the member does next with a method, when its name alone
-        // does not say (PaymentMethodOptions `hint`).
-        'hints' => [
-            'cash_top_up' => 'سلّم المبلغ نقداً في الاستقبال وتُضاف النقاط إلى محفظتك فوراً.',
-        ],
-
         'credit_description' => 'دفع بالبطاقة :reference',
         'reversal_description' => 'إلغاء دفعة بالبطاقة :reference',
         'received_description' => 'دفعة مستلمة',
