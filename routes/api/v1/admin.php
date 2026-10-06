@@ -24,6 +24,7 @@ use App\Http\Controllers\Api\V1\Admin\CoworkingWindowController;
 use App\Http\Controllers\Api\V1\Admin\CurrencyController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
+use App\Http\Controllers\Api\V1\Admin\DiscountReportController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\EventCategoryController;
 use App\Http\Controllers\Api\V1\Admin\EventController;
@@ -161,6 +162,11 @@ Route::apiResource('plan-modules', PlanModuleController::class)
 Route::get('coupons', [CouponController::class, 'index']);
 Route::get('coupons/{coupon}', [CouponController::class, 'show']);
 Route::get('coupons/{coupon}/redemptions', [CouponController::class, 'redemptions']);
+
+// What was given off, and saved, over a period — every operation with its
+// status; totals over the ones that count
+// (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
+Route::get('reports/discounts', [DiscountReportController::class, 'index']);
 
 // Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
 // segment is `resource-types`, not `resources` — that name is already taken
