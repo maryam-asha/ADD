@@ -73,6 +73,21 @@ class PaymentNotificationsTest extends TestCase
         );
     }
 
+    /**
+     * What the app opens the notification with — the `data` of the one sent.
+     *
+     * @return array<string, mixed>
+     */
+    private function toldData(User $member, string $template): array
+    {
+        $sent = Notification::sent($member, GeneralNotification::class)
+            ->first(fn (GeneralNotification $n) => $n->toArray($member)['template_key'] === $template);
+
+        $this->assertNotNull($sent, "No {$template} notification was sent.");
+
+        return $sent->toArray($member)['data'];
+    }
+
     private function assertNotTold(User $member, string $template): void
     {
         Notification::assertNotSentTo(
@@ -206,5 +221,34 @@ class PaymentNotificationsTest extends TestCase
         app(EventApprovalService::class)->approve(EventAttendee::sole(), $this->operator());
 
         $this->assertTold($member, 'event.payment_due');
+        // Paying is `events/{event_id}/register` with the ticket: the push names its event.
+        $this->assertSame([
+            'purpose' => 'event_registration',
+            'payable_type' => 'event_attendee',
+            'payable_id' => EventAttendee::sole()->id,
+            'event_id' => $event->id,
+        ], $this->toldData($member, 'event.payment_due'));
+    }
+
+    public function test_a_seat_confirmed_at_registration_to_be_paid_in_cash_names_its_event(): void
+    {
+        $member = $this->member();
+        $event = Event::create([
+            'title' => ['en' => 'Talk', 'ar' => 'محاضرة'],
+            'start_at' => now()->addDays(2),
+            'end_at' => now()->addDays(2)->addHour(),
+            'location' => 'Hall',
+            'is_free' => false,
+            'price_points' => 80,
+            'status' => 'published',
+            'requires_approval' => false,
+        ]);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'cash'])->assertCreated();
+
+        $data = $this->toldData($member, 'event.payment_due');
+        $this->assertSame($event->id, $data['event_id']);
+        $this->assertSame(EventAttendee::sole()->id, $data['payable_id']);
     }
 }

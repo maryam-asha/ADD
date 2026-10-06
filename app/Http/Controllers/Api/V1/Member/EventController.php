@@ -139,7 +139,12 @@ class EventController extends Controller
             ->seatHolding()
             ->findOrFail($request->validated('ticket_id'));
 
-        $method = $request->validated('payment_method') ?? WalletMethod::KEY;
+        // No method sent: the member's own wallet, as registering without one
+        // is — never a question of which wallet when they belong to a company.
+        $method = $request->validated('payment_method');
+        $walletOwnerType = $method === null ? OwnerType::User->value : $request->validated('wallet_owner_type');
+        $walletOwnerId = $method === null ? $member->id : $request->validated('wallet_owner_id');
+        $method ??= WalletMethod::KEY;
 
         // Only a seat that still owes something can have its choice stored:
         // one a coupon made free (already Paid) or a free event's (no payment
@@ -148,8 +153,8 @@ class EventController extends Controller
             && $attendee->payment_state === EventPaymentState::Unpaid) {
             $attendee->forceFill([
                 'payment_method' => $method,
-                'payment_wallet_owner_type' => $request->validated('wallet_owner_type'),
-                'payment_wallet_owner_id' => $request->validated('wallet_owner_id'),
+                'payment_wallet_owner_type' => $walletOwnerType,
+                'payment_wallet_owner_id' => $walletOwnerId,
             ])->save();
 
             return response()->json(['data' => [
@@ -163,8 +168,8 @@ class EventController extends Controller
 
         try {
             $outcome = $checkout->pay(PaymentPurpose::EventRegistration, $attendee, $member, $method, [
-                'wallet_owner_type' => $request->validated('wallet_owner_type'),
-                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+                'wallet_owner_type' => $walletOwnerType,
+                'wallet_owner_id' => $walletOwnerId,
             ], $request->validated('coupon_code'));
         } catch (Throwable $e) {
             return $this->paymentFailureResponse($e, $member->id) ?? throw $e;

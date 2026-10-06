@@ -81,6 +81,9 @@ class EventRegistrationFulfiller implements PaymentFulfiller
         $this->attendee($payment)->forceFill([
             'payment_state' => EventPaymentState::Paid,
             'paid_at' => now(),
+            // How it was actually paid: a seat registered by card and paid
+            // by wallet through its ticket is not left reading the card.
+            'payment_method' => (string) $payment->method,
         ])->save();
     }
 

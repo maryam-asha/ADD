@@ -348,6 +348,8 @@ class EventRegistrationService
                 'purpose' => 'event_registration',
                 'payable_type' => $attendee->getMorphClass(),
                 'payable_id' => $attendee->id,
+                // Paying is `events/{event_id}/register` with the ticket.
+                'event_id' => $attendee->event_id,
             ]);
         });
     }
