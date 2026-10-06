@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +20,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class AdminBookingResource extends JsonResource
 {
+    use PreloadsAppliedDiscounts;
+
     /**
      * @return array<string, mixed>
      */
@@ -54,6 +58,9 @@ class AdminBookingResource extends JsonResource
             'checked_out_at' => $this->resource->checked_out_at?->toIso8601String(),
             'note' => $this->resource->note,
             'rejection_reason' => $this->resource->rejection_reason,
+            // What was taken off it — offer, coupon, plan discount — as it
+            // was when the price was locked (AppliedDiscountPresenter).
+            'discounts' => app(AppliedDiscountPresenter::class)->for($this->resource),
             'created_at' => $this->resource->created_at?->toIso8601String(),
         ];
     }

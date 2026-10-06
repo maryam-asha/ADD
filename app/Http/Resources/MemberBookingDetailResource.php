@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PriceLabelPresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonInterface;
@@ -74,6 +75,9 @@ class MemberBookingDetailResource extends JsonResource
                 'points' => $total,
                 'price' => $total > 0 ? $prices->total($total, $viewer, $locale)['price'] : null,
             ],
+            // What was taken off it — offer, coupon, plan discount — as it
+            // was when the price was locked (AppliedDiscountPresenter).
+            'discounts' => app(AppliedDiscountPresenter::class)->for($booking),
             // The status stays `confirmed` until checkout, so these are what
             // tell a booking under way from one still to come.
             'checked_in_at' => $this->local($booking->checked_in_at),

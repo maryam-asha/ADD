@@ -2,6 +2,8 @@
 
 namespace App\Http\Resources\Finance;
 
+use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -17,6 +19,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class PaymentResource extends JsonResource
 {
+    use PreloadsAppliedDiscounts;
+
     /**
      * @return array<string, mixed>
      */
@@ -61,6 +65,10 @@ class PaymentResource extends JsonResource
 
             // The bank's reference — what a member quotes when disputing.
             'rrn' => $this->rrn,
+
+            // What was taken off it — offer, coupon, plan discount — as it
+            // was when the price was locked (AppliedDiscountPresenter).
+            'discounts' => app(AppliedDiscountPresenter::class)->for($this->resource),
 
             'created_at' => $this->created_at?->toISOString(),
 

@@ -3,6 +3,8 @@
 namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\WalkinSession;
+use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -10,6 +12,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** The member app's view of a coworking session — either a walk-in or a checked-in booking. */
 class CoworkingSessionResource extends JsonResource
 {
+    use PreloadsAppliedDiscounts;
+
     /**
      * @return array<string, mixed>
      */
@@ -39,6 +43,9 @@ class CoworkingSessionResource extends JsonResource
                 : new SessionEndRequestResource($session->pendingEndRequest),
             // Nothing to pay while it runs; what is owed once it closes.
             'payment' => app(PaymentStatePresenter::class)->for($session, $request->user()),
+            // What was taken off it — offer, coupon, plan discount — as it
+            // was when the price was locked (AppliedDiscountPresenter).
+            'discounts' => app(AppliedDiscountPresenter::class)->for($session),
         ];
     }
 }
