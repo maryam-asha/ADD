@@ -67,7 +67,7 @@ nothing — **including to `admin`**.
 
 ```
 member app                  ADD Core                      Paymera
-    │  POST member/payments     │                              │
+    │  POST wallet/top-ups etc. │                              │
     │─────────────────────────▶ │  create-payment ────────────▶│
     │  {redirect_url}           │◀──── {paymentId, url} ───────│
     │◀───────────────────────── │                              │
@@ -106,7 +106,8 @@ abandoned the payment; `reversed` means an admin cancelled an accepted one.
 
 | Method | Path | Who |
 |---|---|---|
-| `POST` | `/api/v1/member/payments` | member — opens a payment, returns `redirect_url` |
+| `POST` | `/api/v1/member/wallet/top-ups` | member — opens a card top-up, returns `redirect_url` |
+| `POST` | `/api/v1/member/memberships` · `member/bookings` (`booking_id`) · `member/events/{id}/register` (`ticket_id`) · `member/coworking-sessions/{type}/{id}/pay` | member — each operation opens its own card payment (`POST member/payments` is gone, `docs/decisions/prepayment-all-or-nothing.md`) |
 | `GET` | `/api/v1/member/payments` | member — own payment history |
 | `GET` | `/api/v1/member/payments/{payment}` | member — syncs, then returns status |
 | `GET` | `/api/v1/paymera/callback/{token}` | Paymera / the returning member |

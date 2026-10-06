@@ -91,8 +91,8 @@ the duplication this design removes.
 |---|---|
 | `POST member/bookings` | with a prepaid method: creates `awaiting_payment`; supersedes the member's own overlapping `awaiting_payment` bookings on that space (below). **New optional `booking_id`**: pay that booking with the new `payment_method` instead of creating one |
 | `POST member/events/{id}/register` | with a prepaid method on a registration approved on the spot: creates `awaiting_payment`. **New optional `ticket_id`**: pay that registration instead of registering again |
-| `POST member/coworking-sessions/{type}/{id}/pay` | **new** — `{payment_method, wallet_owner_type?, wallet_owner_id?, coupon_code?}` for the member's own closed, unpaid session |
-| `POST member/wallet/top-ups` | **new** — `{amount, payment_method?}`; prepaid methods only (default: the first enabled gateway) |
+| `POST member/coworking-sessions/{type}/{id}/pay` | **new** — `{payment_method, wallet_owner_type?, wallet_owner_id?, coupon_code?}` for the member's own closed, unpaid session; answers `201` with `POST member/payments`' shape, `{data: {payment, redirect_url, next}}` (`coupon` beside `data` when a code was sent) |
+| `POST member/wallet/top-ups` | **new** — `{amount, payment_method?}`; prepaid methods only (default: the first enabled gateway); answers `201` with `POST member/payments`' shape, `{data: {payment, redirect_url, next}}` |
 | `POST member/memberships` | unchanged (already pays by any method) |
 | `POST member/bookings/{id}/cancel` | allowed inside the cancellation window for `awaiting_payment` |
 | `GET member/payment-methods` | unchanged contract; a top-up now lists prepaid methods only |
@@ -103,8 +103,10 @@ the duplication this design removes.
 A request with an id answers `200` with the same shape the create answers
 with — `data` (the booking / registration), `payment`, `redirect_url`, plus
 `next` (`done` | `redirect` | `pay_at_reception`) — so the app handles both
-with one parser; the coworking `pay` answers the same shape. Errors: 404
-(not the member's), 422 `already_paid`, 422 `booking_not_payable`
+with one parser. The coworking `pay` and the top-up keep
+`POST member/payments`' answer shape (`{data: {payment, redirect_url, next}}`,
+`201`), since they create the payment rather than change a record.
+Errors: 404 (not the member's), 409 `already_paid`, 422 `booking_not_payable`
 (cancelled, rejected, no-show — including an `awaiting_payment` whose
 window passed), 422 `booking_mismatch` (values sent that differ from the
 booking), the wallet shortfall 422, the gateway 503s.

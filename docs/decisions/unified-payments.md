@@ -54,7 +54,7 @@ reception columns `collected_via`, `received_amount`, `received_currency`,
 | key | class | pays for | `start()` |
 |---|---|---|---|
 | `wallet` | `WalletMethod` | everything but a top-up | picks the wallet, checks it covers the whole amount, settles now → `done` |
-| `cash` | `CashMethod` | everything but an extension | a plan: pending hold with `expires_at`; anything else (a top-up included): **no row** → `pay_at_reception` |
+| `cash` | `CashMethod` | everything but an extension and a member top-up (reception's top-up writes its own row) | a plan: pending hold with `expires_at`; anything else: **no row** → `pay_at_reception` |
 | `paymera` | `PaymeraGateway` | everything but an extension | freezes the card charge on the row, opens the hosted page → `redirect` |
 
 **Fulfillers** (`App\Domain\Finance\Payments\Fulfillers`), one per purpose,
@@ -88,11 +88,11 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 | operation | wallet | cash | paymera |
 |---|---|---|---|
 | plan (`POST member/memberships`) | default; the owner's wallet (the company's for `company_id`) | hold, 48 h | the member's own plan only |
-| booking (`POST member/bookings`) | pay now or 422 | unpaid | unpaid, then its card payment opens |
+| booking (`POST member/bookings`) | pay now or 422 | unpaid | unpaid, then its card payment opens; to pay another way, send the request again with its id (`booking_id`) |
 | multi-date booking (`/batch`) | one wallet for the total, one payment per booking | unpaid | refused (validation) |
-| event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens |
-| anything unpaid (`POST member/payments`) | yes (a plan: the member's own only) | `pay_at_reception` (a plan: a hold on the member's own wallet) | yes, into the member's own wallet |
-| top-up | — | directions only (`pay_at_reception`, no row, no amount; `hint` in payment-methods); reception credits it through `wallet-top-ups` and the member is notified | yes |
+| event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens; to pay another way, send the request again with its id (`ticket_id`) |
+| anything unpaid (the operation's own endpoint: `POST member/bookings` + `booking_id`, `POST member/events/{id}/register` + `ticket_id`, `POST member/coworking-sessions/{type}/{id}/pay`) | yes | `pay_at_reception` | yes, into the member's own wallet |
+| top-up | — | — (reception credits it through `admin/reception/wallet-top-ups` and the member is notified) | yes (`POST member/wallet/top-ups`) |
 
 Reception: `POST admin/reception/payments/settle` settles any of the four with
 the amount received; `GET admin/reception/outstanding?user_id=` lists
@@ -129,9 +129,11 @@ listed):
   the eligible rows up to it, less credits already expired by then). Another
   wallet's row is a 404.
 
-Topping the wallet up stays `POST member/payments` with
-`purpose: wallet_top_up` — deliberately no wallet-specific alias, so there
-is one way to do it.
+Topping the wallet up is `POST member/wallet/top-ups`, by a prepaid method
+only (the card; cash for points is reception's, through
+`admin/reception/wallet-top-ups`). The generic `POST member/payments` it
+once went through is gone
+([prepayment-all-or-nothing.md](prepayment-all-or-nothing.md)).
 
 A row is named by the payment it belongs to — `WalletTransaction`'s
 `creditPayment`/`debitPayment`/`refundPayment` (the reverse of
@@ -148,17 +150,19 @@ receipt for a payment it just made.
    `supports()` says which purposes it may pay for).
 2. A line under `methods` in `config/payments.php`.
 
-Nothing else: `payment-methods` lists it, `POST member/payments` accepts it,
-the reconciler polls its pending payments, and its accepted payments are
-credited and spent through `fulfilAcceptedGatewayPayment()`
+Nothing else: `payment-methods` lists it, every operation's endpoint accepts
+it as a `payment_method`, the reconciler polls its pending payments, and its
+accepted payments are credited and spent through
+`fulfilAcceptedGatewayPayment()`
 (`PaymentMethodRegistryTest`, `MemberPaymentMethodsTest` register a fake one
 through config alone). `enabled: false` stops new payments only; payments
 already open on it still sync and reverse.
 
 ## Backward compatibility
 
-- `POST member/payments` with no `method` is the card, with the same request
-  and body; `next` is added.
+- `POST member/payments` (a card by default, `next` added) was the one
+  generic way to pay; it is removed (2026-10-06) and each operation pays
+  through its own endpoint — see the end of this file.
 - `/api/v1/paymera/callback/{token}` and `/trigger/{token}` are unchanged;
   `paymera:reconcile` keeps its name and schedule.
 - `POST member/bookings` and `/batch` with no `payment_method` route exactly
@@ -218,7 +222,8 @@ already open on it still sync and reverse.
   maps that pricing failure to 503 `gateway_unavailable`; a booking or a
   registration made with a card therefore still answers 201 with
   `payment: null` and `payment_error` (also `nothing_due` for a free
-  booking), and `POST member/payments` answers 503.
+  booking); the endpoints that open a card for a record that already
+  exists (the id re-send, the coworking `pay`, the top-up) answer 503.
 - **A money amount is a plain decimal** (final review M4). `amount` on
   reception settle, the reception top-up (and its preview) and the member's
   card top-up is `numeric` plus `regex:/^\d+(\.\d{1,6})?$/`: an exponent
@@ -256,15 +261,14 @@ already open on it still sync and reverse.
   input): `POST member/memberships` with `company_id` opens a company's cash
   hold on the company's wallet after `CompanyPolicy::manageMembers`.
 - **Company wallets pay for a company plan only, bought by the company's
-  admin through `POST member/memberships` with `company_id`.** On
-  `POST member/payments` a `plan_purchase` is always the member's own plan: a
-  non-user `wallet_owner_type` is refused with 422
-  `api.payment.company_plan_not_allowed`, for every method. The endpoint
-  applies the plan rules memberships applies: a one-time package
-  (`is_subscription = false`) is a 422 on `plan_id`, and a full branch is
-  422 `api.membership.seat_pool_full` with `first_shortfall_at`, never a 500.
-  Bookings, sessions and events keep the full wallet choice (personal or a
-  company the member belongs to), checked by `WalletMethod`.
+  admin through `POST member/memberships` with `company_id`** — the one
+  endpoint that buys a plan (`POST member/payments` is gone), which also
+  refuses a one-time package (`is_subscription = false`, a 422 on `plan_id`)
+  and answers a full branch with 422 `api.membership.seat_pool_full` and
+  `first_shortfall_at`, never a 500. A card buys the member's own plan only
+  (a company's is 422 `api.payment.method_not_supported`). Bookings,
+  sessions and events keep the full wallet choice (personal or a company the
+  member belongs to), checked by `WalletMethod`.
 
 ## Deploying
 
@@ -314,10 +318,13 @@ already open on it still sync and reverse.
 
 See [pricing-offers-and-coupons.md](pricing-offers-and-coupons.md).
 
-- **`POST member/payments` takes `coupon_code`** for a plan purchase, or on
-  an existing unpaid booking, session or registration (`payable_id`); never
-  for `wallet_top_up`. `GET payment-methods` takes it too, so `amount_points`
-  is the price after the code.
+- **`coupon_code`** is taken by `POST member/memberships` (a plan), and by
+  each operation's pay request on an existing unpaid booking, session or
+  registration (`POST member/bookings` + `booking_id`,
+  `POST member/events/{id}/register` + `ticket_id`,
+  `POST member/coworking-sessions/{type}/{id}/pay`); never by a top-up.
+  `GET payment-methods` takes it too, so `amount_points` is the price after
+  the code.
 - **A plan's amount comes from `PriceQuoteService::forPlanPayment()`** — the
   plan as it is now, its sale as of `payment.created_at`, the coupon from the
   copy of its terms locked on the payment. `PlanPurchaseFulfiller`,
@@ -332,3 +339,21 @@ See [pricing-offers-and-coupons.md](pricing-offers-and-coupons.md).
 - A coupon's use on a payment counts while the payment is pending, accepted
   or in review (`PaymentStatus::holdsRedemption()`): a failed card, an expired
   cash hold or a reversal gives it back.
+
+## Since one way to pay (2026-10-06)
+
+See [prepayment-all-or-nothing.md](prepayment-all-or-nothing.md).
+
+- **`POST member/payments` is removed.** `GET member/payments` and
+  `GET member/payments/{id}` stay — the history, and the status the app
+  polls after the WebView.
+- **A booking or registration is paid again through its own create request
+  sent with the record's id** (`booking_id`, `ticket_id`); a closed
+  coworking session through `POST member/coworking-sessions/{type}/{id}/pay`;
+  a member top-up through `POST member/wallet/top-ups`, card only. All of
+  them end in `PayableCheckout` (or `StartPayment` for a top-up) and answer
+  `{payment, redirect_url, next}`.
+- **`GET member/payment-methods?purpose=wallet_top_up` lists the card
+  only**; the cash "go to reception" hint is gone (`CashMethod::supports()`
+  excludes a top-up). Reception's `admin/reception/wallet-top-ups` is
+  unchanged.
