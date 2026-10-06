@@ -6,17 +6,29 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
- * An item's sale: a price (a space's hourly rate, or a plan's price) and
- * the window it runs in — live from `startsAt` up to, not including,
- * `endsAt` (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+ * The window an offer runs in — live from `startsAt` up to, not including,
+ * `endsAt`; either end may be open (null), meaning always
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
+ *
+ * `points` and of() belong to phase 1's sale columns and go with them.
  */
 final class SaleWindow
 {
     private function __construct(
-        public readonly int $points,
-        public readonly CarbonImmutable $startsAt,
-        public readonly CarbonImmutable $endsAt,
+        public readonly ?int $points,
+        public readonly ?CarbonImmutable $startsAt,
+        public readonly ?CarbonImmutable $endsAt,
     ) {}
+
+    /** An offer's window: from `$startsAt`, until `$endsAt`, either open. */
+    public static function between(?CarbonInterface $startsAt, ?CarbonInterface $endsAt): self
+    {
+        return new self(
+            null,
+            $startsAt !== null ? CarbonImmutable::instance($startsAt)->utc() : null,
+            $endsAt !== null ? CarbonImmutable::instance($endsAt)->utc() : null,
+        );
+    }
 
     /**
      * The sale an item's three columns describe, or null when they describe
@@ -33,20 +45,34 @@ final class SaleWindow
 
     public function isLiveAt(CarbonInterface $at): bool
     {
-        return $at->greaterThanOrEqualTo($this->startsAt) && $at->lessThan($this->endsAt);
+        return ($this->startsAt === null || $at->greaterThanOrEqualTo($this->startsAt))
+            && ($this->endsAt === null || $at->lessThan($this->endsAt));
     }
 
     /**
-     * The part of [$from, $to) that falls inside the sale, or null when none
-     * of it does.
+     * The part of [$from, $to) that falls inside the window, or null when
+     * none of it does.
      *
      * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
      */
     public function clip(CarbonInterface $from, CarbonInterface $to): ?array
     {
-        $start = CarbonImmutable::instance($from)->utc()->max($this->startsAt);
-        $end = CarbonImmutable::instance($to)->utc()->min($this->endsAt);
+        $start = CarbonImmutable::instance($from)->utc();
+        $end = CarbonImmutable::instance($to)->utc();
+
+        if ($this->startsAt !== null) {
+            $start = $start->max($this->startsAt);
+        }
+
+        if ($this->endsAt !== null) {
+            $end = $end->min($this->endsAt);
+        }
 
         return $end->greaterThan($start) ? [$start, $end] : null;
+    }
+
+    public function overlaps(CarbonInterface $from, CarbonInterface $to): bool
+    {
+        return $this->clip($from, $to) !== null;
     }
 }

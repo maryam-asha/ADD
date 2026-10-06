@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\ValueObjects\SaleWindow;
 use Database\Factories\CouponFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -109,6 +110,12 @@ class Coupon extends Model
     public function scopeAutomatic(Builder $query): Builder
     {
         return $query->where('is_automatic', true);
+    }
+
+    /** When it runs: from `starts_at` up to `ends_at`, either open. */
+    public function window(): SaleWindow
+    {
+        return SaleWindow::between($this->starts_at, $this->ends_at);
     }
 
     public function appliesToEverything(): bool
