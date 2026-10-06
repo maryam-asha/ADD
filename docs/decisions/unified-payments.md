@@ -151,7 +151,9 @@ receipt for a payment it just made.
 2. A line under `methods` in `config/payments.php`.
 
 Nothing else: `payment-methods` lists it, every operation's endpoint accepts
-it as a `payment_method`, the reconciler polls its pending payments, and its
+it as a `payment_method` (the top-up does once `StartPayment` takes a gateway
+key — it opens Paymera only today, and `StoreTopUpRequest` accepts no other
+gateway until then), the reconciler polls its pending payments, and its
 accepted payments are credited and spent through
 `fulfilAcceptedGatewayPayment()`
 (`PaymentMethodRegistryTest`, `MemberPaymentMethodsTest` register a fake one

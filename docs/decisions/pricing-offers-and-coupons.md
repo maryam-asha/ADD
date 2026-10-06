@@ -116,6 +116,14 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   needs approval, approving it charges nothing.
 - **A coupon on something already owed** is refused while a payment for it
   is pending, once anything was paid toward it, or if it already has a code.
+  Paying through the record's own endpoint (`booking_id`, `ticket_id`, the
+  coworking `pay`) softens two of those refusals: a code that does not
+  combine with the offer the record was priced at (`not_combinable`), or that
+  arrives while a payment is pending (`payment_in_progress`), is answered
+  `applied: false` with the reason and the payment goes ahead at the current
+  price — the app re-sends the creation request's code, which creation may
+  not have applied (`PayableCheckout`). The code the record already carries
+  is skipped before any lookup, so deactivating it later changes nothing.
 - **`list_price_points`** on bookings, walk-ins, registrations and payments
   is for display: savings = list − final. Refunds still come from `payments`.
 
