@@ -15,7 +15,7 @@ class EnumsTest extends TestCase
     public function test_booking_status_cases(): void
     {
         // Lifecycle order (docs/decisions/booking-outcomes-and-extension.md).
-        $this->assertSame(['pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'], array_column(BookingStatus::cases(), 'value'));
+        $this->assertSame(['awaiting_payment', 'pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'], array_column(BookingStatus::cases(), 'value'));
     }
 
     public function test_payment_state_cases(): void

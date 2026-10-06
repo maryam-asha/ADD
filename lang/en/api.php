@@ -313,6 +313,7 @@ return [
         'note_label' => 'Add a Note (Optional)',
         'note_placeholder' => 'e.g. Meeting purpose, special requests…',
         'statuses' => [
+            'awaiting_payment' => 'Awaiting Payment',
             'confirmed' => 'Confirmed',
             'pending' => 'Under Review',
             'rejected' => 'Rejected',
@@ -325,6 +326,7 @@ return [
         'status_notes' => [
             'refunded' => 'Your points were returned to your wallet.',
             'payment_due' => 'You can pay from the app or at reception.',
+            'payment_not_completed' => 'Cancelled because the payment was not completed in time.',
             'no_show_charged' => 'The points are not refunded because the booking was not cancelled before its deadline.',
             'no_show_free' => 'Nothing is owed for this booking.',
         ],

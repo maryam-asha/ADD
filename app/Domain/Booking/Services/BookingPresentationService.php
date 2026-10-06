@@ -229,6 +229,21 @@ class BookingPresentationService
 
         $outcome = $this->outcomeStep($booking, $locale);
 
+        // Held for its prepayment, or cancelled while still held: it was
+        // never confirmed, whatever the space's approval flag says.
+        if ($booking->status === BookingStatus::AwaitingPayment || $booking->cancelledAwaitingPayment()) {
+            return [
+                'steps' => array_values(array_filter([
+                    $submitted,
+                    $step(BookingStatus::AwaitingPayment, $booking->status === BookingStatus::AwaitingPayment ? 'current' : 'complete', $booking->created_at),
+                    $booking->status === BookingStatus::Cancelled
+                        ? $step(BookingStatus::Cancelled, 'complete', $booking->cancelled_at)
+                        : $step($booking->required_approval ? BookingStatus::Pending : BookingStatus::Confirmed, 'upcoming', null),
+                ])),
+                'rejection_reason' => null,
+            ];
+        }
+
         // Auto-confirmed: its space needed no approval when it was booked,
         // so it was confirmed on submission — whatever came after, cancelled
         // or played out, there was no review to show. A recorded decision or
@@ -324,7 +339,11 @@ class BookingPresentationService
         $key = match ($booking->status) {
             BookingStatus::NoShow => $paid ? 'no_show_charged' : 'no_show_free',
             BookingStatus::Completed => ! $paid && (int) $booking->price_points > 0 ? 'payment_due' : null,
-            BookingStatus::Cancelled, BookingStatus::Rejected => $paid && $this->wasRefunded($booking) ? 'refunded' : null,
+            BookingStatus::Cancelled, BookingStatus::Rejected => match (true) {
+                $booking->cancelledAwaitingPayment() => 'payment_not_completed',
+                $paid && $this->wasRefunded($booking) => 'refunded',
+                default => null,
+            },
             default => null,
         };
 

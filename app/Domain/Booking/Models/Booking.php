@@ -124,6 +124,16 @@ class Booking extends Model
     }
 
     /**
+     * Cancelled while still held for its prepayment — by the clock, by the
+     * member backing out, or superseded. A released hold has no deadline
+     * left, so a paid booking cancelled later is not this.
+     */
+    public function cancelledAwaitingPayment(): bool
+    {
+        return $this->status === BookingStatus::Cancelled && $this->payment_due_at !== null;
+    }
+
+    /**
      * Half-open interval intersection: a booking ending exactly when the
      * window starts does not overlap it. Adjacency is the buffer's concern,
      * not this one.

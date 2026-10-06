@@ -6,11 +6,19 @@ namespace App\Domain\Booking\Enums;
  * pending → confirmed → completed (checked out) | no_show (ended, never
  * checked in); pending → rejected (by staff, or lapsed at its start); either
  * open status → cancelled. The last four are final
- * (docs/decisions/booking-outcomes-and-extension.md).
+ * (docs/decisions/booking-outcomes-and-extension.md). A booking made with a
+ * prepaid method starts one step earlier, as awaiting_payment, and becomes
+ * pending or confirmed once it is paid.
  */
 enum BookingStatus: string
 {
     // In lifecycle order: the order the app's status catalog lists them in.
+
+    // Made with a prepaid method, held for its payment until
+    // `payment_due_at`: it holds the slot and can be paid or cancelled, but
+    // it is not confirmed — door codes, QR unlock and reception ignore it
+    // (docs/decisions/prepayment-all-or-nothing.md).
+    case AwaitingPayment = 'awaiting_payment';
     case Pending = 'pending';
     case Confirmed = 'confirmed';
     case Completed = 'completed';
@@ -29,10 +37,10 @@ enum BookingStatus: string
         return in_array($this, self::open(), true);
     }
 
-    /** Still to happen: awaiting approval, or confirmed. */
+    /** Still to happen: held for its payment, awaiting approval, or confirmed. */
     public static function open(): array
     {
-        return [self::Pending, self::Confirmed];
+        return [self::AwaitingPayment, self::Pending, self::Confirmed];
     }
 
     /**
@@ -44,7 +52,7 @@ enum BookingStatus: string
      */
     public static function slotHolding(): array
     {
-        return [self::Pending, self::Confirmed, self::Completed, self::NoShow];
+        return [self::AwaitingPayment, self::Pending, self::Confirmed, self::Completed, self::NoShow];
     }
 
     /**
@@ -55,7 +63,7 @@ enum BookingStatus: string
      */
     public static function payable(): array
     {
-        return [self::Pending, self::Confirmed, self::Completed];
+        return [self::AwaitingPayment, self::Pending, self::Confirmed, self::Completed];
     }
 
     public function isPayable(): bool

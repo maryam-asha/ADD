@@ -17,6 +17,10 @@ namespace App\Support\Enums;
  */
 enum EventRegistrationStatus: string
 {
+    // Made with a prepaid method, held for its payment until `payment_due_at`:
+    // it holds the seat and can be paid or cancelled, but it is not approved
+    // (docs/decisions/prepayment-all-or-nothing.md).
+    case AwaitingPayment = 'awaiting_payment';
     case Pending = 'pending';
     case Approved = 'approved';
     case Rejected = 'rejected';
@@ -24,7 +28,7 @@ enum EventRegistrationStatus: string
     /** @return list<self> */
     public static function seatHolding(): array
     {
-        return [self::Pending, self::Approved];
+        return [self::AwaitingPayment, self::Pending, self::Approved];
     }
 
     /** @return list<string> */
@@ -41,6 +45,6 @@ enum EventRegistrationStatus: string
     /** Whether a decision has been made and the row is no longer actionable. */
     public function isTerminal(): bool
     {
-        return $this !== self::Pending;
+        return ! in_array($this, [self::AwaitingPayment, self::Pending], true);
     }
 }

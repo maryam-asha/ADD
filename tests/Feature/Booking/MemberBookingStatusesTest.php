@@ -75,6 +75,7 @@ class MemberBookingStatusesTest extends TestCase
         $response->assertOk()
             ->assertJsonPath('data', [
                 'statuses' => [
+                    ['key' => 'awaiting_payment', 'label' => 'بانتظار الدفع'],
                     ['key' => 'pending', 'label' => 'قيد المراجعة'],
                     ['key' => 'confirmed', 'label' => 'مؤكد'],
                     ['key' => 'completed', 'label' => 'مكتمل'],

@@ -666,7 +666,10 @@ class EventBrowseService
         // only an approved registration can go on to be attended or missed.
         $isApproved = $attendee?->status === EventRegistrationStatus::Approved;
 
-        if ($attendee?->status === EventRegistrationStatus::Pending) {
+        if ($attendee?->status === EventRegistrationStatus::AwaitingPayment) {
+            $regStatus = 'awaiting_payment';
+            $regLabel = $locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
+        } elseif ($attendee?->status === EventRegistrationStatus::Pending) {
             $regStatus = 'registered';
             $regLabel = $locale === 'ar' ? 'مسجّل' : 'Registered';
         } elseif ($attendee?->status === EventRegistrationStatus::Rejected) {
@@ -903,6 +906,10 @@ class EventBrowseService
     {
         if ($status === null) {
             return null;
+        }
+
+        if ($status === 'awaiting_payment') {
+            return $locale === 'ar' ? 'بانتظار الدفع' : 'Awaiting payment';
         }
 
         if ($status === 'rejected') {
