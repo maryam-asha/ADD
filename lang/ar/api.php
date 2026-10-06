@@ -117,6 +117,8 @@ return [
         'zone_updated' => 'تم تحديث المنطقة.',
         'space_updated' => 'تم تحديث المساحة.',
         'co_space_has_desks' => 'مساحة العمل المشتركة هذه فيها مقاعد؛ انقلها أو احذفها قبل تغيير نوعها.',
+        'plan_reference_units_without_reference' => 'عدد الوحدات يحتاج إلى باقة أو مساحة مرجعية.',
+        'plan_reference_self' => 'لا يمكن أن تكون الباقة مرجعاً لنفسها.',
         'co_space_desks_held' => 'بعض مقاعد هذه المساحة مرتبطة باشتراكات مكتب مخصص فعّالة.',
         'co_space_exists' => 'هذا الفرع لديه مساحة عمل مشتركة بالفعل؛ أضف إليها مقاعد بدلاً من ذلك.',
         'coupon_updated' => 'تم تحديث الكوبون.',
@@ -507,6 +509,9 @@ return [
         'sale_ends' => 'ينتهي العرض في :date',
         'sale_discount_percent' => 'خصم :percent%',
         'sale_discount_amount' => 'وفّر :amount',
+        'saving_percent' => 'وفّر :percent%',
+        'saving_amount' => 'وفّر :amount',
+        'per_unit' => ':amount لكل :unit',
         'title' => 'الباقات والاشتراكات',
         'subtitle' => 'اختر الباقة المناسبة لأعمالك.',
         'tabs' => [

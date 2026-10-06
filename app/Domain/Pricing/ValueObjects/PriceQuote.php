@@ -27,7 +27,17 @@ final class PriceQuote
         public readonly int $couponPoints,
         public readonly int $finalPoints,
         public readonly ?Coupon $offer = null,
+        public readonly ?PlanSaving $saving = null,
     ) {}
+
+    /** The same price, with the plan's built-in saving beside it (never in it). */
+    public function withSaving(?PlanSaving $saving): self
+    {
+        return new self(
+            $this->listPoints, $this->choice, $this->automaticPoints, $this->planDiscount, $this->coupon,
+            $this->couponOutcome, $this->couponBasePoints, $this->couponPoints, $this->finalPoints, $this->offer, $saving,
+        );
+    }
 
     /** The price after the automatic reduction, before any coupon. */
     public function automaticPrice(): int

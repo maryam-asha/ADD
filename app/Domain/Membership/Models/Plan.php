@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -36,6 +37,9 @@ class Plan extends Model
         'subtitle',
         'is_subscription',
         'price_points',
+        'reference_plan_id',
+        'reference_space_id',
+        'reference_units',
         'duration_days',
         'access_window_start',
         'access_window_end',
@@ -51,6 +55,7 @@ class Plan extends Model
             'subtitle' => 'array',
             'is_subscription' => 'boolean',
             'price_points' => 'integer',
+            'reference_units' => 'integer',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
         ];
@@ -231,6 +236,18 @@ class Plan extends Model
     public function isDedicatedDesk(): bool
     {
         return $this->planModule?->slug === PlanModule::DEDICATED_DESK;
+    }
+
+    /** The plan this one's saving is measured against (PlanSavingCalculator). */
+    public function referencePlan(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reference_plan_id');
+    }
+
+    /** The space whose hourly rate this one's saving is measured against. */
+    public function referenceSpace(): BelongsTo
+    {
+        return $this->belongsTo(Space::class, 'reference_space_id');
     }
 
     public function planModule(): BelongsTo

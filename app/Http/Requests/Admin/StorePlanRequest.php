@@ -4,7 +4,9 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Membership\Models\Plan;
 use App\Support\TranslatableField;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -34,6 +36,11 @@ class StorePlanRequest extends FormRequest
                 'plan_module_id' => ['nullable', 'integer', 'exists:plan_modules,id'],
                 'is_subscription' => ['required', 'boolean'],
                 'price_points' => ['required', 'integer', 'min:0'],
+                // What its saving is measured against: a plan or a space's
+                // hourly rate, times units — one reference or neither.
+                'reference_plan_id' => ['nullable', 'integer', 'exists:plans,id', 'prohibits:reference_space_id'],
+                'reference_space_id' => ['nullable', 'integer', 'exists:spaces,id'],
+                'reference_units' => ['nullable', 'integer', 'min:1', 'required_with:reference_plan_id,reference_space_id'],
                 'duration_days' => ['required', 'integer', 'min:1'],
                 'access_window_start' => ['nullable', 'date_format:H:i', 'required_with:access_window_end'],
                 'access_window_end' => ['nullable', 'date_format:H:i', 'required_with:access_window_start'],
@@ -81,5 +88,30 @@ class StorePlanRequest extends FormRequest
                 'resource_grants.*.order' => ['nullable', 'integer', 'min:0'],
             ],
         );
+    }
+
+    /**
+     * Units with no reference measure against nothing; and a plan is never
+     * its own reference.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($validator->errors()->hasAny(['reference_plan_id', 'reference_space_id', 'reference_units'])) {
+                return;
+            }
+
+            $plan = $this->route('plan');
+            $plan = $plan instanceof Plan ? $plan : ($plan !== null ? Plan::find($plan) : null);
+            $sentOrStored = fn (string $field) => $this->exists($field) ? $this->input($field) : $plan?->getAttribute($field);
+
+            if ($this->input('reference_units') !== null && $sentOrStored('reference_plan_id') === null && $sentOrStored('reference_space_id') === null) {
+                $validator->errors()->add('reference_units', __('api.admin.plan_reference_units_without_reference'));
+            }
+
+            if ($plan !== null && (int) $this->input('reference_plan_id') === $plan->id) {
+                $validator->errors()->add('reference_plan_id', __('api.admin.plan_reference_self'));
+            }
+        });
     }
 }

@@ -168,10 +168,11 @@ class PaymentService
                 return ['payment' => null, 'start' => PaymentStart::payAtReception()];
             }
 
-            // The offer's and the coupon's uses are filed on the row before
-            // what is due is read, so the fulfiller prices the payment with
-            // them — the wallet check, the debit and every later quote alike.
-            if ($quote !== null && ($quote->appliedOffer() !== null || $quote->appliedCoupon() !== null)) {
+            // The offer's and the coupon's uses — and the plan's saving, for
+            // the report — are filed on the row before what is due is read,
+            // so the fulfiller prices the payment with them: the wallet
+            // check, the debit and every later quote alike.
+            if ($quote !== null && ($quote->appliedOffer() !== null || $quote->appliedCoupon() !== null || $quote->saving !== null)) {
                 $payment->amount_points = 0;
                 $payment->save();
                 $this->recorder->record($quote, $payment, $payer, PricingPurpose::PlanPurchase);

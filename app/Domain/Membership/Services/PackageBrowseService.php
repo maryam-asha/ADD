@@ -16,6 +16,7 @@ use App\Domain\Membership\Models\PlanResourceGrant;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Pricing\Services\OfferResolver;
+use App\Domain\Pricing\Services\PlanSavingCalculator;
 use App\Support\Presenters\PriceLabelPresenter;
 
 class PackageBrowseService
@@ -26,6 +27,7 @@ class PackageBrowseService
         private readonly ResourceQuotaService $resourceQuota,
         private readonly PriceLabelPresenter $prices,
         private readonly OfferResolver $offers,
+        private readonly PlanSavingCalculator $savings,
     ) {}
 
     /**
@@ -259,7 +261,7 @@ class PackageBrowseService
     private function formatAvailablePackages(?Membership $activeMembership, ?User $user, ?string $moduleFilter = null): array
     {
         $query = Plan::query()
-            ->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType'])
+            ->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType', 'referencePlan', 'referenceSpace'])
             ->publiclyListable()
             ->where('is_subscription', true);
 
@@ -395,6 +397,9 @@ class PackageBrowseService
             // The best offer live now for this member: what a purchase
             // opened now would cost them.
             'sale' => $this->prices->sale($this->offers->planNow($plan, $user), $pricePoints, $user, false, 'api.package'),
+            // What it saves against its reference plan or hourly rate — its
+            // own price, not a discount; shown beside any offer.
+            'saving' => $this->prices->saving($this->savings->for($plan), $user),
             'duration_days' => $plan->duration_days,
             'tags' => $tags,
             'features' => $features,

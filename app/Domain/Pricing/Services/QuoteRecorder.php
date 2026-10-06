@@ -3,6 +3,7 @@
 namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Services\MembershipResolver;
@@ -51,6 +52,21 @@ class QuoteRecorder
 
         if (($coupon = $quote->appliedCoupon()) !== null) {
             $this->ledger->record($coupon, $member, $record, $purpose, $quote->couponBasePoints, $quote->couponPoints);
+        }
+
+        // A plan's built-in saving changes no price; it is recorded for the
+        // report, apart from the reductions.
+        if (($saving = $quote->saving) !== null && $record instanceof Payment) {
+            $this->ledger->write($record, $member, $purpose, DiscountKind::DurationSaving, [
+                'base_points' => $saving->referencePoints,
+                'points' => $saving->savingPoints,
+                'terms' => [
+                    'compared_to' => $saving->comparedTo,
+                    'reference_id' => $saving->referenceId,
+                    'reference_name' => $saving->referenceName,
+                    'units' => $saving->units,
+                ],
+            ]);
         }
     }
 

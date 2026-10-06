@@ -38,7 +38,8 @@ use Carbon\CarbonInterface;
  *   A  min(O, P) — never both; a tie takes the offer, which spends no
  *      plan-discount usage
  *   then a coupon on A, or — when it does not combine with offers — on L
- *   instead, if that comes out lower; otherwise it is not used.
+ *   instead, if that comes out lower; otherwise it is not used. A plan's
+ *   built-in saving rides along on its quote, outside the price.
  *
  * Integer points throughout: time prices round up once
  * (AmountCalculator), discounts round down (PlanDiscountService,
@@ -56,6 +57,7 @@ class PriceQuoteService
         private readonly CouponCalculator $coupons,
         private readonly CouponLedger $ledger,
         private readonly OfferResolver $offers,
+        private readonly PlanSavingCalculator $savings,
     ) {}
 
     /**
@@ -175,7 +177,8 @@ class PriceQuoteService
         $list = (int) $plan->price_points;
         $offer = $this->offers->forItem($list, PricingTarget::forPlan($plan), $member, $asOf, $inFlight);
 
-        return $this->compose($list, $offer, null, $list, $member, $coupon, PricingTarget::forPlan($plan), $inFlight);
+        return $this->compose($list, $offer, null, $list, $member, $coupon, PricingTarget::forPlan($plan), $inFlight)
+            ->withSaving($this->savings->for($plan));
     }
 
     /**
@@ -194,7 +197,8 @@ class PriceQuoteService
             ? new OfferPrice($offerRow->coupon, $this->offers->priceItem($list, CouponTerms::fromLedger($offerRow)), null)
             : null;
 
-        return $this->atLockedTerms($list, $offer, null, $payment->exists ? $this->ledger->couponFor($payment) : null);
+        return $this->atLockedTerms($list, $offer, null, $payment->exists ? $this->ledger->couponFor($payment) : null)
+            ->withSaving($this->savings->for($plan));
     }
 
     /**

@@ -117,6 +117,8 @@ return [
         'zone_updated' => 'Zone updated.',
         'space_updated' => 'Space updated.',
         'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
+        'plan_reference_units_without_reference' => 'Reference units need a reference plan or space.',
+        'plan_reference_self' => 'A plan cannot be its own reference.',
         'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
         'coupon_updated' => 'Coupon updated.',
@@ -517,6 +519,9 @@ return [
         'sale_ends' => 'Offer ends :date',
         'sale_discount_percent' => ':percent% off',
         'sale_discount_amount' => 'Save :amount',
+        'saving_percent' => 'Save :percent%',
+        'saving_amount' => 'Save :amount',
+        'per_unit' => ':amount per :unit',
         'title' => 'Packages & Subscription',
         'subtitle' => 'Choose the right plan for your business.',
         'tabs' => [
