@@ -10365,7 +10365,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated +\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³\"\n  },\n  \"subtitle\": {\n    \"en\": \"Premium dedicated desk with printing and rooms\",\n    \"ar\": \"ظ…ظƒطھط¨ ظ…ط®طµطµ ظ…ط¹ ط­طµطµ ط·ط¨ط§ط¹ط© ظˆط؛ط±ظپ ط§ط¬طھظ…ط§ط¹ط§طھ\"\n  },\n  \"is_subscription\": true,\n  \"price\": 250.0,\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": 8.0,\n  \"overage_rate\": 1.5,\n  \"is_active\": true,\n  \"order\": 1,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 50.0,\n      \"description\": {\n        \"en\": \"Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ظƒط§ظپظٹظ‡\"\n      },\n      \"order\": 1\n    },\n    {\n      \"category\": \"printing_internet\",\n      \"amount\": 35.0,\n      \"description\": {\n        \"en\": \"Printing Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ط·ط¨ط§ط¹ط©\"\n      },\n      \"order\": 2\n    },\n    {\n      \"category\": \"space_specific\",\n      \"amount\": 8.0,\n      \"description\": {\n        \"en\": \"Meeting Room Hours\",\n        \"ar\": \"ط³ط§ط¹ط§طھ ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ\"\n      },\n      \"order\": 3\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"1 Month access\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ط¯ط© ط´ظ‡ط±\"\n      },\n      \"value\": {\n        \"en\": \"1 Month\",\n        \"ar\": \"ط´ظ‡ط± ظˆط§ط­ط¯\"\n      },\n      \"icon\": \"calendar\",\n      \"is_included\": true,\n      \"order\": 1\n    },\n    {\n      \"name\": {\n        \"en\": \"Access to a Dedicated Desk\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ظƒطھط¨ ظ…ط®طµطµ\"\n      },\n      \"value\": null,\n      \"icon\": \"briefcase\",\n      \"is_included\": true,\n      \"order\": 2\n    },\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 3\n    },\n    {\n      \"name\": {\n        \"en\": \"Printing: 100 B&W, 50 Colored\",\n        \"ar\": \"ط·ط¨ط§ط¹ط©: 100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯طŒ 50 ظ…ظ„ظˆظ†\"\n      },\n      \"value\": {\n        \"en\": \"100 B&W, 50 Colored\",\n        \"ar\": \"100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯\"\n      },\n      \"icon\": \"printer\",\n      \"is_included\": true,\n      \"order\": 4\n    },\n    {\n      \"name\": {\n        \"en\": \"Meeting Rooms: 8 Hours\",\n        \"ar\": \"ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ: 8 ط³ط§ط¹ط§طھ\"\n      },\n      \"value\": {\n        \"en\": \"8 Hours\",\n        \"ar\": \"8 ط³ط§ط¹ط§طھ\"\n      },\n      \"icon\": \"clock\",\n      \"is_included\": true,\n      \"order\": 5\n    }\n  ],\n  \"sale_price_points\": 100,\n  \"sale_starts_at\": \"2026-10-05 10:00\",\n  \"sale_ends_at\": \"2026-10-07 10:00\"\n}",
+                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated +\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³\"\n  },\n  \"subtitle\": {\n    \"en\": \"Premium dedicated desk with printing and rooms\",\n    \"ar\": \"ظ…ظƒطھط¨ ظ…ط®طµطµ ظ…ط¹ ط­طµطµ ط·ط¨ط§ط¹ط© ظˆط؛ط±ظپ ط§ط¬طھظ…ط§ط¹ط§طھ\"\n  },\n  \"is_subscription\": true,\n  \"price\": 250.0,\n  \"pricing_currency\": \"USD\",\n  \"duration_days\": 30,\n  \"included_hours\": 8.0,\n  \"overage_rate\": 1.5,\n  \"is_active\": true,\n  \"order\": 1,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 50.0,\n      \"description\": {\n        \"en\": \"Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ظƒط§ظپظٹظ‡\"\n      },\n      \"order\": 1\n    },\n    {\n      \"category\": \"printing_internet\",\n      \"amount\": 35.0,\n      \"description\": {\n        \"en\": \"Printing Balance\",\n        \"ar\": \"ط±طµظٹط¯ ط§ظ„ط·ط¨ط§ط¹ط©\"\n      },\n      \"order\": 2\n    },\n    {\n      \"category\": \"space_specific\",\n      \"amount\": 8.0,\n      \"description\": {\n        \"en\": \"Meeting Room Hours\",\n        \"ar\": \"ط³ط§ط¹ط§طھ ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ\"\n      },\n      \"order\": 3\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"1 Month access\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ط¯ط© ط´ظ‡ط±\"\n      },\n      \"value\": {\n        \"en\": \"1 Month\",\n        \"ar\": \"ط´ظ‡ط± ظˆط§ط­ط¯\"\n      },\n      \"icon\": \"calendar\",\n      \"is_included\": true,\n      \"order\": 1\n    },\n    {\n      \"name\": {\n        \"en\": \"Access to a Dedicated Desk\",\n        \"ar\": \"ظˆطµظˆظ„ ظ„ظ…ظƒطھط¨ ظ…ط®طµطµ\"\n      },\n      \"value\": null,\n      \"icon\": \"briefcase\",\n      \"is_included\": true,\n      \"order\": 2\n    },\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 3\n    },\n    {\n      \"name\": {\n        \"en\": \"Printing: 100 B&W, 50 Colored\",\n        \"ar\": \"ط·ط¨ط§ط¹ط©: 100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯طŒ 50 ظ…ظ„ظˆظ†\"\n      },\n      \"value\": {\n        \"en\": \"100 B&W, 50 Colored\",\n        \"ar\": \"100 ط£ط¨ظٹط¶ ظˆط£ط³ظˆط¯\"\n      },\n      \"icon\": \"printer\",\n      \"is_included\": true,\n      \"order\": 4\n    },\n    {\n      \"name\": {\n        \"en\": \"Meeting Rooms: 8 Hours\",\n        \"ar\": \"ط؛ط±ظپ ط§ظ„ط§ط¬طھظ…ط§ط¹ط§طھ: 8 ط³ط§ط¹ط§طھ\"\n      },\n      \"value\": {\n        \"en\": \"8 Hours\",\n        \"ar\": \"8 ط³ط§ط¹ط§طھ\"\n      },\n      \"icon\": \"clock\",\n      \"is_included\": true,\n      \"order\": 5\n    }\n  ],\n  \"reference_plan_id\": null,\n  \"reference_space_id\": null,\n  \"reference_units\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -10384,7 +10384,7 @@
                                         "plans"
                                     ]
                                 },
-                                "description": "### Sale (optional)\n`sale_price_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `price_points` — as sent, or as stored. A plan is charged the sale price when its payment opens inside the window."
+                                "description": "\n\n### Saving reference (optional)\n`reference_plan_id` **or** `reference_space_id` (its hourly rate), with `reference_units` — the plan's saving is the reference's list price × units, less its own price. One reference or neither; send all three as null to clear. Admin plan responses return the computed `saving`. Sales moved to automatic offers (`admin/coupons` with `is_automatic: true`)."
                             }
                         },
                         {
@@ -10440,7 +10440,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated + (Updated)\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³ (ظ…ط¹ط¯ظ„)\"\n  },\n  \"subtitle\": {\n    \"en\": \"Updated subtitle\",\n    \"ar\": \"ط´ط±ط­ ظ…ط¹ط¯ظ„\"\n  },\n  \"price\": 260.0,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 60.0,\n      \"description\": {\n        \"en\": \"Updated Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ظƒط§ظپظٹظ‡ ظ…ط¹ط¯ظ„\"\n      },\n      \"order\": 1\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 1\n    }\n  ],\n  \"sale_price_points\": 100,\n  \"sale_starts_at\": \"2026-10-05 10:00\",\n  \"sale_ends_at\": \"2026-10-07 10:00\"\n}",
+                                    "raw": "{\n  \"plan_module_id\": 1,\n  \"name\": {\n    \"en\": \"The Dedicated + (Updated)\",\n    \"ar\": \"ط°ط§ ط¯ظٹط¯ظٹظƒظٹطھط¯ ط¨ظ„ط³ (ظ…ط¹ط¯ظ„)\"\n  },\n  \"subtitle\": {\n    \"en\": \"Updated subtitle\",\n    \"ar\": \"ط´ط±ط­ ظ…ط¹ط¯ظ„\"\n  },\n  \"price\": 260.0,\n  \"balances\": [\n    {\n      \"category\": \"cafe\",\n      \"amount\": 60.0,\n      \"description\": {\n        \"en\": \"Updated Cafأ© Balance\",\n        \"ar\": \"ط±طµظٹط¯ ظƒط§ظپظٹظ‡ ظ…ط¹ط¯ظ„\"\n      },\n      \"order\": 1\n    }\n  ],\n  \"features\": [\n    {\n      \"name\": {\n        \"en\": \"Unlimited Coffee\",\n        \"ar\": \"ظ‚ظ‡ظˆط© ط؛ظٹط± ظ…ط­ط¯ظˆط¯ط©\"\n      },\n      \"value\": null,\n      \"icon\": \"coffee\",\n      \"is_included\": true,\n      \"order\": 1\n    }\n  ],\n  \"reference_plan_id\": null,\n  \"reference_space_id\": null,\n  \"reference_units\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -10460,7 +10460,7 @@
                                         "{{plan_id}}"
                                     ]
                                 },
-                                "description": "Returns `{\"message\": \"...\"}` on success, not the updated plan resource.\n\n### Sale (optional)\n`sale_price_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `price_points` — as sent, or as stored. A plan is charged the sale price when its payment opens inside the window."
+                                "description": "Returns `{\"message\": \"...\"}` on success, not the updated plan resource.\n\n### Saving reference (optional)\n`reference_plan_id` **or** `reference_space_id` (its hourly rate), with `reference_units` — the plan's saving is the reference's list price × units, less its own price. One reference or neither; send all three as null to clear. Admin plan responses return the computed `saving`. Sales moved to automatic offers (`admin/coupons` with `is_automatic: true`)."
                             }
                         },
                         {
@@ -10725,6 +10725,119 @@
                                     ]
                                 },
                                 "description": "Admin only. 204 for a coupon nobody used; 409 (`api.coupon.has_redemptions`) once used — deactivate it with `is_active: false` instead."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Offers (automatic)",
+                    "description": "Automatic offers are coupons with `is_automatic: true` and no code: the best one for the member applies itself (docs/decisions/automatic-offers-savings-discount-ledger.md). `fixed_price` is for offers only and needs targets of one family (time in a space, plans, or events). Update and delete use the Coupons requests.",
+                    "item": [
+                        {
+                            "name": "List Offers",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons?is_automatic=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "is_automatic",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Offers only (`is_automatic=1`); `is_automatic=0` lists typed coupons only."
+                            }
+                        },
+                        {
+                            "name": "Create Offer",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 201) {",
+                                            "    pm.collectionVariables.set('coupon_id', pm.response.json().data.id);",
+                                            "    pm.collectionVariables.set('coupon_code', pm.response.json().data.code);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"is_automatic\": true,\n  \"name\": {\n    \"en\": \"Meeting rooms week\",\n    \"ar\": \"أسبوع غرف الاجتماعات\"\n  },\n  \"discount_type\": \"fixed_price\",\n  \"discount_value\": 80,\n  \"starts_at\": \"2026-10-06 00:00\",\n  \"ends_at\": \"2026-10-13 00:00\",\n  \"usage_limit\": null,\n  \"targets\": [\n    {\n      \"purpose\": \"booking\",\n      \"space_type\": \"room\"\n    },\n    {\n      \"purpose\": \"coworking_session\",\n      \"space_type\": \"room\"\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons"
+                                    ]
+                                },
+                                "description": "No `code` (sending one is a 422). `per_user_limit` defaults to unlimited for an offer."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Reports",
+                    "item": [
+                        {
+                            "name": "Discount Report",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reports/discounts?from=2026-10-01&to=2026-10-31&status=counted&per_page=15"
+                                },
+                                "description": "Every operation with a discount or saving in the period, with its status. Filters: `from`, `to` (local dates), `kind` (offer|plan_discount|coupon|duration_saving), `purpose`, `status` (counted|void), `per_page`. `meta.totals` is over counted operations only; savings are totalled apart. Admin and operations."
                             }
                         }
                     ]
@@ -16183,7 +16296,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"allows_extension\": true,\n  \"cancellation_window_minutes\": 120,\n  \"sale_hourly_rate_points\": 80,\n  \"sale_starts_at\": \"2026-10-05 09:00\",\n  \"sale_ends_at\": \"2026-10-12 09:00\"\n}",
+                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"allows_extension\": true,\n  \"cancellation_window_minutes\": 120\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -16202,7 +16315,7 @@
                                                 "spaces"
                                             ]
                                         },
-                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one.\n\nA co_space takes no `capacity` (422 if sent): its capacity is the number of its desks, starting at 0 — add them under Seats & Desks. Other types send their capacity as before. A branch has one co_space at most: a second one (or turning another space into one via Update Space) is 422 on `space_type` — add desks to the existing one instead.\n\n`allows_extension` (bool, optional, default true): whether bookings on this space may be extended. `cancellation_window_minutes` (int ≥ 0 or null, optional): how long before its start a booking may still be cancelled; null falls back to the global `booking.cancellation_window_minutes`. See docs/decisions/booking-outcomes-and-extension.md.\n\n### Sale (optional)\n`sale_hourly_rate_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `hourly_rate_points` — as sent, or as stored. Members are charged the sale rate for the seconds of a booking inside the window and the normal rate for the rest."
+                                        "description": "status defaults to active أ¢â‚¬â€‌ set it via the separate Update Space Status request, never through this one.\n\nA co_space takes no `capacity` (422 if sent): its capacity is the number of its desks, starting at 0 — add them under Seats & Desks. Other types send their capacity as before. A branch has one co_space at most: a second one (or turning another space into one via Update Space) is 422 on `space_type` — add desks to the existing one instead.\n\n`allows_extension` (bool, optional, default true): whether bookings on this space may be extended. `cancellation_window_minutes` (int ≥ 0 or null, optional): how long before its start a booking may still be cancelled; null falls back to the global `booking.cancellation_window_minutes`. See docs/decisions/booking-outcomes-and-extension.md.\n\nSales moved to automatic offers (`admin/coupons` with `is_automatic: true`)."
                                     }
                                 },
                                 {
@@ -16258,7 +16371,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 25,\n  \"allows_extension\": false,\n  \"cancellation_window_minutes\": null,\n  \"sale_hourly_rate_points\": 80,\n  \"sale_starts_at\": \"2026-10-05 09:00\",\n  \"sale_ends_at\": \"2026-10-12 09:00\"\n}",
+                                            "raw": "{\n  \"building_id\": {{building_id}},\n  \"zone_id\": {{zone_id}},\n  \"space_type\": \"co_space\",\n  \"allocation_model\": \"open\",\n  \"is_lockable\": false,\n  \"capacity\": 25,\n  \"allows_extension\": false,\n  \"cancellation_window_minutes\": null\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -16278,7 +16391,7 @@
                                                 "{{space_id}}"
                                             ]
                                         },
-                                        "description": "Structural fields only أ¢â‚¬â€‌ status/status_reason/status_from/status_until are rejected here even if sent; use Update Space Status. Returns `{\"message\": \"...\"}` on success.\n\n`allows_extension` and `cancellation_window_minutes` as on Create Space; left out, a space keeps what it has, and `null` puts the window back on the global setting. See docs/decisions/booking-outcomes-and-extension.md.\n\n### Sale (optional)\n`sale_hourly_rate_points`, `sale_starts_at`, `sale_ends_at` — all three or none (local times). Send all three as null to end a sale; leave them out to keep it. The sale price must be below `hourly_rate_points` — as sent, or as stored. Members are charged the sale rate for the seconds of a booking inside the window and the normal rate for the rest."
+                                        "description": "Structural fields only أ¢â‚¬â€‌ status/status_reason/status_from/status_until are rejected here even if sent; use Update Space Status. Returns `{\"message\": \"...\"}` on success.\n\n`allows_extension` and `cancellation_window_minutes` as on Create Space; left out, a space keeps what it has, and `null` puts the window back on the global setting. See docs/decisions/booking-outcomes-and-extension.md.\n\nSales moved to automatic offers (`admin/coupons` with `is_automatic: true`)."
                                     }
                                 },
                                 {

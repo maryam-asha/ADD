@@ -10,8 +10,8 @@ use Tests\TestCase;
  *
  * Before it, the list price (AmountCalculator) and the plan discount
  * (PlanDiscountService) were stitched together by hand in six places —
- * creation, batch, extension, preview, closure and plan purchase. A sale
- * and a coupon on top would have been a seventh copy of "which discount
+ * creation, batch, extension, preview, closure and plan purchase. An
+ * offer and a coupon on top would have been a seventh copy of "which discount
  * wins", and the first two copies to drift would quote a member one price
  * and charge them another. So the parts a price is made of may only be
  * called from the Pricing domain, and the money arithmetic there is integer
@@ -26,7 +26,7 @@ class PricingIsCentralizedTest extends TestCase
     /**
      * Pricing time outside the Pricing domain. The three fallbacks price a
      * record from before its price was stored — they read what such a
-     * record cost, and a sale or coupon could not have been on it.
+     * record cost, and an offer or coupon could not have been on it.
      *
      * @var list<string>
      */
@@ -59,7 +59,7 @@ class PricingIsCentralizedTest extends TestCase
         $this->assertNoneOutside(
             '/[dD]iscounts->(apply|resolveFor)\(/',
             self::PLAN_DISCOUNT_ALLOWED,
-            'Which discount wins is PriceQuoteService\'s call — a plan discount, a sale and a coupon are weighed together there:',
+            'Which discount wins is PriceQuoteService\'s call — a plan discount, an offer and a coupon are weighed together there:',
         );
     }
 
@@ -70,6 +70,33 @@ class PricingIsCentralizedTest extends TestCase
             [],
             'A coupon is applied through PriceQuoteService, which knows what it stacks on:',
         );
+    }
+
+    /**
+     * The discount ledger is one place: every reduction and saving, and the
+     * terms it was locked on, are written by CouponLedger (which
+     * QuoteRecorder calls) — so a report reads one consistent record and a
+     * limit counts every use. Anything else creating, inserting, updating or
+     * deleting applied_discounts rows would write a second version of it.
+     */
+    public function test_the_discount_ledger_is_written_only_by_the_coupon_ledger(): void
+    {
+        $violations = [];
+
+        foreach ($this->phpFilesIn(app_path()) as $path => $contents) {
+            if ($path === 'app/Domain/Pricing/Services/CouponLedger.php') {
+                continue;
+            }
+
+            if (preg_match_all('/new AppliedDiscount\b|AppliedDiscount::(create|forceCreate|insert|updateOrCreate|firstOrCreate)\(|applied_discounts[\'"]\)->(insert|update|delete)/', $contents, $matches)) {
+                $violations[] = "{$path}: ".implode(', ', array_unique($matches[0]));
+            }
+        }
+
+        $this->assertSame([], $violations, implode("\n", array_merge(
+            ['applied_discounts is written by CouponLedger only (QuoteRecorder goes through it):'],
+            $violations,
+        )));
     }
 
     /**
@@ -94,7 +121,7 @@ class PricingIsCentralizedTest extends TestCase
 
     /**
      * An activation that charges debits the plan's list price — missing a
-     * live sale and any coupon. A plan is paid for through PaymentService,
+     * live offer and any coupon. A plan is paid for through PaymentService,
      * whose fulfiller activates with `charge: false`; staff activations are
      * free. So every call says `charge: false` out loud rather than
      * inheriting the default.

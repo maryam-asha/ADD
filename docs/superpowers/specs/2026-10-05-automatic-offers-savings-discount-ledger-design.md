@@ -1,6 +1,6 @@
 # Design: Automatic Offers, Duration Savings and the Discount Ledger (Pricing Phase 1.5)
 
-**Status:** draft for review, 2026-10-05. **Owner:** Maryam Asha.
+**Status:** implemented 2026-10-06 (`docs/decisions/automatic-offers-savings-discount-ledger.md`). **Owner:** Maryam Asha.
 **Builds on:** `docs/decisions/pricing-offers-and-coupons.md` (phase 1, merged
 into `feat/add-point-system`, not yet in production) and branch
 `feat/sale-discount-labels` (the `sale` block's discount fields).

@@ -1,6 +1,9 @@
 # Sale prices, coupons and one pricing pipeline
 
-**Status:** resolved 2026-10-05. **Owner:** Maryam Asha.
+**Status:** resolved 2026-10-05; **sales superseded 2026-10-06** by
+automatic offers — see `docs/decisions/automatic-offers-savings-discount-ledger.md`.
+The per-item sale columns below were dropped before reaching production,
+and `coupon_redemptions` became `applied_discounts`. **Owner:** Maryam Asha.
 **Type:** design doc for a new capability (Pricing phase 1 of 3). Design:
 `docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md`; plan:
 `docs/superpowers/plans/2026-10-04-pricing-offers-coupons.md`. This file
