@@ -3,7 +3,6 @@
 namespace Tests\Feature\Finance;
 
 use App\Domain\Finance\Enums\PaymentMethod;
-use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Services\SyncPaymentStatus;
@@ -115,8 +114,7 @@ class PaymeraPaymentTest extends TestCase
         $this->member();
         $this->fakeGateway();
 
-        $response = $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::WalletTopUp->value,
+        $response = $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '10.00',
         ]);
 
@@ -149,9 +147,9 @@ class PaymeraPaymentTest extends TestCase
         $this->fakeGateway();
 
         // The client tries to name its own price. It must be ignored.
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::PlanPurchase->value,
+        $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
+            'payment_method' => 'paymera',
             'amount' => '0.01',
         ])->assertCreated();
 
@@ -188,8 +186,7 @@ class PaymeraPaymentTest extends TestCase
             ]),
         ]);
 
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::WalletTopUp->value,
+        $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '10.00',
         ])->assertStatus(503);
 
@@ -213,8 +210,7 @@ class PaymeraPaymentTest extends TestCase
         ]);
 
         // 502, not 503 — this one is worth retrying.
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::WalletTopUp->value,
+        $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '10.00',
         ])->assertStatus(502);
     }
@@ -230,8 +226,7 @@ class PaymeraPaymentTest extends TestCase
             ]),
         ]);
 
-        $response = $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::WalletTopUp->value,
+        $response = $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '10.00',
         ]);
 
@@ -521,9 +516,9 @@ class PaymeraPaymentTest extends TestCase
         $plan = $this->plan();
         $plan->update(['is_active' => false]);
 
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::PlanPurchase->value,
+        $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
+            'payment_method' => 'paymera',
         ])->assertStatus(422)->assertJsonValidationErrors('plan_id');
 
         $this->assertSame(0, Payment::count());
@@ -535,9 +530,9 @@ class PaymeraPaymentTest extends TestCase
         $plan = $this->plan();
         $plan->update(['is_public' => false]);
 
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::PlanPurchase->value,
+        $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
+            'payment_method' => 'paymera',
         ])->assertStatus(422)->assertJsonValidationErrors('plan_id');
     }
 
@@ -546,8 +541,7 @@ class PaymeraPaymentTest extends TestCase
         $this->member();
 
         // At 0.10 USD per point, 0.05 buys nothing.
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => PaymentPurpose::WalletTopUp->value,
+        $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '0.05',
         ])->assertStatus(422)->assertJsonValidationErrors('amount');
 

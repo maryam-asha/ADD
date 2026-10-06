@@ -189,9 +189,9 @@ class BookingExtensionOwedTest extends TestCase
             ->assertJsonPath('data.amount_points', 100);
 
         // Pay-now by card charges the hour, not the booking again.
-        $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id,
-        ])->assertCreated();
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'booking_id' => $booking->id, 'payment_method' => 'paymera',
+        ])->assertOk();
 
         $second = Payment::query()->latest('id')->firstOrFail();
         $this->assertSame(100, $second->amount_points);

@@ -81,8 +81,8 @@ class PaymentStateBlockTest extends TestCase
             ->assertJsonPath('data.awaiting_payment', false)
             ->assertJsonPath('data.payment_id', null);
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
-            ->assertCreated();
+        $this->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id, 'payment_method' => 'wallet'])
+            ->assertOk();
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}")
             ->assertOk()

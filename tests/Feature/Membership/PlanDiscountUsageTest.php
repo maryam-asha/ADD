@@ -116,8 +116,8 @@ class PlanDiscountUsageTest extends TestCase
         foreach ([10, 12, 14] as $hour) {
             $booking = $this->book($hour, 'cash');
 
-            $this->postJson('/api/v1/member/payments', ['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
-                ->assertCreated();
+            $this->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id, 'payment_method' => 'wallet'])
+                ->assertOk();
         }
 
         $this->assertSame([70, 100, 100], Booking::query()->orderBy('start_at')->pluck('price_points')->all());

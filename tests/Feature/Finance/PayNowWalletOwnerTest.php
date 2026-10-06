@@ -28,14 +28,15 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Whose wallet `POST member/payments` may touch
- * (final review C1, docs/decisions/unified-payments.md).
+ * Whose wallet paying may touch — a booking sent again to
+ * `POST member/bookings` with its id, a plan bought through
+ * `POST member/memberships` (final review C1, docs/decisions/unified-payments.md).
  *
  * Only the wallet method spends from a wallet the member names, and it
  * checks the member may spend from it. Card and cash money always lands in
- * the payer's own wallet first, whatever the request names. A plan bought
- * here is always the member's own: a company plan is bought by the
- * company's admin through `POST member/memberships` with `company_id`.
+ * the payer's own wallet first, whatever the request names. A company plan
+ * is bought by the company's admin through `POST member/memberships` with
+ * `company_id`, and by nobody else.
  */
 class PayNowWalletOwnerTest extends TestCase
 {
@@ -140,9 +141,14 @@ class PayNowWalletOwnerTest extends TestCase
         return app(WalletService::class)->generalBalance($wallet->fresh());
     }
 
-    private function payNow(array $body)
+    private function payBooking(Booking $booking, array $body)
     {
-        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', $body);
+        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id] + $body);
+    }
+
+    private function buyPlan(array $body)
+    {
+        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/memberships', $body);
     }
 
     /** Probe A. */
@@ -153,42 +159,13 @@ class PayNowWalletOwnerTest extends TestCase
         $company->members()->attach($member->id, ['is_admin' => false]);
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow([
-            'purpose' => 'plan_purchase',
-            'method' => 'wallet',
+        $this->buyPlan([
+            'payment_method' => 'wallet',
             'plan_id' => $this->plan()->id,
-            'wallet_owner_type' => 'company',
-            'wallet_owner_id' => $company->id,
-        ])
-            ->assertStatus(422)
-            ->assertJsonPath('message', __('api.payment.company_plan_not_allowed', [], 'en'));
+            'company_id' => $company->id,
+        ])->assertForbidden();
 
         $this->assertSame(0, Membership::count());
-        $this->assertSame(0, Payment::count());
-        $this->assertSame(5000, $this->balance($companyWallet));
-    }
-
-    /**
-     * Even the company's admin: this endpoint buys the member's own plan,
-     * and a company plan goes through memberships, where the admin check is.
-     */
-    public function test_a_company_admin_is_sent_to_memberships_for_a_company_plan(): void
-    {
-        [$company, $companyWallet] = $this->company();
-        $admin = $this->member();
-        $company->members()->attach($admin->id, ['is_admin' => true]);
-        Sanctum::actingAs($admin, ['*']);
-
-        foreach (['wallet', 'cash', null] as $method) {
-            $this->payNow(array_filter([
-                'purpose' => 'plan_purchase',
-                'method' => $method,
-                'plan_id' => $this->plan()->id,
-                'wallet_owner_type' => 'company',
-                'wallet_owner_id' => $company->id,
-            ]))->assertStatus(422);
-        }
-
         $this->assertSame(0, Payment::count());
         $this->assertSame(5000, $this->balance($companyWallet));
     }
@@ -201,13 +178,11 @@ class PayNowWalletOwnerTest extends TestCase
         $booking = $this->unpaidBooking($member);
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow([
-            'purpose' => 'booking',
-            'method' => 'paymera',
-            'payable_id' => $booking->id,
+        $this->payBooking($booking, [
+            'payment_method' => 'paymera',
             'wallet_owner_type' => 'company',
             'wallet_owner_id' => $stranger->id,
-        ])->assertCreated()->assertJsonPath('data.next', 'redirect');
+        ])->assertOk()->assertJsonPath('next', 'redirect');
 
         $personal = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->value('id');
         $this->assertSame($personal, Payment::sole()->wallet_id);
@@ -220,13 +195,11 @@ class PayNowWalletOwnerTest extends TestCase
         $member = $this->member();
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow([
-            'purpose' => 'plan_purchase',
-            'method' => 'cash',
+        $this->buyPlan([
+            'payment_method' => 'cash',
             'plan_id' => $this->plan()->id,
-            'wallet_owner_type' => 'company',
-            'wallet_owner_id' => $stranger->id,
-        ])->assertStatus(422);
+            'company_id' => $stranger->id,
+        ])->assertForbidden();
 
         $this->assertSame(0, Payment::count());
         $this->assertSame(0, Payment::where('wallet_id', $strangerWallet->id)->count());
@@ -237,9 +210,9 @@ class PayNowWalletOwnerTest extends TestCase
         $member = $this->member();
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow(['purpose' => 'plan_purchase', 'method' => 'cash', 'plan_id' => $this->plan()->id])
+        $this->buyPlan(['payment_method' => 'cash', 'plan_id' => $this->plan()->id])
             ->assertCreated()
-            ->assertJsonPath('data.next', 'pay_at_reception');
+            ->assertJsonPath('data.pending_purchase.method', 'cash');
 
         $payment = Payment::sole();
         $this->assertSame(PaymentStatus::Pending, $payment->status);
@@ -259,23 +232,19 @@ class PayNowWalletOwnerTest extends TestCase
         $booking = $this->unpaidBooking($member);
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow([
-            'purpose' => 'booking',
-            'method' => 'wallet',
-            'payable_id' => $booking->id,
+        $this->payBooking($booking, [
+            'payment_method' => 'wallet',
             'wallet_owner_type' => 'company',
             'wallet_owner_id' => $stranger->id,
         ])
             ->assertStatus(422)
             ->assertJsonPath('message', __('api.booking.wallet_not_owned', [], 'en'));
 
-        $this->payNow([
-            'purpose' => 'booking',
-            'method' => 'wallet',
-            'payable_id' => $booking->id,
+        $this->payBooking($booking, [
+            'payment_method' => 'wallet',
             'wallet_owner_type' => 'company',
             'wallet_owner_id' => $company->id,
-        ])->assertCreated()->assertJsonPath('data.next', 'done');
+        ])->assertOk()->assertJsonPath('next', 'done');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame($companyWallet->id, Payment::sole()->wallet_id);
@@ -289,7 +258,7 @@ class PayNowWalletOwnerTest extends TestCase
         $package = $this->plan(['is_subscription' => false]);
 
         foreach (['wallet', 'cash', null] as $method) {
-            $this->payNow(array_filter(['purpose' => 'plan_purchase', 'method' => $method, 'plan_id' => $package->id]))
+            $this->buyPlan(array_filter(['payment_method' => $method, 'plan_id' => $package->id]))
                 ->assertStatus(422)
                 ->assertJsonValidationErrors('plan_id');
         }
@@ -310,7 +279,7 @@ class PayNowWalletOwnerTest extends TestCase
         $member = $this->member(5000);
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow(['purpose' => 'plan_purchase', 'method' => 'wallet', 'plan_id' => $this->plan()->id])
+        $this->buyPlan(['payment_method' => 'wallet', 'plan_id' => $this->plan()->id])
             ->assertStatus(422)
             ->assertJsonPath('message', __('api.membership.seat_pool_full', [], 'en'))
             ->assertJsonStructure(['message', 'first_shortfall_at']);

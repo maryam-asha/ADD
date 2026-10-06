@@ -57,9 +57,8 @@ class MinimumTopUpTest extends TestCase
 
     private function topUp(string $amount)
     {
-        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
-            'method' => 'paymera',
+        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => $amount,
         ]);
     }

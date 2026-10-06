@@ -5,7 +5,6 @@ namespace Tests\Feature\Finance;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
@@ -125,17 +124,22 @@ class PayNowTest extends TestCase
         ]);
     }
 
-    private function payNow(array $body)
+    private function payBooking(Booking $booking, array $body)
     {
-        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', $body);
+        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id] + $body);
     }
 
-    public function test_the_old_top_up_request_answers_as_before_with_next(): void
+    private function topUp(array $body)
+    {
+        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', $body);
+    }
+
+    public function test_a_top_up_answers_as_before_with_next(): void
     {
         Sanctum::actingAs($this->member(), ['*']);
         $this->fakeGateway();
 
-        $this->payNow(['purpose' => 'wallet_top_up', 'amount' => '10.00'])
+        $this->topUp(['amount' => '10.00'])
             ->assertCreated()
             ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en')
             ->assertJsonPath('data.payment.status', 'pending')
@@ -148,11 +152,11 @@ class PayNowTest extends TestCase
         $booking = $this->unpaidBooking($member);
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
-            ->assertCreated()
-            ->assertJsonPath('data.next', 'done')
-            ->assertJsonPath('data.redirect_url', null)
-            ->assertJsonPath('data.payment.status', 'accepted');
+        $this->payBooking($booking, ['payment_method' => 'wallet'])
+            ->assertOk()
+            ->assertJsonPath('next', 'done')
+            ->assertJsonPath('redirect_url', null)
+            ->assertJsonPath('payment.status', 'accepted');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame(200, app(WalletService::class)->generalBalance($this->walletOf($member)));
@@ -165,10 +169,10 @@ class PayNowTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->fakeGateway();
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id])
-            ->assertCreated()
-            ->assertJsonPath('data.next', 'redirect')
-            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
+        $this->payBooking($booking, ['payment_method' => 'paymera'])
+            ->assertOk()
+            ->assertJsonPath('next', 'redirect')
+            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
 
         $payment = Payment::sole();
         $this->assertSame(100, $payment->points_to_credit);
@@ -194,7 +198,7 @@ class PayNowTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->fakeGateway('F');
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id])->assertCreated();
+        $this->payBooking($booking, ['payment_method' => 'paymera'])->assertOk();
         app(SyncPaymentStatus::class)->handle(Payment::sole());
 
         $this->assertSame(PaymentStatus::Failed, Payment::sole()->status);
@@ -222,7 +226,7 @@ class PayNowTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->fakeGateway();
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id])->assertCreated();
+        $this->payBooking($booking, ['payment_method' => 'paymera'])->assertOk();
         app(SyncPaymentStatus::class)->handle(Payment::sole());
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
@@ -235,7 +239,7 @@ class PayNowTest extends TestCase
         $booking = $this->unpaidBooking($this->member());
         Sanctum::actingAs($this->member(300), ['*']);
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])->assertNotFound();
+        $this->payBooking($booking, ['payment_method' => 'wallet'])->assertNotFound();
         $this->assertSame(0, Payment::count());
     }
 
@@ -246,34 +250,9 @@ class PayNowTest extends TestCase
         $booking->forceFill(['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Cash])->save();
         Sanctum::actingAs($member, ['*']);
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
+        $this->payBooking($booking, ['payment_method' => 'wallet'])
             ->assertStatus(409)
             ->assertJsonPath('message', __('api.payment.already_paid', [], 'en'));
-    }
-
-    public function test_an_open_session_cannot_be_paid_but_a_closed_one_can(): void
-    {
-        $member = $this->member(300);
-        Sanctum::actingAs($member, ['*']);
-
-        $open = WalkinSession::factory()->create(['user_id' => $member->id, 'checked_out_at' => null]);
-        $this->payNow(['purpose' => 'coworking_session', 'method' => 'wallet', 'payable_id' => $open->id])
-            ->assertStatus(422)
-            ->assertJsonPath('message', __('api.reception.not_yet_checked_out', [], 'en'));
-
-        $closed = WalkinSession::factory()->create([
-            'user_id' => $member->id,
-            'checked_out_at' => now()->subHour(),
-            'price_points' => 150,
-            'amount_owed' => '15.00',
-            'payment_state' => PaymentState::Unpaid,
-        ]);
-        $this->payNow(['purpose' => 'coworking_session', 'method' => 'wallet', 'payable_id' => $closed->id])
-            ->assertCreated()
-            ->assertJsonPath('data.next', 'done');
-
-        $this->assertSame(PaymentState::Paid, $closed->refresh()->payment_state);
-        $this->assertSame(150, app(WalletService::class)->generalBalance($this->walletOf($member)));
     }
 
     public function test_a_card_accepted_after_the_desk_took_the_money_keeps_the_points_for_review(): void
@@ -283,7 +262,7 @@ class PayNowTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->fakeGateway();
 
-        $this->payNow(['purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id])->assertCreated();
+        $this->payBooking($booking, ['payment_method' => 'paymera'])->assertOk();
 
         // Paid at the desk while the member was on the card page.
         $booking->forceFill(['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Cash])->save();

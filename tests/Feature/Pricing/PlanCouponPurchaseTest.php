@@ -243,17 +243,14 @@ class PlanCouponPurchaseTest extends TestCase
         $this->assertSame(0, app(CouponLedger::class)->liveUsage($coupon));
     }
 
-    public function test_the_payments_endpoint_takes_a_coupon_for_a_plan(): void
+    public function test_an_amount_off_coupon_lowers_a_plan_bought_with_points(): void
     {
         Coupon::factory()->amountOff(20)->create(['code' => 'TWENTY']);
         $member = $this->member(500);
 
-        $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => 'plan_purchase',
-            'method' => 'wallet',
-            'plan_id' => $this->plan->id,
-            'coupon_code' => 'TWENTY',
-        ])->assertCreated()->assertJsonPath('coupon.points_discounted', 20);
+        $this->buy('TWENTY', 'wallet')
+            ->assertCreated()
+            ->assertJsonPath('coupon.points_discounted', 20);
 
         $this->assertSame(100, Payment::sole()->amount_points);
         $this->assertSame(400, $this->balance($member));

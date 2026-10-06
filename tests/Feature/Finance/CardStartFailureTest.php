@@ -136,8 +136,8 @@ class CardStartFailureTest extends TestCase
         ]);
 
         foreach (['paymera', 'wallet'] as $method) {
-            $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-                'purpose' => 'booking', 'method' => $method, 'payable_id' => $booking->id,
+            $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+                'booking_id' => $booking->id, 'payment_method' => $method,
             ])
                 ->assertStatus(422)
                 ->assertJsonPath('message', __('api.payment.nothing_due', [], 'en'));
@@ -175,8 +175,8 @@ class CardStartFailureTest extends TestCase
         ]);
         $this->withoutARate();
 
-        $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id,
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', [
+            'booking_id' => $booking->id, 'payment_method' => 'paymera',
         ])
             ->assertStatus(503)
             ->assertJsonPath('message', __('api.payment.gateway_unavailable', [], 'en'));

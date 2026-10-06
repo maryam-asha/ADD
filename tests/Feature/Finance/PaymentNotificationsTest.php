@@ -167,8 +167,8 @@ class PaymentNotificationsTest extends TestCase
         $booking = Booking::factory()->create(['user_id' => $member->id, 'payment_state' => PaymentState::Unpaid, 'payment_source' => null, 'price_points' => 100]);
         Sanctum::actingAs($member, ['*']);
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'booking', 'method' => 'wallet', 'payable_id' => $booking->id])
-            ->assertCreated();
+        $this->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id, 'payment_method' => 'wallet'])
+            ->assertOk();
 
         $this->assertNotTold($member, 'payment.received');
     }

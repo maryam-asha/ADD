@@ -270,7 +270,7 @@ class PaymentsTableTest extends TestCase
         Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         Sanctum::actingAs($member, ['member-app']);
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up', 'amount' => '10.00'])
+        $this->postJson('/api/v1/member/wallet/top-ups', ['amount' => '10.00'])
             ->assertCreated()
             ->assertJsonPath('data.payment.method', 'paymera')
             ->assertJsonPath('data.payment.amount_points', 100)
@@ -281,24 +281,5 @@ class PaymentsTableTest extends TestCase
         $this->assertSame('paymera', $payment->method);
         $this->assertSame(100, $payment->amount_points);
         $this->assertSame($payment->points_to_credit, $payment->amount_points);
-    }
-
-    /**
-     * A booking, a session or an event registration is paid by naming it.
-     */
-    public function test_paying_for_a_record_requires_naming_it(): void
-    {
-        $this->seed(RoleSeeder::class);
-
-        $member = User::factory()->create();
-        $member->assignRole('member');
-        Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-        Sanctum::actingAs($member, ['member-app']);
-
-        foreach (['booking', 'coworking_session', 'event_registration'] as $purpose) {
-            $this->postJson('/api/v1/member/payments', ['purpose' => $purpose, 'amount' => 10])
-                ->assertStatus(422)
-                ->assertJsonValidationErrors('payable_id');
-        }
     }
 }

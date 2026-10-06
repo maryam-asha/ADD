@@ -72,12 +72,16 @@ class CouponApplicationTest extends TestCase
 
     private function pay(string $purpose, int $payableId, string $code, string $method = 'wallet'): TestResponse
     {
-        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => $purpose,
-            'method' => $method,
-            'payable_id' => $payableId,
-            'coupon_code' => $code,
-        ]);
+        $body = ['payment_method' => $method, 'coupon_code' => $code];
+
+        return match ($purpose) {
+            'booking' => $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings', ['booking_id' => $payableId] + $body),
+            'coworking_session' => $this->withHeader('lang', 'en')->postJson("/api/v1/member/coworking-sessions/walkin/{$payableId}/pay", $body),
+            'event_registration' => $this->withHeader('lang', 'en')->postJson(
+                '/api/v1/member/events/'.EventAttendee::findOrFail($payableId)->event_id.'/register',
+                ['ticket_id' => $payableId] + $body,
+            ),
+        };
     }
 
     public function test_a_coupon_on_an_unpaid_booking_lowers_what_it_owes(): void
@@ -86,7 +90,7 @@ class CouponApplicationTest extends TestCase
         $booking = $this->unpaidBooking();
 
         $this->pay('booking', $booking->id, 'late20')
-            ->assertCreated()
+            ->assertOk()
             ->assertJsonPath('coupon.code', 'LATE20')
             ->assertJsonPath('coupon.applied', true)
             ->assertJsonPath('coupon.points_discounted', 20);
@@ -171,7 +175,7 @@ class CouponApplicationTest extends TestCase
             'list_price_points' => 50,
         ]);
 
-        $this->pay('event_registration', $attendee->id, 'EVENT10')->assertCreated();
+        $this->pay('event_registration', $attendee->id, 'EVENT10')->assertOk();
 
         $this->assertSame(40, $attendee->refresh()->price_points);
         $this->assertSame(40, Payment::sole()->amount_points);

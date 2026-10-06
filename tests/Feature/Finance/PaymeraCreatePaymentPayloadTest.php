@@ -67,7 +67,7 @@ class PaymeraCreatePaymentPayloadTest extends TestCase
     {
         config(['paymera.saved_cards_enabled' => true]);
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up', 'amount' => '10.00'])->assertCreated();
+        $this->postJson('/api/v1/member/wallet/top-ups', ['amount' => '10.00'])->assertCreated();
 
         $token = Payment::sole()->callback_token;
         $this->assertNotNull($token);
@@ -95,8 +95,8 @@ class PaymeraCreatePaymentPayloadTest extends TestCase
             'price_points' => 100,
         ]);
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'booking', 'method' => 'paymera', 'payable_id' => $booking->id])
-            ->assertCreated();
+        $this->postJson('/api/v1/member/bookings', ['booking_id' => $booking->id, 'payment_method' => 'paymera'])
+            ->assertOk();
 
         $token = Payment::sole()->callback_token;
         $this->assertNotNull($token);

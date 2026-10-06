@@ -31,7 +31,7 @@ use Tests\TestCase;
 /**
  * The member's own wallet: GET member/wallet, the history under
  * member/wallet/transactions, and one row as a receipt — including the
- * credit a card top-up (POST member/payments) leaves once accepted.
+ * credit a card top-up (POST member/wallet/top-ups) leaves once accepted.
  *
  * Card rates as in MinimumTopUpTest: 1 point = 0.10 USD and
  * 1 USD = 10,000 SYP, so 10 points cost 10,000.00 SYP.
@@ -337,12 +337,12 @@ class MemberWalletTest extends TestCase
     {
         $this->actingAsMember($this->member());
 
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up', 'method' => 'paymera'])
+        $this->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('amount');
 
         // No method is the card.
-        $this->postJson('/api/v1/member/payments', ['purpose' => 'wallet_top_up'])
+        $this->postJson('/api/v1/member/wallet/top-ups', [])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('amount');
     }
@@ -354,9 +354,8 @@ class MemberWalletTest extends TestCase
 
         // A top-up is an ordinary card payment; until it settles it has no
         // row in the history.
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
-            'method' => 'paymera',
+        $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10000',
         ])
             ->assertCreated()

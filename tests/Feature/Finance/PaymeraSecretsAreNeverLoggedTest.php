@@ -214,8 +214,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
             ),
         ]);
 
-        $response = $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
+        $response = $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '10.00',
         ]);
 

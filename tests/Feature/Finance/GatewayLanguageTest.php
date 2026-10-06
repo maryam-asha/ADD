@@ -55,9 +55,8 @@ class GatewayLanguageTest extends TestCase
 
     private function topUp(array $headers, array $extra = [])
     {
-        return $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
-            'method' => 'paymera',
+        return $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10000',
         ] + $extra, $headers);
     }

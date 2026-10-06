@@ -277,14 +277,14 @@ class EventPaymentTest extends TestCase
     public function test_an_unpaid_registration_can_be_paid_later_from_the_app(): void
     {
         $member = $this->member(300);
-        $this->register($this->paidEvent(), ['payment_method' => 'cash'])->assertCreated();
+        $event = $this->paidEvent();
+        $this->register($event, ['payment_method' => 'cash'])->assertCreated();
         $attendee = EventAttendee::sole();
 
-        $this->withHeader('lang', 'en')->postJson('/api/v1/member/payments', [
-            'purpose' => 'event_registration',
-            'method' => 'wallet',
-            'payable_id' => $attendee->id,
-        ])->assertCreated()->assertJsonPath('data.next', 'done');
+        $this->register($event, [
+            'ticket_id' => $attendee->id,
+            'payment_method' => 'wallet',
+        ])->assertOk()->assertJsonPath('data.next', 'done');
 
         $this->assertSame(EventPaymentState::Paid, $attendee->refresh()->payment_state);
         $this->assertSame(200, $this->balance(OwnerType::User, $member->id));

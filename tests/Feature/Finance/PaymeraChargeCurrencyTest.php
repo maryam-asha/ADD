@@ -186,8 +186,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         // Deliberately no ExchangeRate row.
         Http::fake();
 
-        $response = $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
+        $response = $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '1470000',
         ]);
 
@@ -206,8 +205,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         $this->member();
         Http::fake();
 
-        $response = $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'wallet_top_up',
+        $response = $this->postJson('/api/v1/member/wallet/top-ups', [
             'amount' => '1470000',
         ], ['lang' => 'ar']);
 
@@ -231,9 +229,9 @@ class PaymeraChargeCurrencyTest extends TestCase
 
         Http::fake();
 
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'plan_purchase',
+        $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
+            'payment_method' => 'paymera',
         ])->assertStatus(503);
 
         Http::assertNothingSent();
@@ -266,9 +264,9 @@ class PaymeraChargeCurrencyTest extends TestCase
 
         $this->fakeGateway($expectedMinor);
 
-        $this->postJson('/api/v1/member/payments', [
-            'purpose' => 'plan_purchase',
+        $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
+            'payment_method' => 'paymera',
         ])->assertCreated();
 
         $payment = Payment::first();
