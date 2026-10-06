@@ -425,7 +425,7 @@ return [
         'method_not_supported' => 'This payment method cannot be used for this.',
         'company_plan_not_allowed' => 'A company plan can only be bought by the company\'s admin, as a purchase for the company.',
         'already_paid' => 'This has already been paid.',
-        'booking_not_payable' => 'A cancelled or rejected booking cannot be paid.',
+        'booking_not_payable' => 'A cancelled, rejected or not-attended booking cannot be paid.',
         'nothing_due' => 'There is nothing to pay.',
         'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
         'no_wallet' => 'There is no wallet to record this payment against.',
