@@ -11,7 +11,9 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Models\Coupon;
 use App\Support\Enums\EventPaymentState;
+use App\Support\Enums\EventRegistrationStatus;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -145,5 +147,52 @@ class EventRegistrationPayByIdTest extends TestCase
         $this->register($event->id, ['payment_method' => 'wallet'])
             ->assertStatus(422)
             ->assertJsonValidationErrors('registration');
+    }
+
+    public function test_a_pending_registration_a_coupon_made_free_is_not_given_a_new_choice(): void
+    {
+        $this->member(500);
+        Coupon::factory()->percentage(100)->create(['code' => 'GUEST']);
+        $event = $this->paidEvent(80, requiresApproval: true);
+        $ticket = $this->register($event->id, ['coupon_code' => 'GUEST'])->assertCreated()->json('data.ticket_id');
+
+        $attendee = EventAttendee::findOrFail($ticket);
+        $this->assertSame(EventRegistrationStatus::Pending, $attendee->status);
+        $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
+        $this->assertSame('wallet', $attendee->payment_method);
+
+        // Paid already: the stored choice is not overwritten, and nothing
+        // answers "pay at the desk" for it. The existing fulfiller refuses a
+        // seat that is not yet approved before it looks at what was paid.
+        $this->register($event->id, ['ticket_id' => $ticket, 'payment_method' => 'cash'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.payment.registration_not_payable', [], 'en'));
+
+        $this->assertSame('wallet', $attendee->refresh()->payment_method);
+        $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
+    }
+
+    public function test_an_approved_registration_that_is_already_paid_answers_already_paid(): void
+    {
+        $this->member(500);
+        $event = $this->paidEvent(80);
+        $ticket = $this->register($event->id, ['payment_method' => 'wallet'])->assertCreated()->json('data.ticket_id');
+
+        $this->register($event->id, ['ticket_id' => $ticket, 'payment_method' => 'wallet'])
+            ->assertStatus(409)
+            ->assertJsonPath('message', __('api.payment.already_paid', [], 'en'));
+    }
+
+    public function test_a_pending_seat_of_a_free_event_is_not_given_a_payment_choice(): void
+    {
+        $this->member(500);
+        $event = Event::factory()->requiresApproval()->create(['capacity' => 20]);
+        $ticket = $this->register($event->id, [])->assertCreated()->json('data.ticket_id');
+
+        $this->register($event->id, ['ticket_id' => $ticket, 'payment_method' => 'wallet'])->assertStatus(422);
+
+        $attendee = EventAttendee::findOrFail($ticket);
+        $this->assertNull($attendee->payment_method);
+        $this->assertNull($attendee->payment_state);
     }
 }

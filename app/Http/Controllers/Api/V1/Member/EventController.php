@@ -126,8 +126,9 @@ class EventController extends Controller
     /**
      * The registration sent again with its ticket: nothing is registered
      * and no registration rule runs (window, capacity, form). An approved
-     * seat is paid by the method sent; one still pending approval only has
-     * its stored choice updated — nothing is charged until approval.
+     * seat is paid by the method sent; one still pending approval (and
+     * owing) only has its stored choice updated — nothing is charged until
+     * approval.
      */
     private function payExisting(RegisterForEventRequest $request, Event $event, PayableCheckout $checkout): JsonResponse
     {
@@ -140,7 +141,11 @@ class EventController extends Controller
 
         $method = $request->validated('payment_method') ?? WalletMethod::KEY;
 
-        if ($attendee->status === EventRegistrationStatus::Pending) {
+        // Only a seat that still owes something can have its choice stored:
+        // one a coupon made free (already Paid) or a free event's (no payment
+        // state) is left as it is and answered by the checkout like any other.
+        if ($attendee->status === EventRegistrationStatus::Pending
+            && $attendee->payment_state === EventPaymentState::Unpaid) {
             $attendee->forceFill([
                 'payment_method' => $method,
                 'payment_wallet_owner_type' => $request->validated('wallet_owner_type'),
