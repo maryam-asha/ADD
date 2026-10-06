@@ -4,6 +4,7 @@ namespace Tests\Feature\Pricing;
 
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Finance\Payments\PaymentService;
@@ -14,16 +15,15 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
-use App\Domain\Finance\Enums\PaymentStatus;
-use App\Domain\Pricing\Enums\PricingPurpose;
-use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Services\CouponLedger;
 use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
@@ -164,6 +164,17 @@ class PlanOfferPriceTest extends TestCase
         $payment = Payment::sole();
         $this->assertSame(PaymentStatus::Accepted, $payment->status);
         $this->assertSame(0, $payment->amount_points);
+    }
+
+    /** Review Focus 5: a payment is priced at the offer it locked, however the offer is edited. */
+    public function test_a_plan_payment_is_priced_at_its_locked_offer_after_the_offer_is_edited(): void
+    {
+        Sanctum::actingAs($this->member(), ['*']);
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'cash'])->assertCreated();
+
+        $this->offer->update(['discount_value' => 50]);
+
+        $this->assertSame(100, app(PriceQuoteService::class)->forPlanPayment(Payment::sole(), $this->plan)->finalPoints);
     }
 
     /** Repricing the plan itself is still caught: its list price is read afresh. */

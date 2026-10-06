@@ -16,18 +16,21 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
  * A session priced at check-out — a walk-in, or a booking left unpaid — is
- * priced by PriceQuoteService too: the space's sale by usage time, and the
- * booking's locked plan discount or coupon terms
- * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+ * priced by PriceQuoteService too: the offer it locked, at its copied
+ * terms, else (a walk-in, or a booking priced without one) the best offer
+ * picked now over the time used and locked then; the booking's plan
+ * discount; its coupon at its copied terms
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md, "Locked terms").
  * A room at 100 points an hour; 2026-08-17 is a Monday.
  */
 class SessionClosurePricingTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Space $room;
 
@@ -52,14 +55,9 @@ class SessionClosurePricingTest extends TestCase
         return Carbon::parse("2026-08-17 {$time}", 'Asia/Damascus');
     }
 
-    public function test_a_walk_in_during_a_sale_is_billed_the_sale_rate(): void
+    public function test_a_walk_in_picks_its_offer_at_closure_and_locks_it(): void
     {
-        $this->markTestSkipped('Task 6');
-        $this->room->update([
-            'sale_hourly_rate_points' => 60,
-            'sale_starts_at' => $this->at('00:00')->utc(),
-            'sale_ends_at' => $this->at('10:30')->utc(),
-        ]);
+        $offer = $this->offerOnSpace($this->room, 60, $this->at('00:00')->utc(), $this->at('10:30')->utc());
         $walkin = WalkinSession::factory()->create(['space_id' => $this->room->id, 'checked_in_at' => $this->at('10:00')->utc()]);
 
         app(SessionClosureService::class)->closeOut($walkin, $this->at('11:00'));
@@ -69,6 +67,33 @@ class SessionClosurePricingTest extends TestCase
         $this->assertSame(80, $walkin->price_points);
         $this->assertSame(100, $walkin->list_price_points);
         $this->assertSame('8.00', (string) $walkin->amount_owed);
+
+        $row = app(CouponLedger::class)->offerFor($walkin);
+        $this->assertSame($offer->id, $row->coupon_id);
+        $this->assertSame(100, $row->base_points);
+        $this->assertSame(20, $row->points);
+    }
+
+    /** Review Focus 5: an unpaid booking closed early keeps its offer's copied terms. */
+    public function test_an_unpaid_booking_closed_early_keeps_its_locked_offer_terms(): void
+    {
+        $offer = Coupon::factory()->automatic()->percentage(50)->create();
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        $booking = app(BookingCreationService::class)->create($this->room, $member, $this->at('10:00'), $this->at('12:00'), paymentMethod: 'cash');
+        $this->assertSame(100, $booking->price_points);
+
+        $offer->update(['discount_value' => 10]);
+        $booking->forceFill(['checked_in_at' => $this->at('10:00')->utc()])->save();
+        Carbon::setTestNow($this->at('11:00'));
+
+        app(SessionClosureService::class)->closeOut($booking->refresh(), $this->at('11:00'));
+        $booking->refresh();
+
+        $this->assertSame(50, $booking->price_points);
+        $row = app(CouponLedger::class)->offerFor($booking);
+        $this->assertSame(100, $row->base_points);
+        $this->assertSame(50, $row->points);
     }
 
     /** An unpaid booking repriced at check-out keeps its coupon. */

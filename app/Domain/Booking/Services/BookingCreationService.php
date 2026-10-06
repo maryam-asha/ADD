@@ -111,7 +111,7 @@ class BookingCreationService
 
             $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
-            // The list price, the better of the space's sale and the
+            // The list price, the better of the best automatic offer and the
             // member's plan discount (applied automatically, never an opt-in
             // — docs/decisions/plan-discounts-design.md), and the coupon on
             // top: PriceQuoteService, the one place a price is composed.

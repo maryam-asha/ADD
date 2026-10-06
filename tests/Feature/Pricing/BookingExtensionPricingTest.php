@@ -20,18 +20,20 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
- * An extension is priced at the booking's locked terms — the sale by usage
- * time, or the plan discount it was made with — and never with a coupon:
+ * An extension is priced at the booking's locked terms — the offer it was
+ * priced with, at its copied terms and window, by usage time; else the plan
+ * discount it was made with; else the list price — and never with a coupon:
  * a coupon took its points off the booking as it was made
- * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md, D7).
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md, "Locked terms").
  * A room at 100 points an hour, booked 10:00–11:00 on Monday 2026-08-17.
  */
 class BookingExtensionPricingTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Space $room;
 
@@ -58,13 +60,10 @@ class BookingExtensionPricingTest extends TestCase
         app(WalletService::class)->creditGeneral($wallet, 1000, WalletTransactionSource::TopUp);
     }
 
-    private function sale(string $from, string $to): void
+    /** An offer of 60 an hour on the room over a local window. */
+    private function sale(string $from, string $to): Coupon
     {
-        $this->room->update([
-            'sale_hourly_rate_points' => 60,
-            'sale_starts_at' => Carbon::parse($from, 'Asia/Damascus')->utc(),
-            'sale_ends_at' => Carbon::parse($to, 'Asia/Damascus')->utc(),
-        ]);
+        return $this->offerOnSpace($this->room, 60, Carbon::parse($from, 'Asia/Damascus')->utc(), Carbon::parse($to, 'Asia/Damascus')->utc());
     }
 
     private function bookAndCheckIn(?string $code = null): Booking
@@ -85,9 +84,8 @@ class BookingExtensionPricingTest extends TestCase
         return $booking->refresh();
     }
 
-    public function test_an_extension_past_the_sale_is_at_the_normal_rate(): void
+    public function test_an_extension_past_the_offer_window_pays_the_rate_for_the_time_outside(): void
     {
-        $this->markTestSkipped('Task 6');
         $this->sale('2026-08-17 00:00', '2026-08-17 11:00');
         $booking = $this->bookAndCheckIn();
         $this->assertSame(60, $booking->price_points);
@@ -96,21 +94,41 @@ class BookingExtensionPricingTest extends TestCase
 
         $this->assertSame(160, $booking->price_points);
         $this->assertSame(200, $booking->list_price_points);
+        $row = app(CouponLedger::class)->offerFor($booking);
+        $this->assertSame(200, $row->base_points);
+        $this->assertSame(40, $row->points);
+        $this->assertSame(20, $row->percent);
     }
 
-    public function test_an_extension_into_a_sale_is_at_the_sale_rate(): void
+    /** The booking keeps its choice (D7): one priced at the list price takes no new offer. */
+    public function test_an_extension_of_a_list_priced_booking_takes_no_new_offer(): void
     {
-        $this->markTestSkipped('Task 6');
-        $this->sale('2026-08-17 11:00', '2026-08-18 00:00');
         $booking = $this->bookAndCheckIn();
         $this->assertSame(100, $booking->price_points);
+        $this->sale('2026-08-17 11:00', '2026-08-18 00:00');
 
-        $this->assertSame(60, app(BookingExtensionPlanner::class)->options($booking)->options[0]['points']);
+        $this->assertSame(100, app(BookingExtensionPlanner::class)->options($booking)->options[0]['points']);
 
         $booking = $this->extendAnHour($booking);
 
-        $this->assertSame(160, $booking->price_points);
-        $this->assertSame(200, $booking->list_price_points);
+        $this->assertSame(200, $booking->price_points);
+        $this->assertNull(app(CouponLedger::class)->offerFor($booking));
+    }
+
+    /** Review Focus 5: the offer's copied terms hold after it is edited or switched off. */
+    public function test_an_extension_keeps_the_offer_the_booking_was_priced_with_after_it_is_switched_off(): void
+    {
+        $offer = Coupon::factory()->automatic()->percentage(50)->create();
+        $booking = $this->bookAndCheckIn();
+        $this->assertSame(50, $booking->price_points);
+
+        $offer->update(['is_active' => false, 'discount_value' => 10]);
+        $booking = $this->extendAnHour($booking);
+
+        $this->assertSame(100, $booking->price_points);
+        $row = app(CouponLedger::class)->offerFor($booking);
+        $this->assertSame(200, $row->base_points);
+        $this->assertSame(100, $row->points);
     }
 
     public function test_the_coupon_is_not_taken_off_the_extension(): void

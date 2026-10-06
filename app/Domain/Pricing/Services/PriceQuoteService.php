@@ -95,7 +95,9 @@ class PriceQuoteService
     /**
      * What growing a booking to `$newEnd` costs, at the terms it was made on
      * (D7): with the plan discount it was priced with while that membership
-     * is still active (`$redemption`), else at the list price. Never a
+     * is still active (`$redemption`), else at the offer it was priced with
+     * — its copied terms over its copied window, by usage time — else at
+     * the list price; never a new offer. Never a
      * coupon — a coupon took its points off the booking as it was made.
      * Each figure is the difference of two whole-booking prices, so the
      * booking stays rounded once, as AmountCalculator rounds.
@@ -107,9 +109,16 @@ class PriceQuoteService
         $oldList = $this->amounts->forRange($space, $booking->start_at, $booking->end_at);
         $newList = $this->amounts->forRange($space, $booking->start_at, $newEnd);
 
-        [$old, $new] = $redemption !== null
-            ? [$this->planDiscounts->apply($oldList, $redemption->discount), $this->planDiscounts->apply($newList, $redemption->discount)]
-            : [$oldList, $newList];
+        $offerRow = $redemption === null ? $this->ledger->offerFor($booking) : null;
+
+        [$old, $new] = match (true) {
+            $redemption !== null => [$this->planDiscounts->apply($oldList, $redemption->discount), $this->planDiscounts->apply($newList, $redemption->discount)],
+            $offerRow !== null => [
+                $this->offers->priceSpace($space, $booking->start_at, $booking->end_at, CouponTerms::fromLedger($offerRow)),
+                $this->offers->priceSpace($space, $booking->start_at, $newEnd, CouponTerms::fromLedger($offerRow)),
+            ],
+            default => [$oldList, $newList],
+        };
 
         return [
             'difference' => $new - $old,
@@ -136,9 +145,14 @@ class PriceQuoteService
             ? PlanDiscountRedemption::query()->where('booking_id', $session->id)->first()
             : null;
 
-        $offer = $offerRow !== null
-            ? new OfferPrice($offerRow->coupon, $this->offers->priceSpace($space, $from, $to, CouponTerms::fromLedger($offerRow)), null)
-            : null;
+        // Its locked offer; else, with no plan discount either, the best
+        // offer over the time actually used — picked now and locked by the
+        // closure (QuoteRecorder::reprice).
+        $offer = match (true) {
+            $offerRow !== null => new OfferPrice($offerRow->coupon, $this->offers->priceSpace($space, $from, $to, CouponTerms::fromLedger($offerRow)), null),
+            $planRedemption !== null => null,
+            default => $this->offers->forSpace($space, $from, $to, $session->user, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession, new UsageInFlight),
+        };
 
         return $this->atLockedTerms(
             $this->amounts->forRange($space, $from, $to),

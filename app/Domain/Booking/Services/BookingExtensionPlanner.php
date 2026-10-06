@@ -163,7 +163,8 @@ class BookingExtensionPlanner
     /**
      * What growing the booking to $newEnd costs — PriceQuoteService's, the
      * one place a price is composed: the booking's plan discount while it
-     * is still active, else the space's sale by usage time; never a coupon.
+     * is still active, else the offer it was priced with, at its copied
+     * terms, by usage time, else the list price; never a coupon.
      *
      * @return array{difference: int, list_difference: int, total: int, undiscounted_total: int}
      */

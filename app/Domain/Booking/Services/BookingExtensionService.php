@@ -14,6 +14,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Services\QuoteRecorder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -33,6 +34,7 @@ class BookingExtensionService
         private readonly BookingExtensionPlanner $planner,
         private readonly WalletService $wallets,
         private readonly PaymentService $payments,
+        private readonly QuoteRecorder $recorder,
     ) {}
 
     /**
@@ -114,6 +116,9 @@ class BookingExtensionService
             if ($redemption !== null) {
                 $redemption->update(['points_discounted' => $price['undiscounted_total'] - $price['total']]);
             }
+
+            // The ledger's row for the offer or plan discount grows with it.
+            $this->recorder->recordExtension($lockedBooking, $price);
 
             $moved = $seatSpaceId !== $lockedBooking->seat_space_id;
 

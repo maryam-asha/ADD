@@ -55,6 +55,19 @@ class QuoteRecorder
     }
 
     /**
+     * A booking grown by an extension: the reduction it was priced with —
+     * its offer or its plan discount — now applies to the longer booking.
+     *
+     * @param  array{difference: int, list_difference: int, total: int, undiscounted_total: int}  $price
+     */
+    public function recordExtension(Booking $booking, array $price): void
+    {
+        $row = $this->ledger->offerFor($booking) ?? $this->ledger->planDiscountFor($booking);
+
+        $this->ledger->resize($row, $price['undiscounted_total'], $price['undiscounted_total'] - $price['total']);
+    }
+
+    /**
      * An offer's copy: its terms, its name, and its window — the window is
      * what an extension or a check-out prices the in-window time by.
      *
@@ -78,8 +91,20 @@ class QuoteRecorder
      * breakdown still adds up: what the plan discount and the coupon took
      * off the new price.
      */
-    public function reprice(PriceQuote $quote, Model $record): void
+    public function reprice(PriceQuote $quote, Model $record, ?User $member, PricingPurpose $purpose): void
     {
+        // An offer picked at closure is locked now; one already locked is
+        // resized to the price it now gives — nothing, when the time used
+        // fell wholly outside its window.
+        $row = $this->ledger->offerFor($record);
+        $offer = $quote->appliedOffer();
+
+        if ($row !== null) {
+            $this->ledger->resize($row, $quote->listPoints, $offer !== null ? $quote->automaticPoints : 0);
+        } elseif ($offer !== null && $member !== null) {
+            $this->ledger->write($record, $member, $purpose, DiscountKind::Offer, self::offerAttributes($offer, $quote->listPoints, $quote->automaticPoints));
+        }
+
         if ($record instanceof Booking && $quote->appliedPlanDiscount() !== null) {
             PlanDiscountRedemption::query()->where('booking_id', $record->id)->update(['points_discounted' => $quote->automaticPoints]);
             $this->ledger->resize($this->ledger->planDiscountFor($record), $quote->listPoints, $quote->automaticPoints);
