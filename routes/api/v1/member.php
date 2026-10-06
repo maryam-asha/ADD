@@ -205,11 +205,6 @@ Route::post('services/{id}/requests', [MemberServiceController::class, 'submitRe
 Route::get('service-requests', [MemberServiceRequestController::class, 'index']);
 Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController::class, 'show']);
 
-// Card payments (docs/paymera.md). The app asks for a payment URL here,
-// opens it in a WebView, and polls `payments/{payment}` when the WebView
-// closes — it never talks to Paymera directly, so the API key stays server
-// side. `show` re-syncs with the gateway on read, which is safe to poll:
-// SyncPaymentStatus locks and refuses to re-process a settled payment.
 // The payment methods the member may use, in config/payments.php order; the
 // wallet method carries the member's points (docs/decisions/unified-payments.md).
 Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
@@ -220,6 +215,11 @@ Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
 // Throttled, so codes cannot be guessed at speed.
 Route::post('coupons/preview', CouponPreviewController::class)->middleware('throttle:20,1');
 
+// The member's payments (docs/paymera.md) — reads only. Nothing is paid here:
+// each operation opens its own payment through its own endpoint. `index` is
+// the history; `show` is the status the app polls when its WebView closes —
+// the app never talks to Paymera directly, so the API key stays server side.
+// `show` re-syncs with the gateway on read, which is safe to poll:
+// SyncPaymentStatus locks and refuses to re-process a settled payment.
 Route::get('payments', [PaymentController::class, 'index']);
-Route::post('payments', [PaymentController::class, 'store']);
 Route::get('payments/{payment}', [PaymentController::class, 'show']);

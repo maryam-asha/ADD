@@ -15,8 +15,7 @@ use Throwable;
 /**
  * POST member/wallet/top-ups — the member adds points to their own wallet by
  * card; the app opens `redirect_url` in a WebView and polls
- * GET member/payments/{id}. Answered exactly as POST member/payments
- * answered a top-up, which this replaces.
+ * GET member/payments/{id}.
  */
 class TopUpController extends Controller
 {
