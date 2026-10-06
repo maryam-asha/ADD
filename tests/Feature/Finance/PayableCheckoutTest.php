@@ -25,9 +25,10 @@ use Tests\TestCase;
 
 /**
  * The one place an existing booking, session or registration is paid by a
- * chosen method — what POST member/payments did, now called by purpose from
- * each operation's own endpoint
- * (docs/superpowers/specs/2026-10-06-prepayment-all-or-nothing-design.md).
+ * chosen method — called by purpose from each operation's own endpoint
+ * (POST member/bookings with a booking_id, POST member/events/{id}/register
+ * with a ticket_id, POST member/coworking-sessions/{type}/{id}/pay;
+ * docs/superpowers/specs/2026-10-06-prepayment-all-or-nothing-design.md).
  */
 class PayableCheckoutTest extends TestCase
 {

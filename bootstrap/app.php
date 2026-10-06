@@ -151,13 +151,14 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // A card payment that cannot be priced at all — in practice, a
         // charge currency (PAYMERA_CURRENCY) with no active exchange rate
-        // against the base currency. Handled here rather than only in
-        // PaymentController because the pricing runs inside
-        // StartPaymentRequest's validation too, which is *before* any
-        // controller try/catch can see it; without this the member got a
-        // raw 500. It is not a validation error — the member's input is
-        // fine, our configuration is not — so it must not surface as a 422
-        // against the amount they typed.
+        // against the base currency. Handled here rather than only in the
+        // controllers that price in a try/catch of their own (the booking,
+        // registration, coworking-pay and membership endpoints) because
+        // StoreTopUpRequest prices during its validation (the minimum
+        // top-up), which is *before* any controller try/catch can see it;
+        // without this the member got a raw 500. It is not a validation
+        // error — the member's input is fine, our configuration is not — so
+        // it must not surface as a 422 against the amount they typed.
         $exceptions->render(function (PaymentPricingException $e) {
             Log::channel('paymera')->alert('[Paymera] payment could not be priced', [
                 'error' => $e->getMessage(),

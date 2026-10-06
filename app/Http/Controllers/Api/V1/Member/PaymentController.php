@@ -53,7 +53,7 @@ class PaymentController extends Controller
     }
 
     /**
-     * The member's own card payments, newest first.
+     * The member's own payments — every method and purpose — newest first.
      */
     public function index(Request $request): JsonResponse
     {

@@ -424,7 +424,6 @@ return [
         'plan_unavailable' => 'This package is not available for purchase.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
         'method_not_supported' => 'This payment method cannot be used for this.',
-        'company_plan_not_allowed' => 'A company plan can only be bought by the company\'s admin, as a purchase for the company.',
         'already_paid' => 'This has already been paid.',
         'booking_not_payable' => 'A cancelled, rejected or not-attended booking cannot be paid.',
         'nothing_due' => 'There is nothing to pay.',
