@@ -10,20 +10,22 @@
 
 A member confirms a booking on the app's "Confirm Your Booking" screen and
 picks a payment method: wallet points, cash at reception, or Paymera (card).
-With Paymera, `POST member/bookings` creates the booking **unpaid**, then
-opens the card payment (`BookingController::startCardPayment()`). The
-current rule, written into `BookingPaymentRouter::choose()`, is:
+With Paymera, `POST member/bookings` creates the booking **confirmed and
+unpaid**, then opens the card payment (`BookingController::startCardPayment()`).
+The current rule, written into `BookingPaymentRouter::choose()`, is:
 
 > A gateway pays after the booking exists: it holds the slot unpaid
 > meanwhile, and a failed card leaves it for the desk.
 
-So a failed, abandoned or expired card leaves a booking that holds its slot
-for free until it is cancelled or ends as a no-show. Event registrations
-behave the same way.
+So a failed, abandoned or expired card leaves a *confirmed* booking holding
+its slot for free until it is cancelled or ends as a no-show — and,
+because it is `confirmed`, it is treated as real everywhere: door codes,
+QR unlock (`UnlockService`), reception lists. Event registrations behave
+the same way.
 
 It also breaks the app's retry. When a card fails, the app returns to the
-same confirm screen. Confirming again with another method sends the same
-`POST member/bookings` — and is refused, because the member's own unpaid
+same confirm screen; confirming again with another method sends the same
+`POST member/bookings` and is refused, because the member's own unpaid
 booking holds the slot. Reproduced on this branch:
 
 ```
@@ -31,9 +33,8 @@ booking holds the slot. Reproduced on this branch:
 2nd (cash, same slot):   422  "This space is not available for the requested time."
 ```
 
-Paying is also split across two kinds of endpoint today: each operation
-takes a `payment_method` when it is made (bookings, event registrations,
-plans, coworking end-requests), **and** a generic `POST member/payments`
+Paying is also split across two kinds of endpoint: each operation takes a
+`payment_method` when it is made, **and** a generic `POST member/payments`
 pays for things afterwards (top-ups, "pay now", a coworking session by
 card, a registration approved later). Two ways to pay the same booking is
 the duplication this design removes.
@@ -41,35 +42,36 @@ the duplication this design removes.
 ## Decisions (the user's)
 
 1. **A prepaid method is all-or-nothing.** Choosing one either ends with
-   the operation paid, or the operation is undone. No operation is left
-   holding a slot or seat unpaid because a card failed.
-2. **Scope of the all-or-nothing rule:** bookings and event registrations
-   — the operations that hold a limited place (a slot, a seat) before a
-   card payment completes. Plan purchases are already atomic (no
-   membership exists before the card is accepted); coworking sessions are
-   post-paid (the session already happened).
+   the operation paid, or the operation is undone. Nothing is left holding
+   a slot or seat because a card failed.
+2. **Scope of that rule:** bookings and event registrations — the
+   operations that hold a limited place before a card completes. Plan
+   purchases are already atomic (no membership exists before the card is
+   accepted); coworking sessions are post-paid.
 3. **After a failure the member picks another method on the same screen**
    — a post-paid one (cash at reception) or wallet points.
-4. **The app sends the same request again, changing only
-   `payment_method`.** No `booking_id`: the server recognises the
-   re-submission from the values themselves.
-5. **No choice in time → the booking is cancelled** (a registration:
-   rejected).
-6. **The window is 15 minutes** from creation, configurable, never past
+4. **Paying an existing booking or registration is an explicit endpoint
+   under it** — `POST member/bookings/{id}/pay`,
+   `POST member/events/{id}/registration/pay`. The app keeps the id from the
+   create response. Create stays create only.
+5. **A booking awaiting its prepayment has its own stored status,
+   `awaiting_payment`** — never `confirmed` before it is paid or switched
+   to another method. Registrations alike.
+6. **No choice in time → cancelled** (a registration: rejected).
+7. **The window is 15 minutes** from creation, configurable, never past
    the booking's start.
-7. **`POST member/payments` is removed.** Each operation pays through its
-   own endpoint; the shared payment code is called by purpose, not
-   repeated. Removed outright, released together with the app update (the
-   app is still in development).
-8. **Paying later from the app stays** — through the operation's own
-   endpoint (a cash booking later paid in the app, a registration approved
+8. **`POST member/payments` is removed** — removed outright, released with
+   the app update (the app is still in development). Each operation pays
+   through its own endpoint; the shared payment code is called by purpose.
+9. **Paying later from the app stays** — through the same `pay`
+   endpoints (a cash booking later paid in the app, a registration approved
    later, a coworking session paid by card after it closes).
-9. **A member tops up by a prepaid method only.** Cash top-ups are
-   reception's (`admin/reception/wallet-top-ups`, unchanged).
-10. **Not handled** (accepted as they are today): a plan whose branch
-    fills up while its card payment is open (activation fails after the
-    money is taken → points stay in the wallet, `needs_review`), and a
-    coupon held by a card payment left pending until it settles.
+10. **A member tops up by a prepaid method only.** Cash top-ups are
+    reception's (`admin/reception/wallet-top-ups`, unchanged).
+11. **Not handled** (accepted as today): a plan whose branch fills while its
+    card is open (activation fails after the money is taken → points stay
+    in the wallet, `needs_review`), and a coupon held by a card payment left
+    pending until it settles.
 
 ## Definitions
 
@@ -77,180 +79,168 @@ the duplication this design removes.
   i.e. any key in `PaymentMethodRegistry::gatewayKeys()`. Today: `paymera`.
   A gateway added to `config/payments.php` later follows every rule here
   with no code change.
-- **Awaiting prepayment** — a booking or registration that is unpaid and
-  has a `payment_due_at` that has not passed.
-- **Re-submission** — the member sending an operation's create request
-  again for a record they already hold (same values), with a
-  `payment_method`.
+- **Awaiting payment** — a booking or registration in status
+  `awaiting_payment`; it holds its slot/seat until `payment_due_at`.
 
 ## Endpoint map
 
 | endpoint | change |
 |---|---|
-| `POST member/bookings` | recognises a re-submission (below); `data.payment_due_at` in the response |
-| `POST member/events/{id}/register` | recognises a re-submission instead of answering `already_registered` for an unpaid registration; `payment_due_at` in the result |
+| `POST member/bookings` | with a prepaid method: creates `awaiting_payment`; supersedes the member's own overlapping `awaiting_payment` bookings on that space (below) |
+| `POST member/bookings/{id}/pay` | **new** — `{payment_method, wallet_owner_type?, wallet_owner_id?, coupon_code?}` |
+| `POST member/events/{id}/register` | with a prepaid method on a registration approved on the spot: creates `awaiting_payment` |
+| `POST member/events/{id}/registration/pay` | **new** — same body, for the member's registration to that event |
+| `POST member/coworking-sessions/{type}/{id}/pay` | **new** — same body, for the member's own closed, unpaid session |
+| `POST member/wallet/top-ups` | **new** — `{amount, payment_method?}`; prepaid methods only (default: the first enabled gateway) |
 | `POST member/memberships` | unchanged (already pays by any method) |
-| `POST member/wallet/top-ups` | **new** — `{amount, payment_method?}`; prepaid methods only (default: the first enabled gateway); answers `payment` + `redirect_url` |
-| `POST member/coworking-sessions/{type}/{id}/pay` | **new** — `{payment_method, wallet_owner_type?, wallet_owner_id?, coupon_code?}` for the member's own closed, unpaid session |
-| `POST member/bookings/{id}/cancel` | allowed inside the cancellation window when awaiting prepayment |
+| `POST member/bookings/{id}/cancel` | allowed inside the cancellation window for `awaiting_payment` |
 | `GET member/payment-methods` | unchanged contract; a top-up now lists prepaid methods only |
 | `GET member/payments`, `GET member/payments/{id}` | **kept** — the history, and the status the app polls after the WebView |
 | `POST member/payments` | **removed** |
-| `GET member/payment-purposes` | **removed** (built earlier on this branch as a catalog for `POST member/payments`, never released) |
+| `GET member/payment-purposes` | **removed** (built earlier on this branch as a catalog for `POST member/payments`; never released) |
+
+Every `pay` endpoint answers `200` with the same shape the create answers
+with — `data` (the booking / registration / session), `payment`,
+`redirect_url`, plus `next` (`done` | `redirect` | `pay_at_reception`) — so
+the app handles create and pay with one parser. Errors: 404 (not the
+member's), 422 `already_paid`, 422 `booking_not_payable` (cancelled,
+rejected, no-show — including an `awaiting_payment` whose window passed),
+the wallet shortfall 422, the gateway 503s.
 
 ## Shared code: one service, called by purpose
 
-Every operation that takes a `payment_method` ends the same way: pay it
-now from the wallet, leave it for the desk, or open a gateway payment and
+Every operation that takes a `payment_method` ends the same way: pay now
+from the wallet, leave it for the desk, or open a gateway payment and
 answer with where to pay. Today the card part is copied three times
 (`BookingController::startCardPayment`, `EventController::startCardPayment`,
-`MembershipController::startCard`) and once more inside
-`PaymentController::store`.
+`MembershipController::startCard`) and again inside `PaymentController::store`.
 
 One service replaces all four — working name `OperationCheckout`:
 
 ```php
 pay(PaymentPurpose $purpose, User $member, string $method, array $context): CheckoutResult
 // $context: payable | plan | amount_minor | wallet_owner_* | coupon | lang
-// CheckoutResult: payment, redirect_url, payment_error, next (done | redirect | pay_at_reception)
+// CheckoutResult: payment, redirect_url, payment_error, next
 ```
 
 It sits on the existing `PaymentService::start()` / `StartPayment` — no
-payment logic is rewritten, only gathered. Bookings, registrations,
-memberships, top-ups and coworking sessions all call it; gateway failures
-(`RespondsToGatewayFailures`) are mapped in one place.
+payment logic is rewritten, only gathered. Every create and every `pay`
+endpoint calls it; gateway failures (`RespondsToGatewayFailures`) are
+mapped in one place.
 
 ## Data model
 
-One nullable column, on two tables:
+**A new status on each enum**, first in lifecycle order:
 
-| table | column | meaning |
-|---|---|---|
-| `bookings` | `payment_due_at` (timestamp, nullable, indexed) | set → awaiting prepayment until then; null → no deadline (every booking today, and every wallet/cash booking) |
-| `event_attendees` | `payment_due_at` (same) | same, for a registration |
+- `BookingStatus::AwaitingPayment = 'awaiting_payment'` — in `slotHolding()`
+  (holds the slot), `payable()` and `isOpen()` (cancellable);
+- `EventRegistrationStatus::AwaitingPayment = 'awaiting_payment'` — in
+  `seatHolding()`; `isTerminal()` is updated so it counts as not terminal.
 
-No new status. An awaiting booking keeps `confirmed` (or `pending` when the
-space requires approval), per the project's minimal-status rule; the app
-shows "awaiting payment" from the payment block it already returns plus
-`payment_due_at`.
+Because it is not `confirmed` / `approved`, everything that treats those as
+real ignores it **by default** — 16 references to `BookingStatus::Confirmed`
+across 12 files today, among them door codes, QR unlock (`UnlockService`),
+reception lists and summary, elapsed-booking closing. None of them has to
+learn about prepayment. Only the two holding lists and `payable()` do. The
+app's badge is the stored status, with its label in both languages
+(`api.booking.statuses.awaiting_payment`, the event equivalent).
 
-`payment_due_at` is **not cleared on cancellation**: a `cancelled` booking
-that still has one was cancelled because its prepayment did not complete —
-the reason is derived, like `Booking::lapsedUnreviewed()`, with no reason
-column.
+**One nullable column on each table** — the deadline:
 
-`bookings.payment_method` is **not** used for the member's choice: it
-records how a booking was settled and is read by the cash register, so
-writing `cash` there before money arrives would count as cash received.
-The choice is stored by state: paid (wallet/card), or unpaid with no
-deadline (pay at reception).
+| table | column |
+|---|---|
+| `bookings` | `payment_due_at` (timestamp, nullable, indexed) |
+| `event_attendees` | `payment_due_at` (same) |
+
+Set with the status, never cleared afterwards: a `cancelled` booking (or
+`rejected` registration) that has one was undone because its prepayment did
+not complete — the reason is derived, like `Booking::lapsedUnreviewed()`,
+with no reason column.
+
+`bookings.payment_method` is not used for the member's choice: it records
+how a booking was settled and the cash register reads it.
 
 Config: `config/payments.php` → `'prepayment_window_minutes' =>
 (int) env('PAYMENTS_PREPAYMENT_WINDOW_MINUTES', 15)`.
 
-## Lifecycle (bookings; registrations alike)
+## Lifecycle
 
-| event | effect |
-|---|---|
-| created with a prepaid method | created, holds its slot; `payment_due_at = min(now + window, start_at)`; the card opens |
-| card accepted | the fulfiller marks it paid and clears `payment_due_at` |
-| card failed / canceled / expired, or never opened | nothing changes; it waits within its window |
-| re-submitted with `wallet` | paid now; `payment_due_at = null` |
-| re-submitted with `cash` | stays unpaid, `payment_due_at = null` — an ordinary pay-at-reception booking |
-| re-submitted with a prepaid method | a new card payment opens for the same booking; an awaiting booking keeps its window (**not** extended). An ordinary unpaid booking (cash chosen earlier) paid later by card gets **no** window: its slot was held legitimately, so a failed card leaves it as it was — unpaid, for the desk |
-| member cancels | cancelled at once, even inside the cancellation window, when awaiting |
-| re-submitted for an **overlapping but different** window | an awaiting booking is superseded (cancelled) and the new one is made |
-| checked in, or settled at reception | `payment_due_at = null` — reception now collects |
-| window passes | last gateway check of any pending card payment for it: accepted → paid, kept; otherwise cancelled, slot freed, discount/coupon use given back, member notified |
+**Booking** (a registration follows the same table, `approved` in place of
+`confirmed`; it has no approval step after payment):
 
-## Recognising a re-submission
+| event | status after | notes |
+|---|---|---|
+| created with a prepaid method | `awaiting_payment` | holds the slot; `payment_due_at = min(now + window, start_at)`; the card opens |
+| card accepted | `confirmed` — or `pending` if the space requires approval | paid; the operations "pending approval" notice is sent **now**, not at creation |
+| card failed / canceled / expired, or never opened | `awaiting_payment` | waits within its window |
+| `pay` with `wallet` | `confirmed` / `pending` | paid now |
+| `pay` with `cash` | `confirmed` / `pending` | unpaid — an ordinary pay-at-reception booking |
+| `pay` with a prepaid method | `awaiting_payment` | a new card for the same booking; the window is **not** extended |
+| member cancels | `cancelled` | allowed inside the cancellation window |
+| member creates an **overlapping** booking on the same space | the old one `cancelled` | superseded: the member went back and changed the time |
+| window passes | `cancelled` | after a last gateway check (below) |
 
-### `POST member/bookings`
+**Paying later** (`pay` on a booking that is `pending`, `confirmed` or
+`completed` and unpaid — a cash booking, one owing only an extension):
+`wallet` pays now; a prepaid method opens a card with **no** window and no
+status change — its slot was held legitimately, so a failed card leaves it
+as it was, unpaid for the desk; `cash` changes nothing (`next:
+pay_at_reception`). Same for an `approved` unpaid registration.
 
-**First step of the request — before every creation rule** (start in the
-past, booking window and `min_notice`, business hours, granularity,
-duration, availability). A booking re-submitted 15 minutes later must not
-be refused as "too soon" for a slot it already holds.
+**Registrations needing approval** are unchanged: `pending`, no card at
+registration, the stored choice (`event_attendees.payment_method`) used at
+approval, and paid later through `registration/pay`.
 
-1. Look for the member's own booking with exactly this `space_id`,
-   `start_at`, `end_at`, in a payable status (`pending`, `confirmed`,
-   `completed`), re-read under the space lock.
-2. **Found and unpaid** → no booking is made. No availability, pricing or
-   recording runs: the slot is held and the price was fixed when it was
-   made. The new `payment_method` is applied to it through
-   `OperationCheckout` (lifecycle table above), and it is returned in the
-   **same response shape and the same 201** as a create — the app's code
-   does not change. This covers both the retry after a failed card
-   (awaiting prepayment) and paying later (an ordinary unpaid booking,
-   including one owing only an extension).
-3. **Found and already paid** → 422 `api.payment.already_paid`.
-4. **Not found**, but the member has **awaiting** bookings on the space
-   that overlap the window (they went back and changed the time, or a
-   window passed before the scheduler ran) → those are cancelled as
-   superseded, then the request continues as a normal create. An ordinary
-   unpaid booking is never superseded.
+## The `pay` endpoints
 
-Two bookings can never hold the same slot of the same space, so a match is
-always exactly one booking.
+- `POST member/bookings/{id}/pay` — the member's own booking (else 404),
+  locked; payable and unpaid. Goes through `OperationCheckout` with
+  purpose `Booking`, then moves the status as in the table.
+- `POST member/events/{id}/registration/pay` — the member's seat-holding
+  registration for that event (else 404). Purpose `EventRegistration`.
+- `POST member/coworking-sessions/{type}/{id}/pay` — replaces "a card is
+  paid by the member in the app" through `POST member/payments`
+  (`SessionEndService`). The member's own closed, unpaid session (else
+  404). Purpose `Booking` or `CoworkingSession` by `{type}`. No window and
+  no cancellation: the session already happened, a failed card leaves it
+  owed.
+- `coupon_code` on any `pay`: applied through `CouponApplication` when the
+  record carries none — as pay now does today; the code it already carries
+  is ignored (the app may resend what it sent at creation); a different one
+  → 422 `already_applied`.
 
-`coupon_code` on a re-submission: the same code the booking already
-carries is ignored (the app re-sends what it sent the first time); a code
-on a booking that has none is applied through `CouponApplication`, as pay
-now does today; a different code than the one applied → 422
-`already_applied`.
+## Superseding on create
+
+Inside `POST member/bookings`' locked transaction, **before** the
+availability checks: the member's own `awaiting_payment` bookings on the
+locked space that overlap the requested window are cancelled as
+superseded, then creation continues. This is what lets a member go back,
+change the time and confirm again without being refused by their own hold.
+Only `awaiting_payment` is ever superseded — a real (`confirmed` /
+`pending`) booking still makes the slot unavailable, as today.
 
 `POST member/bookings/batch` is unaffected — it already refuses `paymera`.
 
-### `POST member/events/{id}/register`
-
-Recognition also runs **first** — before the registration window, the
-full flag and capacity, which must not stop paying for a seat already held
-— and, in the request, before the registration-form rules: a re-submission
-does not have to send the form again.
-
-- the member's seat-holding registration exists, **approved and unpaid** →
-  the new `payment_method` is applied to it (same table);
-- **pending approval** → the stored choice (`event_attendees.payment_method`)
-  is updated; nothing is charged until approval, as today;
-- **paid** → `already_registered`, as today.
-
-Only a registration approved on the spot opens its card in the same
-request, so only those get a deadline. One approved later is paid later by
-re-submission, with no window.
-
-On expiry a registration becomes `rejected` with a reason (precedent:
-`events:expire-pending-registrations`), which frees the seat.
-
-### Coworking sessions
-
-`POST member/coworking-sessions/{type}/{id}/pay` replaces "a card is paid
-by the member in the app" through `POST member/payments`
-(`SessionEndService`). The session is the member's own (else 404), closed
-and unpaid. `wallet` pays now, a prepaid method opens a card, `cash` leaves
-it for the desk; `coupon_code` goes through `CouponApplication`. No window
-and no cancellation: the session already happened, so a failed card leaves
-it owed, as today.
-
-### Wallet top-up
+## Wallet top-up
 
 `POST member/wallet/top-ups` takes over `POST member/payments` with
 `purpose: wallet_top_up`: the amount rules move from `StartPaymentRequest`
 unchanged (plain decimal, fits the gateway currency, at least the minimum
-top-up). Only prepaid methods: `CashMethod::supports()` excludes
-`WalletTopUp`, so `GET member/payment-methods?purpose=wallet_top_up`
-stops offering cash and its "go to reception" hint. Reception top-ups do
-not use `supports()` (`WalletTopUpController` writes its own row) and are
+top-up). Prepaid methods only: `CashMethod::supports()` excludes
+`WalletTopUp`, so `GET member/payment-methods?purpose=wallet_top_up` stops
+offering cash and its "go to reception" hint. Reception top-ups do not go
+through `supports()` (`WalletTopUpController` writes its own row) and are
 unaffected.
 
 ## Expiry: the scheduled job
 
 `payments:cancel-expired-prepayments`, **every minute**,
-`withoutOverlapping()` (hourly is far too coarse for 15 minutes). For each
-booking / registration past its `payment_due_at`, still unpaid:
+`withoutOverlapping()`. For each `awaiting_payment` booking / registration
+past its `payment_due_at`:
 
 1. Re-check every pending gateway payment for it through
    `SyncPaymentStatus` (the same last check `expire()` does). Accepted now
-   → it is paid; skip it.
+   → it moves on as paid; skip it.
 2. Otherwise, under a row lock: booking → `cancelled` through a system path
    of `BookingCancellationService` (no window check, nothing to refund,
    discount and coupon use given back as a member cancellation does);
@@ -258,9 +248,6 @@ booking / registration past its `payment_due_at`, still unpaid:
    given back as a rejection does.
 3. Notify the member (`NotificationLog`; templates
    `booking.prepayment_expired`, `event.registration_prepayment_expired`).
-4. Door access: `access:revoke-grants-on-booking-cancellation` already
-   revokes a cancelled booking's grants — and with the issuance change
-   below, an awaiting booking never had one.
 
 ## Edge cases
 
@@ -268,60 +255,70 @@ booking / registration past its `payment_due_at`, still unpaid:
 |---|---|
 | card still `pending` at the deadline | last gateway check first; still pending → cancel; the payment keeps being reconciled |
 | card accepted after the booking was cancelled, or after it was paid another way | existing behaviour: credited as points to the wallet, payment `needs_review` (`PaymentService::spendGatewayCredit`); no automatic bank reversal (Paymera decision 3) — an admin can reverse it. Paymera cannot void a pending payment |
-| door access | `access:issue-grants-on-cancellation-window-close` **skips** bookings with `payment_due_at` set (today it would issue a code on the day for a booking whose card has not gone through) |
-| space requires approval | the card still opens at creation; the operations "pending approval" notice is sent **when the deadline clears**, not at creation, so staff never review a booking that may vanish in 15 minutes |
-| member arrives while awaiting | check-in or reception settlement clears `payment_due_at` |
+| card accepted while `awaiting_payment` but after the window passed and before the job ran | the fulfiller pays it and moves it to `confirmed`/`pending` — paid in full, nothing to undo |
+| member at reception while `awaiting_payment` | reception settles it (cash) → `confirmed`, paid; check-in of an `awaiting_payment` booking is refused until it is paid or switched |
+| door access | nothing to change: grants and QR unlock already look at `confirmed` only |
 
 ## Testing
 
 Feature tests, written first:
 
-- **Bookings:** a prepaid creation sets `payment_due_at` (capped at
-  `start_at`); card accepted clears it; re-submission with `wallet` /
-  `cash` / `paymera` (201, same id, no second booking, price unchanged,
-  coupon not recorded twice); re-submission near the start is not refused
-  as too soon; paying later re-submits an ordinary unpaid booking, and one
-  owing only an extension; a paid one → `already_paid`; an overlapping
-  different window supersedes an awaiting booking only; the reproduced 422
-  now succeeds.
-- **Expiry job:** cancels an expired awaiting booking (slot free,
-  discount/coupon use given back, member notified); keeps one whose card
-  turns out accepted; ignores wallet/cash and not-yet-expired ones.
+- **Statuses:** `awaiting_payment` holds the slot/seat, is cancellable and
+  payable, and is invisible to door codes, QR unlock and reception lists.
+- **Bookings:** a prepaid creation is `awaiting_payment` with
+  `payment_due_at` capped at `start_at`; card accepted → `confirmed` (or
+  `pending`, notice sent then); `pay` with `wallet` / `cash` / `paymera`;
+  the reproduced 422 is gone (create, card fails, `pay` with cash → 200);
+  a member going back and creating an overlapping booking supersedes the
+  hold, never a real booking; paying later a cash booking and one owing
+  only an extension; `already_paid`; another member's booking → 404.
+- **Expiry job:** cancels an expired hold (slot free, discount/coupon use
+  given back, member notified); keeps one whose card turns out accepted;
+  ignores everything else.
 - **Late card success** after cancellation: points in the wallet,
   `needs_review`, booking stays cancelled.
-- **Access grants**, **approval notice**, **cancel inside the window**,
-  **reception check-in/settlement** — as in the table above.
-- **Events:** the same set for registrations, plus a re-submission without
-  the form; a pending one updates the stored choice.
+- **Events:** the same set for registrations; approval-required
+  registrations unchanged.
 - **Coworking pay** and **wallet top-ups:** the cases their
-  `POST member/payments` tests cover today.
-- **Removal:** `POST member/payments` and `GET member/payment-purposes`
-  are 404/405; `GET member/payments` and `GET member/payments/{id}` still
-  work.
+  `POST member/payments` tests cover today; a cash top-up from the app is
+  refused, a reception top-up still works.
+- **Removal:** `POST member/payments` and `GET member/payment-purposes` are
+  gone; `GET member/payments` and `GET member/payments/{id}` still work.
 
 Every existing test that calls `POST member/payments` (about twenty files:
-`PaymeraPaymentTest`, `MemberWalletTest`, `PayNowTest`,
-`EventPaymentTest`, `BookingExtensionOwedTest`, `CouponApplicationTest`,
-...) moves to the operation's endpoint **keeping its assertion** — the
-behaviour each one pins is preserved, only the door changes.
+`PaymeraPaymentTest`, `MemberWalletTest`, `PayNowTest`, `EventPaymentTest`,
+`BookingExtensionOwedTest`, `CouponApplicationTest`, ...) moves to the
+operation's endpoint **keeping its assertion** — the behaviour each one
+pins is preserved, only the door changes.
 
 ## Documentation
 
 - `docs/decisions/prepayment-all-or-nothing.md` — new: the reversal of "a
-  failed card leaves it for the desk", the removal of `POST member/payments`,
-  and why.
+  failed card leaves it for the desk", the `awaiting_payment` status, the
+  removal of `POST member/payments`, and why.
 - `docs/decisions/unified-payments.md` — the methods table and the
   "anything unpaid (`POST member/payments`)" row point to the new decision.
 - `docs/paymera-mobile-api.md` — §2 (top-up through
-  `POST member/wallet/top-ups`), §11 (paying by re-submission,
-  `payment_due_at`, the cancellation reason, coworking pay).
-- Postman — remove Start a Payment and Get Payment Purposes; add Top Up
-  Wallet and Pay Coworking Session; update Create Booking and Register for
-  Event.
+  `POST member/wallet/top-ups`), §11 (the `pay` endpoints, the confirm
+  screen's retry, `awaiting_payment` and `payment_due_at`, the cancellation
+  reason).
+- Postman — remove Start a Payment and Get Payment Purposes; add Pay
+  Booking, Pay Event Registration, Pay Coworking Session, Top Up Wallet;
+  update Create Booking and Register for Event.
+
+## Delivery
+
+Two phases, each releasable on its own:
+
+1. **One way to pay** — `OperationCheckout`; the four `pay`/top-up
+   endpoints; tests moved off `POST member/payments`, which is then
+   removed; cash refused for app top-ups.
+2. **All-or-nothing** — `awaiting_payment`, `payment_due_at`, superseding,
+   the expiry job, the approval-notice timing.
 
 ## Out of scope
 
 - Multi-date bookings (`/batch`) — already refuse a prepaid method.
-- The two plan edge cases in decision 10.
+- The two plan edge cases in decision 11.
 - Automatically reversing a late card success at the bank.
 - Voiding a pending Paymera payment — the gateway API cannot.
