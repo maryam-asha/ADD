@@ -257,7 +257,7 @@ class PayNowWalletOwnerTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $package = $this->plan(['is_subscription' => false]);
 
-        foreach (['wallet', 'cash', null] as $method) {
+        foreach (['wallet', 'cash', 'paymera'] as $method) {
             $this->buyPlan(array_filter(['payment_method' => $method, 'plan_id' => $package->id]))
                 ->assertStatus(422)
                 ->assertJsonValidationErrors('plan_id');

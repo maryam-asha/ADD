@@ -3,6 +3,7 @@
 namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -117,6 +118,48 @@ class CoworkingSessionPayTest extends TestCase
 
         $this->assertSame(PaymentState::Paid, $closed->refresh()->payment_state);
         $this->assertSame(150, app(WalletService::class)->generalBalance($this->walletOf($member)));
+    }
+
+    /**
+     * A booking that was used as a coworking session — checked in, then out —
+     * is a session of `type` booking, paid through the same endpoint, as a
+     * booking.
+     */
+    public function test_a_checked_out_booking_session_is_paid_from_the_wallet(): void
+    {
+        $member = $this->member(300);
+        Sanctum::actingAs($member, ['*']);
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'checked_in_at' => now()->subHours(2),
+            'checked_out_at' => now()->subHour(),
+            'payment_state' => PaymentState::Unpaid,
+            'payment_source' => null,
+            'price_points' => 150,
+            'amount_owed' => '15.00',
+        ]);
+
+        $this->pay('booking', $booking->id, ['payment_method' => 'wallet'])
+            ->assertCreated()
+            ->assertJsonPath('data.next', 'done');
+
+        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
+        $this->assertSame(150, app(WalletService::class)->generalBalance($this->walletOf($member)));
+    }
+
+    public function test_a_booking_that_was_never_checked_in_is_not_a_session(): void
+    {
+        $member = $this->member(300);
+        Sanctum::actingAs($member, ['*']);
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'payment_state' => PaymentState::Unpaid,
+            'price_points' => 150,
+        ]);
+
+        $this->pay('booking', $booking->id, ['payment_method' => 'wallet'])->assertNotFound();
+
+        $this->assertSame(PaymentState::Unpaid, $booking->refresh()->payment_state);
     }
 
     public function test_a_closed_session_is_paid_by_card(): void
