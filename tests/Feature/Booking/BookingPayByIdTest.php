@@ -5,6 +5,8 @@ namespace Tests\Feature\Booking;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
@@ -14,6 +16,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Models\Coupon;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -186,6 +189,125 @@ class BookingPayByIdTest extends TestCase
         $this->book($this->confirmScreen($space, ['payment_method' => 'wallet', 'booking_id' => $id]))
             ->assertOk()
             ->assertJsonPath('next', 'done');
+    }
+
+    /**
+     * A code that creation did not apply (it does not combine with the sale
+     * the room is on) must not block paying later: the confirm screen sends
+     * it again with the id, and the payment goes ahead at the current price,
+     * the answer saying the code was not used.
+     */
+    public function test_a_code_that_creation_did_not_apply_does_not_block_paying_by_another_method(): void
+    {
+        $this->member();
+        $space = $this->openSpace();
+        $space->update([
+            'sale_hourly_rate_points' => 80,
+            'sale_starts_at' => Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(),
+            'sale_ends_at' => Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(),
+        ]);
+        Coupon::factory()->amountOff(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
+        Http::fake(['*' => Http::response('', 500)]);
+
+        $first = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera', 'coupon_code' => 'SOLO']))
+            ->assertCreated()
+            ->assertJsonPath('coupon.applied', false);
+        $this->assertSame(80, Booking::findOrFail($first->json('data.id'))->price_points);
+
+        $this->book($this->confirmScreen($space, [
+            'payment_method' => 'cash',
+            'booking_id' => $first->json('data.id'),
+            'coupon_code' => 'SOLO',
+        ]))
+            ->assertOk()
+            ->assertJsonPath('coupon.code', 'SOLO')
+            ->assertJsonPath('coupon.applied', false)
+            ->assertJsonPath('coupon.points_discounted', 0)
+            ->assertJsonPath('coupon.message', __('api.coupon.offer_is_better', [], 'en'))
+            ->assertJsonPath('next', 'pay_at_reception');
+
+        $this->assertSame(1, Booking::count());
+    }
+
+    public function test_a_code_sent_while_a_card_is_pending_does_not_block_paying_by_the_wallet(): void
+    {
+        $member = $this->member(300);
+        $space = $this->openSpace();
+        Coupon::factory()->create(['code' => 'WAIT']);
+        $booking = Booking::factory()->create([
+            'space_id' => $space->id,
+            'user_id' => $member->id,
+            'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 11:00', 'Asia/Damascus')->utc(),
+            'payment_state' => PaymentState::Unpaid,
+            'payment_source' => null,
+            'price_points' => 100,
+        ]);
+        Payment::factory()->forPayable($booking)->create([
+            'purpose' => PaymentPurpose::Booking,
+            'status' => PaymentStatus::Pending,
+            'user_id' => $member->id,
+        ]);
+
+        $this->book(['booking_id' => $booking->id, 'payment_method' => 'wallet', 'coupon_code' => 'WAIT'])
+            ->assertOk()
+            ->assertJsonPath('coupon.applied', false)
+            ->assertJsonPath('coupon.message', __('api.coupon.payment_in_progress', [], 'en'))
+            ->assertJsonPath('next', 'done');
+
+        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
+        $this->assertSame(100, $booking->price_points);
+        $this->assertSame(200, app(WalletService::class)->generalBalance(
+            Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail()
+        ));
+    }
+
+    /** A code that really cannot be used (unknown) still refuses the payment. */
+    public function test_an_unknown_code_sent_with_the_id_still_refuses(): void
+    {
+        $this->member(300);
+        $space = $this->openSpace();
+        Http::fake(['*' => Http::response('', 500)]);
+        $id = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera']))->json('data.id');
+
+        $this->book(['booking_id' => $id, 'payment_method' => 'wallet', 'coupon_code' => 'NOPE'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.coupon.not_found', [], 'en'));
+    }
+
+    public function test_explicit_nulls_beside_the_booking_id_are_accepted(): void
+    {
+        $this->member();
+        $space = $this->openSpace();
+        Http::fake(['*' => Http::response('', 500)]);
+        $id = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera']))->json('data.id');
+
+        $this->book([
+            'booking_id' => $id,
+            'space_id' => null,
+            'start_at' => null,
+            'end_at' => null,
+            'payment_method' => 'cash',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.id', $id)
+            ->assertJsonPath('next', 'pay_at_reception');
+    }
+
+    public function test_creating_without_a_booking_id_still_needs_the_space_and_the_times(): void
+    {
+        $this->member();
+        $space = $this->openSpace();
+
+        $this->book($this->confirmScreen($space, ['space_id' => null, 'payment_method' => 'cash']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('space_id');
+        $this->book($this->confirmScreen($space, ['start_at' => null, 'payment_method' => 'cash']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('start_at');
+        $this->book($this->confirmScreen($space, ['end_at' => null, 'payment_method' => 'cash']))
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('end_at');
     }
 
     public function test_values_that_differ_from_the_booking_are_refused(): void

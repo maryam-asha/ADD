@@ -11,7 +11,10 @@ use App\Domain\Pricing\ValueObjects\PriceQuote;
  * used (and how much it took off), or not used because the offer already
  * gave a lower price (a coupon that does not combine with offers). A code
  * that could not be used at all never gets here — the purchase was
- * refused with its reason.
+ * refused with its reason. The exception is paying a record that already
+ * exists, where a code that cannot apply (it does not combine with the offer,
+ * or a payment is under way) must not stand in the way of paying
+ * (notAppliedBecause()).
  */
 class CouponOutcomePresenter
 {
@@ -52,15 +55,26 @@ class CouponOutcomePresenter
     }
 
     /**
+     * A code that was sent and not used, with the reason in the member's
+     * words.
+     *
      * @return array{code: string, applied: bool, points_discounted: int, message: string|null}
      */
-    private function notApplied(string $code, ?string $locale): array
+    public function notAppliedBecause(string $code, string $message): array
     {
         return [
             'code' => Coupon::normalizeCode($code),
             'applied' => false,
             'points_discounted' => 0,
-            'message' => __('api.coupon.offer_is_better', [], $locale),
+            'message' => $message,
         ];
+    }
+
+    /**
+     * @return array{code: string, applied: bool, points_discounted: int, message: string|null}
+     */
+    private function notApplied(string $code, ?string $locale): array
+    {
+        return $this->notAppliedBecause($code, __('api.coupon.offer_is_better', [], $locale));
     }
 }

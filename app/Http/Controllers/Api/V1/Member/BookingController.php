@@ -322,7 +322,7 @@ class BookingController extends Controller
         $start = $request->validated('start_at');
         $end = $request->validated('end_at');
 
-        return ($space === null || (int) $space === $booking->space_id)
+        return ($space === null || (int) $space === (int) $booking->space_id)
             && ($start === null || Carbon::parse($start, 'UTC')->equalTo($booking->start_at))
             && ($end === null || Carbon::parse($end, 'UTC')->equalTo($booking->end_at));
     }

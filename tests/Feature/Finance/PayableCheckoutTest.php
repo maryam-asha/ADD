@@ -124,6 +124,28 @@ class PayableCheckoutTest extends TestCase
         ));
     }
 
+    /**
+     * A code switched off after it was applied must not turn an unchanged
+     * re-send into "not valid": the record's own code is recognised before
+     * any lookup of codes in force.
+     */
+    public function test_the_code_a_record_carries_is_ignored_even_once_it_is_deactivated(): void
+    {
+        $member = $this->member(300);
+        $booking = $this->unpaidBooking($member);
+        $coupon = Coupon::factory()->amountOff(10)->create(['code' => 'TENOFF']);
+        app(CouponApplication::class)->apply($booking, $member, $coupon);
+        $coupon->update(['is_active' => false]);
+
+        $outcome = app(PayableCheckout::class)->pay(PaymentPurpose::Booking, $booking, $member, 'wallet', [], ' tenoff ');
+
+        $this->assertSame(PaymentStart::DONE, $outcome->start->kind);
+        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
+        $this->assertSame(210, app(WalletService::class)->generalBalance(
+            Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail()
+        ));
+    }
+
     public function test_a_different_code_on_a_record_that_has_one_is_refused(): void
     {
         $member = $this->member(300);
