@@ -11,6 +11,7 @@ use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
 use App\Domain\Finance\Payments\MemberPayables;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Finance\Services\StartPayment;
@@ -23,7 +24,7 @@ use App\Domain\Pricing\Services\CouponApplication;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
-use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
+use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StartPaymentRequest;
 use App\Http\Resources\Finance\PaymentResource;
@@ -44,7 +45,7 @@ use Throwable;
  */
 class PaymentController extends Controller
 {
-    use RespondsToGatewayFailures;
+    use AnswersPayments;
 
     /**
      * Opens a payment for anything the member pays for, by any enabled
@@ -64,6 +65,7 @@ class PaymentController extends Controller
         CouponEligibility $coupons,
         PriceQuoteService $quotes,
         CouponApplication $application,
+        PayableCheckout $checkout,
     ): JsonResponse {
         $purpose = $request->purpose();
         $method = $request->paymentMethod();
@@ -80,6 +82,18 @@ class PaymentController extends Controller
         }
 
         try {
+            // Something already made — a booking, a session, a registration —
+            // is paid through the same service its own endpoint uses.
+            if (in_array($purpose, [PaymentPurpose::Booking, PaymentPurpose::CoworkingSession, PaymentPurpose::EventRegistration], true)) {
+                $payable = $payables->find($purpose, $request->validated('payable_id'), $member);
+                $outcome = $checkout->pay($purpose, $payable, $member, $method, [
+                    'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                    'wallet_owner_id' => $request->validated('wallet_owner_id'),
+                ], $request->validated('coupon_code'));
+
+                return $this->started($outcome->payment, $outcome->start, $outcome->coupon);
+            }
+
             // A coupon on a plan is locked on the payment as it opens; one
             // that makes the plan free settles it at once, whatever the
             // method asked for.
