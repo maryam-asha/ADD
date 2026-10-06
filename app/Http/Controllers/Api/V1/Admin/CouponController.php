@@ -58,7 +58,15 @@ class CouponController extends AdminResourceController
             ->latest('id');
 
         if ($request->filled('search')) {
-            $query->where('code', 'like', '%'.Coupon::normalizeCode((string) $request->query('search')).'%');
+            $search = (string) $request->query('search');
+            // A coupon by its code, an offer (which has none) by its name.
+            $query->where(fn (Builder $q) => $q->where('code', 'like', '%'.Coupon::normalizeCode($search).'%')
+                ->orWhere('name', 'like', '%'.$search.'%'));
+        }
+
+        // Offers (automatic) and coupons are managed on separate screens.
+        if ($request->has('is_automatic')) {
+            $query->where('is_automatic', $request->boolean('is_automatic'));
         }
 
         if ($request->has('is_active')) {
@@ -92,8 +100,9 @@ class CouponController extends AdminResourceController
 
         $coupon = DB::transaction(function () use ($validated, $request) {
             $coupon = Coupon::create(array_merge(
-                // One use per member unless the admin says otherwise (D11).
-                ['per_user_limit' => 1],
+                // One use per member unless the admin says otherwise (D11) —
+                // a coupon's default; an offer is limited only when set.
+                ['per_user_limit' => ($validated['is_automatic'] ?? false) ? null : 1],
                 $this->couponAttributes($validated),
                 ['source' => CouponSource::Admin, 'created_by' => $request->user()->id],
             ));
@@ -136,7 +145,7 @@ class CouponController extends AdminResourceController
         }
 
         $coupon->delete();
-        $this->logSensitiveAction('coupon_deleted', $coupon, ['code' => $coupon->code]);
+        $this->logSensitiveAction('coupon_deleted', $coupon, ['code' => $coupon->code, 'name' => $coupon->name]);
 
         return response()->noContent();
     }

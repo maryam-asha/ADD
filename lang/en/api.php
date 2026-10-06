@@ -123,6 +123,7 @@ return [
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
         'coupon_updated' => 'Coupon updated.',
         'coupon_target_invalid' => 'A coupon target names at most one item, and one its purpose can be bought with: a plan for a plan purchase, a space or space type for time in a space, an event for a registration.',
+        'offer_fixed_price_family' => 'A fixed price needs targets of one kind: time in a space, plans, or events.',
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',

@@ -21,6 +21,7 @@ class CouponResource extends JsonResource
         return [
             'id' => $this->id,
             'code' => $this->code,
+            'is_automatic' => (bool) $this->is_automatic,
             'name' => $this->name,
             'description' => $this->description,
             'source' => $this->source,
