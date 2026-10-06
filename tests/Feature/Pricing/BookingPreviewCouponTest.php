@@ -18,6 +18,7 @@ use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
@@ -27,11 +28,13 @@ use Tests\TestCase;
  */
 class BookingPreviewCouponTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Space $room;
 
     private User $member;
+
+    private Coupon $offer;
 
     protected function setUp(): void
     {
@@ -40,12 +43,8 @@ class BookingPreviewCouponTest extends TestCase
         $this->seed(SettingSeeder::class);
         Carbon::setTestNow(Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus'));
 
-        $this->room = Space::factory()->room()->create([
-            'hourly_rate_points' => 100,
-            'sale_hourly_rate_points' => 80,
-            'sale_starts_at' => Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(),
-            'sale_ends_at' => Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(),
-        ]);
+        $this->room = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        $this->offer = $this->offerOnSpace($this->room, 80, Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(), Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(), ['name' => ['en' => 'Meeting rooms week', 'ar' => 'أسبوع غرف الاجتماعات']]);
         BusinessHour::factory()->create([
             'branch_id' => $this->room->building->branch_id,
             'day_of_week' => DayOfWeek::Monday,
@@ -84,6 +83,17 @@ class BookingPreviewCouponTest extends TestCase
         $response->assertJsonPath('data.breakdown.total.points', 80);
     }
 
+    /** The offer's line is labelled with its name, or "Offer" when it has none. */
+    public function test_the_offer_line_carries_the_offer_name(): void
+    {
+        $label = fn () => collect($this->preview()->assertOk()->json('data.breakdown.lines'))->firstWhere('key', 'sale')['label'];
+
+        $this->assertSame('Meeting rooms week', $label());
+
+        $this->offer->update(['name' => null]);
+        $this->assertSame('Offer', $label());
+    }
+
     public function test_the_preview_takes_a_coupon_and_says_what_it_did(): void
     {
         Coupon::factory()->percentage(25)->create(['code' => 'QUARTER']);
@@ -114,7 +124,8 @@ class BookingPreviewCouponTest extends TestCase
         $start = Carbon::parse('2026-08-17 10:00', 'Asia/Damascus');
         $booking = app(BookingCreationService::class)->create($this->room, $this->member, $start, $start->copy()->addHour(), paymentMethod: 'wallet', couponCode: 'TEN');
 
-        $this->room->update(['hourly_rate_points' => 500, 'sale_hourly_rate_points' => null, 'sale_starts_at' => null, 'sale_ends_at' => null]);
+        $this->room->update(['hourly_rate_points' => 500]);
+        $this->offer->update(['is_active' => false]);
 
         $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$booking->id}")->assertOk();
 

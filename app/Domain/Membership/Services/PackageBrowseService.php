@@ -391,7 +391,7 @@ class PackageBrowseService
             'formatted_price' => $formattedPrice,
             'formatted_point_price' => $formattedPointPrice,
             // A sale live now: what a purchase opened now would cost.
-            'sale' => $this->prices->sale($plan->saleWindow(), $pricePoints, null, false, 'api.package'),
+            'sale' => $this->prices->sale(null, $pricePoints, null, false, 'api.package'),
             'duration_days' => $plan->duration_days,
             'tags' => $tags,
             'features' => $features,

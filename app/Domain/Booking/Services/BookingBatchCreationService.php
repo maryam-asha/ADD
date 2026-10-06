@@ -98,8 +98,8 @@ class BookingBatchCreationService
         $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
 
         return DB::transaction(function () use ($normalized, $member, $walletOwnerType, $walletOwnerId, $note, $paymentMethod, $coupon) {
-            // The coupon's row is the first lock (CouponLedger).
-            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            // The coupon's and the limited offers' rows are the first lock (CouponLedger).
+            $coupon = $this->couponLedger->lockForPricing($coupon);
 
             // Lock every distinct space in ascending id order. Two
             // concurrent batches touching the same pair of spaces would

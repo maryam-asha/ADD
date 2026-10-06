@@ -66,8 +66,8 @@ class EventRegistrationService
         $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
 
         return DB::transaction(function () use ($event, $user, $fieldValues, $paymentMethod, $walletOwnerType, $walletOwnerId, $coupon) {
-            // 0. The coupon's row before the event's (CouponLedger).
-            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            // 0. The coupon's and the limited offers' rows before the event's (CouponLedger).
+            $coupon = $this->couponLedger->lockForPricing($coupon);
 
             // 1. Lock event for update to prevent race conditions on capacity
             $lockedEvent = Event::query()

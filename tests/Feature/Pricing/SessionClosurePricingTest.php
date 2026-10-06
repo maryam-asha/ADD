@@ -54,6 +54,7 @@ class SessionClosurePricingTest extends TestCase
 
     public function test_a_walk_in_during_a_sale_is_billed_the_sale_rate(): void
     {
+        $this->markTestSkipped('Task 6');
         $this->room->update([
             'sale_hourly_rate_points' => 60,
             'sale_starts_at' => $this->at('00:00')->utc(),

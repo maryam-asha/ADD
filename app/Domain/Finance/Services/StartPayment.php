@@ -15,6 +15,7 @@ use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -49,6 +50,7 @@ class StartPayment
         private readonly PaymentAmountCalculator $amounts,
         private readonly PriceQuoteService $quotes,
         private readonly CouponLedger $couponLedger,
+        private readonly QuoteRecorder $recorder,
     ) {}
 
     /**
@@ -81,7 +83,7 @@ class StartPayment
 
         $payment = DB::transaction(function () use ($user, $purpose, $plan, $amountMinor, $lang, $coupon, $wallet) {
             // The coupon's row first (CouponLedger), then the price it gives.
-            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            $coupon = $this->couponLedger->lockForPricing($coupon);
             $quote = $purpose === PaymentPurpose::PlanPurchase ? $this->quotes->forPlan($plan, $user, $coupon, now()) : null;
 
             // Points are the unit of account, so both purposes resolve to the
@@ -111,8 +113,8 @@ class StartPayment
                 'lang' => $lang ?? (string) config('paymera.default_lang'),
             ]);
 
-            if (($applied = $quote?->appliedCoupon()) !== null) {
-                $this->couponLedger->record($applied, $user, $payment, PricingPurpose::PlanPurchase, $quote->couponBasePoints, $quote->couponPoints);
+            if ($quote !== null) {
+                $this->recorder->record($quote, $payment, $user, PricingPurpose::PlanPurchase);
             }
 
             return $payment;

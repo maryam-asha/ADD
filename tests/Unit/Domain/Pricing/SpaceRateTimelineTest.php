@@ -12,83 +12,24 @@ use Carbon\CarbonImmutable;
 use Tests\TestCase;
 
 /**
- * A space's sale is priced by USAGE time: the seconds of a range inside the
- * sale window at the sale rate, the rest at the normal rate
- * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+ * An offer on time in a space is priced by USAGE time: the seconds of a
+ * range inside the offer's window at the offer's exact rate, the rest at
+ * the normal rate
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md, E3).
  */
 class SpaceRateTimelineTest extends TestCase
 {
-    private function space(array $attributes = []): Space
+    /** A fixed rate of 80 from 2026-10-05 to 2026-10-12, on a room at 100. */
+    private function weekAt80(): CouponTerms
     {
-        return new Space(array_merge([
-            'hourly_rate_points' => 100,
-            'sale_hourly_rate_points' => 80,
-            'sale_starts_at' => CarbonImmutable::parse('2026-10-05 00:00:00'),
-            'sale_ends_at' => CarbonImmutable::parse('2026-10-12 00:00:00'),
-        ], $attributes));
-    }
-
-    /** @return list<array{0: int, 1: int}> */
-    private function segments(Space $space, string $from, string $to): array
-    {
-        return array_map(
-            fn (RateSegment $s) => [$s->seconds, (int) $s->rate],
-            (new SpaceRateTimeline)->segments($space, CarbonImmutable::parse($from), CarbonImmutable::parse($to)),
-        );
-    }
-
-    public function test_a_range_before_or_after_the_sale_is_all_at_the_normal_rate(): void
-    {
-        $this->assertSame([[7200, 100]], $this->segments($this->space(), '2026-10-04 10:00:00', '2026-10-04 12:00:00'));
-        $this->assertSame([[7200, 100]], $this->segments($this->space(), '2026-10-12 00:00:00', '2026-10-12 02:00:00'));
-    }
-
-    public function test_a_range_inside_the_sale_is_all_at_the_sale_rate(): void
-    {
-        $this->assertSame([[7200, 80]], $this->segments($this->space(), '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
-    }
-
-    public function test_a_range_crossing_the_sale_end_is_split(): void
-    {
-        $this->assertSame(
-            [[3600, 80], [3600, 100]],
-            $this->segments($this->space(), '2026-10-11 23:00:00', '2026-10-12 01:00:00'),
-        );
-    }
-
-    public function test_a_range_crossing_the_sale_start_is_split(): void
-    {
-        $this->assertSame(
-            [[1800, 80], [5400, 100]],
-            $this->segments($this->space(), '2026-10-04 22:30:00', '2026-10-05 00:30:00'),
-        );
-    }
-
-    public function test_a_free_sale_is_a_zero_rate_segment(): void
-    {
-        $this->assertSame([[3600, 0]], $this->segments($this->space(['sale_hourly_rate_points' => 0]), '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
-    }
-
-    /** A "sale" never raises a price: a sale rate at or above the normal one is ignored. */
-    public function test_a_sale_rate_above_the_normal_rate_is_ignored(): void
-    {
-        $this->assertSame([[3600, 100]], $this->segments($this->space(['sale_hourly_rate_points' => 120]), '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
-    }
-
-    public function test_a_space_with_no_rate_has_no_segments(): void
-    {
-        $this->assertSame([], $this->segments($this->space(['hourly_rate_points' => null]), '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
-    }
-
-    public function test_a_space_without_a_sale_is_one_segment(): void
-    {
-        $space = $this->space(['sale_hourly_rate_points' => null, 'sale_starts_at' => null, 'sale_ends_at' => null]);
-
-        $this->assertSame([[3600, 100]], $this->segments($space, '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
+        return new CouponTerms(CouponDiscountType::FixedPrice, 80, null, SaleWindow::between(
+            CarbonImmutable::parse('2026-10-05 00:00:00'),
+            CarbonImmutable::parse('2026-10-12 00:00:00'),
+        ));
     }
 
     /** @return list<array{0: int, 1: string}> */
-    private function offerSegments(int $rate, CouponTerms $offer, string $from, string $to): array
+    private function segments(?CouponTerms $offer, string $from, string $to, ?int $rate = 100): array
     {
         return array_map(
             fn (RateSegment $s) => [$s->seconds, $s->rate],
@@ -96,24 +37,56 @@ class SpaceRateTimelineTest extends TestCase
         );
     }
 
+    public function test_a_range_before_or_after_the_offer_is_all_at_the_normal_rate(): void
+    {
+        $this->assertSame([[7200, '100']], $this->segments($this->weekAt80(), '2026-10-04 10:00:00', '2026-10-04 12:00:00'));
+        $this->assertSame([[7200, '100']], $this->segments($this->weekAt80(), '2026-10-12 00:00:00', '2026-10-12 02:00:00'));
+    }
+
+    public function test_a_range_inside_the_offer_is_all_at_the_offer_rate(): void
+    {
+        $this->assertSame([[7200, '80']], $this->segments($this->weekAt80(), '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
+    }
+
+    public function test_a_range_crossing_the_offer_end_is_split(): void
+    {
+        $this->assertSame([[3600, '80'], [3600, '100']], $this->segments($this->weekAt80(), '2026-10-11 23:00:00', '2026-10-12 01:00:00'));
+    }
+
+    public function test_a_range_crossing_the_offer_start_is_split(): void
+    {
+        $this->assertSame([[1800, '80'], [5400, '100']], $this->segments($this->weekAt80(), '2026-10-04 22:30:00', '2026-10-05 00:30:00'));
+    }
+
     public function test_a_percentage_offer_charges_an_exact_rate_inside_its_window(): void
     {
         $offer = new CouponTerms(CouponDiscountType::Percentage, 10, null, SaleWindow::between(CarbonImmutable::parse('2026-10-06 10:00:00'), CarbonImmutable::parse('2026-10-06 11:00:00')));
 
-        $this->assertSame([[3600, '13.50'], [3600, '15']], $this->offerSegments(15, $offer, '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
+        $this->assertSame([[3600, '13.50'], [3600, '15']], $this->segments($offer, '2026-10-06 10:00:00', '2026-10-06 12:00:00', 15));
     }
 
     public function test_an_open_ended_offer_covers_the_whole_range(): void
     {
         $offer = new CouponTerms(CouponDiscountType::AmountOff, 30, null, SaleWindow::between(null, null));
 
-        $this->assertSame([[7200, '70']], $this->offerSegments(100, $offer, '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
+        $this->assertSame([[7200, '70']], $this->segments($offer, '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
     }
 
+    /** An offer never raises a price: one no lower than the rate is ignored. */
     public function test_an_offer_no_lower_than_the_rate_is_ignored(): void
     {
-        $offer = new CouponTerms(CouponDiscountType::FixedPrice, 100, null, SaleWindow::between(null, null));
+        $offer = new CouponTerms(CouponDiscountType::FixedPrice, 120, null, SaleWindow::between(null, null));
 
-        $this->assertSame([[3600, '100']], $this->offerSegments(100, $offer, '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
+        $this->assertSame([[3600, '100']], $this->segments($offer, '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
+    }
+
+    public function test_a_space_with_no_rate_has_no_segments(): void
+    {
+        $this->assertSame([], $this->segments($this->weekAt80(), '2026-10-06 10:00:00', '2026-10-06 11:00:00', null));
+    }
+
+    public function test_no_offer_is_one_segment_at_the_rate(): void
+    {
+        $this->assertSame([[3600, '100']], $this->segments(null, '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
     }
 }

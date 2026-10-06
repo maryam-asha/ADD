@@ -4,11 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Domain\Membership\Models\Plan;
-use App\Http\Requests\Concerns\InterpretsLocalTimes;
-use App\Http\Requests\Concerns\ValidatesSaleWindow;
 use App\Support\TranslatableField;
-use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -18,22 +14,12 @@ use Illuminate\Validation\Rule;
  * rule: a plan window is allowed to wrap past midnight (20:00-00:00 is the
  * evening package this was built for), so an end at or before the start is
  * meaningful here rather than an error.
- *
- * A plan may be on sale for a while — 100 instead of 120 for two days —
- * judged as of when its payment opens (ValidatesSaleWindow).
  */
 class StorePlanRequest extends FormRequest
 {
-    use InterpretsLocalTimes, ValidatesSaleWindow;
-
     public function authorize(): bool
     {
         return true;
-    }
-
-    protected function prepareForValidation(): void
-    {
-        $this->interpretSaleWindow();
     }
 
     /**
@@ -94,17 +80,6 @@ class StorePlanRequest extends FormRequest
                 'resource_grants.*.description.en' => ['nullable', 'string'],
                 'resource_grants.*.order' => ['nullable', 'integer', 'min:0'],
             ],
-            $this->saleWindowRules('sale_price_points'),
         );
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $plan = $this->route('plan');
-            $plan = $plan instanceof Plan ? $plan : ($plan !== null ? Plan::find($plan) : null);
-
-            $this->assertSaleBelowPrice($validator, 'sale_price_points', 'price_points', $plan);
-        });
     }
 }

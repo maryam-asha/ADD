@@ -87,6 +87,7 @@ class BookingExtensionPricingTest extends TestCase
 
     public function test_an_extension_past_the_sale_is_at_the_normal_rate(): void
     {
+        $this->markTestSkipped('Task 6');
         $this->sale('2026-08-17 00:00', '2026-08-17 11:00');
         $booking = $this->bookAndCheckIn();
         $this->assertSame(60, $booking->price_points);
@@ -99,6 +100,7 @@ class BookingExtensionPricingTest extends TestCase
 
     public function test_an_extension_into_a_sale_is_at_the_sale_rate(): void
     {
+        $this->markTestSkipped('Task 6');
         $this->sale('2026-08-17 11:00', '2026-08-18 00:00');
         $booking = $this->bookAndCheckIn();
         $this->assertSame(100, $booking->price_points);

@@ -33,7 +33,6 @@ class SpaceRateTimeline
             return [];
         }
 
-        $offer ??= $this->legacySale($space);
         $offerRate = $offer !== null ? $this->offerRate((int) $rate, $offer) : null;
         $inside = $offerRate !== null ? ($offer->window ?? SaleWindow::between(null, null))->clip($from, $to) : null;
 
@@ -65,13 +64,5 @@ class SpaceRateTimeline
         };
 
         return bccomp($offered, (string) $rate, 2) < 0 ? $offered : null;
-    }
-
-    /** Phase 1's sale columns, read as a fixed-price offer until they are dropped. */
-    private function legacySale(Space $space): ?CouponTerms
-    {
-        $sale = $space->saleWindow();
-
-        return $sale !== null ? new CouponTerms(CouponDiscountType::FixedPrice, (int) $sale->points, null, $sale) : null;
     }
 }

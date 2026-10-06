@@ -104,7 +104,7 @@ class BookingPresentationService
                     'duration' => $this->presenter->durationLabel($minutes),
                     'rate' => $this->money($rate),
                 ], $locale),
-                'sale' => __('api.booking.sale_label', [], $locale),
+                'sale' => $line->name ?? __('api.booking.sale_label', [], $locale),
                 'plan_discount' => __('api.booking.discount_label', ['percent' => $line->percentage], $locale),
                 'coupon' => __('api.booking.coupon_label', ['code' => $line->code], $locale),
             },

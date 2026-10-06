@@ -9,6 +9,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Support\Enums\EventPaymentState;
@@ -82,6 +83,19 @@ class EventRegistrationCouponTest extends TestCase
         $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
         $this->assertSame(430, $this->balance());
         $this->assertSame($coupon->id, app(CouponLedger::class)->couponFor($attendee)->coupon_id);
+    }
+
+    public function test_an_offer_on_the_event_prices_the_registration(): void
+    {
+        $event = $this->event(['price_points' => 50]);
+        $offer = Coupon::factory()->automatic()->percentage(20)->create();
+        $offer->targets()->create(['purpose' => PricingPurpose::EventRegistration, 'event_id' => $event->id]);
+
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register")->assertCreated();
+
+        $attendee = EventAttendee::sole();
+        $this->assertSame(40, $attendee->price_points);
+        $this->assertSame(10, app(CouponLedger::class)->offerFor($attendee)->points);
     }
 
     public function test_a_registration_made_free_is_paid(): void

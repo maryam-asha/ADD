@@ -9,13 +9,10 @@ use Carbon\CarbonInterface;
  * The window an offer runs in — live from `startsAt` up to, not including,
  * `endsAt`; either end may be open (null), meaning always
  * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
- *
- * `points` and of() belong to phase 1's sale columns and go with them.
  */
 final class SaleWindow
 {
     private function __construct(
-        public readonly ?int $points,
         public readonly ?CarbonImmutable $startsAt,
         public readonly ?CarbonImmutable $endsAt,
     ) {}
@@ -24,23 +21,9 @@ final class SaleWindow
     public static function between(?CarbonInterface $startsAt, ?CarbonInterface $endsAt): self
     {
         return new self(
-            null,
             $startsAt !== null ? CarbonImmutable::instance($startsAt)->utc() : null,
             $endsAt !== null ? CarbonImmutable::instance($endsAt)->utc() : null,
         );
-    }
-
-    /**
-     * The sale an item's three columns describe, or null when they describe
-     * none: any of them missing, or a window that never opens.
-     */
-    public static function of(?int $points, ?CarbonInterface $startsAt, ?CarbonInterface $endsAt): ?self
-    {
-        if ($points === null || $startsAt === null || $endsAt === null || ! $endsAt->greaterThan($startsAt)) {
-            return null;
-        }
-
-        return new self($points, CarbonImmutable::instance($startsAt)->utc(), CarbonImmutable::instance($endsAt)->utc());
     }
 
     public function isLiveAt(CarbonInterface $at): bool

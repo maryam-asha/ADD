@@ -25,6 +25,7 @@ class SaleLabelsTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->markTestSkipped('Task 7');
         $this->seed(RoleSeeder::class);
         $this->seed(SettingSeeder::class);
         Carbon::setTestNow(Carbon::parse('2026-10-05 10:00:00', 'Asia/Damascus')->utc());

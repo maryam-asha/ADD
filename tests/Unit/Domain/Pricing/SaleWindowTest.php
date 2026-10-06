@@ -10,21 +10,7 @@ class SaleWindowTest extends TestCase
 {
     private function window(): SaleWindow
     {
-        return SaleWindow::of(80, CarbonImmutable::parse('2026-10-05 00:00:00'), CarbonImmutable::parse('2026-10-12 00:00:00'));
-    }
-
-    /** All three or none: a half-configured sale is no sale at all. */
-    public function test_a_sale_needs_its_price_and_both_ends(): void
-    {
-        $start = CarbonImmutable::parse('2026-10-05 00:00:00');
-        $end = CarbonImmutable::parse('2026-10-12 00:00:00');
-
-        $this->assertNull(SaleWindow::of(null, $start, $end));
-        $this->assertNull(SaleWindow::of(80, null, $end));
-        $this->assertNull(SaleWindow::of(80, $start, null));
-        $this->assertNull(SaleWindow::of(80, $end, $start));
-        $this->assertNull(SaleWindow::of(80, $start, $start));
-        $this->assertNotNull(SaleWindow::of(0, $start, $end));
+        return SaleWindow::between(CarbonImmutable::parse('2026-10-05 00:00:00'), CarbonImmutable::parse('2026-10-12 00:00:00'));
     }
 
     /** Live from its first instant, over at its last: [starts_at, ends_at). */

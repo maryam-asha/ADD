@@ -11,8 +11,10 @@ use App\Domain\Pricing\Enums\DiscountKind;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 
 /**
@@ -21,8 +23,9 @@ use InvalidArgumentException;
  * checked against — live rows, never a stored counter
  * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  *
- * Locking protocol: lockForRedemption() is the FIRST lock — and the first
- * read — in any transaction that redeems. Under MySQL's REPEATABLE READ the
+ * Locking protocol: lockForPricing() — or, where no offer can be chosen,
+ * lockForRedemption() — is the FIRST lock, and the first read, in any
+ * transaction that redeems. Under MySQL's REPEATABLE READ the
  * snapshot is taken at the first plain read, so counting after a later lock
  * could miss a use committed in between and let "the first ten" become
  * eleven; and taking it after Branch/Space would deadlock against a plan
@@ -31,6 +34,31 @@ use InvalidArgumentException;
  */
 class CouponLedger
 {
+    /**
+     * The first lock — and the first read — of a transaction that may spend
+     * an offer or a coupon: the typed coupon and every active offer with a
+     * limit, in id order, in one locking read, so two purchases cannot both
+     * take "the last" use and two transactions never lock them in opposite
+     * orders. No relation filter: a subquery here would be a plain read and
+     * fix the snapshot before the lock.
+     */
+    public function lockForPricing(?Coupon $coupon): ?Coupon
+    {
+        $locked = Coupon::query()
+            ->where(fn (Builder $q) => $q->where('is_automatic', true)->where('is_active', true)
+                ->where(fn (Builder $limited) => $limited->whereNotNull('usage_limit')->orWhereNotNull('per_user_limit')))
+            ->when($coupon !== null, fn (Builder $q) => $q->orWhere('id', $coupon->getKey()))
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($coupon === null) {
+            return null;
+        }
+
+        return $locked->firstWhere('id', $coupon->getKey()) ?? throw (new ModelNotFoundException)->setModel(Coupon::class, [$coupon->getKey()]);
+    }
+
     public function lockForRedemption(Coupon $coupon): Coupon
     {
         return Coupon::query()->whereKey($coupon->getKey())->lockForUpdate()->firstOrFail();

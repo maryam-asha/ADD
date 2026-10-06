@@ -103,7 +103,8 @@ class PaymentController extends Controller
                 $coupon = null;
             }
 
-            if ($coupon !== null && $quotes->forPlan(Plan::findOrFail($request->validated('plan_id')), $member, $coupon, now())->finalPoints === 0) {
+            // A coupon or an offer that makes a plan free settles it at once.
+            if ($purpose === PaymentPurpose::PlanPurchase && $quotes->forPlan(Plan::findOrFail($request->validated('plan_id')), $member, $coupon, now())->finalPoints === 0) {
                 $method = WalletMethod::KEY;
             }
 
