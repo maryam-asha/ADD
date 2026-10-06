@@ -21,6 +21,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
+use App\Domain\Pricing\Services\CouponLedger;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -152,6 +153,13 @@ class PlanDiscountBookingTest extends TestCase
         $this->assertSame($discount->id, $redemption->plan_discount_id);
         $this->assertSame($membership->id, $redemption->membership_id);
         $this->assertSame(30, $redemption->points_discounted);
+
+        // The discount ledger files it too, with the percentage it took.
+        $row = app(CouponLedger::class)->planDiscountFor($booking);
+        $this->assertSame($discount->id, $row->plan_discount_id);
+        $this->assertSame(100, $row->base_points);
+        $this->assertSame(30, $row->points);
+        $this->assertSame(30, $row->percent);
     }
 
     public function test_a_usage_limit_of_one_charges_full_price_on_the_second_booking(): void

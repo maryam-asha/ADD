@@ -106,7 +106,7 @@ class PlanCouponPurchaseTest extends TestCase
         $this->assertSame(120, $payment->list_price_points);
         $this->assertSame(440, $this->balance($member));
         $this->assertSame(1, Membership::count());
-        $this->assertSame($payment->id, app(CouponLedger::class)->forRedeemable($payment)->payment_id);
+        $this->assertSame($payment->id, app(CouponLedger::class)->couponFor($payment)->payment_id);
         $this->assertSame(1, app(CouponLedger::class)->liveUsage($coupon));
     }
 

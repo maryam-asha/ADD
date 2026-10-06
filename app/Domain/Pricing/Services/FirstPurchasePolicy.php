@@ -10,7 +10,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
-use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Support\Enums\EventPaymentState;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -60,7 +60,7 @@ class FirstPurchasePolicy
 
     private function hasUsedAWelcome(User $member): bool
     {
-        return CouponRedemption::query()
+        return AppliedDiscount::query()
             ->live()
             ->where('user_id', $member->id)
             ->whereHas('coupon', fn (Builder $coupon) => $coupon->where('new_members_only', true))

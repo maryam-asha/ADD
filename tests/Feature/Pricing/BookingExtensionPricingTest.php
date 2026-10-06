@@ -121,7 +121,7 @@ class BookingExtensionPricingTest extends TestCase
 
         $this->assertSame(180, $booking->price_points);
         $this->assertSame(200, $booking->list_price_points);
-        $this->assertSame(20, app(CouponLedger::class)->forRedeemable($booking)->points_discounted);
+        $this->assertSame(20, app(CouponLedger::class)->couponFor($booking)->points);
         $this->assertSame(1, app(CouponLedger::class)->liveUsage($coupon));
     }
 }

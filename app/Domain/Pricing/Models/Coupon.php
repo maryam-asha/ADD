@@ -128,7 +128,7 @@ class Coupon extends Model
 
     public function redemptions(): HasMany
     {
-        return $this->hasMany(CouponRedemption::class);
+        return $this->hasMany(AppliedDiscount::class);
     }
 
     public function company(): BelongsTo

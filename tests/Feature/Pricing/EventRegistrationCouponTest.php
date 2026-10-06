@@ -81,7 +81,7 @@ class EventRegistrationCouponTest extends TestCase
         $this->assertSame(100, $attendee->list_price_points);
         $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
         $this->assertSame(430, $this->balance());
-        $this->assertSame($coupon->id, app(CouponLedger::class)->forRedeemable($attendee)->coupon_id);
+        $this->assertSame($coupon->id, app(CouponLedger::class)->couponFor($attendee)->coupon_id);
     }
 
     public function test_a_registration_made_free_is_paid(): void

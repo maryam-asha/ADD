@@ -19,8 +19,8 @@ use App\Domain\Pricing\Enums\CouponRejection;
 use App\Domain\Pricing\Enums\PriceChoice;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
 use App\Domain\Pricing\ValueObjects\CouponTerms;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Pricing\ValueObjects\PricingTarget;
@@ -141,7 +141,7 @@ class PriceQuoteService
             $this->amounts->forRange($space, $from, $to),
             fn () => $this->amounts->forSegments($this->timeline->segments($space, $from, $to)),
             $planRedemption?->discount,
-            $this->ledger->forRedeemable($session),
+            $this->ledger->couponFor($session),
         );
     }
 
@@ -175,7 +175,7 @@ class PriceQuoteService
             $list,
             fn () => $this->planSalePrice($plan, $list, $asOf),
             null,
-            $payment->exists ? $this->ledger->forRedeemable($payment) : null,
+            $payment->exists ? $this->ledger->couponFor($payment) : null,
         );
     }
 
@@ -245,7 +245,7 @@ class PriceQuoteService
      *
      * @param  callable(): int  $salePrice
      */
-    private function atLockedTerms(int $list, callable $salePrice, ?PlanDiscount $discount, ?CouponRedemption $couponRedemption): PriceQuote
+    private function atLockedTerms(int $list, callable $salePrice, ?PlanDiscount $discount, ?AppliedDiscount $couponRedemption): PriceQuote
     {
         $onList = $couponRedemption !== null && ! $couponRedemption->coupon->combinable_with_offers;
 
@@ -260,7 +260,7 @@ class PriceQuoteService
         }
 
         $couponOff = $couponRedemption !== null
-            ? $this->coupons->discountFor(CouponTerms::fromRedemption($couponRedemption), $automatic)
+            ? $this->coupons->discountFor(CouponTerms::fromLedger($couponRedemption), $automatic)
             : 0;
 
         return new PriceQuote(
@@ -288,10 +288,10 @@ class PriceQuoteService
     public function forExistingBooking(Booking $booking): PriceQuote
     {
         $planRedemption = PlanDiscountRedemption::query()->where('booking_id', $booking->id)->first();
-        $couponRedemption = $this->ledger->forRedeemable($booking);
+        $couponRedemption = $this->ledger->couponFor($booking);
 
         $planOff = (int) ($planRedemption?->points_discounted ?? 0);
-        $couponOff = (int) ($couponRedemption?->points_discounted ?? 0);
+        $couponOff = (int) ($couponRedemption?->points ?? 0);
 
         $list = $booking->list_price_points
             ?? ($booking->price_points !== null

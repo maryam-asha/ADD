@@ -97,7 +97,7 @@ class CouponApplicationTest extends TestCase
         $this->assertSame('8.00', (string) $booking->amount_owed);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(80, Payment::sole()->amount_points);
-        $this->assertSame($coupon->id, app(CouponLedger::class)->forRedeemable($booking)->coupon_id);
+        $this->assertSame($coupon->id, app(CouponLedger::class)->couponFor($booking)->coupon_id);
     }
 
     public function test_a_second_coupon_on_the_same_booking_is_refused(): void

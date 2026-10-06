@@ -273,7 +273,7 @@ class BookingController extends Controller
 
         $code = $request->validated('coupon_code');
         $coupon = $code !== null
-            ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->forRedeemable($booking))]
+            ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->couponFor($booking))]
             : [];
 
         return response()->json(['data' => new BookingResource($booking)] + $card + $coupon, 201);

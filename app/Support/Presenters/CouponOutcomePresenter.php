@@ -2,8 +2,8 @@
 
 namespace App\Support\Presenters;
 
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 
 /**
@@ -18,13 +18,13 @@ class CouponOutcomePresenter
     /**
      * @return array{code: string, applied: bool, points_discounted: int, message: string|null}
      */
-    public function present(string $code, ?CouponRedemption $redemption, ?string $locale = null): array
+    public function present(string $code, ?AppliedDiscount $redemption, ?string $locale = null): array
     {
         if ($redemption !== null) {
             return [
                 'code' => $redemption->coupon->code,
                 'applied' => true,
-                'points_discounted' => $redemption->points_discounted,
+                'points_discounted' => $redemption->points,
                 'message' => null,
             ];
         }

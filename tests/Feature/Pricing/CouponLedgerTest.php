@@ -43,8 +43,8 @@ class CouponLedgerTest extends TestCase
         $this->assertSame(20, $redemption->discount_value);
         $this->assertSame(50, $redemption->max_discount_points);
         $this->assertSame(100, $redemption->base_points);
-        $this->assertSame(20, $redemption->points_discounted);
-        $this->assertTrue($redemption->is($this->ledger()->forRedeemable($booking)));
+        $this->assertSame(20, $redemption->points);
+        $this->assertTrue($redemption->is($this->ledger()->couponFor($booking)));
     }
 
     public function test_each_kind_of_record_takes_its_own_column(): void

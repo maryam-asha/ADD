@@ -89,8 +89,8 @@ class SessionClosurePricingTest extends TestCase
         $this->assertSame(70, $quote['points']);
         $this->assertSame(70, $booking->price_points);
         $this->assertSame(100, $booking->list_price_points);
-        $redemption = app(CouponLedger::class)->forRedeemable($booking);
-        $this->assertSame(30, $redemption->points_discounted);
+        $redemption = app(CouponLedger::class)->couponFor($booking);
+        $this->assertSame(30, $redemption->points);
         $this->assertSame(100, $redemption->base_points);
     }
 

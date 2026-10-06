@@ -98,9 +98,9 @@ class BookingCouponCreationTest extends TestCase
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(920, $this->balance($member));
 
-        $redemption = app(CouponLedger::class)->forRedeemable($booking);
+        $redemption = app(CouponLedger::class)->couponFor($booking);
         $this->assertSame($coupon->id, $redemption->coupon_id);
-        $this->assertSame(20, $redemption->points_discounted);
+        $this->assertSame(20, $redemption->points);
         $this->assertSame(100, $redemption->base_points);
     }
 

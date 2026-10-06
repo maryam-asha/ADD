@@ -4,8 +4,8 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
 use App\Http\Requests\Admin\StoreCouponRequest;
 use App\Http\Requests\Admin\UpdateCouponRequest;
 use App\Http\Resources\CouponRedemptionResource;
@@ -145,9 +145,9 @@ class CouponController extends AdminResourceController
     public function redemptions(Request $request, Coupon $coupon): AnonymousResourceCollection
     {
         $page = $coupon->redemptions()->with('user')->latest('id')->paginate($request->integer('per_page', 15));
-        $counting = CouponRedemption::query()->whereKey($page->pluck('id'))->live()->pluck('id')->flip();
+        $counting = AppliedDiscount::query()->whereKey($page->pluck('id'))->live()->pluck('id')->flip();
 
-        $page->getCollection()->each(fn (CouponRedemption $redemption) => $redemption->setAttribute('counts', $counting->has($redemption->id)));
+        $page->getCollection()->each(fn (AppliedDiscount $redemption) => $redemption->setAttribute('counts', $counting->has($redemption->id)));
 
         return CouponRedemptionResource::collection($page);
     }

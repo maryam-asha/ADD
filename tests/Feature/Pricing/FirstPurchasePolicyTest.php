@@ -15,8 +15,8 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
 use App\Domain\Pricing\Services\FirstPurchasePolicy;
 use App\Support\Enums\EventPaymentState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -114,7 +114,7 @@ class FirstPurchasePolicyTest extends TestCase
         $welcome = Coupon::factory()->create(['new_members_only' => true]);
         $booking = Booking::factory()->create(['user_id' => $member->id, 'status' => BookingStatus::Confirmed]);
 
-        CouponRedemption::create([
+        AppliedDiscount::create([
             'coupon_id' => $welcome->id,
             'user_id' => $member->id,
             'purpose' => PricingPurpose::Booking,
@@ -122,7 +122,7 @@ class FirstPurchasePolicyTest extends TestCase
             'discount_type' => CouponDiscountType::Percentage,
             'discount_value' => 50,
             'base_points' => 100,
-            'points_discounted' => 50,
+            'points' => 50,
         ]);
 
         $this->assertFalse($this->isNew($member));

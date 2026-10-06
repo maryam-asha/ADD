@@ -216,7 +216,7 @@ class MembershipController extends Controller
     private function couponOutcome(?Coupon $coupon, Payment $payment): array
     {
         return $coupon === null ? [] : [
-            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment)),
+            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->couponFor($payment)),
         ];
     }
 

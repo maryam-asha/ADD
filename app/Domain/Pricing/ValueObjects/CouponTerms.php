@@ -3,8 +3,8 @@
 namespace App\Domain\Pricing\ValueObjects;
 
 use App\Domain\Pricing\Enums\CouponDiscountType;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
 
 /**
  * The part of a coupon that decides how much it takes off. Read from the
@@ -24,7 +24,7 @@ final class CouponTerms
         return new self($coupon->discount_type, (int) $coupon->discount_value, $coupon->max_discount_points);
     }
 
-    public static function fromRedemption(CouponRedemption $redemption): self
+    public static function fromLedger(AppliedDiscount $redemption): self
     {
         return new self($redemption->discount_type, (int) $redemption->discount_value, $redemption->max_discount_points);
     }

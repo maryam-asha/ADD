@@ -9,7 +9,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A coupon on the dashboard, as the admin wrote it. `used` is how many uses
  * still count against its limits — a cancelled booking's use gave itself
- * back (CouponRedemption::scopeLive).
+ * back (AppliedDiscount::scopeLive).
  */
 class CouponResource extends JsonResource
 {

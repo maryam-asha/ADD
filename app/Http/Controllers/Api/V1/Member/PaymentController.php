@@ -185,7 +185,7 @@ class PaymentController extends Controller
     private function planOutcome(?Coupon $coupon, ?Payment $payment): ?array
     {
         return $coupon !== null && $payment !== null
-            ? app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment))
+            ? app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->couponFor($payment))
             : null;
     }
 

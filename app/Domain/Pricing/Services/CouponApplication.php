@@ -90,7 +90,7 @@ class CouponApplication
      */
     private function assertTakesACoupon(Booking|WalkinSession|EventAttendee $record): void
     {
-        if ($this->ledger->forRedeemable($record) !== null) {
+        if ($this->ledger->couponFor($record) !== null) {
             throw new CouponRejectedException(CouponRejection::AlreadyApplied);
         }
 

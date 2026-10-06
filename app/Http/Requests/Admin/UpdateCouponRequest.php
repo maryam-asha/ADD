@@ -7,7 +7,7 @@ use Illuminate\Validation\Rule;
 
 /**
  * Same shape as creating one; the code may stay its own. Uses already
- * made keep the terms they were made on (CouponRedemption), so changing
+ * made keep the terms they were made on (AppliedDiscount), so changing
  * the discount only changes what comes next.
  */
 class UpdateCouponRequest extends StoreCouponRequest

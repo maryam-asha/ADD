@@ -13,9 +13,9 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\PricingPurpose;
-use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
-use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\Models\AppliedDiscount;
+use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,16 +123,16 @@ class CouponModelTest extends TestCase
         $this->assertSame(6, $coupon->redemptions()->live()->count());
     }
 
-    private function redemption(Coupon $coupon, array $attachment): CouponRedemption
+    private function redemption(Coupon $coupon, array $attachment): AppliedDiscount
     {
-        return CouponRedemption::create(array_merge([
+        return AppliedDiscount::create(array_merge([
             'coupon_id' => $coupon->id,
             'user_id' => User::factory()->create()->id,
             'purpose' => PricingPurpose::Booking,
             'discount_type' => CouponDiscountType::Percentage,
             'discount_value' => 10,
             'base_points' => 100,
-            'points_discounted' => 10,
+            'points' => 10,
         ], $attachment));
     }
 
