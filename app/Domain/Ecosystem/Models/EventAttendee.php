@@ -38,6 +38,7 @@ class EventAttendee extends Model
         'paid_at',
         'checked_in_at',
         'checked_in_by',
+        'payment_due_at',
     ];
 
     protected function casts(): array
@@ -54,6 +55,7 @@ class EventAttendee extends Model
             'paid_at' => 'datetime',
             'checked_in_at' => 'datetime',
             'checked_in_by' => 'integer',
+            'payment_due_at' => 'datetime',
         ];
     }
 
@@ -111,6 +113,14 @@ class EventAttendee extends Model
     public function approver(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /** Held for its prepayment past the deadline: no new payment may open. */
+    public function awaitingPaymentExpired(): bool
+    {
+        return $this->status === EventRegistrationStatus::AwaitingPayment
+            && $this->payment_due_at !== null
+            && ! $this->payment_due_at->isFuture();
     }
 
     /**

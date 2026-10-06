@@ -55,6 +55,7 @@ class Booking extends Model
         'note',
         'approved_by',
         'approved_at',
+        'payment_due_at',
     ];
 
     protected function casts(): array
@@ -76,6 +77,7 @@ class Booking extends Model
             'paid_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'approved_at' => 'datetime',
+            'payment_due_at' => 'datetime',
             'required_approval' => 'boolean',
         ];
     }
@@ -121,6 +123,14 @@ class Booking extends Model
         return $this->status === BookingStatus::Rejected
             && $this->approved_by === null
             && $this->rejection_reason === null;
+    }
+
+    /** Held for its prepayment past the deadline: no new payment may open. */
+    public function awaitingPaymentExpired(): bool
+    {
+        return $this->status === BookingStatus::AwaitingPayment
+            && $this->payment_due_at !== null
+            && ! $this->payment_due_at->isFuture();
     }
 
     /**

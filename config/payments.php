@@ -66,4 +66,17 @@ return [
     */
     'min_top_up_points' => (int) env('PAYMENTS_MIN_TOP_UP_POINTS', 10),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Prepayment window
+    |--------------------------------------------------------------------------
+    |
+    | A booking or registration made with a prepaid method (a gateway) is
+    | held this many minutes — never past its start — for the card to go
+    | through or the member to choose another method; then it is cancelled
+    | (payments:cancel-expired-prepayments).
+    |
+    */
+    'prepayment_window_minutes' => (int) env('PAYMENTS_PREPAYMENT_WINDOW_MINUTES', 15),
+
 ];
