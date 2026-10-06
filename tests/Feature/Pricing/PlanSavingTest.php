@@ -182,6 +182,20 @@ class PlanSavingTest extends TestCase
             ->assertJsonValidationErrors('reference_units');
     }
 
+    /** Exactly one reference: one sent beside one stored is refused, not stored twice. */
+    public function test_a_reference_sent_beside_a_stored_one_of_the_other_kind_is_refused(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 2]);
+        $plan = Plan::factory()->create(['price_points' => 900, 'reference_space_id' => $space->id, 'reference_units' => 25]);
+        $monthly = $this->monthly();
+        $this->admin();
+
+        $this->putJson("/api/v1/admin/plans/{$plan->id}", $this->payload(['reference_plan_id' => $monthly->id, 'reference_units' => 12]))
+            ->assertJsonValidationErrors('reference_plan_id');
+
+        $this->assertNull($plan->fresh()->reference_plan_id);
+    }
+
     public function test_a_plan_cannot_reference_itself(): void
     {
         $plan = Plan::factory()->create(['price_points' => 900]);

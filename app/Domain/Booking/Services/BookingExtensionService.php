@@ -118,7 +118,7 @@ class BookingExtensionService
             }
 
             // The ledger's row for the offer or plan discount grows with it.
-            $this->recorder->recordExtension($lockedBooking, $price);
+            $this->recorder->recordExtension($lockedBooking, $price, $redemption);
 
             $moved = $seatSpaceId !== $lockedBooking->seat_space_id;
 

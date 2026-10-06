@@ -24,13 +24,6 @@ return new class extends Migration
         Schema::rename('coupon_redemptions', 'applied_discounts');
 
         Schema::table('applied_discounts', function (Blueprint $table) {
-            $table->dropUnique('coupon_redemptions_booking_id_unique');
-            $table->dropUnique('coupon_redemptions_walkin_session_id_unique');
-            $table->dropUnique('coupon_redemptions_event_attendee_id_unique');
-            $table->dropUnique('coupon_redemptions_payment_id_unique');
-        });
-
-        Schema::table('applied_discounts', function (Blueprint $table) {
             $table->string('kind', 20)->default('coupon')->after('purpose');
             $table->foreignId('plan_discount_id')->nullable()->after('coupon_id')->constrained('plan_discounts')->nullOnDelete();
             $table->unsignedTinyInteger('percent')->default(0)->after('points_discounted');
@@ -40,10 +33,11 @@ return new class extends Migration
             $table->unsignedInteger('discount_value')->nullable()->change();
         });
 
-        Schema::table('applied_discounts', function (Blueprint $table) {
-            $table->renameColumn('points_discounted', 'points');
-        });
-
+        // The (record, kind) uniques first: on MySQL each single-column
+        // unique is the only index behind its record's foreign key, and
+        // cannot be dropped (error 1553) until another index leads with
+        // that column. DDL is not transactional there, so a failure past
+        // the rename would leave the migration unrunnable.
         Schema::table('applied_discounts', function (Blueprint $table) {
             $table->unique(['booking_id', 'kind']);
             $table->unique(['walkin_session_id', 'kind']);
@@ -51,10 +45,34 @@ return new class extends Migration
             $table->unique(['payment_id', 'kind']);
             $table->index(['kind', 'created_at']);
         });
+
+        Schema::table('applied_discounts', function (Blueprint $table) {
+            $table->dropUnique('coupon_redemptions_booking_id_unique');
+            $table->dropUnique('coupon_redemptions_walkin_session_id_unique');
+            $table->dropUnique('coupon_redemptions_event_attendee_id_unique');
+            $table->dropUnique('coupon_redemptions_payment_id_unique');
+        });
+
+        Schema::table('applied_discounts', function (Blueprint $table) {
+            $table->renameColumn('points_discounted', 'points');
+        });
     }
 
     public function down(): void
     {
+        Schema::table('applied_discounts', function (Blueprint $table) {
+            $table->renameColumn('points', 'points_discounted');
+        });
+
+        // The single-column uniques back before the composite ones go, for
+        // the same foreign-key reason as up().
+        Schema::table('applied_discounts', function (Blueprint $table) {
+            $table->unique('booking_id', 'coupon_redemptions_booking_id_unique');
+            $table->unique('walkin_session_id', 'coupon_redemptions_walkin_session_id_unique');
+            $table->unique('event_attendee_id', 'coupon_redemptions_event_attendee_id_unique');
+            $table->unique('payment_id', 'coupon_redemptions_payment_id_unique');
+        });
+
         Schema::table('applied_discounts', function (Blueprint $table) {
             $table->dropIndex(['kind', 'created_at']);
             $table->dropUnique(['booking_id', 'kind']);
@@ -64,21 +82,10 @@ return new class extends Migration
         });
 
         Schema::table('applied_discounts', function (Blueprint $table) {
-            $table->renameColumn('points', 'points_discounted');
-        });
-
-        Schema::table('applied_discounts', function (Blueprint $table) {
             $table->dropConstrainedForeignId('plan_discount_id');
             $table->dropColumn(['kind', 'percent', 'terms']);
         });
 
         Schema::rename('applied_discounts', 'coupon_redemptions');
-
-        Schema::table('coupon_redemptions', function (Blueprint $table) {
-            $table->unique('booking_id');
-            $table->unique('walkin_session_id');
-            $table->unique('event_attendee_id');
-            $table->unique('payment_id');
-        });
     }
 };

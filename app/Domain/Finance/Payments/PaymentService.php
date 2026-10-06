@@ -134,7 +134,12 @@ class PaymentService
             // are counted from a fresh snapshot (CouponLedger), and the price
             // they give — eligibility checked — before anything is written. A
             // plan is always quoted: an offer may price it with no code typed.
-            $coupon = $this->couponLedger->lockForPricing($coupon);
+            // Nothing else is priced here — an extension's charge, an approved
+            // registration's — and those callers already hold their record's
+            // lock, so taking the coupon rows after it would invert the order.
+            if ($purpose === PaymentPurpose::PlanPurchase) {
+                $coupon = $this->couponLedger->lockForPricing($coupon);
+            }
             $quote = $purpose === PaymentPurpose::PlanPurchase && isset($context['plan'])
                 ? $this->quotes->forPlan($context['plan'], $payer, $coupon, now())
                 : null;

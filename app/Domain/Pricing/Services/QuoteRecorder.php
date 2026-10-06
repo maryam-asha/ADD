@@ -71,14 +71,17 @@ class QuoteRecorder
     }
 
     /**
-     * A booking grown by an extension: the reduction it was priced with —
-     * its offer or its plan discount — now applies to the longer booking.
+     * A booking grown by an extension: the reduction that priced the
+     * extension — its plan discount while the membership is active
+     * (`$redemption`), else its offer — now applies to the longer booking.
+     * One that did not price it (a plan discount whose membership lapsed)
+     * keeps what it gave, as PriceQuoteService::forExtension() chose.
      *
      * @param  array{difference: int, list_difference: int, total: int, undiscounted_total: int}  $price
      */
-    public function recordExtension(Booking $booking, array $price): void
+    public function recordExtension(Booking $booking, array $price, ?PlanDiscountRedemption $redemption): void
     {
-        $row = $this->ledger->offerFor($booking) ?? $this->ledger->planDiscountFor($booking);
+        $row = $redemption !== null ? $this->ledger->planDiscountFor($booking) : $this->ledger->offerFor($booking);
 
         $this->ledger->resize($row, $price['undiscounted_total'], $price['undiscounted_total'] - $price['total']);
     }

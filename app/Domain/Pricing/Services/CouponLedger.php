@@ -14,7 +14,6 @@ use App\Domain\Pricing\Models\Coupon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 
 /**
@@ -36,27 +35,23 @@ class CouponLedger
 {
     /**
      * The first lock — and the first read — of a transaction that may spend
-     * an offer or a coupon: the typed coupon and every active offer with a
-     * limit, in id order, in one locking read, so two purchases cannot both
-     * take "the last" use and two transactions never lock them in opposite
-     * orders. No relation filter: a subquery here would be a plain read and
-     * fix the snapshot before the lock.
+     * an offer or a coupon: every active offer with a limit, in id order,
+     * then the typed coupon (never automatic, so never among them) — so two
+     * purchases cannot both take "the last" use and two transactions never
+     * lock them in opposite orders. Locking reads only: a subquery here
+     * would be a plain read and fix the snapshot before the lock.
      */
     public function lockForPricing(?Coupon $coupon): ?Coupon
     {
-        $locked = Coupon::query()
-            ->where(fn (Builder $q) => $q->where('is_automatic', true)->where('is_active', true)
-                ->where(fn (Builder $limited) => $limited->whereNotNull('usage_limit')->orWhereNotNull('per_user_limit')))
-            ->when($coupon !== null, fn (Builder $q) => $q->orWhere('id', $coupon->getKey()))
+        Coupon::query()
+            ->where('is_automatic', true)
+            ->where('is_active', true)
+            ->where(fn (Builder $limited) => $limited->whereNotNull('usage_limit')->orWhereNotNull('per_user_limit'))
             ->orderBy('id')
             ->lockForUpdate()
             ->get();
 
-        if ($coupon === null) {
-            return null;
-        }
-
-        return $locked->firstWhere('id', $coupon->getKey()) ?? throw (new ModelNotFoundException)->setModel(Coupon::class, [$coupon->getKey()]);
+        return $coupon !== null ? $this->lockForRedemption($coupon) : null;
     }
 
     public function lockForRedemption(Coupon $coupon): Coupon

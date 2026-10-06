@@ -36,11 +36,19 @@ use Illuminate\Support\Collection as BaseCollection;
  */
 class OfferResolver
 {
-    /** @var list<CouponRule> */
-    private readonly array $rules;
+    /** @var list<CouponRule> who may use an offer — everything but its target */
+    private readonly array $memberRules;
 
-    /** Active offers, targets loaded — read once per instance, since a listing prices many cards. */
-    private ?Collection $live = null;
+    /**
+     * What the app shows (hourlyNow, planNow) is read once per instance — a
+     * listing shows many cards, and who may use an offer does not depend on
+     * the card. A price that is charged reads afresh every time, so a limit
+     * is counted from the rows its transaction locked.
+     */
+    private ?Collection $shown = null;
+
+    /** @var array<int, array<int, bool>> member id (0: none) => offer id => usable */
+    private array $usable = [];
 
     public function __construct(
         private readonly AmountCalculator $amounts,
@@ -52,14 +60,14 @@ class OfferResolver
         IsForNewMembers $newMembers,
         IsWithinUsageLimits $limits,
     ) {
-        $this->rules = [$this->appliesTo, $audience, $newMembers, $limits];
+        $this->memberRules = [$audience, $newMembers, $limits];
     }
 
     /** The best offer on [$from, $to) in a space, priced over the whole range. */
     public function forSpace(Space $space, CarbonInterface $from, CarbonInterface $to, ?User $member, PricingPurpose $purpose, UsageInFlight $inFlight): ?OfferPrice
     {
         return $this->best(
-            $this->candidates(PricingTarget::forSpace($purpose, $space), $member, $inFlight)
+            $this->candidates(PricingTarget::forSpace($purpose, $space), $member, $inFlight, shown: false)
                 ->filter(fn (Coupon $offer) => $offer->window()->overlaps($from, $to)),
             $this->amounts->forRange($space, $from, $to),
             fn (CouponTerms $terms) => $this->priceSpace($space, $from, $to, $terms),
@@ -67,10 +75,10 @@ class OfferResolver
     }
 
     /** The best offer on a plan or an event priced `$list`, live at `$at`. */
-    public function forItem(int $list, PricingTarget $target, ?User $member, CarbonInterface $at, UsageInFlight $inFlight): ?OfferPrice
+    public function forItem(int $list, PricingTarget $target, ?User $member, CarbonInterface $at, UsageInFlight $inFlight, bool $shown = false): ?OfferPrice
     {
         return $this->best(
-            $this->candidates($target, $member, $inFlight)->filter(fn (Coupon $offer) => $offer->window()->isLiveAt($at)),
+            $this->candidates($target, $member, $inFlight, $shown)->filter(fn (Coupon $offer) => $offer->window()->isLiveAt($at)),
             $list,
             fn (CouponTerms $terms) => $this->priceItem($list, $terms),
         );
@@ -108,7 +116,7 @@ class OfferResolver
         }
 
         $best = $this->best(
-            $this->candidates(PricingTarget::forSpace(PricingPurpose::Booking, $space), $member, new UsageInFlight)
+            $this->candidates(PricingTarget::forSpace(PricingPurpose::Booking, $space), $member, new UsageInFlight, shown: true)
                 ->filter(fn (Coupon $offer) => $offer->window()->isLiveAt(now())),
             $rate,
             fn (CouponTerms $terms) => $this->roundedUp($this->timeline->offerRate($rate, $terms) ?? (string) $rate),
@@ -120,31 +128,49 @@ class OfferResolver
     /** The offer on a plan live now for this member: what a purchase opened now would cost. */
     public function planNow(Plan $plan, ?User $member): ?OfferPrice
     {
-        return $this->forItem((int) $plan->price_points, PricingTarget::forPlan($plan), $member, now(), new UsageInFlight);
-    }
-
-    /** @return BaseCollection<int, Coupon> */
-    private function candidates(PricingTarget $target, ?User $member, UsageInFlight $inFlight): BaseCollection
-    {
-        $this->live ??= Coupon::query()->automatic()->where('is_active', true)->with('targets')->orderBy('id')->get();
-
-        return $this->live->filter(fn (Coupon $offer) => $member === null
-            ? $this->forEveryone($offer, $target)
-            : collect($this->rules)->every(fn (CouponRule $rule) => $rule->rejection($offer, $member, $target, $inFlight, now()) === null));
+        return $this->forItem((int) $plan->price_points, PricingTarget::forPlan($plan), $member, now(), new UsageInFlight, shown: true);
     }
 
     /**
-     * No member to check an audience against — an anonymous listing, a
-     * staff-side preview: only an offer for everyone, within its total
-     * limit. AppliesToTarget never reads the member, so a blank one stands in.
+     * The offers for this target this member may use. The target is checked
+     * first — in memory, from the loaded targets; AppliesToTarget never
+     * reads the member, so a blank one stands in when there is none.
+     *
+     * @return BaseCollection<int, Coupon>
      */
-    private function forEveryone(Coupon $offer, PricingTarget $target): bool
+    private function candidates(PricingTarget $target, ?User $member, UsageInFlight $inFlight, bool $shown): BaseCollection
     {
-        return $offer->company_id === null
-            && ! $offer->new_members_only
-            && ! $offer->users()->exists()
-            && ($offer->usage_limit === null || $this->ledger->liveUsage($offer) < $offer->usage_limit)
-            && $this->appliesTo->rejection($offer, new User, $target, new UsageInFlight, now()) === null;
+        $offers = $shown ? ($this->shown ??= $this->activeOffers()) : $this->activeOffers();
+
+        return $offers
+            ->filter(fn (Coupon $offer) => $this->appliesTo->rejection($offer, $member ?? new User, $target, $inFlight, now()) === null)
+            ->filter(fn (Coupon $offer) => $shown
+                ? $this->usable[$member->id ?? 0][$offer->id] ??= $this->usableBy($offer, $member, $inFlight)
+                : $this->usableBy($offer, $member, $inFlight));
+    }
+
+    /** @return Collection<int, Coupon> */
+    private function activeOffers(): Collection
+    {
+        return Coupon::query()->automatic()->where('is_active', true)->with('targets')->withCount('users')->orderBy('id')->get();
+    }
+
+    /**
+     * Whether `$member` may use the offer: the audience, new-members and
+     * usage rules a typed coupon meets. With no member to check an audience
+     * against — an anonymous listing, a staff-side preview — only an offer
+     * for everyone, within its total limit.
+     */
+    private function usableBy(Coupon $offer, ?User $member, UsageInFlight $inFlight): bool
+    {
+        if ($member === null) {
+            return $offer->company_id === null
+                && ! $offer->new_members_only
+                && (int) $offer->users_count === 0
+                && ($offer->usage_limit === null || $this->ledger->liveUsage($offer) + $inFlight->coupon($offer) < $offer->usage_limit);
+        }
+
+        return collect($this->memberRules)->every(fn (CouponRule $rule) => $rule->rejection($offer, $member, new PricingTarget(PricingPurpose::Booking), $inFlight, now()) === null);
     }
 
     /**

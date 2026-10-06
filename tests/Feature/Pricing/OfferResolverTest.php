@@ -18,6 +18,7 @@ use App\Domain\Pricing\ValueObjects\PricingTarget;
 use App\Domain\Pricing\ValueObjects\UsageInFlight;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -217,6 +218,36 @@ class OfferResolverTest extends TestCase
         $inFlight->addCoupon($offer);
 
         $this->assertNull($this->resolver()->forSpace($space, Carbon::parse('2026-10-06 09:00'), Carbon::parse('2026-10-06 10:00'), $member, PricingPurpose::Booking, $inFlight));
+    }
+
+    /** A listing prices many cards: the offer checks are read once, not per card. */
+    public function test_showing_offers_on_many_cards_does_not_query_per_card(): void
+    {
+        $member = User::factory()->create();
+        $spaces = Space::factory()->room()->count(12)->create(['hourly_rate_points' => 100]);
+        foreach (range(1, 4) as $i) {
+            $this->offer(['discount_type' => 'percentage', 'discount_value' => 5 * $i, 'usage_limit' => 50]);
+        }
+        $named = $this->offer(['discount_type' => 'percentage', 'discount_value' => 40]);
+        $named->users()->attach($member);
+        $resolver = $this->resolver();
+
+        $count = function (callable $show) {
+            DB::flushQueryLog();
+            DB::enableQueryLog();
+            $show();
+            $queries = count(DB::getQueryLog());
+            DB::disableQueryLog();
+
+            return $queries;
+        };
+
+        foreach ([null, $member] as $viewer) {
+            $two = $count(fn () => $spaces->take(2)->each(fn (Space $s) => $resolver->hourlyNow($s, $viewer)));
+            $twelve = $count(fn () => $spaces->each(fn (Space $s) => $resolver->hourlyNow($s, $viewer)));
+
+            $this->assertLessThanOrEqual($two, $twelve, 'offer checks re-run for every card');
+        }
     }
 
     /** E8: a fraction of a point per hour is shown rounded up. */

@@ -16,14 +16,16 @@ return new class extends Migration
     {
         Schema::table('coupons', function (Blueprint $table) {
             $table->string('code', 40)->nullable()->change();
-            $table->boolean('is_automatic')->default(false)->after('code')->index();
+            $table->boolean('is_automatic')->default(false)->after('code');
+            // CouponLedger::lockForPricing() locks the active offers' range.
+            $table->index(['is_automatic', 'is_active']);
         });
     }
 
     public function down(): void
     {
         Schema::table('coupons', function (Blueprint $table) {
-            $table->dropIndex(['is_automatic']);
+            $table->dropIndex(['is_automatic', 'is_active']);
             $table->dropColumn('is_automatic');
             $table->string('code', 40)->nullable(false)->change();
         });

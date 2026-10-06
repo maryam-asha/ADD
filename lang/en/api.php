@@ -119,6 +119,7 @@ return [
         'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
         'plan_reference_units_without_reference' => 'Reference units need a reference plan or space.',
         'plan_reference_self' => 'A plan cannot be its own reference.',
+        'plan_reference_one_kind' => 'A plan is measured against one reference: a plan or a space, not both.',
         'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
         'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
         'coupon_updated' => 'Coupon updated.',

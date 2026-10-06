@@ -91,8 +91,9 @@ class StorePlanRequest extends FormRequest
     }
 
     /**
-     * Units with no reference measure against nothing; and a plan is never
-     * its own reference.
+     * One reference or neither, as stored once saved; units with no
+     * reference measure against nothing; and a plan is never its own
+     * reference.
      */
     public function withValidator(Validator $validator): void
     {
@@ -104,6 +105,15 @@ class StorePlanRequest extends FormRequest
             $plan = $this->route('plan');
             $plan = $plan instanceof Plan ? $plan : ($plan !== null ? Plan::find($plan) : null);
             $sentOrStored = fn (string $field) => $this->exists($field) ? $this->input($field) : $plan?->getAttribute($field);
+
+            // One reference or neither — a reference sent beside a stored one
+            // of the other kind would leave both.
+            if ($sentOrStored('reference_plan_id') !== null && $sentOrStored('reference_space_id') !== null) {
+                $validator->errors()->add(
+                    $this->filled('reference_plan_id') ? 'reference_plan_id' : 'reference_space_id',
+                    __('api.admin.plan_reference_one_kind'),
+                );
+            }
 
             if ($this->input('reference_units') !== null && $sentOrStored('reference_plan_id') === null && $sentOrStored('reference_space_id') === null) {
                 $validator->errors()->add('reference_units', __('api.admin.plan_reference_units_without_reference'));

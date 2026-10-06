@@ -10,8 +10,11 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Models\Coupon;
@@ -129,6 +132,46 @@ class BookingExtensionPricingTest extends TestCase
         $row = app(CouponLedger::class)->offerFor($booking);
         $this->assertSame(200, $row->base_points);
         $this->assertSame(100, $row->points);
+    }
+
+    /**
+     * Charging an extension prices nothing, so it takes no offer locks: it
+     * already holds the booking and branch, and taking the coupon rows
+     * after them would invert the lock order booking creation uses.
+     */
+    public function test_charging_an_extension_takes_no_offer_locks(): void
+    {
+        $booking = $this->bookAndCheckIn();
+        $this->partialMock(CouponLedger::class, fn ($mock) => $mock->shouldReceive('lockForPricing')->never());
+
+        $booking = $this->extendAnHour($booking);
+
+        $this->assertSame(200, $booking->price_points);
+    }
+
+    /** The ledger keeps what the plan discount gave once its membership lapses. */
+    public function test_an_extension_after_the_membership_lapsed_leaves_the_plan_discount_row_alone(): void
+    {
+        $plan = Plan::factory()->create();
+        $plan->discounts()->create(['percentage' => 30, 'space_id' => $this->room->id]);
+        $membership = Membership::factory()->create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $this->member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(30),
+        ]);
+        $booking = $this->bookAndCheckIn();
+        $this->assertSame(70, $booking->price_points);
+
+        $membership->forceFill(['current_period_end' => now()->subMinute()])->save();
+        $booking = $this->extendAnHour($booking);
+
+        $this->assertSame(170, $booking->price_points);
+        $row = app(CouponLedger::class)->planDiscountFor($booking);
+        $this->assertSame(100, $row->base_points);
+        $this->assertSame(30, $row->points);
     }
 
     public function test_the_coupon_is_not_taken_off_the_extension(): void
