@@ -2,20 +2,19 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
-use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Services\EventBrowseService;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
-use App\Domain\Finance\Payments\PaymentService;
-use App\Domain\Identity\Models\User;
+use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Membership\Enums\OwnerType;
-use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
+use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Experience\RegisterForEventRequest;
 use App\Http\Requests\Public\BrowseEventsRequest;
-use App\Http\Resources\Finance\PaymentResource;
 use App\Services\Experience\EventRegistrationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -25,7 +24,7 @@ use Throwable;
 
 class EventController extends Controller
 {
-    use RespondsToGatewayFailures;
+    use AnswersPayments;
 
     /**
      * Browse events for member app with custom filters (free, cancelled, category, search).
@@ -89,10 +88,15 @@ class EventController extends Controller
         RegisterForEventRequest $request,
         int|string $id,
         EventRegistrationService $registrationService,
-        PaymentService $payments,
+        PayableCheckout $checkout,
         PaymentMethodRegistry $methods,
     ): JsonResponse {
         $event = Event::findOrFail($id);
+
+        if ($request->validated('ticket_id') !== null) {
+            return $this->payExisting($request, $event, $checkout);
+        }
+
         $method = $request->validated('payment_method');
 
         $result = $registrationService->register(
@@ -113,33 +117,58 @@ class EventController extends Controller
         if ($method !== null && in_array($method, $methods->gatewayKeys(), true)
             && $attendee?->status === EventRegistrationStatus::Approved
             && $attendee->payment_state === EventPaymentState::Unpaid) {
-            $result += $this->startCardPayment($payments, $attendee, $request->user(), $method, app()->getLocale());
+            $result += $this->payBesideNewRecord($checkout, PaymentPurpose::EventRegistration, $attendee, $request->user(), $method);
         }
 
         return response()->json(['data' => $result], 201);
     }
 
     /**
-     * @return array{payment: PaymentResource|null, redirect_url: string|null, payment_error?: string}
+     * The registration sent again with its ticket: nothing is registered
+     * and no registration rule runs (window, capacity, form). An approved
+     * seat is paid by the method sent; one still pending approval only has
+     * its stored choice updated — nothing is charged until approval.
      */
-    private function startCardPayment(PaymentService $payments, EventAttendee $attendee, User $member, string $method, ?string $lang): array
+    private function payExisting(RegisterForEventRequest $request, Event $event, PayableCheckout $checkout): JsonResponse
     {
-        try {
-            ['payment' => $payment, 'start' => $start] = $payments->start(PaymentPurpose::EventRegistration, $member, $method, array_filter([
-                'payable' => $attendee,
-                'lang' => in_array($lang, ['ar', 'en'], true) ? $lang : null,
-            ]));
-        } catch (ReceptionActionException $e) {
-            // Nothing to open (nothing due): the seat stands, as for a
-            // gateway that cannot be reached.
-            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($e->messageKey, $e->params)];
-        } catch (Throwable $e) {
-            $failure = $this->gatewayFailure($e, $member->id) ?? throw $e;
+        $member = $request->user();
+        $attendee = EventAttendee::query()
+            ->where('user_id', $member->id)
+            ->where('event_id', $event->id)
+            ->seatHolding()
+            ->findOrFail($request->validated('ticket_id'));
 
-            return ['payment' => null, 'redirect_url' => null, 'payment_error' => __($failure['key'])];
+        $method = $request->validated('payment_method') ?? WalletMethod::KEY;
+
+        if ($attendee->status === EventRegistrationStatus::Pending) {
+            $attendee->forceFill([
+                'payment_method' => $method,
+                'payment_wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'payment_wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ])->save();
+
+            return response()->json(['data' => [
+                'ticket_id' => $attendee->id,
+                'status' => $attendee->status->value,
+                'payment' => null,
+                'redirect_url' => null,
+                'next' => PaymentStart::PAY_AT_RECEPTION,
+            ]]);
         }
 
-        return ['payment' => new PaymentResource($payment), 'redirect_url' => $start->redirectUrl];
+        try {
+            $outcome = $checkout->pay(PaymentPurpose::EventRegistration, $attendee, $member, $method, [
+                'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ], $request->validated('coupon_code'));
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        return response()->json(['data' => [
+            'ticket_id' => $attendee->id,
+            'status' => $attendee->refresh()->status->value,
+        ] + $this->checkoutFields($outcome) + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : [])]);
     }
 
     /**

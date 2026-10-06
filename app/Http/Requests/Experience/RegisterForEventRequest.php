@@ -30,7 +30,13 @@ class RegisterForEventRequest extends FormRequest
      */
     public function rules(): array
     {
-        return array_merge($this->formFieldRules(), [
+        // With the ticket of a registration already made, nothing is
+        // registered: only how it is paid changes — so the form is not asked
+        // for again.
+        $form = $this->filled('ticket_id') ? [] : $this->formFieldRules();
+
+        return array_merge($form, [
+            'ticket_id' => ['nullable', 'integer'],
             // Omitted: the member's own wallet, as before payment methods.
             // A card is paid after the seat is confirmed, like a booking.
             'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
