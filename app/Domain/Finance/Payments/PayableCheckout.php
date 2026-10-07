@@ -2,6 +2,9 @@
 
 namespace App\Domain\Finance\Payments;
 
+use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Identity\Models\User;
 use App\Domain\Pricing\Enums\CouponRejection;
@@ -40,6 +43,8 @@ class PayableCheckout
         private readonly CouponLedger $ledger,
         private readonly CouponApplication $application,
         private readonly CouponOutcomePresenter $outcomes,
+        private readonly PrepaymentHold $holds,
+        private readonly PaymentMethodRegistry $methods,
     ) {}
 
     /**
@@ -53,6 +58,13 @@ class PayableCheckout
         array $context = [],
         ?string $couponCode = null,
     ): CheckoutOutcome {
+        // A hold past its deadline takes no new payment: it is about to be
+        // cancelled (payments:cancel-expired-prepayments). A card already in
+        // flight still settles it — that goes through the fulfiller, not here.
+        if (($payable instanceof Booking || $payable instanceof EventAttendee) && $payable->awaitingPaymentExpired()) {
+            throw new ReceptionActionException($payable instanceof Booking ? 'api.payment.booking_not_payable' : 'api.payment.registration_not_payable');
+        }
+
         $coupon = $this->couponToApply($payable, $couponCode);
 
         $outcome = null;
@@ -63,6 +75,9 @@ class PayableCheckout
                 $outcome = $this->outcomes->fromQuote($couponCode, $quote);
 
                 if ($quote->finalPoints === 0) {
+                    // Nothing left to pay: nothing to hold for.
+                    $this->releaseHold($payable);
+
                     return new CheckoutOutcome(null, PaymentStart::done(), $outcome);
                 }
             } catch (CouponRejectedException $e) {
@@ -84,7 +99,21 @@ class PayableCheckout
             'lang' => in_array($locale, ['ar', 'en'], true) ? $locale : null,
         ], fn ($value) => $value !== null));
 
+        // A method paid later (cash) settles how it is paid without paying
+        // it: the hold goes now. The wallet already released it through the
+        // fulfiller; a gateway keeps it held until the bank answers.
+        if (! in_array($method, $this->methods->gatewayKeys(), true)) {
+            $this->releaseHold($payable);
+        }
+
         return new CheckoutOutcome($payment, $start, $outcome);
+    }
+
+    private function releaseHold(Model $payable): void
+    {
+        if ($payable instanceof Booking || $payable instanceof EventAttendee) {
+            $this->holds->release($payable->refresh());
+        }
     }
 
     /**

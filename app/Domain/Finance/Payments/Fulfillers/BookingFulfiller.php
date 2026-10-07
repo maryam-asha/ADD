@@ -8,6 +8,7 @@ use App\Domain\Booking\Services\AmountCalculator;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Finance\Services\PointConversionService;
 
 /**
@@ -22,6 +23,7 @@ class BookingFulfiller extends SessionPaymentFulfiller
         PaymentMethodRegistry $methods,
         private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
+        private readonly PrepaymentHold $holds,
     ) {
         parent::__construct($methods);
     }
@@ -90,6 +92,16 @@ class BookingFulfiller extends SessionPaymentFulfiller
         if ($this->pointsDue($payment) <= 0) {
             throw new ReceptionActionException('api.payment.nothing_due');
         }
+    }
+
+    /**
+     * Paid — and a booking held for this payment is no longer held.
+     */
+    public function fulfil(Payment $payment): void
+    {
+        parent::fulfil($payment);
+
+        $this->holds->release($this->session($payment));
     }
 
     protected function session(Payment $payment): Booking

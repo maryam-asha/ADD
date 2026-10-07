@@ -8,6 +8,7 @@ use App\Domain\Experience\Models\Event;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
+use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -17,15 +18,18 @@ use App\Support\Enums\EventRegistrationStatus;
  * registration when it was made, from the general balance — the wording and
  * pool event registration has always debited.
  *
- * Only an approved registration is paid for: a pending one may still be
- * turned down, and a rejected one holds no seat. Paying marks it paid, which
- * is what the door checks.
+ * Only an approved registration — or one held for this very payment
+ * (awaiting_payment) — is paid for: a pending one may still be turned down,
+ * and a rejected one holds no seat. Paying marks it paid, which is what the
+ * door checks, and releases the hold.
  *
  * Lives in Finance, not Ecosystem: Finance may read the event side, the
  * event side may not import Finance (DomainLayerBoundaryTest).
  */
 class EventRegistrationFulfiller implements PaymentFulfiller
 {
+    public function __construct(private readonly PrepaymentHold $holds) {}
+
     public function purpose(): PaymentPurpose
     {
         return PaymentPurpose::EventRegistration;
@@ -59,7 +63,7 @@ class EventRegistrationFulfiller implements PaymentFulfiller
     {
         $attendee = $this->attendee($payment);
 
-        if ($attendee->status !== EventRegistrationStatus::Approved) {
+        if (! in_array($attendee->status, [EventRegistrationStatus::Approved, EventRegistrationStatus::AwaitingPayment], true)) {
             throw new ReceptionActionException('api.payment.registration_not_payable');
         }
 
@@ -78,13 +82,18 @@ class EventRegistrationFulfiller implements PaymentFulfiller
 
     public function fulfil(Payment $payment): void
     {
-        $this->attendee($payment)->forceFill([
+        $attendee = $this->attendee($payment);
+
+        $attendee->forceFill([
             'payment_state' => EventPaymentState::Paid,
             'paid_at' => now(),
             // How it was actually paid: a seat registered by card and paid
             // by wallet through its ticket is not left reading the card.
             'payment_method' => (string) $payment->method,
         ])->save();
+
+        // Paid — and a registration held for this payment is no longer held.
+        $this->holds->release($attendee);
     }
 
     /**

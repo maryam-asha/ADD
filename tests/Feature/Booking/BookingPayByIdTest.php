@@ -175,14 +175,15 @@ class BookingPayByIdTest extends TestCase
     /**
      * Sent again with the id, no creation rule runs: a booking made at
      * 08:00 for 10:00, paid again at 09:30 — inside the 60-minute notice
-     * a new booking needs — is not refused as too soon.
+     * a new booking needs — is not refused as too soon. Made with cash: an
+     * ordinary unpaid booking with no deadline (one held for a card would
+     * have expired by 09:30, and rightly takes no new payment).
      */
     public function test_sent_again_close_to_the_start_is_not_refused_as_too_soon(): void
     {
         $this->member(300);
         $space = $this->openSpace();
-        Http::fake(['*' => Http::response('', 500)]);
-        $id = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera']))->json('data.id');
+        $id = $this->book($this->confirmScreen($space, ['payment_method' => 'cash']))->json('data.id');
 
         Carbon::setTestNow(Carbon::parse('2026-08-17 09:30:00', 'Asia/Damascus'));
 
