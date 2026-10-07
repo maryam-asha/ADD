@@ -91,8 +91,9 @@ class AdminEventAttendeeController extends Controller
 
     /**
      * Lets an attendee in at the door. Only an approved registration gets
-     * in, and for a paid event only a paid one — confirmed unpaid (cash, a
-     * card still to be paid) is a seat, not entry.
+     * in, and for a paid event only a paid one — approved unpaid (cash) is a
+     * seat, not entry, and a card seat is awaiting_payment, not approved
+     * at all, until its card goes through.
      */
     public function checkIn(Request $request, Event $event, EventAttendee $attendee): JsonResponse
     {

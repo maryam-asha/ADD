@@ -170,8 +170,9 @@ class EventRegistrationService
             // registration, with how the member means to pay. Points are
             // only ever taken from an approved registration, so a pending
             // one costs nothing and a rejection needs no refund; an approved
-            // one paid by cash or card is confirmed unpaid and cannot be
-            // checked in until it is paid.
+            // one paid by cash is approved unpaid, and one paid by card is
+            // held as awaiting_payment until the card goes through — neither
+            // can be checked in until it is paid.
             $isFree = (bool) ($lockedEvent->is_free ?? true);
             $listPoints = (int) ($lockedEvent->price_points ?? 0);
             $isPaidEvent = ! $isFree && $listPoints > 0;
@@ -341,9 +342,10 @@ class EventRegistrationService
     }
 
     /**
-     * A seat confirmed for a paid event but not paid for yet (cash at the
-     * desk, or a card still to be paid): the member is told they owe it,
-     * after commit.
+     * A seat approved for a paid event but not paid for yet (cash at the
+     * desk): the member is told they owe it, after commit. A card seat is
+     * not announced this way — it is awaiting_payment, held for its card
+     * until payment_due_at, and the member is already paying it.
      */
     private function tellPaymentDue(EventAttendee $attendee, Event $event): void
     {

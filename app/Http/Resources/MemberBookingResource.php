@@ -15,9 +15,11 @@ use Illuminate\Http\Resources\Json\JsonResource;
  *
  * Everything else (the breakdown, the payment details, `status_note`,
  * cancel and extend) is MemberBookingDetailResource's. The list renders
- * dozens of these, and every field here is one the app draws; the badge's
- * "pending payment" is `confirmed` with `payment_state` unpaid, read by the
- * app rather than a third value sent here.
+ * dozens of these, and every field here is one the app draws. A booking held
+ * for its card is `awaiting_payment` with a `payment_due_at`; the badge's
+ * "pending payment" for a cash booking is `confirmed` (or `pending`) with
+ * `payment_state` unpaid, read by the app rather than a third value sent
+ * here.
  *
  * @property Booking $resource
  */
