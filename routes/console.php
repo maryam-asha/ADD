@@ -101,3 +101,10 @@ Schedule::command('paymera:reconcile')->everyFiveMinutes()->withoutOverlapping()
  * holds only — gateway payments are paymera:reconcile's.
  */
 Schedule::command('payments:expire-pending')->hourly()->withoutOverlapping();
+
+/*
+ * A booking or registration made with a prepaid method is held for
+ * payments.prepayment_window_minutes (15); one neither paid nor switched to
+ * another method by then is let go. The window is minutes, so every minute.
+ */
+Schedule::command('payments:cancel-expired-prepayments')->everyMinute()->withoutOverlapping();

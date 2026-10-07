@@ -585,6 +585,7 @@ return [
         'registers_externally' => 'Registration for this event is handled on an external form.',
         'pending_rejected' => 'Closed out :count pending registration(s).',
         'pending_expired' => 'Closed automatically: not reviewed before the event.',
+        'prepayment_expired' => 'Your seat was released because the payment was not completed in time.',
         'cancelled' => 'This event is cancelled and registration is closed.',
         'not_available' => 'This event is currently not available for registration.',
         'closed' => 'Registration for this event has closed.',
