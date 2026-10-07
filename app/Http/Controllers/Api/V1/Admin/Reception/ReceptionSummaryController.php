@@ -38,7 +38,7 @@ class ReceptionSummaryController extends Controller
         // without a check-in and not yet over. A booking held for its payment
         // is not expected until it is paid or switched to another method.
         $expected = Booking::query()
-            ->whereIn('status', [BookingStatus::Pending, BookingStatus::Confirmed])
+            ->whereIn('status', BookingStatus::expected())
             ->whereNull('checked_in_at')
             ->where('end_at', '>', $now)
             ->where('start_at', '<=', $endOfToday);

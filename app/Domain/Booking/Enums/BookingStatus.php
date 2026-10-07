@@ -44,6 +44,19 @@ enum BookingStatus: string
     }
 
     /**
+     * Still to happen and not merely held for its payment: awaiting approval,
+     * or confirmed. What reception expects to arrive and staff count as
+     * upcoming — a booking awaiting its card payment is neither until it is
+     * paid or switched to another method.
+     *
+     * @return list<self>
+     */
+    public static function expected(): array
+    {
+        return [self::Pending, self::Confirmed];
+    }
+
+    /**
      * The statuses that hold (or held) a slot. A `pending` booking is itself
      * the hold; `completed` and `no_show` kept theirs to the end, so the
      * calendar still draws them and an early checkout frees nothing.

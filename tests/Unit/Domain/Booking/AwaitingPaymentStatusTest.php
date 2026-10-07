@@ -22,6 +22,12 @@ class AwaitingPaymentStatusTest extends TestCase
         $this->assertTrue(BookingStatus::AwaitingPayment->isOpen());
     }
 
+    public function test_a_booking_awaiting_payment_is_not_one_staff_expect(): void
+    {
+        $this->assertNotContains(BookingStatus::AwaitingPayment, BookingStatus::expected());
+        $this->assertSame([BookingStatus::Pending, BookingStatus::Confirmed], BookingStatus::expected());
+    }
+
     public function test_a_registration_awaiting_payment_holds_its_seat_and_is_not_decided(): void
     {
         $this->assertSame('awaiting_payment', EventRegistrationStatus::AwaitingPayment->value);
