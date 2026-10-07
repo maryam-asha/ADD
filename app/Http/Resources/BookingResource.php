@@ -21,6 +21,7 @@ class BookingResource extends JsonResource
             'status' => $this->status->value,
             'payment_state' => $this->payment_state->value,
             'payment_source' => $this->payment_source?->value,
+            'payment_due_at' => $this->payment_due_at?->toIso8601String(),
         ];
     }
 }

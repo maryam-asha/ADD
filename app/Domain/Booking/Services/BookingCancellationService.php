@@ -52,6 +52,11 @@ class BookingCancellationService
             return false;
         }
 
+        // Nothing was paid for a hold, so the window does not apply.
+        if ($booking->status === BookingStatus::AwaitingPayment) {
+            return true;
+        }
+
         return ! now()->gt($booking->start_at->copy()->subMinutes($this->windowMinutesFor($booking)));
     }
 
@@ -95,20 +100,48 @@ class BookingCancellationService
 
             $windowMinutes = $this->windowMinutesFor($locked);
 
-            if (now()->gt($locked->start_at->copy()->subMinutes($windowMinutes))) {
+            if ($locked->status !== BookingStatus::AwaitingPayment
+                && now()->gt($locked->start_at->copy()->subMinutes($windowMinutes))) {
                 throw new ReceptionActionException('api.reception.cancellation_window_passed');
             }
 
-            $locked->forceFill([
-                'status' => BookingStatus::Cancelled,
-                'cancelled_at' => now(),
-            ])->save();
-
-            $this->refunder->refund($locked, 'Booking cancellation refund');
-
-            // The usage this booking consumed is returned once it no
-            // longer holds a charge (docs/decisions/plan-discounts-design.md).
-            $this->discounts->voidFor($locked);
+            $this->markCancelled($locked);
         });
+    }
+
+    /**
+     * A hold let go by the system — its deadline passed, or the member
+     * superseded it with another time. No cancellation window applies
+     * (nothing was paid) and a hold already released is left alone.
+     *
+     * @return bool whether it was cancelled
+     */
+    public function releaseUnpaidHold(Booking $booking): bool
+    {
+        return DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== BookingStatus::AwaitingPayment) {
+                return false;
+            }
+
+            $this->markCancelled($locked);
+
+            return true;
+        });
+    }
+
+    private function markCancelled(Booking $locked): void
+    {
+        $locked->forceFill([
+            'status' => BookingStatus::Cancelled,
+            'cancelled_at' => now(),
+        ])->save();
+
+        $this->refunder->refund($locked, 'Booking cancellation refund');
+
+        // The usage this booking consumed is returned once it no
+        // longer holds a charge (docs/decisions/plan-discounts-design.md).
+        $this->discounts->voidFor($locked);
     }
 }

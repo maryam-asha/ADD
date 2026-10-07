@@ -9,6 +9,8 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
@@ -45,6 +47,9 @@ class BookingCreationService
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
         private readonly PendingBookingNotice $pendingNotice,
+        private readonly PaymentMethodRegistry $methods,
+        private readonly PrepaymentHold $holds,
+        private readonly BookingCancellationService $cancellations,
     ) {}
 
     public function create(
@@ -96,6 +101,19 @@ class BookingCreationService
             // this request was in flight is refused rather than booked.
             $this->assertAcceptsBookings($locked);
 
+            // A member who went back from the confirm screen and picked
+            // another time would be refused by their own hold: holds of
+            // theirs on this space that this window would collide with are
+            // let go first. Only a hold — a real booking still blocks.
+            $padding = max($rules->bufferMinutes, 0);
+            Booking::query()
+                ->forSpace($locked->id)
+                ->where('user_id', $member->id)
+                ->where('status', BookingStatus::AwaitingPayment)
+                ->overlapping($startAt->copy()->subMinutes($padding), $endAt->copy()->addMinutes($padding))
+                ->get()
+                ->each(fn (Booking $hold) => $this->cancellations->releaseUnpaidHold($hold));
+
             // Re-read inside the lock. Nothing the calendar computed is
             // reused here — the read path is advisory, and only these
             // freshly-read rows decide whether the slot is actually free.
@@ -128,7 +146,18 @@ class BookingCreationService
             // back here is the intended direction, not leftover scaffolding.
             $amount = $this->points->pointsToUsd($finalPoints);
 
-            $status = $locked->requires_approval ? BookingStatus::Pending : BookingStatus::Confirmed;
+            // A prepaid method pays after the booking exists: it is held
+            // until the card goes through, the member chooses another
+            // method, or its deadline (docs/decisions/prepayment-all-or-nothing.md).
+            $held = $finalPoints > 0
+                && $paymentMethod !== null
+                && in_array($paymentMethod, $this->methods->gatewayKeys(), true);
+
+            $status = match (true) {
+                $held => BookingStatus::AwaitingPayment,
+                (bool) $locked->requires_approval => BookingStatus::Pending,
+                default => BookingStatus::Confirmed,
+            };
 
             $booking = Booking::create([
                 'space_id' => $locked->id,
@@ -137,7 +166,8 @@ class BookingCreationService
                 'start_at' => $startAt,
                 'end_at' => $endAt,
                 'status' => $status,
-                'required_approval' => $status === BookingStatus::Pending,
+                'required_approval' => (bool) $locked->requires_approval,
+                'payment_due_at' => $held ? $this->holds->dueAt($startAt) : null,
                 'amount_owed' => $amount,
                 'currency' => 'USD',
                 ...$quote->attributes(),

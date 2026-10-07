@@ -61,8 +61,9 @@ class BookingPaymentRouter
             WalletMethod::KEY => $this->strictChoice($member, $points, $ownerType, $ownerId),
             'cash' => null,
             default => in_array($method, $this->methods->gatewayKeys(), true)
-                // A gateway pays after the booking exists: it holds the slot
-                // unpaid meanwhile, and a failed card leaves it for the desk.
+                // A gateway pays after the booking exists: it is held
+                // (awaiting_payment) until the card goes through, another
+                // method is chosen, or its deadline.
                 ? null
                 : throw new ReceptionActionException('api.payment.method_not_supported'),
         };
