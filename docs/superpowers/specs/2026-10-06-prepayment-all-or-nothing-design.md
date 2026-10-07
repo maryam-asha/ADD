@@ -94,7 +94,7 @@ the duplication this design removes.
 | `POST member/coworking-sessions/{type}/{id}/pay` | **new** — `{payment_method, wallet_owner_type?, wallet_owner_id?, coupon_code?}` for the member's own closed, unpaid session; answers `201` with `POST member/payments`' shape, `{data: {payment, redirect_url, next}}` (`coupon` beside `data` when a code was sent) |
 | `POST member/wallet/top-ups` | **new** — `{amount, payment_method?}`; prepaid methods only (default: the first enabled gateway); answers `201` with `POST member/payments`' shape, `{data: {payment, redirect_url, next}}` |
 | `POST member/memberships` | unchanged (already pays by any method) |
-| `POST member/bookings/{id}/cancel` | allowed inside the cancellation window for `awaiting_payment` |
+| `POST member/bookings/{id}/cancel` | allowed at any time for `awaiting_payment` — the cancellation window does not apply to a hold |
 | `GET member/payment-methods` | unchanged contract; a top-up now lists prepaid methods only |
 | `GET member/payments`, `GET member/payments/{id}` | **kept** — the history, and the status the app polls after the WebView |
 | `POST member/payments` | **removed** |
@@ -149,6 +149,11 @@ learn about prepayment. Only the two holding lists and `payable()` do. The
 app's badge is the stored status, with its label in both languages
 (`api.booking.statuses.awaiting_payment`, the event equivalent).
 
+`BookingStatus::expected()` — `pending` and `confirmed` — names what staff
+see: the reception summary's expected arrivals and the admin member
+profile's upcoming count read it instead of restating a status list, so a
+hold is in neither until it is paid or switched.
+
 **One nullable column on each table** — the deadline:
 
 | table | column |
@@ -156,10 +161,15 @@ app's badge is the stored status, with its label in both languages
 | `bookings` | `payment_due_at` (timestamp, nullable, indexed) |
 | `event_attendees` | `payment_due_at` (same) |
 
-Set with the status, never cleared afterwards: a `cancelled` booking (or
-`rejected` registration) that has one was undone because its prepayment did
-not complete — the reason is derived, like `Booking::lapsedUnreviewed()`,
-with no reason column.
+Set with the status, **cleared when the hold is released** (the card is
+accepted, it is paid from the wallet, or the member switches to cash) and
+**kept when it is cancelled** — by the clock, by the member, or superseded.
+So a booking (or registration) that still carries one was undone while it
+was held: the reason is derived, like `Booking::lapsedUnreviewed()`, with no
+reason column (`Booking::cancelledAwaitingPayment()` — the `status_note`
+"payment not completed"). The reason it is cleared on release: a hold that
+was paid and cancelled later must not read as one whose payment did not
+complete.
 
 `bookings.payment_method` is not used for the member's choice: it records
 how a booking was settled and the cash register reads it.
@@ -175,12 +185,12 @@ Config: `config/payments.php` → `'prepayment_window_minutes' =>
 | event | status after | notes |
 |---|---|---|
 | created with a prepaid method | `awaiting_payment` | holds the slot; `payment_due_at = min(now + window, start_at)`; the card opens |
-| card accepted | `confirmed` — or `pending` if the space requires approval | paid; the operations "pending approval" notice is sent **now**, not at creation |
+| card accepted | `confirmed` — or `pending` if the space requires approval | paid; `payment_due_at` is cleared; the operations "pending approval" notice is sent **now**, not at creation |
 | card failed / canceled / expired, or never opened | `awaiting_payment` | waits within its window |
 | sent again with `booking_id` + `wallet` | `confirmed` / `pending` | paid now |
 | sent again with `booking_id` + `cash` | `confirmed` / `pending` | unpaid — an ordinary pay-at-reception booking |
 | sent again with `booking_id` + a prepaid method | `awaiting_payment` | a new card for the same booking; the window is **not** extended |
-| member cancels | `cancelled` | allowed inside the cancellation window |
+| member cancels | `cancelled` | allowed at any time — nothing was paid, so the cancellation window does not apply |
 | member creates an **overlapping** booking on the same space | the old one `cancelled` | superseded: the member went back and changed the time |
 | window passes | `cancelled` | after a last gateway check (below) |
 

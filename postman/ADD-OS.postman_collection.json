@@ -1803,7 +1803,7 @@
                                                 "bookings"
                                             ]
                                         },
-                                        "description": "docs/decisions/booking-creation-approval-extension.md. Creates a confirmed+unpaid booking when the space has no wallet balance and requires_approval = false. 201 returns the created booking and auto-captures booking_id.\n\n### Cases — see this request's saved examples\n- **Error: Invalid Start Time** — 422 `{\"message\": \"The start time does not match this space's slot granularity.\"}`\n- **Error: Slot Unavailable** — 422 `{\"message\": \"This space is not available for the requested time.\"}` when a confirmed or pending booking already covers this window.\n- **Error: Multiple Wallets, Choice Required** — 422 `{\"message\": \"More than one wallet can cover this booking. Please choose one.\", \"wallet_options\": [...]}` when both a personal and a company balance apply -- resubmit with wallet_owner_type/wallet_owner_id from the list (see Wallet > Get Wallet Options).\n- **Error: Start in the Past** — 422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting.\n- **Error: Outside the Booking Window** — The booking window, two rules (a booking's length has no maximum):\n• booking.max_days_ahead → 422 api.booking.too_far_ahead (start date beyond today + N local days). 0 = no limit, the default.\n• booking.min_notice_minutes → 422 api.booking.too_soon (start closer to now than N minutes). Seeded at 60; 0 turns it off.\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range.\n\nAlso 422 api.booking.space_not_bookable when the space is under maintenance or retired (e.g. taken out of service after the booking screen opened) — on create, on bookings/batch (per-window reason space_not_bookable) and on bookings/preview (as unavailable_reason). The read endpoints 404 such a space.\n\n### Paying (unified payments)\n`payment_method` (required): wallet (pay now, or 422 with current/required/shortage and no booking), cash (unpaid, settled at reception), paymera (unpaid, then its card payment opens: `payment` and `redirect_url` beside `data`).\n\nIf the card cannot be started, the booking still stands, unpaid, with `payment: null` and `payment_error` — the member can pay again or at the desk. `bookings/batch` takes wallet or cash only.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. The coupon is used once the booking holds its slot; cancelling gives it back.\n\n### Paying again — send the request again with the booking's id\nA booking is made first, then paid. To pay it another way — after a failed card, or later (a cash booking paid in the app) — send this same request again with `booking_id` (the `data.id` of the first response) and the new `payment_method` (plus `wallet_owner_type`/`wallet_owner_id`, `coupon_code` if needed). Nothing is created and no creation rule runs (start in the past, booking window, hours, granularity, availability): only how it is paid changes, so a request sent minutes before the start is never refused as too soon. `space_id`, `start_at` and `end_at` are optional then; any that are sent must equal the booking's, else 422 `booking_mismatch`.\n\nAnswers 200 `{data: <the booking>, payment, redirect_url, next, coupon?}` — `next` is `redirect` | `done` | `pay_at_reception`. Errors: 404 not the member's booking · 409 already paid · 422 `booking_not_payable` (cancelled, rejected, no-show) · 422 `{message, current, required, shortage}` when the wallet is short · 502/503 card payment unavailable (not a declined card)."
+                                        "description": "docs/decisions/booking-creation-approval-extension.md. Creates a confirmed+unpaid booking when the space has no wallet balance and requires_approval = false (made with a card it is created `awaiting_payment` instead — see Held for its prepayment below). 201 returns the created booking and auto-captures booking_id.\n\n### Cases — see this request's saved examples\n- **Error: Invalid Start Time** — 422 `{\"message\": \"The start time does not match this space's slot granularity.\"}`\n- **Error: Slot Unavailable** — 422 `{\"message\": \"This space is not available for the requested time.\"}` when a confirmed or pending booking already covers this window.\n- **Error: Multiple Wallets, Choice Required** — 422 `{\"message\": \"More than one wallet can cover this booking. Please choose one.\", \"wallet_options\": [...]}` when both a personal and a company balance apply -- resubmit with wallet_owner_type/wallet_owner_id from the list (see Wallet > Get Wallet Options).\n- **Error: Start in the Past** — 422 api.booking.start_in_the_past. Closes a trap where a past-dated booking could be created and paid for and then never cancelled, its cancellation window having long gone. A booking starting this very minute is still fine. Overridable via the booking.allow_past_bookings setting.\n- **Error: Outside the Booking Window** — The booking window, two rules (a booking's length has no maximum):\n• booking.max_days_ahead → 422 api.booking.too_far_ahead (start date beyond today + N local days). 0 = no limit, the default.\n• booking.min_notice_minutes → 422 api.booking.too_soon (start closer to now than N minutes). Seeded at 60; 0 turns it off.\nChecked right after the past-start rule, before business hours. They apply to reception bookings too (same BookingCreationService), to bookings/batch (per-window reason too_far_ahead / too_soon) and to bookings/preview (as unavailable_reason). The calendar projects the same rules as slot states too_soon / too_far_ahead and day state out_of_range.\n\nAlso 422 api.booking.space_not_bookable when the space is under maintenance or retired (e.g. taken out of service after the booking screen opened) — on create, on bookings/batch (per-window reason space_not_bookable) and on bookings/preview (as unavailable_reason). The read endpoints 404 such a space.\n\n### Paying (unified payments)\n`payment_method` (required): wallet (pay now, or 422 with current/required/shortage and no booking), cash (unpaid, settled at reception), paymera (a hold — `status: awaiting_payment` with a `payment_due_at` deadline — then its card payment opens: `payment` and `redirect_url` beside `data`).\n\nIf the card cannot be started, the hold still stands until `payment_due_at`, with `payment: null` and `payment_error` — the member can pay again with the booking's id (below), or choose cash or the wallet. `bookings/batch` takes wallet or cash only.\n\n**`payment_method` is required** — the method the member picked from Get Payment Methods (`wallet` | `cash` | `paymera`; batch: `wallet` | `cash`). Omitting it → 422 and nothing is booked.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). The response carries `coupon: {code, applied, points_discounted, message}`; `applied: false` with a message means the current offer was already lower. The coupon is used once the booking holds its slot; cancelling gives it back.\n\n### Paying again — send the request again with the booking's id\nA booking is made first, then paid. To pay it another way — after a failed card, or later (a cash booking paid in the app) — send this same request again with `booking_id` (the `data.id` of the first response) and the new `payment_method` (plus `wallet_owner_type`/`wallet_owner_id`, `coupon_code` if needed). Nothing is created and no creation rule runs (start in the past, booking window, hours, granularity, availability): only how it is paid changes, so a request sent minutes before the start is never refused as too soon. `space_id`, `start_at` and `end_at` are optional then; any that are sent must equal the booking's, else 422 `booking_mismatch`.\n\nAnswers 200 `{data: <the booking>, payment, redirect_url, next, coupon?}` — `next` is `redirect` | `done` | `pay_at_reception`. Errors: 404 not the member's booking · 409 already paid · 422 `booking_not_payable` (cancelled, rejected, no-show — or an `awaiting_payment` whose `payment_due_at` passed) · 422 `{message, current, required, shortage}` when the wallet is short · 502/503 card payment unavailable (not a declined card).\n\n### Held for its prepayment — `awaiting_payment`\nA booking made with a prepaid method (`paymera` today; any gateway key in `config/payments.php`) is a **hold**: `status: awaiting_payment` and `payment_due_at = min(now + 15 minutes, start_at)` (`PAYMENTS_PREPAYMENT_WINDOW_MINUTES`). It holds the slot but is not confirmed — door codes, QR unlock and the reception lists and counts ignore it; reception cannot check it in (409 `api.booking.check_in_awaiting_payment`: take the payment first) and a coworking scan tells the member to pay it first. The confirm screen shows a countdown from `payment_due_at`, which the member booking list and detail carry too.\n\nIt is released — `payment_due_at` cleared — when the card is accepted, when it is paid from the wallet, or when the member switches to cash by sending this request again with `booking_id`: the booking becomes `confirmed` (`pending` if the space needs approval; the operations \"pending approval\" notice is sent then, not at creation). Sending it again with another prepaid method opens a new card **without** extending the deadline.\n\nThe member may cancel a hold at any time (Cancel Booking), even inside the cancellation window. Creating a booking for another time on the same space (no `booking_id`) cancels the member's own overlapping hold; a real `confirmed` or `pending` booking still blocks.\n\nPast `payment_due_at`, `payments:cancel-expired-prepayments` (every minute, after one last gateway check) cancels the hold: `status: cancelled`, `status_note` \"payment not completed\" (`api.booking.status_notes.payment_not_completed`), and the member is notified. Sending the request again with its `booking_id` then answers 422 `booking_not_payable` and the member starts again. A card already in flight that the bank accepts before the cancellation still pays it; one accepted after becomes points in the wallet with the payment `needs_review`."
                                     },
                                     "response": [
                                         {
@@ -2210,10 +2210,10 @@
                                                 }
                                             ],
                                             "cookie": [],
-                                            "body": "{\n    \"data\": {\n        \"id\": 18,\n        \"space_id\": 2,\n        \"user_id\": 18,\n        \"start_at\": \"2026-10-01T07:00:00+00:00\",\n        \"end_at\": \"2026-10-01T08:00:00+00:00\",\n        \"status\": \"confirmed\",\n        \"payment_state\": \"unpaid\",\n        \"payment_source\": null\n    }\n}"
+                                            "body": "{\n    \"data\": {\n        \"id\": 18,\n        \"space_id\": 2,\n        \"user_id\": 18,\n        \"start_at\": \"2026-10-01T07:00:00+00:00\",\n        \"end_at\": \"2026-10-01T08:00:00+00:00\",\n        \"status\": \"confirmed\",\n        \"payment_state\": \"unpaid\",\n        \"payment_source\": null,\n        \"payment_due_at\": null\n    }\n}"
                                         },
                                         {
-                                            "name": "Card — gateway unavailable, booking kept",
+                                            "name": "Card — gateway unavailable, hold kept",
                                             "originalRequest": {
                                                 "auth": {
                                                     "type": "bearer",
@@ -2268,7 +2268,123 @@
                                                 }
                                             ],
                                             "cookie": [],
-                                            "body": "{\n    \"data\": {\n        \"id\": 19,\n        \"space_id\": 2,\n        \"user_id\": 18,\n        \"start_at\": \"2026-10-01T09:00:00+00:00\",\n        \"end_at\": \"2026-10-01T10:00:00+00:00\",\n        \"status\": \"confirmed\",\n        \"payment_state\": \"unpaid\",\n        \"payment_source\": null\n    },\n    \"payment\": null,\n    \"redirect_url\": null,\n    \"payment_error\": \"الدفع بالبطاقة غير متاح مؤقتاً. يرجى المحاولة بعد قليل.\"\n}"
+                                            "body": "{\n    \"data\": {\n        \"id\": 19,\n        \"space_id\": 2,\n        \"user_id\": 18,\n        \"start_at\": \"2026-10-01T09:00:00+00:00\",\n        \"end_at\": \"2026-10-01T10:00:00+00:00\",\n        \"status\": \"awaiting_payment\",\n        \"payment_state\": \"unpaid\",\n        \"payment_source\": null,\n        \"payment_due_at\": \"2026-09-30T08:15:00+00:00\"\n    },\n    \"payment\": null,\n    \"redirect_url\": null,\n    \"payment_error\": \"الدفع بالبطاقة غير متاح مؤقتاً. يرجى المحاولة بعد قليل.\"\n}"
+                                        },
+                                        {
+                                            "name": "Card — held for its payment",
+                                            "originalRequest": {
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{member_token}}"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/bookings",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "bookings"
+                                                    ]
+                                                },
+                                                "body": {
+                                                    "mode": "raw",
+                                                    "raw": "{\n  \"space_id\": \"{{space_id}}\",\n  \"start_at\": \"2026-10-01T12:00:00+03:00\",\n  \"end_at\": \"2026-10-01T13:00:00+03:00\",\n  \"payment_method\": \"paymera\"\n}",
+                                                    "options": {
+                                                        "raw": {
+                                                            "language": "json"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "status": "Created",
+                                            "code": 201,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"data\": {\n        \"id\": 19,\n        \"space_id\": 2,\n        \"user_id\": 18,\n        \"start_at\": \"2026-10-01T09:00:00+00:00\",\n        \"end_at\": \"2026-10-01T10:00:00+00:00\",\n        \"status\": \"awaiting_payment\",\n        \"payment_state\": \"unpaid\",\n        \"payment_source\": null,\n        \"payment_due_at\": \"2026-09-30T08:15:00+00:00\"\n    },\n    \"payment\": {\n        \"id\": 27,\n        \"status\": \"pending\",\n        \"purpose\": \"booking\",\n        \"method\": \"paymera\",\n        \"amount_minor\": 13840000,\n        \"currency\": \"SYP\",\n        \"currency_exponent\": 2,\n        \"points_to_credit\": 100,\n        \"amount_points\": 100,\n        \"transaction_id\": null,\n        \"payable\": {\n            \"type\": \"booking\",\n            \"id\": 19\n        },\n        \"expires_at\": null,\n        \"plan_id\": null,\n        \"membership_id\": null,\n        \"rrn\": null,\n        \"created_at\": \"2026-09-30T08:00:02.000000Z\"\n    },\n    \"redirect_url\": \"https://egate-t.paymera.cc/start/4d5e6f70-example/ar\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Hold Expired",
+                                            "originalRequest": {
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "{{member_token}}"
+                                                        }
+                                                    ]
+                                                },
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/bookings",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "bookings"
+                                                    ]
+                                                },
+                                                "body": {
+                                                    "mode": "raw",
+                                                    "raw": "{\n  \"booking_id\": 19,\n  \"payment_method\": \"cash\"\n}",
+                                                    "options": {
+                                                        "raw": {
+                                                            "language": "json"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "status": "Unprocessable Content",
+                                            "code": 422,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"A cancelled, rejected or not-attended booking cannot be paid.\"\n}"
                                         }
                                     ]
                                 },
@@ -5366,7 +5482,7 @@
                                         "register"
                                     ]
                                 },
-                                "description": "تسجيل العضو الحالي في الفعالية. تؤخذ بيانات العضو تلقائياً من حسابه (الاسم، البريد، الهاتف). في الفعاليات المجانية يتم التسجيل الفوري، وفي الفعاليات المدفوعة يتم خصم سعر الفعالية بالنقاط (price_points) مباشرة من محفظة العضو.\n\n### Cases — see this request's saved examples\n- **answering the form** — Answers are validated against the event's stored field definitions. Submitting name/phone/email is refused with 422 — they come from the token.\n- **profile only** — Most events need nothing the account does not already hold. An empty body is valid; check has_registration_form on the details endpoint first.\n\n### Paying (unified payments)\n`payment_method` (optional, default the member's own wallet as before) and `wallet_owner_type`/`wallet_owner_id`. For a paid event: wallet pays now (short = the old `points` validation error); cash or paymera confirm the seat **unpaid** — the door refuses check-in until it is paid. With paymera the response adds `payment` and `redirect_url`. An event that needs approval stores the choice and charges the wallet at approval.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). What the registration costs after the code is the registration's own `price_points`; the event's `price_points` stays its list price. A coupon that makes the event free confirms the seat as paid.\n\n### Paying again — send the request again with the ticket's id\nA registration is made first, then paid. To pay it another way — after a failed card, or later (an approved, unpaid seat) — send this request again with `ticket_id` (the `data.ticket_id` of the first response) and `payment_method` (plus `wallet_owner_type`/`wallet_owner_id`, `coupon_code`). **No form is sent**: nothing is registered and the registration window, the full flag, capacity and form rules do not run.\n\nAnswers 200 `{data: {ticket_id, status, payment, redirect_url, next, coupon?}}`. A registration still **pending approval** (and unpaid) only has its stored choice updated — `next: pay_at_reception`, `payment: null`, nothing charged until approval. Errors: 404 not the member's registration for this event · 409 already paid · 422 `{message, current, required, shortage}` when the wallet is short · 502/503 card payment unavailable. Without a `ticket_id`, registering again for an event the member already holds a seat in is still `already_registered`.",
+                                "description": "تسجيل العضو الحالي في الفعالية. تؤخذ بيانات العضو تلقائياً من حسابه (الاسم، البريد، الهاتف). في الفعاليات المجانية يتم التسجيل الفوري، وفي الفعاليات المدفوعة يتم خصم سعر الفعالية بالنقاط (price_points) مباشرة من محفظة العضو.\n\n### Cases — see this request's saved examples\n- **answering the form** — Answers are validated against the event's stored field definitions. Submitting name/phone/email is refused with 422 — they come from the token.\n- **profile only** — Most events need nothing the account does not already hold. An empty body is valid; check has_registration_form on the details endpoint first.\n\n### Paying (unified payments)\n`payment_method` (optional, default the member's own wallet as before) and `wallet_owner_type`/`wallet_owner_id`. For a paid event: wallet pays now (short = the old `points` validation error); cash confirms the seat (`approved`) **unpaid** — the door refuses check-in until it is paid; paymera holds it as `awaiting_payment` with a `payment_due_at` deadline (below), and the response adds `payment` and `redirect_url` inside `data`. An event that needs approval stores the choice and charges the wallet at approval.\n\n### Coupon (optional)\n`coupon_code` — leave it empty for none. A code that cannot be used refuses the request with 422 `{message, reason}` (`reason` = not_found | not_started | expired | usage_limit_reached | per_user_limit_reached | not_eligible | new_members_only | not_applicable | min_amount_not_met | not_combinable | already_applied | payment_in_progress). What the registration costs after the code is the registration's own `price_points`; the event's `price_points` stays its list price. A coupon that makes the event free confirms the seat as paid.\n\n### Paying again — send the request again with the ticket's id\nA registration is made first, then paid. To pay it another way — after a failed card, or later (an approved, unpaid seat) — send this request again with `ticket_id` (the `data.ticket_id` of the first response) and `payment_method` (plus `wallet_owner_type`/`wallet_owner_id`, `coupon_code`). **No form is sent**: nothing is registered and the registration window, the full flag, capacity and form rules do not run.\n\nAnswers 200 `{data: {ticket_id, status, payment, redirect_url, next, coupon?}}`. A registration still **pending approval** (and unpaid) only has its stored choice updated — `next: pay_at_reception`, `payment: null`, nothing charged until approval. Errors: 404 not the member's registration for this event · 409 already paid · 422 `{message, current, required, shortage}` when the wallet is short · 422 `registration_not_payable` (a rejected registration, or an `awaiting_payment` whose `payment_due_at` passed) · 502/503 card payment unavailable. Without a `ticket_id`, registering again for an event the member already holds a seat in is still `already_registered`.\n\n### Held for its prepayment — `awaiting_payment`\nA registration approved on the spot for a paid event (and not made free by a coupon) and paid by a prepaid method (`paymera` today; any gateway key in `config/payments.php`) is a **hold**: `status: awaiting_payment`, with `payment_due_at = min(now + 15 minutes, the event's start)` in the result's `data`. It holds the seat but is not approved, so the door refuses check-in until it is paid. It is released to `approved` (`payment_due_at` cleared) when the card is accepted, when it is paid from the wallet, or when the member switches to cash by sending this request again with `ticket_id`. Past the deadline `payments:cancel-expired-prepayments` rejects it (\"Your seat was released because the payment was not completed in time\", `api.event.prepayment_expired`) and notifies the member; sending `ticket_id` again then answers 422 `registration_not_payable` and the member registers again. A registration that needs approval is unchanged: `pending`, no card at registration, paid after approval by sending `ticket_id`.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n  \"coupon_code\": \"{{coupon_code}}\"\n}",
@@ -5691,7 +5807,127 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"message\": \"تم التسجيل في الفعالية بنجاح.\",\n        \"ticket_id\": 5,\n        \"status\": \"approved\",\n        \"requires_approval\": false,\n        \"event\": {\n            \"id\": 23,\n            \"title\": \"فعالية اختبار الدفع\",\n            \"start_at\": \"2026-10-05\",\n            \"location\": \"Main Hall\",\n            \"price_points\": 80\n        }\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"message\": \"تم التسجيل في الفعالية بنجاح.\",\n        \"ticket_id\": 5,\n        \"status\": \"approved\",\n        \"requires_approval\": false,\n        \"payment_due_at\": null,\n        \"event\": {\n            \"id\": 23,\n            \"title\": \"فعالية اختبار الدفع\",\n            \"start_at\": \"2026-10-05\",\n            \"location\": \"Main Hall\",\n            \"price_points\": 80\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "Card — held for its payment",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events/{{event_id}}/register",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events",
+                                                "{{event_id}}",
+                                                "register"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"payment_method\": \"paymera\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"message\": \"تم التسجيل في الفعالية بنجاح.\",\n        \"ticket_id\": 6,\n        \"status\": \"awaiting_payment\",\n        \"requires_approval\": false,\n        \"payment_due_at\": \"2026-10-04T08:15:00+00:00\",\n        \"event\": {\n            \"id\": 23,\n            \"title\": \"فعالية اختبار الدفع\",\n            \"start_at\": \"2026-10-05\",\n            \"location\": \"Main Hall\",\n            \"price_points\": 80\n        },\n        \"payment\": {\n            \"id\": 28,\n            \"status\": \"pending\",\n            \"purpose\": \"event_registration\",\n            \"method\": \"paymera\",\n            \"amount_minor\": 11072000,\n            \"currency\": \"SYP\",\n            \"currency_exponent\": 2,\n            \"points_to_credit\": 80,\n            \"amount_points\": 80,\n            \"transaction_id\": null,\n            \"payable\": {\n                \"type\": \"event_attendee\",\n                \"id\": 6\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"created_at\": \"2026-10-04T08:00:02.000000Z\"\n        },\n        \"redirect_url\": \"https://egate-t.paymera.cc/start/5e6f7081-example/ar\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Hold Expired",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events/{{event_id}}/register",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events",
+                                                "{{event_id}}",
+                                                "register"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"ticket_id\": 6,\n  \"payment_method\": \"cash\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Only an approved registration for an event that is still on can be paid.\"\n}"
                                 }
                             ]
                         },

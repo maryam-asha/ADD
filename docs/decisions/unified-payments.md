@@ -88,9 +88,9 @@ registered in `PaymentServiceProvider::FULFILLERS`: `pointsDue`,
 | operation | wallet | cash | paymera |
 |---|---|---|---|
 | plan (`POST member/memberships`) | default; the owner's wallet (the company's for `company_id`) | hold, 48 h | the member's own plan only |
-| booking (`POST member/bookings`) | pay now or 422 | unpaid | unpaid, then its card payment opens; to pay another way, send the request again with its id (`booking_id`) |
+| booking (`POST member/bookings`) | pay now or 422 | unpaid | held as `awaiting_payment` until `payment_due_at` (`prepayment-all-or-nothing.md`), then its card payment opens; to pay another way, send the request again with its id (`booking_id`) |
 | multi-date booking (`/batch`) | one wallet for the total, one payment per booking | unpaid | refused (validation) |
-| event registration | pay now, or at approval from the stored choice | confirmed unpaid | confirmed unpaid, then its card payment opens; to pay another way, send the request again with its id (`ticket_id`) |
+| event registration | pay now, or at approval from the stored choice | confirmed unpaid | held as `awaiting_payment` until `payment_due_at` (`prepayment-all-or-nothing.md`), then its card payment opens; to pay another way, send the request again with its id (`ticket_id`) |
 | anything unpaid (the operation's own endpoint: `POST member/bookings` + `booking_id`, `POST member/events/{id}/register` + `ticket_id`, `POST member/coworking-sessions/{type}/{id}/pay`) | yes | `pay_at_reception` | yes, into the member's own wallet |
 | top-up | — | — (reception credits it through `admin/reception/wallet-top-ups` and the member is notified) | yes (`POST member/wallet/top-ups`) |
 
