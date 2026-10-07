@@ -22,6 +22,8 @@ class CouponCalculator
         $discount = match ($terms->type) {
             CouponDiscountType::Percentage => (int) bcdiv(bcmul((string) $base, (string) $terms->value), '100', 0),
             CouponDiscountType::AmountOff => $terms->value,
+            // An offer's price: whatever is above it comes off.
+            CouponDiscountType::FixedPrice => max(0, $base - $terms->value),
         };
 
         if ($terms->maxDiscountPoints !== null) {

@@ -550,7 +550,8 @@ Authorization: Bearer <access_token>
 
 ## 12. العروض وكوبونات الحسم
 
-التصميم كاملاً في `docs/decisions/pricing-offers-and-coupons.md`. ما يحتاجه
+التصميم كاملاً في `docs/decisions/pricing-offers-and-coupons.md`
+و`docs/decisions/automatic-offers-savings-discount-ledger.md`. ما يحتاجه
 التطبيق:
 
 ### أ. لا تحسب السعر بنفسك
@@ -565,25 +566,63 @@ POST /api/v1/member/bookings/preview
 ```
 
 التفصيل (`breakdown`) يضيف سطرين جديدين بجانب سطر خصم الباقة (`discount`):
-`sale` (توفير العرض) و`coupon` (خصم الكوبون).
+`sale` (توفير العرض، وعنوانه اسم العرض أو "عرض" إن لم يكن له اسم) و`coupon`
+(خصم الكوبون).
 
 ### ب. كتلة `sale` في المساحات والباقات
 
 تظهر في قائمة المساحات وتفاصيلها (`details.sale`) وفي قائمة الباقات
-وتفاصيلها (`sale`). قيمتها `null` إذا لم يكن هناك عرض قائم الآن:
+وتفاصيلها (`sale`). هي أفضل عرض قائم الآن **لهذا العضو**: عرض مخصص لأعضاء
+بعينهم لا يظهر لغيرهم، لذا أرسل التوكن دائماً. قيمتها `null` إذا لم يكن هناك
+عرض قائم الآن:
 
 ```json
 "sale": {
-  "points": 80,
+  "original_points": 100,
   "original_label": "10 $ / ساعة",
+  "points": 80,
   "sale_label": "8 $ / ساعة",
+  "discount_points": 20,
+  "discount_amount_label": "2 $ / ساعة",
+  "discount_percent": 20,
+  "discount_label": "خصم 20%",
   "ends_at": "2026-10-12T09:00:00+03:00",
   "ends_label": "ينتهي العرض في 2026-10-12 09:00"
 }
 ```
 
-اعرض `original_label` مشطوباً وبجانبه `sale_label`، و`ends_label` تحتهما.
-النصوص جاهزة بلغة الهيدر `lang` وعملة الهيدر `currency`.
+اعرض `original_label` مشطوباً، وبجانبه `sale_label`، و`discount_label` شارة
+الحسم، و`ends_label` تحتها. النصوص جاهزة بلغة الهيدر `lang` وعملة الهيدر
+`currency`. النسبة تُقرَّب للأسفل فلا تُعلن خصماً أكبر من الحقيقي، والحسم الأقل
+من 1% تعرضه `discount_label` بالمبلغ ("وفّر …") بدل "خصم 0%". في المساحات
+الحسم للساعة، مثل السعر، وإذا ترك العرض كسراً من النقطة في الساعة يُعرض السعر
+مقرّباً للأعلى (الخصم الفعلي عند الدفع دقيق).
+
+عرض بلا تاريخ نهاية تكون فيه `ends_at` و`ends_label` بقيمة `null`: لا تعرض
+سطر الانتهاء.
+
+### ب-2. كتلة `saving` في الباقات
+
+بجانب `sale` في قائمة الباقات وتفاصيلها. هي توفير الباقة نفسها مقارنة بمرجعها
+(باقة شهرية × 12، أو سعر ساعة مساحة × عدد الساعات)، وليست خصماً: السعر لا
+يتغيّر بسببها. قيمتها `null` إذا لم يكن للباقة مرجع أو توفير. قد تظهر الكتلتان
+معاً:
+
+```json
+"saving": {
+  "compared_to": "plan",
+  "reference_points": 1500,
+  "reference_label": "150 $",
+  "saving_points": 600,
+  "saving_percent": 40,
+  "saving_label": "وفّر 40%",
+  "per_unit_label": "75 $ لكل الشهرية"
+}
+```
+
+اعرض `reference_label` مشطوباً كمرجع، و`saving_label` شارة، و`per_unit_label`
+تحت السعر. `compared_to` هي `plan` أو `space` (عندها `per_unit_label` سعر
+للساعة).
 
 ### ج. زر "تطبيق" للكوبون
 
@@ -613,6 +652,55 @@ POST /api/v1/member/coupons/preview
 
 لا يُنشئ شيئاً ولا يستهلك الكوبون. مفاتيح `lines`:
 `base` | `sale` | `plan_discount` | `coupon`. الحد 20 طلباً في الدقيقة.
+
+### ج-2. كوبوناتي: ما يمكن للعضو تطبيقه
+
+```http
+GET /api/v1/member/coupons
+GET /api/v1/member/coupons?purpose=booking&space_id=5
+GET /api/v1/member/coupons?purpose=plan_purchase&plan_id=3
+GET /api/v1/member/coupons?purpose=event_registration&event_id=8
+```
+
+يعيد الكوبونات المخصّصة لهذا العضو باسمه أو لشركته، الفعّالة الآن (داخل
+مدتها ولم يستنفدها). مع `purpose` وعنصر يعيد فقط ما ينطبق عليه. لا يظهر
+الكوبون العام غير المخصّص لأحد: يبقى كوداً يُوزَّع خارج التطبيق. والعروض لا
+تظهر هنا، فهي تظهر في السعر نفسه (كتلة `sale`).
+
+| `purpose` | العنصر |
+|---|---|
+| `booking` أو `coworking_session` | `space_id` (اختياري) |
+| `plan_purchase` | `plan_id` (اختياري) |
+| `event_registration` | `event_id` (اختياري) |
+
+```json
+{
+  "data": [
+    {
+      "code": "ROOM20",
+      "name": "خصم الغرف",
+      "description": null,
+      "discount_type": "percentage",
+      "discount_value": 20,
+      "max_discount_points": 50,
+      "min_amount_points": null,
+      "combinable_with_offers": true,
+      "starts_at": null,
+      "ends_at": "2026-08-30T21:00:00.000000Z",
+      "uses_left": 1,
+      "targets": [{"purpose": "booking", "plan_id": null, "space_id": 5, "space_type": null, "event_id": null}]
+    }
+  ]
+}
+```
+
+- الترتيب: الأقرب انتهاءً أولاً.
+- `discount_type`: `percentage` (قيمة `discount_value` نسبة) أو `amount_off` (نقاط).
+- `uses_left`: كم مرة بقيت له، و`null` تعني بلا حد.
+- `targets` فارغة تعني أنه ينطبق على كل شيء ما عدا شحن المحفظة.
+- لا يضمن الظهور هنا أن يُطبَّق الكوبون: قد يكون السعر أقل من
+  `min_amount_points`، أو يكون العرض أفضل. للسعر النهائي استخدم زر "تطبيق"
+  (ج) بالكود نفسه.
 
 ### د. إرسال الكوبون مع الشراء
 
@@ -661,3 +749,34 @@ POST /api/v1/member/coupons/preview
 
 الكوبون الذي يجعل الباقة مجانية يفعّلها فوراً بلا دفع. وإلغاء الحجز، أو فشل
 البطاقة، أو انتهاء مهلة الدفع النقدي، يعيد استخدام الكوبون للعضو تلقائياً.
+
+### و. ما طُبِّق على العملية: `discounts`
+
+تفاصيل الحجز (`GET bookings/{id}`) والدفعة (`GET payments` و`payments/{id}`)
+وجلسة العمل المشترك تحمل `discounts`: كل ما حُسم منها، كما كان لحظة تثبيت
+السعر. تغيير العرض أو إعادة تسميته لاحقاً لا يغيّر ما يظهر هنا.
+
+```json
+"discounts": [
+  {
+    "kind": "offer",
+    "offer_id": 12,
+    "coupon_id": null,
+    "plan_discount_id": null,
+    "name": "أسبوع الغرف",
+    "code": null,
+    "discount_type": "percentage",
+    "discount_value": 20,
+    "max_discount_points": null,
+    "base_points": 100,
+    "points": 20,
+    "percent": 20
+  }
+]
+```
+
+- `kind`: `offer` (عرض تلقائي، يُعرَّف بـ`offer_id`)، أو `coupon` (كوبون،
+  بـ`coupon_id` و`code`)، أو `plan_discount` (خصم الباقة)، أو
+  `duration_saving` (توفير باقة طويلة؛ لا يُنقص السعر، و`name` هو ما قورنت به).
+- `points` ما حُسم من `base_points`، و`percent` نسبته مقرّبة للأسفل.
+- قائمة فارغة: لم يُحسم شيء.

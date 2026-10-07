@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Pricing\Services\PlanSavingCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -34,12 +35,12 @@ class PlanResource extends JsonResource
             'is_active' => $this->is_active,
             'is_public' => $this->is_public,
             'order' => $this->order,
-            // The sale as the admin entered it, live or not — dashboard only,
-            // so a sale scheduled for next week is not announced early;
-            // members see a running one as labels (PackageBrowseService).
-            'sale_price_points' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_price_points),
-            'sale_starts_at' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_starts_at?->toISOString()),
-            'sale_ends_at' => $this->when($request->is('api/v1/admin/*'), fn () => $this->sale_ends_at?->toISOString()),
+            'reference_plan_id' => $this->reference_plan_id,
+            'reference_space_id' => $this->reference_space_id,
+            'reference_units' => $this->reference_units,
+            // What it saves against its reference — dashboard only; members
+            // read it as labels (PackageBrowseService).
+            'saving' => $this->when($request->is('api/v1/admin/*'), fn () => app(PlanSavingCalculator::class)->for($this->resource)?->toArray()),
             'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
                 'id' => $b->id,
                 'category' => $b->category->value,

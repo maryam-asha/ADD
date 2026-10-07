@@ -9,10 +9,10 @@ use App\Domain\Pricing\Enums\PriceChoice;
 use App\Domain\Pricing\Models\Coupon;
 
 /**
- * A composed price: the list price, the automatic reduction chosen (sale or
- * plan discount, never both), the coupon on top, and what is left to pay.
- * Only PriceQuoteService makes one
- * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
+ * A composed price: the list price, the automatic reduction chosen (the
+ * best automatic offer or the plan discount, never both), the coupon on
+ * top, and what is left to pay. Only PriceQuoteService makes one
+ * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  */
 final class PriceQuote
 {
@@ -26,7 +26,18 @@ final class PriceQuote
         public readonly int $couponBasePoints,
         public readonly int $couponPoints,
         public readonly int $finalPoints,
+        public readonly ?Coupon $offer = null,
+        public readonly ?PlanSaving $saving = null,
     ) {}
+
+    /** The same price, with the plan's built-in saving beside it (never in it). */
+    public function withSaving(?PlanSaving $saving): self
+    {
+        return new self(
+            $this->listPoints, $this->choice, $this->automaticPoints, $this->planDiscount, $this->coupon,
+            $this->couponOutcome, $this->couponBasePoints, $this->couponPoints, $this->finalPoints, $this->offer, $saving,
+        );
+    }
 
     /** The price after the automatic reduction, before any coupon. */
     public function automaticPrice(): int
@@ -46,13 +57,19 @@ final class PriceQuote
         return $this->choice === PriceChoice::Plan ? $this->planDiscount : null;
     }
 
+    /** The automatic offer, when it was the reduction chosen. */
+    public function appliedOffer(): ?Coupon
+    {
+        return $this->choice === PriceChoice::Offer ? $this->offer : null;
+    }
+
     /** @return list<PriceLine> */
     public function lines(): array
     {
         $lines = [new PriceLine('base', $this->listPoints)];
 
-        if ($this->automaticPoints > 0 && $this->choice === PriceChoice::Sale) {
-            $lines[] = new PriceLine('sale', -$this->automaticPoints);
+        if ($this->automaticPoints > 0 && $this->choice === PriceChoice::Offer) {
+            $lines[] = new PriceLine('sale', -$this->automaticPoints, name: $this->offer?->translate('name') ?: null);
         } elseif ($this->automaticPoints > 0 && $this->choice === PriceChoice::Plan) {
             $lines[] = new PriceLine('plan_discount', -$this->automaticPoints, percentage: $this->planDiscount?->percentage);
         }
@@ -87,6 +104,10 @@ final class PriceQuote
     {
         if (($discount = $this->appliedPlanDiscount()) !== null) {
             $inFlight->addPlanDiscount($discount);
+        }
+
+        if (($offer = $this->appliedOffer()) !== null) {
+            $inFlight->addCoupon($offer);
         }
 
         if (($coupon = $this->appliedCoupon()) !== null) {

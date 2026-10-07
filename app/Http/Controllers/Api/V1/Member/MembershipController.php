@@ -93,12 +93,12 @@ class MembershipController extends Controller
             $ownerId = $member->id;
         }
 
-        // A coupon is checked — and its price known — before any method is
-        // chosen: one that makes the plan free settles it at once, whatever
-        // the member asked to pay with.
+        // A coupon is checked — and the price known — before any method is
+        // chosen: a coupon or an offer that makes the plan free settles it
+        // at once, whatever the member asked to pay with.
         $code = $request->validated('coupon_code');
         $coupon = $code !== null ? $coupons->resolve($code) : null;
-        $free = $coupon !== null && $quotes->forPlan($plan, $member, $coupon, now())->finalPoints === 0;
+        $free = $quotes->forPlan($plan, $member, $coupon, now())->finalPoints === 0;
 
         return match ($free ? WalletMethod::KEY : ($request->validated('payment_method') ?? WalletMethod::KEY)) {
             CashMethod::KEY => $this->holdForCash($payments, $member, $plan, $ownerType, $ownerId, $coupon),
@@ -216,7 +216,7 @@ class MembershipController extends Controller
     private function couponOutcome(?Coupon $coupon, Payment $payment): array
     {
         return $coupon === null ? [] : [
-            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->forRedeemable($payment)),
+            'coupon' => app(CouponOutcomePresenter::class)->present($coupon->code, app(CouponLedger::class)->couponFor($payment)),
         ];
     }
 

@@ -20,18 +20,20 @@ use App\Domain\Pricing\ValueObjects\PriceQuote;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
  * The one composition of a booking's price
  * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md):
- * list → the better of sale and plan discount → coupon on top.
+ * list → the better of the automatic offer and the plan discount → coupon
+ * on top (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  *
  * A room at 100 points an hour, booked for two hours: a list price of 200.
  */
 class PriceQuoteBookingTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Space $room;
 
@@ -54,9 +56,10 @@ class PriceQuoteBookingTest extends TestCase
         return app(PriceQuoteService::class)->forBooking($this->room->fresh(), $this->start, $this->start->addHours($hours), $this->member, $coupon);
     }
 
-    private function sale(int $rate, string $from = '2026-10-05 00:00:00', string $to = '2026-10-12 00:00:00'): void
+    /** An automatic offer on the room: a fixed hourly rate over a window. */
+    private function sale(int $rate, string $from = '2026-10-05 00:00:00', string $to = '2026-10-12 00:00:00'): Coupon
     {
-        $this->room->update(['sale_hourly_rate_points' => $rate, 'sale_starts_at' => $from, 'sale_ends_at' => $to]);
+        return $this->offerOnSpace($this->room, $rate, $from, $to);
     }
 
     private function planDiscount(int $percent): void
@@ -97,9 +100,19 @@ class PriceQuoteBookingTest extends TestCase
 
         $quote = $this->quote();
 
-        $this->assertSame(PriceChoice::Sale, $quote->choice);
+        $this->assertSame(PriceChoice::Offer, $quote->choice);
         $this->assertSame(160, $quote->finalPoints);
         $this->assertSame(['base' => 200, 'sale' => -40], $this->lines($quote));
+    }
+
+    public function test_the_quote_carries_the_offer_and_names_its_line(): void
+    {
+        $offer = $this->sale(80);
+
+        $quote = $this->quote();
+
+        $this->assertTrue($quote->appliedOffer()->is($offer));
+        $this->assertSame('Offer', $quote->lines()[1]->name);
     }
 
     /** Usage time: only the hour inside the sale is at the sale rate. */
@@ -132,7 +145,7 @@ class PriceQuoteBookingTest extends TestCase
 
         $quote = $this->quote();
 
-        $this->assertSame(PriceChoice::Sale, $quote->choice);
+        $this->assertSame(PriceChoice::Offer, $quote->choice);
         $this->assertSame(140, $quote->finalPoints);
         $this->assertNull($quote->planDiscount);
     }
@@ -172,7 +185,7 @@ class PriceQuoteBookingTest extends TestCase
 
         $quote = $this->quote($coupon);
 
-        $this->assertSame(PriceChoice::Sale, $quote->choice);
+        $this->assertSame(PriceChoice::Offer, $quote->choice);
         $this->assertSame(CouponOutcome::OfferIsBetter, $quote->couponOutcome);
         $this->assertNull($quote->appliedCoupon());
         $this->assertSame(160, $quote->finalPoints);

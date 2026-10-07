@@ -85,6 +85,19 @@ class BookingBatchCouponTest extends TestCase
         $this->assertSame(2, app(CouponLedger::class)->liveUsage($coupon));
     }
 
+    /** Review Focus 4: an offer with one use left prices only the first date. */
+    public function test_an_offer_with_one_use_left_prices_only_the_first_date_of_a_batch(): void
+    {
+        $offer = Coupon::factory()->automatic()->percentage(50)->create(['usage_limit' => 1]);
+
+        $bookings = app(BookingBatchCreationService::class)->createMany($this->threeDays(), $this->member, paymentMethod: 'wallet');
+
+        $this->assertSame([50, 100, 100], array_map(fn (Booking $b) => $b->price_points, $bookings));
+        $this->assertSame(1, app(CouponLedger::class)->liveUsage($offer));
+        $this->assertNotNull(app(CouponLedger::class)->offerFor($bookings[0]));
+        $this->assertNull(app(CouponLedger::class)->offerFor($bookings[1]));
+    }
+
     public function test_a_coupon_no_date_can_use_is_refused_with_its_reason(): void
     {
         $hall = Space::factory()->room()->create(['hourly_rate_points' => 100, 'slot_granularity_minutes' => 60]);

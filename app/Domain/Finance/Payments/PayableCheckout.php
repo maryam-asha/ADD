@@ -127,7 +127,7 @@ class PayableCheckout
             return null;
         }
 
-        $carried = $this->ledger->forRedeemable($payable);
+        $carried = $this->ledger->couponFor($payable);
 
         if ($carried !== null && Coupon::normalizeCode($couponCode) === $carried->coupon->code) {
             return null;

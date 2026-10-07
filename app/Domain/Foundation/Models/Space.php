@@ -7,7 +7,6 @@ use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
-use App\Domain\Pricing\Concerns\HasSalePrice;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -16,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Space extends Model
 {
-    use HasFactory, HasSalePrice, HasTranslations;
+    use HasFactory, HasTranslations;
 
     protected $fillable = [
         'building_id',
@@ -28,9 +27,6 @@ class Space extends Model
         'capacity',
         'images',
         'hourly_rate_points',
-        'sale_hourly_rate_points',
-        'sale_starts_at',
-        'sale_ends_at',
         'cancellation_window_minutes',
         'slot_granularity_minutes',
         'buffer_minutes',
@@ -50,9 +46,6 @@ class Space extends Model
             'allocation_model' => AllocationModel::class,
             'is_lockable' => 'boolean',
             'hourly_rate_points' => 'integer',
-            'sale_hourly_rate_points' => 'integer',
-            'sale_starts_at' => 'datetime',
-            'sale_ends_at' => 'datetime',
             'requires_approval' => 'boolean',
             'allows_extension' => 'boolean',
             'cancellation_window_minutes' => 'integer',
@@ -61,11 +54,6 @@ class Space extends Model
             'status_until' => 'datetime',
             'images' => AsMediaUrlArray::class,
         ];
-    }
-
-    protected function salePriceColumn(): string
-    {
-        return 'sale_hourly_rate_points';
     }
 
     /**

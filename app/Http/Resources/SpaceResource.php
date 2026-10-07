@@ -47,11 +47,6 @@ class SpaceResource extends JsonResource
             // database default (true) applies.
             'allows_extension' => (bool) ($this->allows_extension ?? true),
             'cancellation_window_minutes' => $this->cancellation_window_minutes,
-            // The sale as the admin entered it, live or not; members see it
-            // as labels, and only while it runs (PriceLabelPresenter::sale).
-            'sale_hourly_rate_points' => $this->sale_hourly_rate_points,
-            'sale_starts_at' => $this->sale_starts_at?->toISOString(),
-            'sale_ends_at' => $this->sale_ends_at?->toISOString(),
             'amenities' => $this->amenities->pluck('amenity'),
             'status' => $this->status,
             'status_reason' => $this->status_reason,

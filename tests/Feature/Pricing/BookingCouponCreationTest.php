@@ -27,6 +27,7 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
@@ -36,7 +37,7 @@ use Tests\TestCase;
  */
 class BookingCouponCreationTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Space $room;
 
@@ -98,9 +99,9 @@ class BookingCouponCreationTest extends TestCase
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(920, $this->balance($member));
 
-        $redemption = app(CouponLedger::class)->forRedeemable($booking);
+        $redemption = app(CouponLedger::class)->couponFor($booking);
         $this->assertSame($coupon->id, $redemption->coupon_id);
-        $this->assertSame(20, $redemption->points_discounted);
+        $this->assertSame(20, $redemption->points);
         $this->assertSame(100, $redemption->base_points);
     }
 
@@ -148,13 +149,9 @@ class BookingCouponCreationTest extends TestCase
         }
     }
 
-    public function test_a_sale_prices_the_booking_by_usage_time(): void
+    public function test_an_offer_prices_the_booking_by_usage_time(): void
     {
-        $this->room->update([
-            'sale_hourly_rate_points' => 60,
-            'sale_starts_at' => Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(),
-            'sale_ends_at' => Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(),
-        ]);
+        $offer = $this->offerOnSpace($this->room, 60, Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(), Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc());
         $member = $this->member();
 
         $booking = $this->book($member, 10);
@@ -162,9 +159,56 @@ class BookingCouponCreationTest extends TestCase
         $this->assertSame(60, $booking->price_points);
         $this->assertSame(100, $booking->list_price_points);
         $this->assertSame(940, $this->balance($member));
+
+        // Filed in the ledger with a copy of its terms.
+        $row = app(CouponLedger::class)->offerFor($booking);
+        $this->assertSame($offer->id, $row->coupon_id);
+        $this->assertSame(100, $row->base_points);
+        $this->assertSame(40, $row->points);
+        $this->assertSame(40, $row->percent);
+        $this->assertSame('2026-08-17T21:00:00+00:00', $row->terms['ends_at']); // Damascus midnight
     }
 
-    /** A plan discount's use is spent only when it, not the sale, priced the booking. */
+    /** A tie between the offer and the plan discount takes the offer: no plan-discount use is spent. */
+    public function test_a_tie_takes_the_offer_and_spends_no_plan_discount_use(): void
+    {
+        $member = $this->member();
+        $plan = Plan::factory()->create();
+        $plan->discounts()->create(['percentage' => 30, 'space_id' => $this->room->id]);
+        Membership::factory()->create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(30),
+        ]);
+        $this->offerOnSpace($this->room, 70);
+
+        $booking = $this->book($member, 10);
+
+        $this->assertSame(70, $booking->price_points);
+        $this->assertFalse(PlanDiscountRedemption::where('booking_id', $booking->id)->exists());
+        $this->assertNull(app(CouponLedger::class)->planDiscountFor($booking));
+        $this->assertNotNull(app(CouponLedger::class)->offerFor($booking));
+    }
+
+    public function test_a_combinable_coupon_stacks_on_the_offer_and_both_are_filed(): void
+    {
+        $this->offerOnSpace($this->room, 75);
+        Coupon::factory()->percentage(10)->create(['code' => 'TEN']);
+        $member = $this->member();
+
+        $booking = $this->book($member, 10, 'TEN');
+
+        $this->assertSame(68, $booking->price_points);
+        $this->assertSame(25, app(CouponLedger::class)->offerFor($booking)->points);
+        $coupon = app(CouponLedger::class)->couponFor($booking);
+        $this->assertSame(75, $coupon->base_points);
+        $this->assertSame(7, $coupon->points);
+    }
+
+    /** A plan discount's use is spent only when it, not the offer, priced the booking. */
     public function test_the_plan_discount_is_redeemed_only_when_it_was_chosen(): void
     {
         $member = $this->member();
@@ -183,11 +227,7 @@ class BookingCouponCreationTest extends TestCase
         $this->assertSame(70, $planPriced->price_points);
         $this->assertSame(30, PlanDiscountRedemption::where('booking_id', $planPriced->id)->value('points_discounted'));
 
-        $this->room->update([
-            'sale_hourly_rate_points' => 50,
-            'sale_starts_at' => Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(),
-            'sale_ends_at' => Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(),
-        ]);
+        $this->offerOnSpace($this->room, 50);
 
         $salePriced = $this->book($member, 12);
         $this->assertSame(50, $salePriced->price_points);

@@ -3,7 +3,7 @@
 namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
-use App\Domain\Pricing\Concerns\HasSalePrice;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -27,7 +27,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class Plan extends Model
 {
-    use HasFactory, HasSalePrice, HasTranslations;
+    use HasFactory, HasTranslations;
 
     private const MINUTES_PER_DAY = 1440;
 
@@ -37,9 +37,9 @@ class Plan extends Model
         'subtitle',
         'is_subscription',
         'price_points',
-        'sale_price_points',
-        'sale_starts_at',
-        'sale_ends_at',
+        'reference_plan_id',
+        'reference_space_id',
+        'reference_units',
         'duration_days',
         'access_window_start',
         'access_window_end',
@@ -55,17 +55,10 @@ class Plan extends Model
             'subtitle' => 'array',
             'is_subscription' => 'boolean',
             'price_points' => 'integer',
-            'sale_price_points' => 'integer',
-            'sale_starts_at' => 'datetime',
-            'sale_ends_at' => 'datetime',
+            'reference_units' => 'integer',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
         ];
-    }
-
-    protected function salePriceColumn(): string
-    {
-        return 'sale_price_points';
     }
 
     /**
@@ -243,6 +236,18 @@ class Plan extends Model
     public function isDedicatedDesk(): bool
     {
         return $this->planModule?->slug === PlanModule::DEDICATED_DESK;
+    }
+
+    /** The plan this one's saving is measured against (PlanSavingCalculator). */
+    public function referencePlan(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'reference_plan_id');
+    }
+
+    /** The space whose hourly rate this one's saving is measured against. */
+    public function referenceSpace(): BelongsTo
+    {
+        return $this->belongsTo(Space::class, 'reference_space_id');
     }
 
     public function planModule(): BelongsTo

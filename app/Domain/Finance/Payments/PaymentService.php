@@ -31,6 +31,7 @@ use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
+use App\Domain\Pricing\Services\QuoteRecorder;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\DetectsLostConnections;
 use Illuminate\Database\Eloquent\Model;
@@ -75,6 +76,7 @@ class PaymentService
         private readonly PaymentNotifier $notifier,
         private readonly PriceQuoteService $quotes,
         private readonly CouponLedger $couponLedger,
+        private readonly QuoteRecorder $recorder,
     ) {}
 
     /**
@@ -128,11 +130,19 @@ class PaymentService
         }
 
         $open = function () use ($purpose, $payer, $driver, $fulfiller, $context, $coupon) {
-            // The coupon's row first, so its limits are counted from a fresh
-            // snapshot (CouponLedger), and the price it gives — eligibility
-            // checked — before anything is written.
-            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
-            $quote = $coupon !== null ? $this->quotes->forPlan($context['plan'], $payer, $coupon, now()) : null;
+            // The coupon's and the limited offers' rows first, so their limits
+            // are counted from a fresh snapshot (CouponLedger), and the price
+            // they give — eligibility checked — before anything is written. A
+            // plan is always quoted: an offer may price it with no code typed.
+            // Nothing else is priced here — an extension's charge, an approved
+            // registration's — and those callers already hold their record's
+            // lock, so taking the coupon rows after it would invert the order.
+            if ($purpose === PaymentPurpose::PlanPurchase) {
+                $coupon = $this->couponLedger->lockForPricing($coupon);
+            }
+            $quote = $purpose === PaymentPurpose::PlanPurchase && isset($context['plan'])
+                ? $this->quotes->forPlan($context['plan'], $payer, $coupon, now())
+                : null;
 
             $payment = new Payment;
             $payment->forceFill([
@@ -163,13 +173,14 @@ class PaymentService
                 return ['payment' => null, 'start' => PaymentStart::payAtReception()];
             }
 
-            // The coupon's use is filed on the row before what is due is read,
-            // so the fulfiller prices the payment with it — the wallet check,
-            // the debit and every later quote alike.
-            if (($applied = $quote?->appliedCoupon()) !== null) {
+            // The offer's and the coupon's uses — and the plan's saving, for
+            // the report — are filed on the row before what is due is read,
+            // so the fulfiller prices the payment with them: the wallet
+            // check, the debit and every later quote alike.
+            if ($quote !== null && ($quote->appliedOffer() !== null || $quote->appliedCoupon() !== null || $quote->saving !== null)) {
                 $payment->amount_points = 0;
                 $payment->save();
-                $this->couponLedger->record($applied, $payer, $payment, PricingPurpose::PlanPurchase, $quote->couponBasePoints, $quote->couponPoints);
+                $this->recorder->record($quote, $payment, $payer, PricingPurpose::PlanPurchase);
             }
 
             $payment->amount_points = isset($context['points']) ? (int) $context['points'] : $fulfiller->pointsDue($payment);
@@ -182,9 +193,9 @@ class PaymentService
 
             $payment->save();
 
-            // A plan a coupon made free has nothing to spend or collect:
-            // settled on the spot, by whatever method was asked for.
-            if ($applied !== null && $payment->amount_points === 0) {
+            // A plan a coupon or an offer made free has nothing to spend or
+            // collect: settled on the spot, by whatever method was asked for.
+            if ($quote !== null && $quote->finalPoints < $quote->listPoints && $payment->amount_points === 0) {
                 return ['payment' => $this->settle($payment)->refresh(), 'start' => PaymentStart::done()];
             }
 

@@ -49,6 +49,7 @@ class CouponEligibility
     public function resolve(string $code): Coupon
     {
         return Coupon::query()
+            ->where('is_automatic', false)
             ->where('code', Coupon::normalizeCode($code))
             ->where('is_active', true)
             ->first()
@@ -60,13 +61,26 @@ class CouponEligibility
      */
     public function assertUsable(Coupon $coupon, User $member, PricingTarget $target, ?UsageInFlight $inFlight = null, ?CarbonInterface $at = null): void
     {
+        if (($rejection = $this->rejection($coupon, $member, $target, $inFlight, $at)) !== null) {
+            throw new CouponRejectedException($rejection);
+        }
+    }
+
+    /**
+     * The first rule that refuses, or null. With no target, what the coupon
+     * is for is not asked — only whether this member may use it at all.
+     */
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, ?UsageInFlight $inFlight = null, ?CarbonInterface $at = null): ?CouponRejection
+    {
         $inFlight ??= new UsageInFlight;
         $at ??= now();
 
         foreach ($this->rules as $rule) {
             if (($rejection = $rule->rejection($coupon, $member, $target, $inFlight, $at)) !== null) {
-                throw new CouponRejectedException($rejection);
+                return $rejection;
             }
         }
+
+        return null;
     }
 }

@@ -7,8 +7,6 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
-use App\Http\Requests\Concerns\InterpretsLocalTimes;
-use App\Http\Requests\Concerns\ValidatesSaleWindow;
 use App\Support\TranslatableField;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -16,8 +14,6 @@ use Illuminate\Validation\Rule;
 
 class StoreSpaceRequest extends FormRequest
 {
-    use InterpretsLocalTimes, ValidatesSaleWindow;
-
     public function authorize(): bool
     {
         return true;
@@ -33,8 +29,6 @@ class StoreSpaceRequest extends FormRequest
                 'images' => [$this->input('image_url')],
             ]);
         }
-
-        $this->interpretSaleWindow();
     }
 
     /**
@@ -66,8 +60,6 @@ class StoreSpaceRequest extends FormRequest
                 'allows_extension' => ['sometimes', 'boolean'],
                 'cancellation_window_minutes' => ['sometimes', 'nullable', 'integer', 'min:0', 'max:10080'],
             ],
-            // An hourly rate on sale for a while (a week at 80 instead of 100).
-            $this->saleWindowRules('sale_hourly_rate_points'),
         );
     }
 
@@ -77,15 +69,13 @@ class StoreSpaceRequest extends FormRequest
      * seats are more desks. And a co_space with desks keeps its type: turned
      * into anything else, its desks would sit in a space that has none
      * (docs/decisions/coworking-seat-pool.md). SpaceController re-checks the
-     * first rule under the branch lock. A sale rate is below the hourly rate.
+     * first rule under the branch lock.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
             $self = $this->route('space');
             $self = $self instanceof Space ? $self : ($self !== null ? Space::find($self) : null);
-
-            $this->assertSaleBelowPrice($validator, 'sale_hourly_rate_points', 'hourly_rate_points', $self);
 
             if ($self !== null
                 && $self->space_type === SpaceType::CoSpace

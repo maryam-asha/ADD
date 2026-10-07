@@ -19,6 +19,8 @@ use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Domain\Pricing\Services\QuoteRecorder;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
@@ -36,6 +38,7 @@ class SessionClosureService
         private readonly PlanHourCoverageService $planHours,
         private readonly PriceQuoteService $quotes,
         private readonly QuoteRecorder $recorder,
+        private readonly CouponLedger $couponLedger,
     ) {}
 
     /**
@@ -55,6 +58,9 @@ class SessionClosureService
     public function closeOut(Booking|WalkinSession $session, CarbonInterface $enteredTime): void
     {
         DB::transaction(function () use ($session, $enteredTime) {
+            // A session priced now may take a limited offer: those rows
+            // first, as every pricing transaction takes them (CouponLedger).
+            $this->couponLedger->lockForPricing(null);
             $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
             $this->assertOpenForClosure($locked);
@@ -92,6 +98,7 @@ class SessionClosureService
     public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
     {
         DB::transaction(function () use ($session, $closingInstant) {
+            $this->couponLedger->lockForPricing(null);
             $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
             $this->assertOpenForClosure($locked);
@@ -215,8 +222,8 @@ class SessionClosureService
         $block = $this->blockSeconds();
         $billed = $billable > 0 ? (int) (ceil($billable / $block) * $block) : 0;
 
-        // The billed stretch, from check-in: the space's sale by usage time,
-        // and the record's locked plan discount or coupon terms
+        // The billed stretch, from check-in: the record's locked offer or
+        // plan discount — or the best offer now — and its coupon terms
         // (PriceQuoteService, the one place a price is composed).
         return $this->quotes->forSession($session, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
     }
@@ -302,7 +309,7 @@ class SessionClosureService
         $session->forceFill($attributes)->save();
 
         if ($repriced) {
-            $this->recorder->reprice($quote, $session);
+            $this->recorder->reprice($quote, $session, $session->user, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession);
         }
 
         // An end request still waiting on this session is moot once it is

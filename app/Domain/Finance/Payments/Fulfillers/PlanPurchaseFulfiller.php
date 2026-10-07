@@ -38,8 +38,8 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
     }
 
     /**
-     * The plan as it is now — a repriced plan is caught — at the sale live
-     * when the payment was opened and the coupon locked on it
+     * The plan as it is now — a repriced plan is caught — at the offer and
+     * the coupon locked on the payment when it was opened
      * (PriceQuoteService, the one place a price is composed).
      */
     public function pointsDue(Payment $payment): int

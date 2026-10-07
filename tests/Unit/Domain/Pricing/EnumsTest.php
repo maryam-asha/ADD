@@ -39,7 +39,7 @@ class EnumsTest extends TestCase
 
     public function test_coupon_discount_type_cases(): void
     {
-        $this->assertSame(['percentage', 'amount_off'], array_column(CouponDiscountType::cases(), 'value'));
+        $this->assertSame(['percentage', 'amount_off', 'fixed_price'], array_column(CouponDiscountType::cases(), 'value'));
     }
 
     /** Phase 1 issues coupons from the dashboard only; gift and referral come later. */

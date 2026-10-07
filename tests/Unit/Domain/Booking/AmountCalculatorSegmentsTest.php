@@ -15,6 +15,18 @@ use Tests\TestCase;
  */
 class AmountCalculatorSegmentsTest extends TestCase
 {
+    public function test_a_fractional_rate_is_summed_exactly_and_rounded_once(): void
+    {
+        $calculator = new AmountCalculator;
+
+        // 2 h at 13.5/h is exactly 27 — rounding the rate first would say 28.
+        $this->assertSame(27, $calculator->forSegments([new RateSegment(7200, '13.5')]));
+        // 1 h at 13.5/h is 13.5, charged 14.
+        $this->assertSame(14, $calculator->forSegments([new RateSegment(3600, '13.5')]));
+        // 30 min at 13.5 + 30 min at 15 = 14.25, charged 15.
+        $this->assertSame(15, $calculator->forSegments([new RateSegment(1800, '13.5'), new RateSegment(1800, 15)]));
+    }
+
     public function test_segments_are_summed_before_the_single_ceil(): void
     {
         $calculator = new AmountCalculator;

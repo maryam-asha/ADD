@@ -23,6 +23,7 @@ use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
@@ -33,7 +34,7 @@ use Tests\TestCase;
  */
 class BookingPayByIdTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -202,11 +203,12 @@ class BookingPayByIdTest extends TestCase
     {
         $this->member();
         $space = $this->openSpace();
-        $space->update([
-            'sale_hourly_rate_points' => 80,
-            'sale_starts_at' => Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc(),
-            'sale_ends_at' => Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc(),
-        ]);
+        $this->offerOnSpace(
+            $space,
+            80,
+            Carbon::parse('2026-08-17 00:00:00', 'Asia/Damascus')->utc()->toDateTimeString(),
+            Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc()->toDateTimeString(),
+        );
         Coupon::factory()->amountOff(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
         Http::fake(['*' => Http::response('', 500)]);
 

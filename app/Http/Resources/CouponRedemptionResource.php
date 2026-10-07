@@ -8,7 +8,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One use of a coupon: who, on what, and the terms it was locked in on.
  * `counts` says whether it still counts against the coupon's limits — set
- * by the controller from CouponRedemption::scopeLive, since that follows
+ * by the controller from AppliedDiscount::scopeLive, since that follows
  * the record's status rather than a column here.
  */
 class CouponRedemptionResource extends JsonResource
@@ -34,7 +34,11 @@ class CouponRedemptionResource extends JsonResource
             'discount_value' => $this->discount_value,
             'max_discount_points' => $this->max_discount_points,
             'base_points' => $this->base_points,
-            'points_discounted' => $this->points_discounted,
+            'kind' => $this->kind,
+            'points' => $this->points,
+            'percent' => $this->percent,
+            // The phase-1 name for `points`, kept while the dashboard moves over.
+            'points_discounted' => $this->points,
             'counts' => (bool) $this->getAttribute('counts'),
             'created_at' => $this->created_at,
         ];

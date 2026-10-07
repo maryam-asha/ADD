@@ -100,7 +100,7 @@ class CouponPreviewControllerTest extends TestCase
             ->assertJsonPath('data.price_points', 50);
 
         $this->assertSame(100, $booking->refresh()->price_points);
-        $this->assertNull(app(CouponLedger::class)->forRedeemable($booking));
+        $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 
     public function test_an_event(): void

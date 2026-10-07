@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
+use App\Http\Controllers\Api\V1\Member\MemberCouponController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
 use App\Http\Controllers\Api\V1\Member\MemberServiceController;
@@ -214,6 +215,11 @@ Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
 // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
 // Throttled, so codes cannot be guessed at speed.
 Route::post('coupons/preview', CouponPreviewController::class)->middleware('throttle:20,1');
+
+// "My coupons": the codes given to this member, by name or through their
+// company, usable now — with `purpose` and a space, plan or event, only
+// those that apply to it. A code given to no one in particular is never listed.
+Route::get('coupons', MemberCouponController::class);
 
 // The member's payments (docs/paymera.md) — reads only. Nothing is paid here:
 // each operation opens its own payment through its own endpoint. `index` is

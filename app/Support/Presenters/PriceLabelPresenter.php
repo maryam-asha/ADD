@@ -6,7 +6,8 @@ use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
-use App\Domain\Pricing\ValueObjects\SaleWindow;
+use App\Domain\Pricing\ValueObjects\OfferPrice;
+use App\Domain\Pricing\ValueObjects\PlanSaving;
 use App\Support\Time\LocalTime;
 use Illuminate\Http\Request;
 
@@ -90,18 +91,20 @@ class PriceLabelPresenter
     }
 
     /**
-     * A sale live right now, as the member sees it: the original price
-     * (struck through by the app), the sale price, and when the sale ends.
-     * Null when nothing is on sale — before it starts, after it ends, or a
-     * "sale" no lower than the price. `$hourly` labels a space's rate;
-     * otherwise a total, such as a package's. `$endsKey` names the
-     * "ends …" sentence (`api.space.sale_ends`, `api.package.sale_ends`).
+     * The best automatic offer live right now for this member, as they see
+     * it — the `sale` block (OfferResolver::hourlyNow / planNow): the
+     * original price (struck through by the app), the offer price, how much
+     * it takes off, and when the offer ends — both null for an offer with no
+     * end. Null when there is no offer, or one no lower than the price.
+     * `$hourly` labels a space's rate (the discount is then per hour too);
+     * otherwise a total, such as a package's. `$group` holds the sentences
+     * (`api.space`, `api.package`: `sale_ends`, `sale_discount_*`).
      *
-     * @return array{points: int, original_label: string, sale_label: string, ends_at: string, ends_label: string}|null
+     * @return array{points: int, original_points: int, original_label: string, sale_label: string, discount_points: int, discount_amount_label: string, discount_percent: int, discount_label: string, ends_at: ?string, ends_label: ?string}|null
      */
-    public function sale(?SaleWindow $sale, int $originalPoints, ?User $user, bool $hourly, string $endsKey, ?string $locale = null): ?array
+    public function sale(?OfferPrice $offer, int $originalPoints, ?User $user, bool $hourly, string $group, ?string $locale = null): ?array
     {
-        if ($sale === null || ! $sale->isLiveAt(now()) || $sale->points >= $originalPoints) {
+        if ($offer === null || $offer->points >= $originalPoints) {
             return null;
         }
 
@@ -109,14 +112,63 @@ class PriceLabelPresenter
         $label = fn (int $points) => $hourly
             ? $this->hourly($points, $user, $locale)['price_label']
             : $this->total($points, $user, $locale)['price'];
-        $endsAt = app(LocalTime::class)->toLocal($sale->endsAt);
+        $endsAt = $offer->endsAt !== null ? app(LocalTime::class)->toLocal($offer->endsAt) : null;
+
+        $discount = $originalPoints - $offer->points;
+        // Rounded down: the discount announced is never more than the real one.
+        $percent = intdiv($discount * 100, $originalPoints);
+        $discountLabel = $label($discount);
 
         return [
-            'points' => $sale->points,
+            'points' => $offer->points,
+            'original_points' => $originalPoints,
             'original_label' => $label($originalPoints),
-            'sale_label' => $label($sale->points),
-            'ends_at' => $endsAt->toIso8601String(),
-            'ends_label' => __($endsKey, ['date' => $endsAt->format('Y-m-d H:i')], $locale),
+            'sale_label' => $label($offer->points),
+            'discount_points' => $discount,
+            'discount_amount_label' => $discountLabel,
+            'discount_percent' => $percent,
+            // Under one percent, "0% off" would say nothing: the amount instead.
+            'discount_label' => $percent >= 1
+                ? __("{$group}.sale_discount_percent", ['percent' => $percent], $locale)
+                : __("{$group}.sale_discount_amount", ['amount' => $discountLabel], $locale),
+            'ends_at' => $endsAt?->toIso8601String(),
+            'ends_label' => $endsAt !== null ? __("{$group}.sale_ends", ['date' => $endsAt->format('Y-m-d H:i')], $locale) : null,
+        ];
+    }
+
+    /**
+     * A plan's built-in saving, as the member sees it — the `saving` block
+     * beside `sale`: what the reference costs (`reference_label`), what the
+     * plan saves, and its price per unit (`per_unit_label`, rounded UP to a
+     * whole point like an offer rate, E8 — it never understates the price).
+     * Null when the plan has no saving.
+     *
+     * @return array{compared_to: string, reference_points: int, reference_label: string, saving_points: int, saving_percent: int, saving_label: string, per_unit_label: string}|null
+     */
+    public function saving(?PlanSaving $saving, ?User $user, ?string $locale = null): ?array
+    {
+        if ($saving === null) {
+            return null;
+        }
+
+        $locale ??= app()->getLocale();
+        $whole = bcdiv($saving->perUnitPoints, '1', 0);
+        $perUnit = (int) (bccomp($saving->perUnitPoints, $whole, 2) > 0 ? bcadd($whole, '1') : $whole);
+        $savingAmount = $this->total($saving->savingPoints, $user, $locale)['price'];
+
+        return [
+            'compared_to' => $saving->comparedTo,
+            'reference_points' => $saving->referencePoints,
+            'reference_label' => $this->total($saving->referencePoints, $user, $locale)['price'],
+            'saving_points' => $saving->savingPoints,
+            'saving_percent' => $saving->savingPercent,
+            // Under one percent, "0%" would say nothing: the amount instead.
+            'saving_label' => $saving->savingPercent >= 1
+                ? __('api.package.saving_percent', ['percent' => $saving->savingPercent], $locale)
+                : __('api.package.saving_amount', ['amount' => $savingAmount], $locale),
+            'per_unit_label' => $saving->comparedTo === 'space'
+                ? $this->hourly($perUnit, $user, $locale)['price_label']
+                : __('api.package.per_unit', ['amount' => $this->total($perUnit, $user, $locale)['price'], 'unit' => (string) $saving->referenceName], $locale),
         ];
     }
 

@@ -15,7 +15,7 @@ use Carbon\CarbonInterface;
  */
 class MemberIsInAudience implements CouponRule
 {
-    public function rejection(Coupon $coupon, User $member, PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
+    public function rejection(Coupon $coupon, User $member, ?PricingTarget $target, UsageInFlight $inFlight, CarbonInterface $at): ?CouponRejection
     {
         if ($coupon->users()->exists() && ! $coupon->users()->whereKey($member->id)->exists()) {
             return CouponRejection::NotEligible;

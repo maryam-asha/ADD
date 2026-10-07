@@ -23,6 +23,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
+use Tests\Feature\Pricing\Concerns\MakesOffers;
 use Tests\TestCase;
 
 /**
@@ -33,7 +34,7 @@ use Tests\TestCase;
  */
 class PlanCouponPurchaseTest extends TestCase
 {
-    use RefreshDatabase;
+    use MakesOffers, RefreshDatabase;
 
     private Plan $plan;
 
@@ -106,13 +107,13 @@ class PlanCouponPurchaseTest extends TestCase
         $this->assertSame(120, $payment->list_price_points);
         $this->assertSame(440, $this->balance($member));
         $this->assertSame(1, Membership::count());
-        $this->assertSame($payment->id, app(CouponLedger::class)->forRedeemable($payment)->payment_id);
+        $this->assertSame($payment->id, app(CouponLedger::class)->couponFor($payment)->payment_id);
         $this->assertSame(1, app(CouponLedger::class)->liveUsage($coupon));
     }
 
-    public function test_a_coupon_on_top_of_the_plans_sale(): void
+    public function test_a_coupon_on_top_of_the_plans_offer(): void
     {
-        $this->plan->update(['sale_price_points' => 100, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay()]);
+        $this->offerOnPlan($this->plan, 100, now()->subDay(), now()->addDay());
         Coupon::factory()->percentage(10)->create(['code' => 'TEN']);
         $this->member(500);
 
@@ -222,13 +223,13 @@ class PlanCouponPurchaseTest extends TestCase
     }
 
     /**
-     * A coupon that does not combine with offers, beaten by the sale: the
-     * plan is bought at the sale price and the response says why the code
+     * A coupon that does not combine with offers, beaten by the offer: the
+     * plan is bought at the offer price and the response says why the code
      * was not used (D2) — the use is not spent.
      */
-    public function test_a_coupon_beaten_by_the_sale_says_so(): void
+    public function test_a_coupon_beaten_by_the_offer_says_so(): void
     {
-        $this->plan->update(['sale_price_points' => 100, 'sale_starts_at' => now()->subDay(), 'sale_ends_at' => now()->addDay()]);
+        $this->offerOnPlan($this->plan, 100, now()->subDay(), now()->addDay());
         $coupon = Coupon::factory()->percentage(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
         $this->member(500);
 

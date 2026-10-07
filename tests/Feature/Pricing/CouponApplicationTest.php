@@ -101,7 +101,7 @@ class CouponApplicationTest extends TestCase
         $this->assertSame('8.00', (string) $booking->amount_owed);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(80, Payment::sole()->amount_points);
-        $this->assertSame($coupon->id, app(CouponLedger::class)->forRedeemable($booking)->coupon_id);
+        $this->assertSame($coupon->id, app(CouponLedger::class)->couponFor($booking)->coupon_id);
     }
 
     public function test_a_second_coupon_on_the_same_booking_is_refused(): void
@@ -135,7 +135,7 @@ class CouponApplicationTest extends TestCase
         $booking->refresh();
         $this->assertSame(100, $booking->price_points);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
-        $this->assertNull(app(CouponLedger::class)->forRedeemable($booking));
+        $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 
     /**
@@ -158,7 +158,7 @@ class CouponApplicationTest extends TestCase
         $this->assertSame(80, $booking->price_points);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(80, Payment::sole()->amount_points);
-        $this->assertNull(app(CouponLedger::class)->forRedeemable($booking));
+        $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 
     public function test_a_coupon_that_clears_a_session_leaves_nothing_to_pay(): void

@@ -3,13 +3,17 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Pricing\Enums\CouponRevisionAction;
 use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
-use App\Domain\Pricing\Models\CouponRedemption;
+use App\Domain\Pricing\Models\CouponRevision;
+use App\Domain\Pricing\Services\CouponHistory;
 use App\Http\Requests\Admin\StoreCouponRequest;
 use App\Http\Requests\Admin\UpdateCouponRequest;
 use App\Http\Resources\CouponRedemptionResource;
 use App\Http\Resources\CouponResource;
+use App\Http\Resources\CouponRevisionResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
@@ -58,7 +62,15 @@ class CouponController extends AdminResourceController
             ->latest('id');
 
         if ($request->filled('search')) {
-            $query->where('code', 'like', '%'.Coupon::normalizeCode((string) $request->query('search')).'%');
+            $search = (string) $request->query('search');
+            // A coupon by its code, an offer (which has none) by its name.
+            $query->where(fn (Builder $q) => $q->where('code', 'like', '%'.Coupon::normalizeCode($search).'%')
+                ->orWhere('name', 'like', '%'.$search.'%'));
+        }
+
+        // Offers (automatic) and coupons are managed on separate screens.
+        if ($request->has('is_automatic')) {
+            $query->where('is_automatic', $request->boolean('is_automatic'));
         }
 
         if ($request->has('is_active')) {
@@ -86,19 +98,21 @@ class CouponController extends AdminResourceController
         );
     }
 
-    public function store(StoreCouponRequest $request): CouponResource
+    public function store(StoreCouponRequest $request, CouponHistory $history): CouponResource
     {
         $validated = $request->validated();
 
-        $coupon = DB::transaction(function () use ($validated, $request) {
+        $coupon = DB::transaction(function () use ($validated, $request, $history) {
             $coupon = Coupon::create(array_merge(
-                // One use per member unless the admin says otherwise (D11).
-                ['per_user_limit' => 1],
+                // One use per member unless the admin says otherwise (D11) —
+                // a coupon's default; an offer is limited only when set.
+                ['per_user_limit' => ($validated['is_automatic'] ?? false) ? null : 1],
                 $this->couponAttributes($validated),
                 ['source' => CouponSource::Admin, 'created_by' => $request->user()->id],
             ));
 
             $this->syncAudience($coupon, $validated);
+            $history->record($coupon, CouponRevisionAction::Created, $request->user());
 
             return $coupon;
         });
@@ -108,14 +122,15 @@ class CouponController extends AdminResourceController
         return new CouponResource($coupon->refresh()->load(['targets', 'users']));
     }
 
-    public function update(UpdateCouponRequest $request, Coupon $coupon): JsonResponse
+    public function update(UpdateCouponRequest $request, Coupon $coupon, CouponHistory $history): JsonResponse
     {
         $validated = $request->validated();
         $before = $coupon->only(array_keys($this->couponAttributes($validated)));
 
-        DB::transaction(function () use ($coupon, $validated) {
+        DB::transaction(function () use ($coupon, $validated, $history, $request) {
             $coupon->update($this->couponAttributes($validated));
             $this->syncAudience($coupon, $validated);
+            $history->record($coupon, CouponRevisionAction::Updated, $request->user());
         });
 
         $this->logSensitiveAction('coupon_updated', $coupon, ['before' => $before, 'after' => $validated]);
@@ -135,19 +150,31 @@ class CouponController extends AdminResourceController
             throw new HttpResponseException(response()->json(['message' => __('api.coupon.has_redemptions')], 409));
         }
 
-        $coupon->delete();
-        $this->logSensitiveAction('coupon_deleted', $coupon, ['code' => $coupon->code]);
+        // Its history outlives it: a period it ran in still lists it.
+        DB::transaction(function () use ($coupon) {
+            app(CouponHistory::class)->record($coupon, CouponRevisionAction::Deleted, request()->user());
+            $coupon->delete();
+        });
+        $this->logSensitiveAction('coupon_deleted', $coupon, ['code' => $coupon->code, 'name' => $coupon->name]);
 
         return response()->noContent();
+    }
+
+    /** Every version of it an admin saved, newest first (CouponHistory). */
+    public function revisions(Request $request, Coupon $coupon): AnonymousResourceCollection
+    {
+        return CouponRevisionResource::collection(
+            CouponRevision::query()->where('coupon_id', $coupon->id)->latest('recorded_at')->latest('id')->paginate($request->integer('per_page', 15))
+        );
     }
 
     /** Who used it, newest first, and whether each use still counts. */
     public function redemptions(Request $request, Coupon $coupon): AnonymousResourceCollection
     {
         $page = $coupon->redemptions()->with('user')->latest('id')->paginate($request->integer('per_page', 15));
-        $counting = CouponRedemption::query()->whereKey($page->pluck('id'))->live()->pluck('id')->flip();
+        $counting = AppliedDiscount::query()->whereKey($page->pluck('id'))->live()->pluck('id')->flip();
 
-        $page->getCollection()->each(fn (CouponRedemption $redemption) => $redemption->setAttribute('counts', $counting->has($redemption->id)));
+        $page->getCollection()->each(fn (AppliedDiscount $redemption) => $redemption->setAttribute('counts', $counting->has($redemption->id)));
 
         return CouponRedemptionResource::collection($page);
     }

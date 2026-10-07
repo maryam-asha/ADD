@@ -84,9 +84,9 @@ class BookingCreationService
         $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
 
         return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod, $coupon) {
-            // The coupon's row first — before the branch and the space — so
+            // The coupon's and the limited offers' rows first — before the branch and the space — so
             // its limits are counted from a fresh snapshot (CouponLedger).
-            $coupon = $coupon !== null ? $this->couponLedger->lockForRedemption($coupon) : null;
+            $coupon = $this->couponLedger->lockForPricing($coupon);
 
             if ($rules->usesBranchPool) {
                 // Every decision about a branch's co-working seats — bookings,
@@ -129,7 +129,7 @@ class BookingCreationService
 
             $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
-            // The list price, the better of the space's sale and the
+            // The list price, the better of the best automatic offer and the
             // member's plan discount (applied automatically, never an opt-in
             // — docs/decisions/plan-discounts-design.md), and the coupon on
             // top: PriceQuoteService, the one place a price is composed.
