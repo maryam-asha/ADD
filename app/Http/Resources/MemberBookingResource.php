@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Support\Time\LocalTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -44,6 +45,9 @@ class MemberBookingResource extends JsonResource
             'is_upcoming' => $booking->start_at->isFuture(),
             'status' => $booking->status->value,
             'status_label' => $booking->status->label($locale),
+            // A booking held for its payment: when the hold lapses, in the
+            // district's offset like the detail's times.
+            'payment_due_at' => app(LocalTime::class)->toLocal($booking->payment_due_at)?->toIso8601String(),
             'payment_state' => $booking->payment_state->value,
         ];
     }

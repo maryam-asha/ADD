@@ -85,7 +85,7 @@ class MemberBookingCardTest extends TestCase
 
         $card = $this->card();
 
-        $this->assertSame(['id', 'space', 'date_label', 'time_label', 'is_upcoming', 'status', 'status_label', 'payment_state'], array_keys($card));
+        $this->assertSame(['id', 'space', 'date_label', 'time_label', 'is_upcoming', 'status', 'status_label', 'payment_due_at', 'payment_state'], array_keys($card));
         $this->assertSame(['title', 'main_image'], array_keys($card['space']));
         $this->assertSame($booking->id, $card['id']);
         $this->assertSame('Meeting Room A', $card['space']['title']);

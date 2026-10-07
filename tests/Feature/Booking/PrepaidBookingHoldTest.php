@@ -308,4 +308,38 @@ class PrepaidBookingHoldTest extends TestCase
             'payment_method' => 'cash',
         ])->assertStatus(422);
     }
+
+    /**
+     * The member's views read times in the district's offset, as every other
+     * time on them (`checked_in_at`), so the countdown's deadline is local.
+     */
+    public function test_the_member_sees_the_hold_its_deadline_and_why_it_was_cancelled(): void
+    {
+        $this->member();
+        $space = $this->openSpace();
+        Http::fake(['*' => Http::response('', 500)]);
+        $id = $this->book([
+            'space_id' => $space->id,
+            'start_at' => '2026-08-17T10:00:00+03:00',
+            'end_at' => '2026-08-17T11:00:00+03:00',
+            'payment_method' => 'paymera',
+        ])->json('data.id');
+        $due = Carbon::parse('2026-08-17 08:15:00', 'Asia/Damascus')->toIso8601String();
+
+        $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$id}")
+            ->assertOk()
+            ->assertJsonPath('data.status', 'awaiting_payment')
+            ->assertJsonPath('data.payment_due_at', $due);
+
+        // The list card carries the same deadline for its countdown.
+        $this->withHeader('lang', 'en')->getJson('/api/v1/member/bookings')
+            ->assertOk()
+            ->assertJsonPath('data.0.status', 'awaiting_payment')
+            ->assertJsonPath('data.0.payment_due_at', $due);
+
+        app(BookingCancellationService::class)->releaseUnpaidHold(Booking::findOrFail($id));
+
+        $this->withHeader('lang', 'en')->getJson("/api/v1/member/bookings/{$id}")
+            ->assertJsonPath('data.status_note', __('api.booking.status_notes.payment_not_completed', [], 'en'));
+    }
 }

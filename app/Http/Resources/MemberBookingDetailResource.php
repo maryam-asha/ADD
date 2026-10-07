@@ -53,6 +53,10 @@ class MemberBookingDetailResource extends JsonResource
             'status' => $booking->status->value,
             'status_label' => $booking->status->label($locale),
             'status_note' => $presentation->statusNote($booking, $locale),
+            // While `awaiting_payment`: the moment the hold lapses, for the
+            // app's countdown. Kept after a lapse, which is how the
+            // cancellation reads as "payment not completed".
+            'payment_due_at' => $this->local($booking->payment_due_at),
             'space' => [
                 // Kept so the app can tell the space booked from `seat`, the
                 // room a co-working booking may actually sit in.
