@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
@@ -254,6 +255,23 @@ class CoworkingSessionStartTest extends TestCase
         ]);
 
         $this->scan()->assertStatus(409)->assertExactJson(['message' => 'Your booking is awaiting approval. Please see reception.']);
+        $this->assertNull($booking->fresh()->checked_in_at);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_a_booking_held_for_payment_is_not_checked_in(): void
+    {
+        $member = $this->actingAsMember();
+        $booking = Booking::factory()->create([
+            'user_id' => $member->id,
+            'space_id' => $this->space->id,
+            'status' => BookingStatus::AwaitingPayment,
+            'payment_due_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+        ]);
+
+        $this->scan()->assertStatus(409)->assertExactJson(['message' => 'Your booking is waiting for its payment. Pay it in the app or at reception, then scan again.']);
         $this->assertNull($booking->fresh()->checked_in_at);
         $this->assertSame(0, WalkinSession::count());
     }

@@ -87,6 +87,10 @@ class CoworkingSessionService
             if ($booking !== null) {
                 // No fallback to a walk-in: that would route around approval
                 // (docs/decisions/kiosk-display.md, same rule).
+                if ($booking->status === BookingStatus::AwaitingPayment) {
+                    throw new ReceptionActionException('api.coworking.booking_awaiting_payment', 409);
+                }
+
                 if ($booking->status === BookingStatus::Pending) {
                     throw new ReceptionActionException('api.coworking.booking_pending_approval', 409);
                 }

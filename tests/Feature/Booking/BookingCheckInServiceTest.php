@@ -68,6 +68,9 @@ class BookingCheckInServiceTest extends TestCase
             $this->fail('Checked in a booking still held for its payment');
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.booking.check_in_awaiting_payment', $e->messageKey);
+            $this->assertSame(409, $e->status);
         }
+
+        $this->assertNull($booking->fresh()->checked_in_at);
     }
 }

@@ -372,6 +372,7 @@ return [
         'ticket_expired' => 'This confirmation has expired. Scan the kiosk code again.',
         'unavailable' => 'Coworking sessions are not available at this kiosk right now.',
         'confirmation_required' => 'Your plan will not cover this session (:reason). It will be billed at :rate points per hour.',
+        'booking_awaiting_payment' => 'Your booking is waiting for its payment. Pay it in the app or at reception, then scan again.',
         'booking_pending_approval' => 'Your booking is awaiting approval. Please see reception.',
         'no_open_session' => 'You have no active session.',
         'end_request_not_pending' => 'This end request is no longer pending.',
