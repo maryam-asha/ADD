@@ -29,6 +29,12 @@ class BookingCheckInService
             throw new ReceptionActionException('api.reception.already_cancelled', 409);
         }
 
+        // Held for its card payment: take the payment first (reception
+        // settles it, which releases the hold), then check it in.
+        if ($booking->status === BookingStatus::AwaitingPayment) {
+            throw new ReceptionActionException('api.booking.check_in_awaiting_payment', 409);
+        }
+
         if ($booking->status === BookingStatus::Pending) {
             throw new ReceptionActionException('api.booking.check_in_requires_approval', 409);
         }

@@ -275,6 +275,7 @@ return [
         'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
         'check_in_no_show' => 'This booking ended without a check-in and can no longer be checked in.',
         'check_in_ended' => 'This booking has already ended and can no longer be checked in.',
+        'check_in_awaiting_payment' => 'This booking is waiting for its payment. Take the payment first, then check it in.',
         'not_cancellable' => 'This booking has already been closed and cannot be cancelled.',
         'lapsed_unreviewed' => 'Your request was not reviewed before it started, so it was closed automatically.',
 

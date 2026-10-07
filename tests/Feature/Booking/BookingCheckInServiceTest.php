@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
@@ -51,6 +52,22 @@ class BookingCheckInServiceTest extends TestCase
         } catch (ReceptionActionException $e) {
             $this->assertSame('api.booking.check_in_requires_approval', $e->messageKey);
             $this->assertSame(409, $e->status);
+        }
+    }
+
+    public function test_a_booking_held_for_its_payment_cannot_be_checked_in(): void
+    {
+        $booking = Booking::factory()->create([
+            'status' => BookingStatus::AwaitingPayment,
+            'payment_due_at' => now()->addMinutes(10),
+            'space_id' => $this->coworkingSpace()->id,
+        ]);
+
+        try {
+            app(BookingCheckInService::class)->checkIn($booking);
+            $this->fail('Checked in a booking still held for its payment');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.booking.check_in_awaiting_payment', $e->messageKey);
         }
     }
 }
