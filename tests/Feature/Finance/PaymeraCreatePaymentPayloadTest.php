@@ -67,7 +67,7 @@ class PaymeraCreatePaymentPayloadTest extends TestCase
     {
         config(['paymera.saved_cards_enabled' => true]);
 
-        $this->postJson('/api/v1/member/wallet/top-ups', ['amount' => '10.00'])->assertCreated();
+        $this->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera', 'amount' => '10.00'])->assertCreated();
 
         $token = Payment::sole()->callback_token;
         $this->assertNotNull($token);

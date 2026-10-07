@@ -18,6 +18,12 @@ use App\Domain\Foundation\Services\BusinessHoursService;
  */
 class BookingCheckInService
 {
+    /**
+     * How long before its start a booking may be checked in, from any door.
+     * A late arrival is always let in while the booking runs.
+     */
+    public const EARLY_CHECK_IN_MINUTES = 15;
+
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly OpenCoworkingSessionLocator $openSessions,
@@ -58,6 +64,10 @@ class BookingCheckInService
             throw new ReceptionActionException('api.booking.check_in_ended', 409);
         }
 
+        if ($booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
+            throw new ReceptionActionException('api.booking.check_in_too_early', 409);
+        }
+
         // At most one open coworking session per member, as for walk-ins
         // (WalkInCapacityService::start()); the scan returns the open one
         // before it ever gets here. Rooms and the other space types are not
@@ -70,8 +80,11 @@ class BookingCheckInService
             throw new ReceptionActionException('api.reception.outside_business_hours');
         }
 
+        // An early arrival is let in, but its session begins when the booking
+        // does: `checked_in_at` is never before `start_at` (the bookings
+        // table's CHECK constraint holds MySQL to the same).
         $booking->forceFill([
-            'checked_in_at' => now(),
+            'checked_in_at' => now()->max($booking->start_at),
             'checked_in_via' => $via,
             'kiosk_id' => $kiosk?->id,
         ])->save();

@@ -187,6 +187,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         Http::fake();
 
         $response = $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '1470000',
         ]);
 
@@ -206,6 +207,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         Http::fake();
 
         $response = $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '1470000',
         ], ['lang' => 'ar']);
 

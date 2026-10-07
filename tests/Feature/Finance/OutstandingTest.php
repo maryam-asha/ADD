@@ -8,8 +8,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
-use App\Domain\Finance\Enums\PaymentPurpose;
-use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Plan;
@@ -77,7 +76,7 @@ class OutstandingTest extends TestCase
         ]);
 
         $plan = Plan::factory()->create(['price_points' => 1200, 'is_active' => true]);
-        ['payment' => $hold] = app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
+        $hold = Payment::factory()->cashPlanHold($plan)->create(['user_id' => $member->id, 'wallet_id' => Wallet::firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $member->id])->id]);
 
         $response = $this->getJson("/api/v1/admin/reception/outstanding?user_id={$member->id}")->assertOk();
 

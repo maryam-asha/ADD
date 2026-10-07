@@ -337,9 +337,7 @@ class PackageBrowseService
     private function formatPackage(Plan $plan, bool $isCurrent, ?User $user): array
     {
         $pricePoints = (int) $plan->price_points;
-        $price = (float) $this->points->pointsToUsd($pricePoints);
-        $formattedPrice = sprintf('$%.2f /%s', $price, __('api.package.per_month'));
-        $formattedPointPrice = sprintf('%s %s /%s', number_format($pricePoints), __('api.package.points_unit'), __('api.package.per_month'));
+        $pricing = $this->prices->plan($pricePoints, $user);
 
         $name = $plan->translate('name') ?? 'Plan';
         $subtitle = $plan->translate('subtitle');
@@ -392,8 +390,7 @@ class PackageBrowseService
                 'icon' => $plan->planModule->icon,
             ] : null,
             'subtitle' => $subtitle,
-            'formatted_price' => $formattedPrice,
-            'formatted_point_price' => $formattedPointPrice,
+            'pricing' => $pricing,
             // The best offer live now for this member: what a purchase
             // opened now would cost them.
             'sale' => $this->prices->sale($this->offers->planNow($plan, $user), $pricePoints, $user, false, 'api.package'),

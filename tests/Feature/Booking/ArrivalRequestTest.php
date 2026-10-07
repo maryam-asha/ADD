@@ -138,7 +138,7 @@ class ArrivalRequestTest extends TestCase
             'open_time' => '08:00',
             'close_time' => '20:00',
         ]);
-        $booking = Booking::factory()->create(['space_id' => $space->id]);
+        $booking = Booking::factory()->create(['space_id' => $space->id, 'start_at' => now(), 'end_at' => now()->addHour()]);
         $arrivalRequest = ArrivalRequest::factory()->create(['matched_booking_id' => $booking->id]);
 
         $response = $this->postJson("/api/v1/admin/reception/arrival-requests/{$arrivalRequest->id}/confirm");

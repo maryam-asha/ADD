@@ -5,6 +5,7 @@ namespace Tests\Feature\Membership;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
@@ -23,9 +24,9 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Buying a plan by any method (docs/superpowers/plans/2026-09-30-unified-payments.md,
- * Task 6): points now (the default, as before), cash at the desk — held as
- * a pending purchase until reception takes the money — or a card.
+ * Buying a plan (docs/decisions/unified-payments.md): points now (the
+ * default), or a card — subscribed only once the card is accepted. There is
+ * no subscription without payment, so a plan takes no cash.
  */
 class PlanPurchasePaymentMethodTest extends TestCase
 {
@@ -140,38 +141,30 @@ class PlanPurchasePaymentMethodTest extends TestCase
         $this->assertSame($companyWallet->id, Payment::sole()->wallet_id);
     }
 
-    public function test_a_plan_bought_with_cash_is_held_for_reception_without_a_membership(): void
+    public function test_a_plan_cannot_be_bought_with_cash(): void
     {
         $member = $this->member(0);
-        $plan = $this->plan();
         Sanctum::actingAs($member, ['*']);
 
-        $response = $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'payment_method' => 'cash'])
-            ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.method', 'cash')
-            ->assertJsonPath('data.pending_purchase.amount_points', 1200);
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan()->id, 'payment_method' => 'cash'])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('payment_method');
 
         $this->assertSame(0, Membership::count());
-        $payment = Payment::sole();
-        $this->assertSame(PaymentStatus::Pending, $payment->status);
-        $this->assertSame($plan->id, $payment->plan_id);
-        $this->assertTrue($payment->expires_at->equalTo(now()->addHours(48)));
-        $this->assertSame($payment->id, $response->json('data.pending_purchase.id'));
+        $this->assertSame(0, Payment::count());
     }
 
-    public function test_asking_again_for_the_same_plan_with_cash_returns_the_same_hold(): void
+    public function test_cash_is_not_offered_for_a_plan(): void
     {
-        $member = $this->member(0);
-        $plan = $this->plan();
+        $member = $this->member(5000);
         Sanctum::actingAs($member, ['*']);
 
-        $first = $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'payment_method' => 'cash'])
-            ->assertCreated()->json('data.pending_purchase.id');
-        $second = $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'payment_method' => 'cash'])
-            ->assertCreated()->json('data.pending_purchase.id');
+        $keys = collect($this->getJson('/api/v1/member/payment-methods?purpose=plan_purchase&plan_id='.$this->plan()->id)
+            ->assertOk()
+            ->json('data.methods'))->pluck('key')->all();
 
-        $this->assertSame($first, $second);
-        $this->assertSame(1, Payment::count());
+        $this->assertNotContains('cash', $keys);
+        $this->assertContains('wallet', $keys);
     }
 
     public function test_a_plan_bought_by_card_returns_where_to_pay(): void
@@ -194,7 +187,8 @@ class PlanPurchasePaymentMethodTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.next', 'redirect')
             ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-777/en')
-            ->assertJsonPath('data.payment.method', 'paymera');
+            ->assertJsonPath('data.payment.method', 'paymera')
+            ->assertJsonPath('data.payment.gateway_payment_id', 'pay-777');
 
         $this->assertSame(0, Membership::count());
     }
@@ -218,7 +212,45 @@ class PlanPurchasePaymentMethodTest extends TestCase
         $this->assertSame(0, Payment::count());
     }
 
-    public function test_the_current_membership_shows_a_pending_cash_purchase(): void
+    public function test_a_plan_is_subscribed_once_its_card_payment_is_accepted(): void
+    {
+        $this->fakeCard('A');
+        $member = $this->member(0);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan()->id, 'payment_method' => 'paymera'])
+            ->assertCreated();
+        $this->assertSame(0, Membership::count());
+
+        app(SyncPaymentStatus::class)->handle(Payment::sole());
+
+        $payment = Payment::sole();
+        $this->assertSame(PaymentStatus::Accepted, $payment->status);
+        $this->assertSame(Membership::sole()->id, $payment->membership_id);
+        $this->assertSame(0, $this->balance(OwnerType::User, $member->id));
+    }
+
+    public function test_a_plan_whose_card_payment_fails_is_not_subscribed(): void
+    {
+        $this->fakeCard('F');
+        $member = $this->member(0);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan()->id, 'payment_method' => 'paymera'])
+            ->assertCreated();
+
+        app(SyncPaymentStatus::class)->handle(Payment::sole());
+
+        $this->assertSame(PaymentStatus::Failed, Payment::sole()->status);
+        $this->assertSame(0, Membership::count());
+        $this->assertSame(0, $this->balance(OwnerType::User, $member->id));
+    }
+
+    /**
+     * A cash hold opened before plans stopped taking cash still shows until
+     * reception settles it or it expires.
+     */
+    public function test_the_current_membership_still_shows_a_cash_hold_opened_earlier(): void
     {
         $member = $this->member(0);
         $plan = $this->plan();
@@ -229,12 +261,40 @@ class PlanPurchasePaymentMethodTest extends TestCase
             ->assertJsonPath('data', null)
             ->assertJsonPath('pending_purchase', null);
 
-        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'payment_method' => 'cash'])->assertCreated();
+        Payment::factory()->forPlan($plan)->withoutGateway('cash', 1200)->create([
+            'user_id' => $member->id,
+            'wallet_id' => Wallet::where('owner_id', $member->id)->firstOrFail()->id,
+            'status' => PaymentStatus::Pending,
+            'expires_at' => now()->addHours(48),
+        ]);
 
         $this->getJson('/api/v1/member/memberships/current')
             ->assertOk()
             ->assertJsonPath('data', null)
             ->assertJsonPath('pending_purchase.plan_id', $plan->id)
             ->assertJsonPath('pending_purchase.status', 'pending');
+    }
+
+    /** Paymera answering a plan's card: opened, then `$status` for the amount it was opened at. */
+    private function fakeCard(string $status): void
+    {
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-777/en', 'paymentId' => 'pay-777'],
+            ]),
+            '*/api/get-payment-status/*' => fn () => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => [
+                    'status' => $status,
+                    'creationTimestamp' => '2026-10-05 10:00:00.000',
+                    'rrn' => '000009876543',
+                    'amount' => Payment::sole()->amount_minor,
+                    'terminalId' => '99990001',
+                ],
+            ]),
+        ]);
     }
 }

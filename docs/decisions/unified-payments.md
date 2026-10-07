@@ -21,7 +21,8 @@ The user's decisions the design records:
 - An event registration may be confirmed unpaid, but not checked in until it
   is paid.
 - A plan bought with cash is a pending hold; nothing is activated until
-  reception takes the money, and the hold expires.
+  reception takes the money, and the hold expires. *Superseded 2026-10-07:
+  a plan takes no cash at all — see "Since plans take no cash" below.*
 - Payment state is visible on every operation.
 - Reception enters the amount received; any overpayment becomes points.
 - Events and plans may be paid from the same wallets as bookings (personal,
@@ -54,7 +55,7 @@ reception columns `collected_via`, `received_amount`, `received_currency`,
 | key | class | pays for | `start()` |
 |---|---|---|---|
 | `wallet` | `WalletMethod` | everything but a top-up | picks the wallet, checks it covers the whole amount, settles now → `done` |
-| `cash` | `CashMethod` | everything but an extension and a member top-up (reception's top-up writes its own row) | a plan: pending hold with `expires_at`; anything else: **no row** → `pay_at_reception` |
+| `cash` | `CashMethod` | everything but an extension, a member top-up (reception's top-up writes its own row) and a plan | **no row** → `pay_at_reception` |
 | `paymera` | `PaymeraGateway` | everything but an extension | freezes the card charge on the row, opens the hosted page → `redirect` |
 
 **Fulfillers** (`App\Domain\Finance\Payments\Fulfillers`), one per purpose,
@@ -124,14 +125,22 @@ listed):
   General first.
 - `GET member/wallet/transactions` — the rows, newest first, paginated;
   filters `type` (credit/debit), `category`, `from`/`to` (local days).
+  Each row carries two money figures that are not the same thing: `amount`
+  is the points priced at **today's** rate, so it moves with the exchange
+  rate; `paid` is the money actually handed over for a credit (amount and
+  currency, from the row's audit columns, fixed at the moment of payment),
+  and null for a row no money came with — a spend, a grant, a gift. The app
+  shows what a member paid from `paid`, and a spend in points; only the
+  balance is priced at today's rate.
 - `GET member/wallet/transactions/{id}` — one row as a receipt, with the
   balance of its pool before and after it (`WalletService::balanceAfter()`:
   the eligible rows up to it, less credits already expired by then). Another
   wallet's row is a 404.
 
-Topping the wallet up is `POST member/wallet/top-ups`, by a prepaid method
-only (the card; cash for points is reception's, through
-`admin/reception/wallet-top-ups`). The generic `POST member/payments` it
+Topping the wallet up is `POST member/wallet/top-ups`, by a gateway only,
+named in a required `payment_method` (today `paymera`; cash for points is
+reception's, through `admin/reception/wallet-top-ups`). `StartPayment`
+opens the payment through the method named and records it under it. The generic `POST member/payments` it
 once went through is gone
 ([prepayment-all-or-nothing.md](prepayment-all-or-nothing.md)).
 
@@ -151,14 +160,19 @@ receipt for a payment it just made.
 2. A line under `methods` in `config/payments.php`.
 
 Nothing else: `payment-methods` lists it, every operation's endpoint accepts
-it as a `payment_method` (the top-up does once `StartPayment` takes a gateway
-key — it opens Paymera only today, and `StoreTopUpRequest` accepts no other
-gateway until then), the reconciler polls its pending payments, and its
-accepted payments are credited and spent through
+it as a `payment_method` — the top-up included, whose `StartPayment` opens
+the payment through the gateway named — the reconciler polls its pending
+payments, and its accepted payments are credited and spent through
 `fulfilAcceptedGatewayPayment()`
 (`PaymentMethodRegistryTest`, `MemberPaymentMethodsTest` register a fake one
 through config alone). `enabled: false` stops new payments only; payments
 already open on it still sync and reverse.
+
+One thing `StartPayment` still takes from Paymera's settings whatever the
+gateway: the charged currency, its exponent and the terminal id
+(`config/paymera.php`, through `PaymentAmountCalculator`). A second gateway
+charging in another currency, or with its own terminal, moves those onto
+its driver first.
 
 ## Backward compatibility
 
@@ -195,9 +209,10 @@ already open on it still sync and reverse.
   the old refund (recomputed price less discount, to the member's wallet).
 - **Money paid for something is spent from general**, never from a plan
   allowance: the money bought general points.
-- **The cash hold is 48 hours** (`PAYMENTS_CASH_PLAN_HOLD_HOURS`);
-  `payments:expire-pending` (hourly) lets it lapse and never touches gateway
-  payments.
+- **The cash hold is 48 hours**; `payments:expire-pending` (hourly) lets
+  it lapse and never touches gateway payments. *No new hold is opened since
+  2026-10-07 (plans take no cash); the setting is gone, and the job only
+  lets the holds opened before that lapse.*
 - **Cash for a booking, session or registration writes no row**; the target's
   own unpaid state is the record until reception takes the money.
 - **An extension is `booking_extension`**, a purpose of its own, because its
@@ -359,3 +374,27 @@ See [prepayment-all-or-nothing.md](prepayment-all-or-nothing.md).
   only**; the cash "go to reception" hint is gone (`CashMethod::supports()`
   excludes a top-up). Reception's `admin/reception/wallet-top-ups` is
   unchanged.
+
+## Since plans take no cash (2026-10-07)
+
+There is no subscription without payment: a plan is bought with **points**
+— subscribed at once, or refused with nothing written when they do not
+cover it — or **a card**, subscribed only when the card is accepted
+(`PlanPurchaseFulfiller`); a failed or cancelled card subscribes nothing.
+
+- **`CashMethod::supports()` excludes `plan_purchase`**, so cash is not
+  listed by `GET member/payment-methods?purpose=plan_purchase` and
+  `PaymentService::start()` refuses it (`api.payment.method_not_supported`);
+  `POST member/memberships` accepts `payment_method` `wallet` or `paymera`
+  only (422 on `cash`). Cash for a booking, session or registration is
+  unchanged.
+- **Holds opened before this keep working until they end**: reception still
+  settles one (`settleAtReception` does not ask `supports()`), it is still
+  listed in reception's outstanding items and in `memberships/current`'s
+  `pending_purchase`, and `payments:expire-pending` lets it lapse within its
+  48 hours. Once none are left, that reading and the job are dead code a
+  later change may remove.
+- **A member who wants to pay a plan in cash** tops up their wallet at
+  reception (`admin/reception/wallet-top-ups`) and buys it with points.
+- `payments.cash_plan_hold_hours` (`PAYMENTS_CASH_PLAN_HOLD_HOURS`) is
+  removed; tests build an old hold with `PaymentFactory::cashPlanHold()`.

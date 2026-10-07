@@ -17,7 +17,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
-use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PackageBrowseService;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
@@ -25,6 +25,7 @@ use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Http\Controllers\Concerns\RespondsToGatewayFailures;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\ListMembershipsRequest;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
@@ -42,11 +43,11 @@ use Throwable;
  * "self-service checked via the policy in the controller" shape as
  * CompanyWalletAllocationController.
  *
- * How it is paid (docs/superpowers/plans/2026-09-30-unified-payments.md,
- * Task 6): points from the owner's wallet now (the default, and the only
- * way before payment methods existed); cash at the desk, held as a pending
- * purchase — no membership — until reception takes the money; or a card,
- * for the member's own plan, which answers with where to pay.
+ * How it is paid (docs/decisions/unified-payments.md): there is no
+ * subscription without payment. Points from the owner's wallet (the
+ * default) subscribe at once, or not at all when they do not cover it; a
+ * card, for the member's own plan, answers with where to pay and subscribes
+ * only once the card is accepted (PlanPurchaseFulfiller). No cash.
  */
 class MembershipController extends Controller
 {
@@ -60,6 +61,8 @@ class MembershipController extends Controller
      *
      * `pending_purchase` sits beside `data`, not inside it: a plan held for
      * cash is not a membership, and `data` keeps its shape for old apps.
+     * Plans no longer take cash; this shows a hold opened before that until
+     * reception settles it or it lapses (payments:expire-pending).
      */
     public function current(Request $request, PackageBrowseService $service): JsonResponse
     {
@@ -68,6 +71,57 @@ class MembershipController extends Controller
         return response()->json([
             'data' => $service->getCurrentSubscription($request->user()),
             'pending_purchase' => $pending === null ? null : new PaymentResource($pending),
+        ]);
+    }
+
+    /**
+     * Every subscription the member holds or held — their own and those of
+     * the companies they belong to — active or expired, newest first.
+     * `via` says whose it is (`personal` | `company`, with the company named);
+     * `status` is `active` until `current_period_end`, then `expired`;
+     * `is_current` marks the one memberships/current shows (the member's own
+     * active plan first, else a company's), on no row once all have ended.
+     * Filters: `status`, `via`, `per_page`.
+     */
+    public function index(ListMembershipsRequest $request, MembershipResolver $memberships): JsonResponse
+    {
+        $member = $request->user();
+        $companies = $member->companies()->get()->keyBy('id');
+        $currentId = $memberships->activeFor($member)?->id;
+
+        $paginator = $memberships->heldBy($member)
+            ->with(['plan', 'seatDesks'])
+            ->when($request->validated('via'), fn (Builder $q, string $via) => $q->where(
+                'owner_type',
+                $via === 'company' ? OwnerType::Company : OwnerType::User,
+            ))
+            ->when($request->validated('status') === 'active', fn (Builder $q) => $q->live())
+            ->when($request->validated('status') === 'expired', fn (Builder $q) => $q->ended())
+            ->orderByDesc('current_period_start')
+            ->orderByDesc('id')
+            ->paginate((int) ($request->validated('per_page') ?? 20));
+
+        return response()->json([
+            'data' => collect($paginator->items())->map(fn (Membership $membership) => [
+                'id' => $membership->id,
+                'plan' => ['id' => $membership->plan_id, 'name' => $membership->plan?->translate('name')],
+                'via' => $membership->owner_type === OwnerType::Company ? 'company' : 'personal',
+                'company' => $membership->owner_type === OwnerType::Company
+                    ? ['id' => $membership->owner_id, 'name' => $companies->get($membership->owner_id)?->legal_name]
+                    : null,
+                'status' => $membership->isLive() ? 'active' : 'expired',
+                'is_current' => $membership->id === $currentId,
+                'seats' => $membership->seats,
+                'desks' => $membership->seatDesks->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values(),
+                'current_period_start' => $membership->current_period_start->toIso8601String(),
+                'current_period_end' => $membership->current_period_end->toIso8601String(),
+            ])->values(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+            ],
         ]);
     }
 
@@ -101,7 +155,6 @@ class MembershipController extends Controller
         $free = $quotes->forPlan($plan, $member, $coupon, now())->finalPoints === 0;
 
         return match ($free ? WalletMethod::KEY : ($request->validated('payment_method') ?? WalletMethod::KEY)) {
-            CashMethod::KEY => $this->holdForCash($payments, $member, $plan, $ownerType, $ownerId, $coupon),
             PaymeraGateway::KEY => $this->startCard($card, $member, $plan, $ownerType, app()->getLocale(), $coupon),
             default => $this->payWithPoints($payments, $member, $plan, $ownerType, $ownerId, $coupon),
         };
@@ -138,39 +191,6 @@ class MembershipController extends Controller
             ->additional($this->couponOutcome($coupon, $payment))
             ->response()
             ->setStatusCode(201);
-    }
-
-    /**
-     * Asking again for the same plan and owner while a hold is open returns
-     * that hold rather than a second one.
-     *
-     * The hold is opened on the owner's wallet — the company's, for a
-     * company purchase — handed to the payment as already authorized: this
-     * endpoint checked CompanyPolicy::manageMembers above, which the cash
-     * method itself cannot.
-     */
-    private function holdForCash(PaymentService $payments, User $member, Plan $plan, OwnerType $ownerType, int $ownerId, ?Coupon $coupon = null): JsonResponse
-    {
-        $wallet = Wallet::query()->where('owner_type', $ownerType)->where('owner_id', $ownerId)->first();
-
-        if ($wallet === null && $ownerType === OwnerType::Company) {
-            return response()->json(['message' => __('api.payment.no_wallet')], 422);
-        }
-
-        // A coupon opens a hold of its own, at its price.
-        $existing = $wallet === null || $coupon !== null ? null : $this->openCashHolds()
-            ->where('plan_id', $plan->id)
-            ->where('wallet_id', $wallet->id)
-            ->latest('id')
-            ->first();
-
-        $payment = $existing ?? $payments->start(PaymentPurpose::PlanPurchase, $member, CashMethod::KEY, array_filter([
-            'plan' => $plan,
-            'authorized_wallet' => $wallet,
-            'coupon' => $coupon,
-        ]))['payment'];
-
-        return response()->json(['data' => ['pending_purchase' => new PaymentResource($payment)]] + $this->couponOutcome($coupon, $payment), 201);
     }
 
     /**
@@ -221,8 +241,8 @@ class MembershipController extends Controller
     }
 
     /**
-     * The latest open cash hold the member placed — for themselves or for a
-     * company they buy for.
+     * The latest open cash hold the member placed before plans stopped
+     * taking cash — for themselves or for a company they bought for.
      */
     private function pendingCashPurchase(User $member): ?Payment
     {

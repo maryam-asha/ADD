@@ -2,12 +2,9 @@
 
 namespace Tests\Feature\Pricing;
 
-use App\Domain\Finance\Enums\PaymentMethod;
-use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\OutstandingItems;
-use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -106,37 +103,30 @@ class PlanOfferPriceTest extends TestCase
         $this->assertSame(400, app(WalletService::class)->generalBalance(app(WalletService::class)->walletFor(OwnerType::User, $member->id)));
     }
 
-    /** A cash hold opened during the offer is settled at the offer price after it ends. */
-    public function test_a_cash_hold_opened_during_the_offer_keeps_its_price(): void
+    /** A card opened during the offer is accepted at the offer price after it ends. */
+    public function test_a_card_opened_during_the_offer_keeps_its_price(): void
     {
+        $this->fakeCard();
         $member = $this->member();
         Sanctum::actingAs($member, ['*']);
 
-        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'cash'])
-            ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.amount_points', 100);
-
-        $this->assertSame(100, app(OutstandingItems::class)->for($member->id, 'USD')['items'][0]['amount_points']);
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'paymera'])
+            ->assertCreated();
 
         Carbon::setTestNow(now()->addDays(2));
-        $operator = User::factory()->create();
-        $operator->assignRole('operations');
+        app(SyncPaymentStatus::class)->handle(Payment::sole());
 
-        app(PaymentService::class)->settleAtReception(PaymentPurpose::PlanPurchase, Payment::sole(), PaymentMethod::Cash, null, null, $operator);
-
-        $this->assertSame(100, Payment::sole()->amount_points);
+        $payment = Payment::sole();
+        $this->assertSame(PaymentStatus::Accepted, $payment->status);
+        $this->assertSame(100, $payment->amount_points);
         $this->assertSame(1, Membership::count());
+        // Credited 100 by the card, spent 100 on the plan.
+        $this->assertSame(0, app(WalletService::class)->generalBalance(app(WalletService::class)->walletFor(OwnerType::User, $member->id)));
     }
 
     public function test_a_card_payment_charges_the_offer_price(): void
     {
-        Http::fake([
-            '*/api/create-payment' => Http::response([
-                'ErrorMessage' => 'Success',
-                'ErrorCode' => 0,
-                'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1'],
-            ]),
-        ]);
+        $this->fakeCard();
         Sanctum::actingAs($this->member(), ['*']);
 
         $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'paymera'])->assertCreated();
@@ -169,8 +159,9 @@ class PlanOfferPriceTest extends TestCase
     /** Review Focus 5: a payment is priced at the offer it locked, however the offer is edited. */
     public function test_a_plan_payment_is_priced_at_its_locked_offer_after_the_offer_is_edited(): void
     {
+        $this->fakeCard();
         Sanctum::actingAs($this->member(), ['*']);
-        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'cash'])->assertCreated();
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan->id, 'payment_method' => 'paymera'])->assertCreated();
 
         $this->offer->update(['discount_value' => 50]);
 
@@ -184,5 +175,28 @@ class PlanOfferPriceTest extends TestCase
         $this->offer->update(['is_active' => false]);
 
         $this->assertSame(150, app(PriceQuoteService::class)->forPlan($this->plan, null, null, now())->finalPoints);
+    }
+
+    /** Paymera opening a card, and accepting it for the amount it was opened at. */
+    private function fakeCard(): void
+    {
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1'],
+            ]),
+            '*/api/get-payment-status/*' => fn () => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => [
+                    'status' => 'A',
+                    'creationTimestamp' => '2026-10-05 10:00:00.000',
+                    'rrn' => '000009876543',
+                    'amount' => Payment::sole()->amount_minor,
+                    'terminalId' => (string) config('paymera.terminal_id'),
+                ],
+            ]),
+        ]);
     }
 }

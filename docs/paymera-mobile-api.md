@@ -44,6 +44,7 @@ POST /api/v1/member/wallet/top-ups
 
 ```json
 {
+  "payment_method": "paymera",
   "amount": "1470000"
 }
 ```
@@ -51,9 +52,12 @@ POST /api/v1/member/wallet/top-ups
 `amount` بالوحدات الكبرى للعملة المشحونة (ليرة سورية) — أي `1470000` تعني
 1,470,000 ل.س. **لا ترسل قروشاً ولا فواصل ولا رموز عملة.**
 
-الشحن بطريقة مسبقة الدفع فقط (البطاقة): `payment_method` اختياري وافتراضيه
-البطاقة، وأي طريقة لا تصلح للشحن (`cash`، `wallet`) ← 422. شحن النقاط نقداً
-يتم في الاستقبال، لا من التطبيق.
+الشحن ببوابة دفع فقط: `payment_method` **إلزامي** — اليوم `paymera` وحدها.
+اعرض الطرق من `GET member/payment-methods?purpose=wallet_top_up` وأرسل
+`key` الطريقة التي اختارها العضو كما هو، فإذا أُضيفت بوابة جديدة تعمل دون
+تعديل في التطبيق. غيابه، أو طريقة لا تصلح للشحن (`cash`، `wallet`)، أو
+بوابة معطّلة ← 422 على `payment_method`. شحن النقاط نقداً يتم في الاستقبال،
+لا من التطبيق.
 
 ### ب. شراء باقة
 
@@ -79,7 +83,7 @@ POST /api/v1/member/memberships
 | الحقل | المسار | إلزامي | الوصف |
 |---|---|---|---|
 | `amount` | `wallet/top-ups` | نعم | نص/رقم، بالوحدات الكبرى، ≥ 0.01، رقم عشري عادي (`10` أو `10.50`) — صيغة الأُس مثل `1e3` ← 422 |
-| `payment_method` | `wallet/top-ups` | لا | بطاقة فقط (`paymera`)، وهي الافتراضية |
+| `payment_method` | `wallet/top-ups` | نعم | بوابة دفع من `payment-methods?purpose=wallet_top_up` — اليوم `paymera` فقط |
 | `plan_id` | `memberships` | نعم | معرّف باقة متاحة للبيع |
 | `payment_method` | `memberships` | لا | `paymera` للبطاقة؛ الافتراضي `wallet` (انظر القسم 11-ج) |
 
@@ -246,17 +250,24 @@ GET /api/v1/member/payments
 
 ## 8. الحقول المتاحة للعضو
 
-أحد عشر حقلاً فقط:
+ثمانية عشر حقلاً:
 
-`id` · `status` · `purpose` · `amount_minor` · `currency` ·
-`currency_exponent` · `points_to_credit` · `plan_id` · `membership_id` ·
-`rrn` · `created_at`
+`id` · `status` · `purpose` · `method` · `amount_minor` · `currency` ·
+`currency_exponent` · `points_to_credit` · `amount_points` ·
+`transaction_id` · `payable` · `expires_at` · `plan_id` · `membership_id` ·
+`rrn` · `gateway_payment_id` · `discounts` · `created_at`
+
+`id` هو معرّف الدفعة عندنا، وهو ما تمرّره إلى
+`GET member/payments/{id}`. أما `gateway_payment_id` فهو معرّف Paymera
+نفسه للدفعة (مثل `d7a49cb9-c9d6-433c-85bf-b8f50757a36c`، وهو أيضاً داخل
+`redirect_url`)، و`null` لدفعة لم تمرّ ببوابة (نقاط أو نقد). لا تستعلم به
+عن الحالة؛ يفيد للمطابقة مع لوحة Paymera أو عند التواصل مع الدعم.
 
 `rrn` هو الرقم المرجعي البنكي — اعرضه في إيصال النجاح، فهو ما يُستشهد به
 عند أي نزاع (يطابق عمود `Trans RRN` في لوحة Paymera).
 
-حقول أخرى (`terminal_id`، `review_reason`، `gateway_payment_id`…) متاحة
-للوحة الإدارة فقط ولن تصل التطبيق.
+حقول أخرى (`terminal_id`، `review_reason`، `user_id`…) متاحة للوحة الإدارة
+فقط ولن تصل التطبيق.
 
 ---
 
@@ -456,10 +467,14 @@ Authorization: Bearer <access_token>
   والبطاقة تُبقيه **معلّقاً**: `data.status` = `awaiting_payment` مع
   `data.payment_due_at` حتى تُدفع (القسم و). ولا يُسمح بالدخول قبل الدفع في
   الحالتين. احتفظ بـ`data.ticket_id` لـ(ب).
-- **الباقة:** `POST member/memberships` يقبل `payment_method`. `cash` يعيد
-  `{"data": {"pending_purchase": {...}}}` — حجز لمدة 48 ساعة بلا اشتراك حتى
-  يدفع العضو في الاستقبال، ويظهر أيضاً في `memberships/current` تحت
-  `pending_purchase`. `paymera` يعيد شكل بدء الدفع في القسم 2.
+- **الباقة:** لا اشتراك بلا دفع. `POST member/memberships` يقبل
+  `payment_method` = `wallet` (الافتراضي) أو `paymera` فقط، و`cash` يُرفض
+  بـ 422. بالنقاط: إن كفت يُنشأ الاشتراك فوراً (201)، وإلا 422 ولا يُكتب
+  شيء. بالبطاقة: يعيد شكل بدء الدفع في القسم 2، ولا يُنشأ الاشتراك إلا حين
+  تُقبل البطاقة؛ إن فشلت أو أُلغيت فلا اشتراك، ويبدأ العضو من جديد. ومن أراد
+  الدفع نقداً يشحن محفظته في الاستقبال ثم يشتري بالنقاط. `pending_purchase`
+  في `memberships/current` يبقى `null` إلا لحجز نقدي قديم فُتح قبل هذا
+  التغيير ولم ينتهِ بعد.
 
 ### د. كتلة `payment` في الشاشات
 
@@ -471,7 +486,7 @@ Authorization: Bearer <access_token>
  "price_point": "100 pts", "paid_at": null, "payment_id": null}
 ```
 
-`state`: `paid` | `unpaid` | `pending` (دفع بطاقة جارٍ أو باقة محجوزة للنقد)
+`state`: `paid` | `unpaid` | `pending` (دفع بطاقة جارٍ، أو باقة محجوزة للنقد من قبل 2026-10-07)
 | `null` (لا شيء للدفع: فعالية مجانية أو جلسة ما زالت مفتوحة).
 
 `amount_points`: السعر كاملاً بعد الدفع، و**ما بقي مستحقاً** قبله. الحجز

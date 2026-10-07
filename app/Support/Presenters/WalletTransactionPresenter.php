@@ -26,7 +26,11 @@ use App\Support\Time\LocalTime;
  *
  * Every money figure is derived from the points, in the caller's display
  * currency (PriceLabelPresenter), except `paid`: the money actually handed
- * over or charged for a credit, verbatim from the row's audit columns.
+ * over or charged for a credit, verbatim from the row's audit columns. So
+ * `amount` is what the points are worth at today's rate and drifts with it;
+ * `paid` is fixed at the moment of payment, and null for a row no money
+ * came with (a spend, a grant, a gift). A row shows what was paid by `paid`,
+ * never by `amount`.
  *
  * Expects the relations WalletHistoryService loads.
  */
@@ -58,7 +62,9 @@ class WalletTransactionPresenter
             'title' => $this->title($transaction, $payment, $kind, $locale),
             // Signed, as stored: negative is a spend.
             'points' => $transaction->amount,
+            // Today's value of the points, not what was paid — see `paid`.
             'amount' => $this->prices->total(abs($transaction->amount), $viewer, $locale),
+            'paid' => $this->paid($transaction, $locale),
             'category' => $transaction->category->value,
             'category_label' => __("api.wallet.categories.{$transaction->category->value}", [], $locale),
             'method' => $method,
@@ -71,7 +77,7 @@ class WalletTransactionPresenter
 
     /**
      * The receipt for one row: the list row plus the pool's balance either
-     * side of it, the money behind a credit, and the payment it belongs to.
+     * side of it and the payment it belongs to.
      *
      * @param  int  $balanceAfter  WalletService::balanceAfter() for this row
      * @return array<string, mixed>
@@ -89,7 +95,6 @@ class WalletTransactionPresenter
                 'before' => $this->prices->total($balanceAfter - $transaction->amount, $viewer, $locale),
                 'after' => $this->prices->total($balanceAfter, $viewer, $locale),
             ],
-            'paid' => $this->paid($transaction, $locale),
             'expires_at' => $this->time->toLocal($transaction->expires_at)?->toIso8601String(),
             'payment' => $payment === null ? null : [
                 'id' => $payment->id,

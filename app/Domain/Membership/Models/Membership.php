@@ -8,6 +8,7 @@ use App\Domain\Membership\Concerns\ValidatesOwner;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Services\MembershipBranchResolver;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -85,5 +86,34 @@ class Membership extends Model
     public function seatDesks(): BelongsToMany
     {
         return $this->belongsToMany(SeatDesk::class, 'membership_seat_desk')->withTimestamps();
+    }
+
+    /**
+     * Active and not yet ended. Nothing writes an `expired` status: a
+     * subscription past `current_period_end` is over by its date alone.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeLive(Builder $query): void
+    {
+        $query->where('status', MembershipStatus::Active)->where('current_period_end', '>=', now());
+    }
+
+    /**
+     * Over: past its period, or no longer active — what scopeLive() is not.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeEnded(Builder $query): void
+    {
+        $query->where(fn (Builder $q) => $q
+            ->where('status', '!=', MembershipStatus::Active)
+            ->orWhere('current_period_end', '<', now()));
+    }
+
+    /** The same rule as scopeLive(), for a loaded row. */
+    public function isLive(): bool
+    {
+        return $this->status === MembershipStatus::Active && ! $this->current_period_end->isPast();
     }
 }

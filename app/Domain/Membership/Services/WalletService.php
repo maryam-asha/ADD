@@ -225,6 +225,17 @@ class WalletService
     }
 
     /**
+     * generalBalance() of `$user`'s personal wallet — 0 when they have none
+     * yet, rather than creating one just to read it.
+     */
+    public function personalGeneralBalance(User $user): int
+    {
+        $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $user->id)->first();
+
+        return $wallet === null ? 0 : $this->generalBalance($wallet);
+    }
+
+    /**
      * Unlocked read of the general (never-expiring) point balance — for
      * display and receipts. Debits use lockedGeneralBalance() instead.
      */

@@ -139,7 +139,7 @@ class PayNowTest extends TestCase
         Sanctum::actingAs($this->member(), ['*']);
         $this->fakeGateway();
 
-        $this->topUp(['amount' => '10.00'])
+        $this->topUp(['payment_method' => 'paymera', 'amount' => '10.00'])
             ->assertCreated()
             ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en')
             ->assertJsonPath('data.payment.status', 'pending')

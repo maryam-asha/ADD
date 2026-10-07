@@ -153,8 +153,9 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   only if no date could use it (D1).
 - **The breakdown keeps the plan discount's line key `discount`** for the
   app; the new lines are `sale` and `coupon`.
-- **A cash plan purchase with a coupon opens its own hold** rather than
-  reusing an open one priced without it.
+- **A cash plan purchase with a coupon opened its own hold** rather than
+  reusing an open one priced without it — until plans stopped taking cash
+  (2026-10-07, [unified-payments.md](unified-payments.md)).
 - **Package sale labels are in the base currency**, like the package's own
   `formatted_price`.
 - **The raw sale fields are on admin routes only** — a scheduled sale is not

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Member;
 
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -94,8 +95,13 @@ class PackageBrowseTest extends TestCase
                     'name',
                     'module',
                     'subtitle',
-                    'formatted_price',
-                    'formatted_point_price',
+                    'pricing' => [
+                        'points',
+                        'points_label',
+                        'price',
+                        'price_label',
+                        'currency',
+                    ],
                     'features' => [
                         '*' => ['id', 'name', 'value', 'icon', 'is_included'],
                     ],
@@ -123,9 +129,12 @@ class PackageBrowseTest extends TestCase
 
         $response->assertJsonPath('data.1.name', 'The Free Bird');
         $response->assertJsonPath('data.1.is_current', true);
-        // price_points 750, point.rate_usd 0.10 (SettingSeeder) -> $75.00.
-        $response->assertJsonPath('data.1.formatted_price', '$75.00 /mo');
-        $response->assertJsonPath('data.1.formatted_point_price', '750 pts /mo');
+        // price_points 750, point.rate_usd 0.10 (SettingSeeder) -> 75 USD.
+        $response->assertJsonPath('data.1.pricing.points', 750);
+        $response->assertJsonPath('data.1.pricing.points_label', '750 pts / mo');
+        $response->assertJsonPath('data.1.pricing.price', 75);
+        $response->assertJsonPath('data.1.pricing.price_label', '75 $ / mo');
+        $response->assertJsonPath('data.1.pricing.currency', 'USD');
 
         $response->assertJsonPath('data.2.name', 'The Happy Committer');
         $response->assertJsonPath('data.2.is_current', false);
@@ -432,5 +441,37 @@ class PackageBrowseTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.is_current', true);
+    }
+
+    public function test_package_pricing_follows_locale_and_chosen_currency(): void
+    {
+        $this->actingAsMember();
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001']);
+
+        // In Arabic with base currency (USD)
+        $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/member/packages/2');
+        $responseAr->assertOk();
+        $responseAr->assertJsonPath('data.pricing.points', 750);
+        $responseAr->assertJsonPath('data.pricing.points_label', '750 نقطة / شهرياً');
+        $responseAr->assertJsonPath('data.pricing.price', 75);
+        $responseAr->assertJsonPath('data.pricing.price_label', '75 $ / شهرياً');
+        $responseAr->assertJsonPath('data.pricing.currency', 'USD');
+
+        // In Arabic with SYP currency
+        $responseArSyp = $this->withHeaders(['lang' => 'ar', 'currency' => 'SYP'])->getJson('/api/v1/member/packages/2');
+        $responseArSyp->assertOk();
+        $responseArSyp->assertJsonPath('data.pricing.points', 750);
+        $responseArSyp->assertJsonPath('data.pricing.price', 750000);
+        $responseArSyp->assertJsonPath('data.pricing.price_label', '750,000 ل.س / شهرياً');
+        $responseArSyp->assertJsonPath('data.pricing.currency', 'SYP');
+
+        // In English with SYP currency
+        $responseEnSyp = $this->withHeaders(['lang' => 'en', 'currency' => 'SYP'])->getJson('/api/v1/member/packages/2');
+        $responseEnSyp->assertOk();
+        $responseEnSyp->assertJsonPath('data.pricing.points', 750);
+        $responseEnSyp->assertJsonPath('data.pricing.points_label', '750 pts / mo');
+        $responseEnSyp->assertJsonPath('data.pricing.price', 750000);
+        $responseEnSyp->assertJsonPath('data.pricing.price_label', '750,000 SYP / mo');
+        $responseEnSyp->assertJsonPath('data.pricing.currency', 'SYP');
     }
 }

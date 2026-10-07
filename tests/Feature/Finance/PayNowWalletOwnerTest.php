@@ -4,7 +4,6 @@ namespace Tests\Feature\Finance;
 
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\Branch;
@@ -189,34 +188,20 @@ class PayNowWalletOwnerTest extends TestCase
     }
 
     /** Probe C. */
-    public function test_a_cash_plan_hold_cannot_be_opened_on_a_foreign_company(): void
+    public function test_a_plan_cannot_be_bought_on_a_foreign_company(): void
     {
-        [$stranger, $strangerWallet] = $this->company(0);
+        [$stranger, $strangerWallet] = $this->company();
         $member = $this->member();
         Sanctum::actingAs($member, ['*']);
 
         $this->buyPlan([
-            'payment_method' => 'cash',
+            'payment_method' => 'wallet',
             'plan_id' => $this->plan()->id,
             'company_id' => $stranger->id,
         ])->assertForbidden();
 
         $this->assertSame(0, Payment::count());
         $this->assertSame(0, Payment::where('wallet_id', $strangerWallet->id)->count());
-    }
-
-    public function test_a_cash_plan_hold_opened_here_is_the_members_own(): void
-    {
-        $member = $this->member();
-        Sanctum::actingAs($member, ['*']);
-
-        $this->buyPlan(['payment_method' => 'cash', 'plan_id' => $this->plan()->id])
-            ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.method', 'cash');
-
-        $payment = Payment::sole();
-        $this->assertSame(PaymentStatus::Pending, $payment->status);
-        $this->assertSame(Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->value('id'), $payment->wallet_id);
     }
 
     /**
@@ -291,11 +276,11 @@ class PayNowWalletOwnerTest extends TestCase
 
     /**
      * The one path a company plan is bought by: its admin, through
-     * memberships. A cash hold there still opens on the company's wallet.
+     * memberships, from the company's wallet.
      */
-    public function test_a_company_admin_still_holds_a_company_plan_for_cash_through_memberships(): void
+    public function test_only_a_company_admin_buys_a_company_plan_through_memberships(): void
     {
-        [$company, $companyWallet] = $this->company(0);
+        [$company, $companyWallet] = $this->company();
         $admin = $this->member();
         $company->members()->attach($admin->id, ['is_admin' => true]);
         $member = $this->member();
@@ -303,14 +288,14 @@ class PayNowWalletOwnerTest extends TestCase
         $plan = $this->plan();
 
         Sanctum::actingAs($member, ['*']);
-        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'company_id' => $company->id, 'payment_method' => 'cash'])
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'company_id' => $company->id, 'payment_method' => 'wallet'])
             ->assertForbidden();
 
         Sanctum::actingAs($admin, ['*']);
-        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'company_id' => $company->id, 'payment_method' => 'cash'])
-            ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.method', 'cash');
+        $this->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id, 'company_id' => $company->id, 'payment_method' => 'wallet'])
+            ->assertCreated();
 
         $this->assertSame($companyWallet->id, Payment::sole()->wallet_id);
+        $this->assertSame(OwnerType::Company, Membership::sole()->owner_type);
     }
 }

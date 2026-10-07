@@ -66,7 +66,9 @@ class WalletController extends Controller
     public function transactions(
         ListWalletTransactionsRequest $request,
         WalletHistoryService $history,
+        WalletService $wallets,
         WalletTransactionPresenter $presenter,
+        PriceLabelPresenter $prices,
     ): JsonResponse {
         $member = $request->user();
 
@@ -77,9 +79,13 @@ class WalletController extends Controller
         );
 
         return response()->json([
-            'data' => $paginator->getCollection()
-                ->map(fn (WalletTransaction $transaction) => $presenter->item($transaction, $member))
-                ->values(),
+            'data' => [
+                // The general balance, whatever filters narrowed the list.
+                'points_label' => $prices->pointsLabel($wallets->personalGeneralBalance($member)),
+                'transactions' => $paginator->getCollection()
+                    ->map(fn (WalletTransaction $transaction) => $presenter->item($transaction, $member))
+                    ->values(),
+            ],
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),

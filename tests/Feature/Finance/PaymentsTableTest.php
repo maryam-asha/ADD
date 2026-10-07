@@ -270,7 +270,7 @@ class PaymentsTableTest extends TestCase
         Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
         Sanctum::actingAs($member, ['member-app']);
 
-        $this->postJson('/api/v1/member/wallet/top-ups', ['amount' => '10.00'])
+        $this->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera', 'amount' => '10.00'])
             ->assertCreated()
             ->assertJsonPath('data.payment.method', 'paymera')
             ->assertJsonPath('data.payment.amount_points', 100)

@@ -130,14 +130,14 @@ class MoneyAmountSpellingTest extends TestCase
         ]);
 
         foreach (self::EXPONENTS as $amount) {
-            $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', ['amount' => $amount])
+            $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera', 'amount' => $amount])
                 ->assertStatus(422)
                 ->assertJsonValidationErrors('amount');
         }
 
         $this->assertSame(0, Payment::count());
 
-        $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', ['amount' => ' 5'])
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera', 'amount' => ' 5'])
             ->assertCreated();
         $this->assertSame(500, Payment::sole()->amount_minor);
     }

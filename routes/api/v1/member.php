@@ -143,6 +143,10 @@ Route::get('packages/{plan}', [PackageController::class, 'show']);
 // their company — one endpoint, self-service checked in the controller.
 Route::post('memberships', [MembershipController::class, 'store']);
 
+// Every subscription the member holds or held — their own and their
+// companies', active or expired — each saying whose it is (`via`).
+Route::get('memberships', [MembershipController::class, 'index']);
+
 // The member's own active plan and this-cycle usage — "My Subscription" tab.
 Route::get('memberships/current', [MembershipController::class, 'current']);
 

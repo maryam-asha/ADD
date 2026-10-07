@@ -24,8 +24,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CoworkingSessionService
 {
-    /** How long before its start a scan may check a booking in. */
-    public const EARLY_CHECK_IN_MINUTES = 15;
+    /** How long before its start a scan may check a booking in: the same window as every check-in. */
+    public const EARLY_CHECK_IN_MINUTES = BookingCheckInService::EARLY_CHECK_IN_MINUTES;
 
     public function __construct(
         private readonly KioskCodeVerifier $codes,

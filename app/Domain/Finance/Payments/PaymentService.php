@@ -126,7 +126,7 @@ class PaymentService
         // price, and takes a coupon through CouponApplication. A card opens
         // through StartPayment, so a gateway never reaches this with one.
         if ($coupon !== null && ($purpose !== PaymentPurpose::PlanPurchase || $driver instanceof PaymentGateway)) {
-            throw new LogicException('PaymentService::start() locks a coupon on a plan purchase paid in points or cash only.');
+            throw new LogicException('PaymentService::start() locks a coupon on a plan purchase paid in points only.');
         }
 
         $open = function () use ($purpose, $payer, $driver, $fulfiller, $context, $coupon) {
@@ -167,9 +167,9 @@ class PaymentService
 
             $fulfiller->assertPayable($payment);
 
-            // Cash for anything but a plan leaves the target simply unpaid;
-            // reception writes the payment when it takes the money.
-            if ($driver instanceof CashMethod && ! $driver->createsPendingRowFor($purpose)) {
+            // Cash leaves the target simply unpaid; reception writes the
+            // payment when it takes the money.
+            if ($driver instanceof CashMethod) {
                 return ['payment' => null, 'start' => PaymentStart::payAtReception()];
             }
 

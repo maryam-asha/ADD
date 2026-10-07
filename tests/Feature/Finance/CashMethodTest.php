@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Finance;
 
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
@@ -19,8 +20,10 @@ use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 /**
- * Cash at the reception desk (docs/superpowers/plans/2026-09-30-unified-payments.md,
- * Task 6): only a plan is held as a pending payment, and the hold lapses.
+ * Cash at the reception desk (docs/decisions/unified-payments.md): nothing
+ * is written until reception takes the money, and a plan takes no cash —
+ * there is no subscription without payment. A plan hold opened before that
+ * still lapses.
  */
 class CashMethodTest extends TestCase
 {
@@ -48,22 +51,30 @@ class CashMethodTest extends TestCase
         return $member;
     }
 
+    private function hold(User $member, Plan $plan): Payment
+    {
+        return Payment::factory()->cashPlanHold($plan)->create([
+            'user_id' => $member->id,
+            'wallet_id' => Wallet::where('owner_id', $member->id)->firstOrFail()->id,
+        ]);
+    }
+
     private function plan(): Plan
     {
         return Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30, 'is_active' => true]);
     }
 
-    public function test_cash_for_a_plan_writes_a_held_pending_payment(): void
+    public function test_cash_cannot_buy_a_plan(): void
     {
-        $member = $this->member();
+        try {
+            app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $this->member(), 'cash', ['plan' => $this->plan()]);
+            $this->fail('Cash opened a plan purchase.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.payment.method_not_supported', $e->messageKey);
+        }
 
-        ['payment' => $payment, 'start' => $start] = app(PaymentService::class)
-            ->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $this->plan()]);
-
-        $this->assertSame('pay_at_reception', $start->kind);
-        $this->assertSame(PaymentStatus::Pending, $payment->status);
-        $this->assertSame(1200, $payment->amount_points);
-        $this->assertTrue($payment->expires_at->equalTo(now()->addHours(48)));
+        $this->assertSame(0, Payment::count());
+        $this->assertSame(0, Membership::count());
     }
 
     public function test_cash_for_anything_else_writes_no_row(): void
@@ -79,23 +90,12 @@ class CashMethodTest extends TestCase
         $this->assertSame(0, Payment::count());
     }
 
-    public function test_the_hold_follows_its_setting(): void
-    {
-        config(['payments.cash_plan_hold_hours' => 6]);
-
-        ['payment' => $payment] = app(PaymentService::class)
-            ->start(PaymentPurpose::PlanPurchase, $this->member(), 'cash', ['plan' => $this->plan()]);
-
-        $this->assertTrue($payment->expires_at->equalTo(now()->addHours(6)));
-    }
-
     public function test_a_lapsed_cash_hold_expires_and_nothing_else_is_touched(): void
     {
         $member = $this->member();
         $plan = $this->plan();
 
-        ['payment' => $lapsed] = app(PaymentService::class)
-            ->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
+        $lapsed = $this->hold($member, $plan);
 
         $card = Payment::factory()->forPlan($plan)->create([
             'user_id' => $member->id,
@@ -105,8 +105,7 @@ class CashMethodTest extends TestCase
 
         Carbon::setTestNow(now()->addHours(49));
 
-        ['payment' => $fresh] = app(PaymentService::class)
-            ->start(PaymentPurpose::PlanPurchase, $this->member(), 'cash', ['plan' => $plan]);
+        $fresh = $this->hold($this->member(), $plan);
 
         $this->assertSame(0, Artisan::call('payments:expire-pending'));
 

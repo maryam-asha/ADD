@@ -76,6 +76,22 @@ class PaymentFactory extends Factory
     }
 
     /**
+     * A plan held for cash at the desk, as opened before plans stopped
+     * taking cash: pending, at the plan's price, lapsing in `$hours`. Such a
+     * hold is still settled at reception or let go by payments:expire-pending.
+     */
+    public function cashPlanHold(Plan $plan, int $hours = 48): static
+    {
+        return $this->forPlan($plan)
+            ->withoutGateway('cash', (int) $plan->price_points)
+            ->state(fn () => [
+                'status' => PaymentStatus::Pending,
+                'list_price_points' => (int) $plan->price_points,
+                'expires_at' => now()->addHours($hours),
+            ]);
+    }
+
+    /**
      * A payment that never touched a gateway (wallet points, cash at the
      * desk): no terminal, no callback token, no minor-unit amount, and
      * nothing to credit — its worth is `amount_points`.

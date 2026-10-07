@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Contracts\PaymentGateway;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Identity\Models\User;
@@ -58,6 +59,7 @@ class StartPayment
      * caller settles it through PaymentService instead.
      *
      * @param  int|null  $amountMinor  required for a top-up, ignored for a plan purchase
+     * @param  string  $method  the gateway's key in config/payments.php — the payment is opened through it and recorded under it
      * @return array{payment: Payment, url: string}
      */
     public function handle(
@@ -67,6 +69,7 @@ class StartPayment
         ?int $amountMinor = null,
         ?string $lang = null,
         ?Coupon $coupon = null,
+        string $method = PaymeraGateway::KEY,
     ): array {
         if ($purpose === PaymentPurpose::PlanPurchase && $plan === null) {
             throw new InvalidArgumentException('A plan purchase requires a plan.');
@@ -74,14 +77,18 @@ class StartPayment
 
         // Resolved before the row is written: a method that is switched off
         // must refuse here, not after leaving a pending row with no id.
-        $gateway = $this->registry->get(PaymeraGateway::KEY);
+        $gateway = $this->registry->get($method);
+
+        if (! $gateway instanceof PaymentGateway) {
+            throw new InvalidArgumentException("[{$method}] is not a gateway: StartPayment opens card payments only.");
+        }
 
         // A member always funds their own personal wallet here. Company
         // wallets are funded by their admins through the existing
         // allocation/top-up paths, which carry their own authorization.
         $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
 
-        $payment = DB::transaction(function () use ($user, $purpose, $plan, $amountMinor, $lang, $coupon, $wallet) {
+        $payment = DB::transaction(function () use ($user, $purpose, $plan, $amountMinor, $lang, $coupon, $wallet, $method) {
             // The coupon's row first (CouponLedger), then the price it gives.
             $coupon = $this->couponLedger->lockForPricing($coupon);
             $quote = $purpose === PaymentPurpose::PlanPurchase ? $this->quotes->forPlan($plan, $user, $coupon, now()) : null;
@@ -97,7 +104,7 @@ class StartPayment
 
             $payment = Payment::create([
                 'callback_token' => Payment::newCallbackToken(),
-                'method' => PaymeraGateway::KEY,
+                'method' => $method,
                 'purpose' => $purpose,
                 'status' => PaymentStatus::Pending,
                 'user_id' => $user->id,

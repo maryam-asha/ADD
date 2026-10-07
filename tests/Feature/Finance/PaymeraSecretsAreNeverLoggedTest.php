@@ -215,6 +215,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10.00',
         ]);
 

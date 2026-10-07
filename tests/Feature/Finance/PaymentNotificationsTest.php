@@ -6,9 +6,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
-use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -192,7 +190,7 @@ class PaymentNotificationsTest extends TestCase
     {
         $member = $this->member();
         $plan = Plan::factory()->create(['price_points' => 1200, 'is_active' => true]);
-        app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
+        $hold = Payment::factory()->cashPlanHold($plan)->create(['user_id' => $member->id, 'wallet_id' => Wallet::firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $member->id])->id]);
 
         Carbon::setTestNow(now()->addHours(49));
         Artisan::call('payments:expire-pending');

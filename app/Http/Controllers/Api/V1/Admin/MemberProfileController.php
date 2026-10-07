@@ -180,15 +180,10 @@ class MemberProfileController extends Controller
     }
 
     /** Their own subscriptions and their companies', newest first. */
-    public function memberships(ListMemberMembershipsRequest $request, User $user): JsonResponse
+    public function memberships(ListMemberMembershipsRequest $request, User $user, MembershipResolver $memberships): JsonResponse
     {
-        $companyIds = $user->companies()->pluck('companies.id');
-
-        $paginator = Membership::query()
+        $paginator = $memberships->heldBy($user)
             ->with(['plan', 'seatDesks'])
-            ->where(fn ($q) => $q
-                ->where(fn ($own) => $own->where('owner_type', OwnerType::User)->where('owner_id', $user->id))
-                ->orWhere(fn ($company) => $company->where('owner_type', OwnerType::Company)->whereIn('owner_id', $companyIds)))
             ->when($request->validated('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('current_period_start')
             ->orderByDesc('id')

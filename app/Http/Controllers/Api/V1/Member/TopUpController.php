@@ -13,8 +13,9 @@ use Illuminate\Http\JsonResponse;
 use Throwable;
 
 /**
- * POST member/wallet/top-ups — the member adds points to their own wallet by
- * card; the app opens `redirect_url` in a WebView and polls
+ * POST member/wallet/top-ups — the member adds points to their own wallet
+ * through the gateway they name in `payment_method` (today `paymera`, the
+ * card); the app opens `redirect_url` in a WebView and polls
  * GET member/payments/{id}.
  */
 class TopUpController extends Controller
@@ -31,6 +32,7 @@ class TopUpController extends Controller
                 purpose: PaymentPurpose::WalletTopUp,
                 amountMinor: $request->amountMinor(),
                 lang: app()->getLocale(),
+                method: $request->validated('payment_method'),
             );
         } catch (UnknownPaymentMethodException) {
             return response()->json(['message' => __('api.payment.gateway_unavailable')], 503);

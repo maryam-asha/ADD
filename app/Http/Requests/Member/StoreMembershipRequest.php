@@ -30,9 +30,11 @@ class StoreMembershipRequest extends FormRequest
         return [
             'plan_id' => ['required', 'integer', 'exists:plans,id'],
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
-            // Omitted: points, as before payment methods existed.
+            // Omitted: points, as before payment methods existed. Points or a
+            // card only — never cash: there is no subscription without
+            // payment (docs/decisions/unified-payments.md).
             'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
-                ['wallet', 'cash', 'paymera'],
+                ['wallet', 'paymera'],
                 array_keys(app(PaymentMethodRegistry::class)->enabled()),
             )))],
             // A coupon is the member's own: not on a purchase for a company

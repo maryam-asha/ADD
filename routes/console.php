@@ -96,9 +96,9 @@ Schedule::command('bookings:close-elapsed')->everyFiveMinutes()->withoutOverlapp
 Schedule::command('paymera:reconcile')->everyFiveMinutes()->withoutOverlapping();
 
 /*
- * Plans chosen with cash are held for reception for
- * payments.cash_plan_hold_hours; a hold nobody came to pay lapses. Cash
- * holds only — gateway payments are paymera:reconcile's.
+ * Plan holds opened for cash before plans stopped taking cash lapse when
+ * nobody came to pay them. Cash holds only — gateway payments are
+ * paymera:reconcile's.
  */
 Schedule::command('payments:expire-pending')->hourly()->withoutOverlapping();
 

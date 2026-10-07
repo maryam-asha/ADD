@@ -164,7 +164,8 @@ class MemberPaymentMethodsTest extends TestCase
             ->assertJsonPath('data.amount_points', 1200)
             ->assertJsonPath('data.methods.0.available', true);
 
-        $this->assertSame(['wallet', 'cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
+        // Points or a card: there is no subscription without payment, so no cash.
+        $this->assertSame(['wallet', 'paymera'], array_column($response->json('data.methods'), 'key'));
         // A plan bought here is the member's own: only their wallet pays.
         $this->assertSame(['user'], array_column($response->json('data.methods.0.wallets'), 'owner_type'));
     }

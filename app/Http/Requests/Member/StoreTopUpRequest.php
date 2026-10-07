@@ -3,7 +3,6 @@
 namespace App\Http\Requests\Member;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
-use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Rules\AmountFitsCurrency;
@@ -29,15 +28,11 @@ class StoreTopUpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            // Omitted: the card. Only methods that can top up (cash cannot,
-            // nor can points buy points) — and of those, only the gateway the
-            // top-up actually charges: StartPayment opens Paymera and nothing
-            // else, so another gateway would be accepted here and charged
-            // through Paymera. It needs StartPayment to take its key first.
-            'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
-                array_keys(app(PaymentMethodRegistry::class)->availableFor(PaymentPurpose::WalletTopUp)),
-                [PaymeraGateway::KEY],
-            )))],
+            // Always named, so a gateway added in config is chosen the same
+            // way. Only an enabled gateway that can top up: cash cannot (it
+            // is reception's), nor can points buy points. StartPayment opens
+            // the payment through the method named here.
+            'payment_method' => ['required', 'string', Rule::in(self::methods())],
             // A plain decimal: `numeric` alone lets `1e3` through, which
             // bcmath refuses (amountMinor()).
             'amount' => [
@@ -70,6 +65,21 @@ class StoreTopUpRequest extends FormRequest
                 ]));
             }
         });
+    }
+
+    /**
+     * The gateways a member may top up with now.
+     *
+     * @return list<string>
+     */
+    public static function methods(): array
+    {
+        $registry = app(PaymentMethodRegistry::class);
+
+        return array_values(array_intersect(
+            array_keys($registry->availableFor(PaymentPurpose::WalletTopUp)),
+            $registry->gatewayKeys(),
+        ));
     }
 
     /**

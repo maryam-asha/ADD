@@ -282,6 +282,15 @@ starts, so the scan uses it only if it starts within
 (`start_at <= now + 15 min`, which includes a booking already under way). The
 matcher itself is unchanged; the window is applied in `CoworkingSessionService`.
 
+Since 2026-10-05 the same window binds every door, not only the scan:
+`BookingCheckInService::EARLY_CHECK_IN_MINUTES` (which the scan's constant now
+reads) refuses a desk or arrival-request check-in further ahead with **409**
+`api.booking.check_in_too_early`. An arrival inside the window is let in, but
+`checked_in_at` records the booking's **start**, never earlier; a late arrival
+is let in at any time while the booking runs and records when it happened. The
+`bookings_checked_in_not_before_start` CHECK constraint (MySQL/MariaDB) holds
+the table to `checked_in_at >= start_at` whatever writes it.
+
 Outside that window the scan treats the member as having **no booking** and
 carries on to coverage and a walk-in. A member who scans at 09:00 with an
 18:00 booking gets a walk-in, covered by the plan or confirmed as paid, not a

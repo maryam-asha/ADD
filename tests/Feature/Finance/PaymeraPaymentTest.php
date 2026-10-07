@@ -115,6 +115,7 @@ class PaymeraPaymentTest extends TestCase
         $this->fakeGateway();
 
         $response = $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10.00',
         ]);
 
@@ -187,6 +188,7 @@ class PaymeraPaymentTest extends TestCase
         ]);
 
         $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10.00',
         ])->assertStatus(503);
 
@@ -211,6 +213,7 @@ class PaymeraPaymentTest extends TestCase
 
         // 502, not 503 — this one is worth retrying.
         $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10.00',
         ])->assertStatus(502);
     }
@@ -227,6 +230,7 @@ class PaymeraPaymentTest extends TestCase
         ]);
 
         $response = $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '10.00',
         ]);
 
@@ -542,6 +546,7 @@ class PaymeraPaymentTest extends TestCase
 
         // At 0.10 USD per point, 0.05 buys nothing.
         $this->postJson('/api/v1/member/wallet/top-ups', [
+            'payment_method' => 'paymera',
             'amount' => '0.05',
         ])->assertStatus(422)->assertJsonValidationErrors('amount');
 

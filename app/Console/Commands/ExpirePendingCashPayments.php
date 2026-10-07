@@ -11,10 +11,11 @@ use Illuminate\Support\Facades\Log;
 use Throwable;
 
 /**
- * A plan chosen with cash is held for the member to pay at the desk
- * (CashMethod, `payments.cash_plan_hold_hours`). Nothing was taken, so a
- * hold nobody came to pay simply lapses: it becomes Expired, and reception
- * can no longer settle it.
+ * A plan chosen with cash was held for the member to pay at the desk, until
+ * plans stopped taking cash (there is no subscription without payment —
+ * docs/decisions/unified-payments.md); the holds opened before that keep
+ * their `expires_at`. Nothing was taken, so a hold nobody came to pay simply
+ * lapses: it becomes Expired, and reception can no longer settle it.
  *
  * Only cash holds. A gateway's pending payment has money possibly in flight
  * at the bank, and paymera:reconcile alone decides its fate.

@@ -66,6 +66,11 @@ class PaymentResource extends JsonResource
             // The bank's reference — what a member quotes when disputing.
             'rrn' => $this->rrn,
 
+            // The gateway's own id for it (Paymera's paymentId, also in
+            // `redirect_url`) — not `id`, which is ours and what Get Payment
+            // Status takes. Null for a payment no gateway handled.
+            'gateway_payment_id' => $this->payment_id,
+
             // What was taken off it — offer, coupon, plan discount — as it
             // was when the price was locked (AppliedDiscountPresenter).
             'discounts' => app(AppliedDiscountPresenter::class)->for($this->resource),
@@ -80,7 +85,6 @@ class PaymentResource extends JsonResource
                     'name' => $this->user->name,
                     'phone' => $this->user->phone,
                 ]),
-                'gateway_payment_id' => $this->payment_id,
                 'user_id' => $this->user_id,
                 'wallet_id' => $this->wallet_id,
                 'wallet_transaction_id' => $this->wallet_transaction_id,

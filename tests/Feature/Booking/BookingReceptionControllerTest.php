@@ -58,7 +58,7 @@ class BookingReceptionControllerTest extends TestCase
     public function test_operations_can_check_in_a_confirmed_booking(): void
     {
         $operator = $this->actingAsOperations();
-        $booking = Booking::factory()->create(['space_id' => $this->openSpace()->id]);
+        $booking = Booking::factory()->create(['space_id' => $this->openSpace()->id, 'start_at' => now(), 'end_at' => now()->addHour()]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-in");
 
@@ -81,8 +81,8 @@ class BookingReceptionControllerTest extends TestCase
     public function test_check_in_fails_outside_business_hours(): void
     {
         $this->actingAsOperations();
-        $booking = Booking::factory()->create(['space_id' => $this->openSpace()->id]);
         Carbon::setTestNow(Carbon::parse('2026-08-17 23:00:00', 'Asia/Damascus'));
+        $booking = Booking::factory()->create(['space_id' => $this->openSpace()->id, 'start_at' => now(), 'end_at' => now()->addHour()]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-in");
 

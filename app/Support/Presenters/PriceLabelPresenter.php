@@ -58,6 +58,33 @@ class PriceLabelPresenter
     }
 
     /**
+     * A package / membership plan's rate: price and points as numbers along with labels.
+     *
+     * @return array{
+     *     points: int,
+     *     points_label: string,
+     *     price: int|float,
+     *     price_label: string,
+     *     currency: string
+     * }
+     */
+    public function plan(int $points, ?User $user, ?string $locale = null, ?string $period = null): array
+    {
+        $locale ??= app()->getLocale();
+        $period ??= __('api.package.per_month', [], $locale);
+        [$amount, $currency] = $this->amountFor($points, $user);
+        $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
+
+        return [
+            'points' => $points,
+            'points_label' => $this->pointsLabel($points, $locale).' / '.$period,
+            'price' => $numericPrice,
+            'price_label' => $this->currencyLabel($amount, $currency, $locale).' / '.$period,
+            'currency' => $currency,
+        ];
+    }
+
+    /**
      * A whole amount due: price and points as numbers along with labels.
      *
      * @return array{
@@ -77,7 +104,7 @@ class PriceLabelPresenter
         $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
 
         $priceLabel = $this->currencyLabel($amount, $currency, $locale);
-        $pointsLabel = __('api.space.price_points', ['points' => number_format($points)], $locale);
+        $pointsLabel = $this->pointsLabel($points, $locale);
 
         return [
             'points' => $points,
@@ -88,6 +115,14 @@ class PriceLabelPresenter
             'price_point' => $pointsLabel,
             'currency' => $currency,
         ];
+    }
+
+    /**
+     * A number of points as the member reads it, e.g. "1,200 pts".
+     */
+    public function pointsLabel(int $points, ?string $locale = null): string
+    {
+        return __('api.space.price_points', ['points' => number_format($points)], $locale ?? app()->getLocale());
     }
 
     /**

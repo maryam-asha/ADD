@@ -3,9 +3,9 @@
 namespace App\Domain\Membership\Services;
 
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * The one place "what is this user's active membership" is resolved —
@@ -23,8 +23,7 @@ class MembershipResolver
         $membership = Membership::query()
             ->where('owner_type', OwnerType::User)
             ->where('owner_id', $user->id)
-            ->where('status', MembershipStatus::Active)
-            ->where('current_period_end', '>=', now())
+            ->live()
             ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();
@@ -42,8 +41,7 @@ class MembershipResolver
         return Membership::query()
             ->where('owner_type', OwnerType::Company)
             ->whereIn('owner_id', $companyIds)
-            ->where('status', MembershipStatus::Active)
-            ->where('current_period_end', '>=', now())
+            ->live()
             ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();
@@ -56,17 +54,26 @@ class MembershipResolver
      */
     public function hasHeldAnyFor(User $user): bool
     {
+        return $this->heldBy($user)->exists();
+    }
+
+    /**
+     * Every membership this user holds or held — their own, and those of
+     * the companies they belong to now — whatever its status or period.
+     *
+     * @return Builder<Membership>
+     */
+    public function heldBy(User $user): Builder
+    {
         $companyIds = $user->companies()->pluck('companies.id');
 
-        return Membership::query()
-            ->where(function ($query) use ($user, $companyIds) {
-                $query->where(fn ($q) => $q->where('owner_type', OwnerType::User)->where('owner_id', $user->id));
+        return Membership::query()->where(function (Builder $query) use ($user, $companyIds) {
+            $query->where(fn (Builder $q) => $q->where('owner_type', OwnerType::User)->where('owner_id', $user->id));
 
-                if ($companyIds->isNotEmpty()) {
-                    $query->orWhere(fn ($q) => $q->where('owner_type', OwnerType::Company)->whereIn('owner_id', $companyIds));
-                }
-            })
-            ->exists();
+            if ($companyIds->isNotEmpty()) {
+                $query->orWhere(fn (Builder $q) => $q->where('owner_type', OwnerType::Company)->whereIn('owner_id', $companyIds));
+            }
+        });
     }
 
     /**
@@ -81,8 +88,7 @@ class MembershipResolver
         return Membership::query()
             ->where('owner_type', $ownerType)
             ->where('owner_id', $ownerId)
-            ->where('status', MembershipStatus::Active)
-            ->where('current_period_end', '>=', now())
+            ->live()
             ->with(['plan.planModule', 'plan.balances', 'plan.features', 'plan.discounts', 'plan.resourceGrants.resourceType'])
             ->latest('id')
             ->first();

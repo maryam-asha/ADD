@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\DeskAssignmentRefusedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
@@ -53,9 +52,7 @@ class MembershipController extends Controller
                 'plan.planModule',
                 fn (Builder $m) => $m->where('slug', PlanModule::DEDICATED_DESK),
             ))
-            ->when($request->boolean('live'), fn (Builder $q) => $q
-                ->where('status', MembershipStatus::Active->value)
-                ->where('current_period_end', '>=', now()))
+            ->when($request->boolean('live'), fn (Builder $q) => $q->live())
             ->when($request->boolean('without_desk'), fn (Builder $q) => $q->whereDoesntHave('seatDesks'))
             ->when($request->filled('branch_id'), fn (Builder $q) => $q->where('branch_id', $request->integer('branch_id')))
             ->orderByDesc('id')

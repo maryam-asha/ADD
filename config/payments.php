@@ -50,12 +50,6 @@ return [
     ],
 
     /*
-    | How long a plan bought with cash is held for the member to pay at the
-    | desk before payments:expire-pending lets it go.
-    */
-    'cash_plan_hold_hours' => (int) env('PAYMENTS_CASH_PLAN_HOLD_HOURS', 48),
-
-    /*
     |--------------------------------------------------------------------------
     | Smallest wallet top-up
     |--------------------------------------------------------------------------

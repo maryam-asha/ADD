@@ -13,9 +13,12 @@ use App\Domain\Finance\Payments\PaymentStart;
  *
  * A booking, a session or an event registration simply stays unpaid until
  * then — its own unpaid state is the record, and reception writes the
- * payment row when it takes the money. A plan cannot wait like that (there
- * is no membership yet to be unpaid), so a plan bought with cash is held as
- * a pending payment that expires: see createsPendingRowFor().
+ * payment row when it takes the money.
+ *
+ * A plan is not offered: there is no subscription without payment, so a
+ * plan is bought with points or a card only (docs/decisions/unified-payments.md).
+ * Cash holds opened before that still settle at reception or lapse
+ * (payments:expire-pending).
  *
  * A top-up is not offered at all: the member hands the cash over at the
  * desk, which credits it through the reception top-up
@@ -41,34 +44,16 @@ class CashMethod implements PaymentMethodDriver
      * Not an extension: it is settled from the wallet as it happens, or the
      * booking is left owing it. Not a member's top-up: cash for points is
      * taken by reception (admin/reception/wallet-top-ups), which writes its
-     * own row and never asks this.
+     * own row and never asks this. Not a plan: a plan is paid when bought.
      */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return ! in_array($purpose, [PaymentPurpose::BookingExtension, PaymentPurpose::WalletTopUp], true);
+        return ! in_array($purpose, [PaymentPurpose::BookingExtension, PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
     }
 
-    /**
-     * Whether choosing cash for `$purpose` writes a pending payment row now.
-     * Only a plan does; everything else is recorded by reception when paid.
-     */
-    public function createsPendingRowFor(PaymentPurpose $purpose): bool
-    {
-        return $purpose === PaymentPurpose::PlanPurchase;
-    }
-
-    /**
-     * The row stays Pending, held for `payments.cash_plan_hold_hours`, after
-     * which payments:expire-pending lets it go.
-     */
+    /** Nothing is written now: reception records the payment when paid. */
     public function start(Payment $payment, array $context = []): PaymentStart
     {
-        if ($this->createsPendingRowFor($payment->purpose)) {
-            $payment->forceFill([
-                'expires_at' => now()->addHours((int) config('payments.cash_plan_hold_hours', 48)),
-            ])->save();
-        }
-
         return PaymentStart::payAtReception();
     }
 }

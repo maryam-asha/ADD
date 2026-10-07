@@ -136,7 +136,9 @@ class BookingPayByIdTest extends TestCase
         $this->book($this->confirmScreen($space, ['payment_method' => 'wallet', 'booking_id' => $id]))
             ->assertOk()
             ->assertJsonPath('next', 'done')
-            ->assertJsonPath('payment.status', 'accepted');
+            ->assertJsonPath('payment.status', 'accepted')
+            // Points never went through a gateway.
+            ->assertJsonPath('payment.gateway_payment_id', null);
 
         $this->assertSame(PaymentState::Paid, Booking::findOrFail($id)->payment_state);
         $this->assertSame(200, app(WalletService::class)->generalBalance(

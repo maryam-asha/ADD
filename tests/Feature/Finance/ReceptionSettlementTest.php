@@ -13,7 +13,6 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
@@ -176,7 +175,7 @@ class ReceptionSettlementTest extends TestCase
         Space::factory()->create(['building_id' => Building::factory()->create(['branch_id' => $branch->id])->id, 'capacity' => 10]);
         $member = $this->member();
         $plan = Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30, 'is_active' => true]);
-        ['payment' => $hold] = app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
+        $hold = Payment::factory()->cashPlanHold($plan)->create(['user_id' => $member->id, 'wallet_id' => Wallet::firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $member->id])->id]);
 
         $this->settle(['purpose' => 'plan_purchase', 'payment_id' => $hold->id, 'collected_via' => 'cash'])
             ->assertCreated()
@@ -199,7 +198,7 @@ class ReceptionSettlementTest extends TestCase
         Membership::factory()->create(['branch_id' => $branch->id]);
         $member = $this->member();
         $plan = Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30, 'is_active' => true]);
-        ['payment' => $hold] = app(PaymentService::class)->start(PaymentPurpose::PlanPurchase, $member, 'cash', ['plan' => $plan]);
+        $hold = Payment::factory()->cashPlanHold($plan)->create(['user_id' => $member->id, 'wallet_id' => Wallet::firstOrCreate(['owner_type' => OwnerType::User, 'owner_id' => $member->id])->id]);
 
         $this->settle(['purpose' => 'plan_purchase', 'payment_id' => $hold->id, 'collected_via' => 'cash'])
             ->assertStatus(422)

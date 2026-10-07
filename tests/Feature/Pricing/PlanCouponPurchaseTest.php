@@ -2,11 +2,8 @@
 
 namespace Tests\Feature\Pricing;
 
-use App\Domain\Finance\Enums\PaymentMethod;
-use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
-use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -123,29 +120,33 @@ class PlanCouponPurchaseTest extends TestCase
     }
 
     /** A cash hold carries the coupon to the desk; letting it expire gives the use back. */
-    public function test_a_cash_hold_carries_the_coupon_until_it_is_settled_or_expires(): void
+    public function test_a_card_payment_carries_the_coupon_until_it_is_paid_or_fails(): void
     {
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1'],
+            ]),
+        ]);
         $coupon = Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
-        $this->member();
 
-        $this->buy('HALF', 'cash')
-            ->assertCreated()
-            ->assertJsonPath('data.pending_purchase.amount_points', 60)
-            ->assertJsonPath('coupon.points_discounted', 60);
-
-        $operator = User::factory()->create();
-        $operator->assignRole('operations');
-        app(PaymentService::class)->settleAtReception(PaymentPurpose::PlanPurchase, Payment::sole(), PaymentMethod::Cash, null, null, $operator);
+        // Paid in points at once: the coupon is spent with the plan.
+        $this->member(500);
+        $this->buy('HALF')->assertCreated()->assertJsonPath('coupon.points_discounted', 60);
         $this->assertSame(60, Payment::sole()->amount_points);
         $this->assertSame(1, Membership::count());
 
-        // A second member's hold, left to expire.
+        // A second member's card, still open: the coupon is theirs meanwhile.
         $this->member();
-        $this->buy('HALF', 'cash')->assertCreated();
+        $this->buy('HALF', 'paymera')->assertCreated();
         $this->assertSame(2, app(CouponLedger::class)->liveUsage($coupon));
+        $this->assertSame(1, Membership::count());
 
-        Payment::query()->latest('id')->firstOrFail()->forceFill(['status' => PaymentStatus::Expired])->save();
+        // The card fails: no plan, and the use is given back.
+        Payment::query()->latest('id')->firstOrFail()->forceFill(['status' => PaymentStatus::Failed])->save();
         $this->assertSame(1, app(CouponLedger::class)->liveUsage($coupon));
+        $this->assertSame(1, Membership::count());
     }
 
     public function test_a_card_payment_is_opened_at_the_coupon_price(): void
@@ -180,7 +181,7 @@ class PlanCouponPurchaseTest extends TestCase
     {
         Coupon::factory()->percentage(100)->create(['code' => 'GIFT']);
 
-        foreach ([null, 'cash', 'paymera'] as $method) {
+        foreach ([null, 'wallet', 'paymera'] as $method) {
             $member = $this->member();
 
             $this->buy('GIFT', $method)->assertCreated();

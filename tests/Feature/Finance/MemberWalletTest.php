@@ -164,7 +164,35 @@ class MemberWalletTest extends TestCase
 
         $this->getJson('/api/v1/member/wallet/transactions')
             ->assertOk()
-            ->assertJsonPath('meta.total', 0);
+            ->assertJsonPath('meta.total', 0)
+            ->assertJsonPath('data.points_label', '0 pts');
+
+        $this->getJson('/api/v1/member/profile')
+            ->assertOk()
+            ->assertJsonPath('data.points_label', '0 pts');
+    }
+
+    public function test_the_history_and_profile_carry_the_general_points_only(): void
+    {
+        $member = $this->member(300);
+        app(WalletService::class)->creditCategorized(
+            $this->walletOf($member),
+            WalletTransactionCategory::Cafe,
+            50,
+            WalletTransactionSource::SubscriptionGrant,
+            now()->addMonth(),
+        );
+        $this->actingAsMember($member);
+
+        // Narrowing the list to cafe rows doesn't narrow the balance.
+        $this->getJson('/api/v1/member/wallet/transactions?category=cafe')
+            ->assertOk()
+            ->assertJsonPath('meta.total', 1)
+            ->assertJsonPath('data.points_label', '300 pts');
+
+        $this->getJson('/api/v1/member/profile')
+            ->assertOk()
+            ->assertJsonPath('data.points_label', '300 pts');
     }
 
     public function test_the_history_is_the_members_own_rows_newest_first(): void
@@ -176,14 +204,14 @@ class MemberWalletTest extends TestCase
 
         $this->getJson('/api/v1/member/wallet/transactions')
             ->assertOk()
-            ->assertJsonCount(2, 'data')
+            ->assertJsonCount(2, 'data.transactions')
             ->assertJsonPath('meta.total', 2)
-            ->assertJsonPath('data.0.kind', 'gift')
-            ->assertJsonPath('data.0.title', 'Gift points')
-            ->assertJsonPath('data.0.type', 'credit')
-            ->assertJsonPath('data.0.points', 20)
-            ->assertJsonPath('data.1.kind', 'top_up')
-            ->assertJsonPath('data.1.points', 300);
+            ->assertJsonPath('data.transactions.0.kind', 'gift')
+            ->assertJsonPath('data.transactions.0.title', 'Gift points')
+            ->assertJsonPath('data.transactions.0.type', 'credit')
+            ->assertJsonPath('data.transactions.0.points', 20)
+            ->assertJsonPath('data.transactions.1.kind', 'top_up')
+            ->assertJsonPath('data.transactions.1.points', 300);
     }
 
     public function test_a_spend_is_named_by_what_it_paid_for(): void
@@ -194,20 +222,22 @@ class MemberWalletTest extends TestCase
 
         $this->getJson('/api/v1/member/wallet/transactions')
             ->assertOk()
-            ->assertJsonPath('data.0.type', 'debit')
-            ->assertJsonPath('data.0.kind', 'coworking_session')
-            ->assertJsonPath('data.0.title', 'Coworking session — Meeting Room A')
-            ->assertJsonPath('data.0.points', -250)
-            ->assertJsonPath('data.0.amount.points', 250)
-            ->assertJsonPath('data.0.method', 'wallet')
-            ->assertJsonPath('data.0.method_label', 'Wallet points')
+            ->assertJsonPath('data.transactions.0.type', 'debit')
+            ->assertJsonPath('data.transactions.0.kind', 'coworking_session')
+            ->assertJsonPath('data.transactions.0.title', 'Coworking session — Meeting Room A')
+            ->assertJsonPath('data.transactions.0.points', -250)
+            ->assertJsonPath('data.transactions.0.amount.points', 250)
+            ->assertJsonPath('data.transactions.0.method', 'wallet')
+            ->assertJsonPath('data.transactions.0.method_label', 'Wallet points')
+            // Points spent, no money handed over: nothing was paid.
+            ->assertJsonPath('data.transactions.0.paid', null)
             // No space-specific points, so the spend fell back to general.
-            ->assertJsonPath('data.0.category', 'general');
+            ->assertJsonPath('data.transactions.0.category', 'general');
 
         $this->withHeader('lang', 'ar')
             ->getJson('/api/v1/member/wallet/transactions')
-            ->assertJsonPath('data.0.title', 'جلسة عمل مشترك — غرفة الاجتماعات أ')
-            ->assertJsonPath('data.0.category_label', 'الرصيد العام');
+            ->assertJsonPath('data.transactions.0.title', 'جلسة عمل مشترك — غرفة الاجتماعات أ')
+            ->assertJsonPath('data.transactions.0.category_label', 'الرصيد العام');
     }
 
     public function test_the_receipt_shows_the_balance_either_side_and_the_payment(): void
@@ -268,14 +298,14 @@ class MemberWalletTest extends TestCase
 
         $this->getJson('/api/v1/member/wallet/transactions?type=debit')
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.type', 'debit');
+            ->assertJsonPath('data.transactions.0.type', 'debit');
 
         $this->getJson('/api/v1/member/wallet/transactions?type=credit')
             ->assertJsonPath('meta.total', 2);
 
         $this->getJson('/api/v1/member/wallet/transactions?category=cafe')
             ->assertJsonPath('meta.total', 1)
-            ->assertJsonPath('data.0.kind', 'subscription_grant');
+            ->assertJsonPath('data.transactions.0.kind', 'subscription_grant');
 
         $today = now()->setTimezone('Asia/Damascus')->format('Y-m-d');
         $tomorrow = now()->setTimezone('Asia/Damascus')->addDay()->format('Y-m-d');
@@ -304,8 +334,8 @@ class MemberWalletTest extends TestCase
 
         $this->getJson('/api/v1/member/wallet/transactions?per_page=2&page=2')
             ->assertOk()
-            ->assertJsonCount(1, 'data')
-            ->assertJsonPath('data.0.points', 300)
+            ->assertJsonCount(1, 'data.transactions')
+            ->assertJsonPath('data.transactions.0.points', 300)
             ->assertJsonPath('meta.current_page', 2)
             ->assertJsonPath('meta.last_page', 2)
             ->assertJsonPath('meta.per_page', 2);
@@ -341,10 +371,10 @@ class MemberWalletTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors('amount');
 
-        // No method is the card.
+        // The method is always named.
         $this->postJson('/api/v1/member/wallet/top-ups', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors('amount');
+            ->assertJsonValidationErrors(['payment_method', 'amount']);
     }
 
     public function test_an_accepted_card_top_up_is_a_top_up_row_with_the_money_paid(): void
@@ -379,6 +409,13 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.paid.currency', 'SYP')
             ->assertJsonPath('data.balance.before.points', 0)
             ->assertJsonPath('data.balance.after.points', 10);
+
+        // The list shows the money as it was paid, not re-priced at today's
+        // rate — the receipt and the row agree.
+        $this->getJson('/api/v1/member/wallet/transactions')
+            ->assertOk()
+            ->assertJsonPath('data.transactions.0.paid.amount', '10000.00')
+            ->assertJsonPath('data.transactions.0.paid.currency', 'SYP');
 
         $this->getJson('/api/v1/member/wallet')->assertJsonPath('data.balance.points', 10);
     }
