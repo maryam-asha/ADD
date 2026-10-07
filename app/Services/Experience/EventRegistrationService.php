@@ -12,7 +12,9 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Forms\Services\FormSubmissionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -41,6 +43,8 @@ class EventRegistrationService
         private readonly QuoteRecorder $recorder,
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
+        private readonly PaymentMethodRegistry $methods,
+        private readonly PrepaymentHold $holds,
     ) {}
 
     /**
@@ -181,6 +185,17 @@ class EventRegistrationService
             $method = $paymentMethod ?? WalletMethod::KEY;
             $pointsDeducted = 0;
 
+            // A seat confirmed on the spot and paid by a prepaid method is
+            // held until the card goes through or another method is chosen
+            // (docs/decisions/prepayment-all-or-nothing.md).
+            $held = $status === EventRegistrationStatus::Approved
+                && $isPaidEvent && ! $madeFree
+                && in_array($method, $this->methods->gatewayKeys(), true);
+
+            if ($held) {
+                $status = EventRegistrationStatus::AwaitingPayment;
+            }
+
             // 7. Create the attendee from the member's own profile. Name,
             // phone and email are never asked for on the form — they are
             // already known, and a form field could contradict them.
@@ -194,6 +209,7 @@ class EventRegistrationService
                 'pending_expires_at' => $status === EventRegistrationStatus::Pending
                     ? $this->pendingDeadlineFor($lockedEvent)
                     : null,
+                'payment_due_at' => $held ? $this->holds->dueAt($lockedEvent->start_at) : null,
                 'attended' => null,
                 'price_points' => $isPaidEvent ? $pricePoints : null,
                 'list_price_points' => $isPaidEvent ? $listPoints : null,
@@ -243,6 +259,7 @@ class EventRegistrationService
                 'ticket_id' => $attendee->id,
                 'status' => $status->value,
                 'requires_approval' => (bool) $lockedEvent->requires_approval,
+                'payment_due_at' => $attendee->payment_due_at?->toIso8601String(),
                 'event' => [
                     'id' => $lockedEvent->id,
                     'title' => $lockedEvent->translate('title', $locale),

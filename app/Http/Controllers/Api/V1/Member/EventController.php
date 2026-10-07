@@ -109,13 +109,13 @@ class EventController extends Controller
             $request->validated('coupon_code'),
         );
 
-        // A card pays once the seat is confirmed; a pending one is paid
-        // after approval, from pay-now. If the gateway cannot be reached the
-        // seat stands, unpaid.
+        // A card pays once the seat is confirmed (held for it, until it is
+        // paid); a pending one is paid after approval, from pay-now. If the
+        // gateway cannot be reached the seat stands, unpaid.
         $attendee = EventAttendee::query()->find($result['ticket_id']);
 
         if ($method !== null && in_array($method, $methods->gatewayKeys(), true)
-            && $attendee?->status === EventRegistrationStatus::Approved
+            && in_array($attendee?->status, [EventRegistrationStatus::Approved, EventRegistrationStatus::AwaitingPayment], true)
             && $attendee->payment_state === EventPaymentState::Unpaid) {
             $result += $this->payBesideNewRecord($checkout, PaymentPurpose::EventRegistration, $attendee, $request->user(), $method);
         }
