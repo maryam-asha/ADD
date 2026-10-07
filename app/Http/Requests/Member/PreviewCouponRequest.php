@@ -5,22 +5,21 @@ namespace App\Http\Requests\Member;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * A code and what it would be used on: a plan; a booking window (a space
- * and its times) or an unpaid booking; a closed co-working session; an
- * event or an unpaid registration for one.
+ * A code, and — optionally — what it would be used on. The code alone is
+ * checked for this member; a purpose, or a purpose and an item, also that it
+ * applies there; something that can be priced — a plan; a booking window (a
+ * space and its times) or an unpaid booking; a closed co-working session; an
+ * event or an unpaid registration for one — is priced too.
+ *
+ * The purpose and its item are those "my coupons" takes, plus a booking
+ * window and `payable_id`.
  */
-class PreviewCouponRequest extends FormRequest
+class PreviewCouponRequest extends ListMemberCouponsRequest
 {
     use InterpretsLocalTimes;
-
-    public function authorize(): bool
-    {
-        return true;
-    }
 
     protected function prepareForValidation(): void
     {
@@ -32,46 +31,33 @@ class PreviewCouponRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
+        return array_merge(parent::rules(), [
             'code' => ['required', 'string', 'max:40'],
-            'purpose' => ['required', Rule::enum(PricingPurpose::class)],
+            'purpose' => ['nullable', 'required_with:space_id,plan_id,event_id,payable_id', Rule::enum(PricingPurpose::class)],
             // Only a plan the member could buy — active and public, as both
             // purchase paths require.
-            'plan_id' => [
-                'required_if:purpose,'.PricingPurpose::PlanPurchase->value,
-                'nullable',
-                'integer',
-                Rule::exists('plans', 'id')->where('is_active', true)->where('is_public', true),
-            ],
-            'payable_id' => ['required_if:purpose,'.PricingPurpose::CoworkingSession->value, 'nullable', 'integer'],
+            'plan_id' => ['nullable', 'integer', Rule::exists('plans', 'id')->where('is_active', true)->where('is_public', true)],
+            'payable_id' => ['nullable', 'integer'],
             'space_id' => ['nullable', 'integer', 'exists:spaces,id', 'required_with:start_at,end_at'],
-            'start_at' => ['nullable', 'date', 'required_with:space_id'],
-            'end_at' => ['nullable', 'date', 'after:start_at', 'required_with:space_id'],
-            'event_id' => ['nullable', 'integer', 'exists:events,id'],
-        ];
+            'start_at' => ['nullable', 'date', 'required_with:end_at'],
+            'end_at' => ['nullable', 'date', 'after:start_at', 'required_with:start_at'],
+        ]);
     }
 
-    /**
-     * A booking is a window or an unpaid booking; a registration an event or
-     * an unpaid registration — one of the two is needed.
-     */
+    /** Besides the parent's item-for-purpose check: a plan is never already owed. */
     public function withValidator(Validator $validator): void
     {
-        $validator->after(function (Validator $validator) {
-            $missing = match ($this->input('purpose')) {
-                PricingPurpose::Booking->value => ! $this->filled('payable_id') && ! $this->filled('space_id') ? 'space_id' : null,
-                PricingPurpose::EventRegistration->value => ! $this->filled('payable_id') && ! $this->filled('event_id') ? 'event_id' : null,
-                default => null,
-            };
+        parent::withValidator($validator);
 
-            if ($missing !== null) {
-                $validator->errors()->add($missing, __('validation.required', ['attribute' => $missing]));
+        $validator->after(function (Validator $validator) {
+            if ($this->filled('payable_id') && $this->input('purpose') === PricingPurpose::PlanPurchase->value) {
+                $validator->errors()->add('payable_id', __('validation.prohibited', ['attribute' => 'payable_id']));
             }
         });
     }
 
-    public function purpose(): PricingPurpose
+    public function purpose(): ?PricingPurpose
     {
-        return PricingPurpose::from($this->validated('purpose'));
+        return PricingPurpose::tryFrom((string) $this->validated('purpose'));
     }
 }

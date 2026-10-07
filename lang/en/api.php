@@ -279,6 +279,7 @@ return [
         'check_in_no_show' => 'This booking ended without a check-in and can no longer be checked in.',
         'check_in_ended' => 'This booking has already ended and can no longer be checked in.',
         'check_in_awaiting_payment' => 'This booking is waiting for its payment. Take the payment first, then check it in.',
+        'check_in_too_early' => 'Check-in opens 15 minutes before the booking starts.',
         'not_cancellable' => 'This booking has already been closed and cannot be cancelled.',
         'lapsed_unreviewed' => 'Your request was not reviewed before it started, so it was closed automatically.',
 
@@ -607,6 +608,9 @@ return [
         'registration_success_points' => 'Successfully registered for the event. :points points deducted from your wallet.',
         'price_free' => 'Free',
         'price_points' => ':points pts',
+        'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
         'registration_pending' => 'Your registration has been submitted and is awaiting approval.',
         'not_pending' => 'This registration is not awaiting approval.',
         'rejection_reason_required' => 'A rejection reason is required.',
@@ -622,6 +626,7 @@ return [
     ],
 
     'coupon' => [
+        'valid' => 'This code is valid and can be used.',
         'not_found' => 'This code is not valid.',
         'not_started' => 'This code is not active yet.',
         'expired' => 'This code has expired.',

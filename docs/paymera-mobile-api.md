@@ -630,6 +630,15 @@ POST /api/v1/member/bookings/preview
 POST /api/v1/member/coupons/preview
 ```
 
+يعمل على خطوتين ولا يُنشئ شيئاً ولا يستهلك الكوبون:
+
+1. **التحقق:** هل الكود موجود وفعّال الآن، وهل يحق لهذا العضو استخدامه. وإذا
+   أُرسل `purpose` (مع عنصر أو بدونه) يتحقق أيضاً أنه ينطبق عليه.
+2. **السعر:** إذا أُرسل شيء له سعر، يحسب السعر بعد الكوبون بنفس حساب الشراء،
+   فيتحقق أيضاً من الحد الأدنى للسعر ومن الدمج مع العرض.
+
+`code` وحده إجباري. ما يُحسب له سعر:
+
 | `purpose` | مع |
 |---|---|
 | `plan_purchase` | `plan_id` |
@@ -637,10 +646,21 @@ POST /api/v1/member/coupons/preview
 | `coworking_session` | `payable_id` لجلسة مغلقة غير مدفوعة |
 | `event_registration` | `event_id`، أو `payable_id` لتسجيل غير مدفوع |
 
+`purpose` وحده، أو مع `space_id` دون أوقات، يُتحقق منه ولا يُسعَّر.
+
 ```json
 {
+  "message": "هذا الكود صالح ويمكن استخدامه.",
   "data": {
-    "coupon": {"code": "WELCOME20", "applied": true, "points_discounted": 24, "message": null},
+    "coupon": {
+      "code": "WELCOME20", "name": "أهلاً", "description": null,
+      "discount_type": "percentage", "discount_value": 20,
+      "max_discount_points": null, "min_amount_points": null,
+      "combinable_with_offers": false,
+      "starts_at": null, "ends_at": "2026-10-12T06:00:00.000000Z",
+      "uses_left": 1, "targets": [],
+      "applied": true, "points_discounted": 24, "message": null
+    },
     "list_points": 120,
     "list_price": "12 $",
     "price_points": 96,
@@ -650,8 +670,18 @@ POST /api/v1/member/coupons/preview
 }
 ```
 
-لا يُنشئ شيئاً ولا يستهلك الكوبون. مفاتيح `lines`:
-`base` | `sale` | `plan_discount` | `coupon`. الحد 20 طلباً في الدقيقة.
+- بلا شيء يُسعَّر: المفاتيح نفسها، و`applied` و`points_discounted` و`list_points`
+  و`list_price` و`price_points` و`price` و`lines` كلها `null`.
+- `applied: false` يعني أن الكوبون غير قابل للدمج وأن العرض أفضل منه، فيبقى السعر
+  سعر العرض، و`message` يقول ذلك.
+- الكود الذي لا يصلح يعيد 422 `{message, reason}`، و`reason` واحد من: `not_found`
+  (غير موجود أو موقوف، بنفس الرد)، `not_started`، `expired`، `not_applicable`،
+  `not_eligible`، `new_members_only`، `usage_limit_reached`،
+  `per_user_limit_reached`، `min_amount_not_met`، `already_applied`،
+  `payment_in_progress`.
+
+مفاتيح `lines`: `base` | `sale` | `plan_discount` | `coupon`. الحد 20 طلباً في
+الدقيقة.
 
 ### ج-2. كوبوناتي: ما يمكن للعضو تطبيقه
 

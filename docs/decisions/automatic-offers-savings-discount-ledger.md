@@ -95,9 +95,12 @@ saving is not an offer.
 
 ## What the member sees
 
-- **`sale`** (spaces and packages): the best offer live **now for this
-  member**, so a members-only offer shows only to its members. Same shape
-  as before. `ends_at` and `ends_label` are null for an offer with no end.
+- **`sale`** (spaces, packages and events): the best offer live **now for
+  this member**, so a members-only offer shows only to its members. Same
+  shape as before. On an event card it is null for a free event and once
+  the member is registered — their price is locked (2026-10-07,
+  `EventSalePresenter`, outside the domains because Experience may not
+  import Pricing). `ends_at` and `ends_label` are null for an offer with no end.
   A rate with a fraction of a point is shown rounded **up** (E8); the
   charge is exact.
 - **`saving`** (packages): `{compared_to, reference_points,

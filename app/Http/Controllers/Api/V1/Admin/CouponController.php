@@ -105,8 +105,9 @@ class CouponController extends AdminResourceController
         $coupon = DB::transaction(function () use ($validated, $request, $history) {
             $coupon = Coupon::create(array_merge(
                 // One use per member unless the admin says otherwise (D11) —
-                // a coupon's default; an offer is limited only when set.
-                ['per_user_limit' => ($validated['is_automatic'] ?? false) ? null : 1],
+                // a coupon's default; an offer is limited only when set. And
+                // no stacking on an offer unless asked: the better of the two.
+                ['per_user_limit' => ($validated['is_automatic'] ?? false) ? null : 1, 'combinable_with_offers' => false],
                 $this->couponAttributes($validated),
                 ['source' => CouponSource::Admin, 'created_by' => $request->user()->id],
             ));

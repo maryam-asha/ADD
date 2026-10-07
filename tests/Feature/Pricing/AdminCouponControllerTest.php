@@ -88,6 +88,20 @@ class AdminCouponControllerTest extends TestCase
         $this->assertTrue(Activity::where('description', 'coupon_created')->where('subject_id', $coupon->id)->exists());
     }
 
+    /** No stacking on an offer unless the admin asks for it: the member gets the better of the two. */
+    public function test_a_coupon_does_not_combine_with_offers_unless_asked(): void
+    {
+        $this->signInAs('admin');
+
+        $this->postJson('/api/v1/admin/coupons', $this->payload())
+            ->assertCreated()
+            ->assertJsonPath('data.combinable_with_offers', false);
+
+        $this->postJson('/api/v1/admin/coupons', $this->payload(['code' => 'STACK', 'combinable_with_offers' => true]))
+            ->assertCreated()
+            ->assertJsonPath('data.combinable_with_offers', true);
+    }
+
     public function test_a_coupon_may_be_unlimited_per_member(): void
     {
         $this->signInAs('admin');

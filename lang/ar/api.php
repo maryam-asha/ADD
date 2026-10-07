@@ -279,6 +279,7 @@ return [
         'check_in_no_show' => 'انتهى هذا الحجز دون تسجيل دخول ولم يعد بالإمكان تسجيل دخوله.',
         'check_in_ended' => 'انتهى وقت هذا الحجز ولم يعد بالإمكان تسجيل دخوله.',
         'check_in_awaiting_payment' => 'هذا الحجز بانتظار الدفع. حصّل الدفع أولاً ثم سجّل دخوله.',
+        'check_in_too_early' => 'يفتح تسجيل الدخول قبل 15 دقيقة من بداية الحجز.',
         'not_cancellable' => 'هذا الحجز مغلق ولا يمكن إلغاؤه.',
         'lapsed_unreviewed' => 'لم تتم مراجعة طلبك قبل موعد بدئه، فأُغلق تلقائياً.',
 
@@ -597,6 +598,9 @@ return [
         'registration_success_points' => 'تم التسجيل في الفعالية بنجاح وتم خصم :points نقطة من محفظتك.',
         'price_free' => 'مجاني',
         'price_points' => ':points نقطة',
+        'sale_ends' => 'ينتهي العرض في :date',
+        'sale_discount_percent' => 'خصم :percent%',
+        'sale_discount_amount' => 'وفّر :amount',
         'registration_pending' => 'تم إرسال تسجيلك وهو بانتظار الموافقة.',
         'not_pending' => 'هذا التسجيل ليس في انتظار الموافقة.',
         'rejection_reason_required' => 'سبب الرفض مطلوب.',
@@ -612,6 +616,7 @@ return [
     ],
 
     'coupon' => [
+        'valid' => 'هذا الكود صالح ويمكن استخدامه.',
         'not_found' => 'هذا الكود غير صالح.',
         'not_started' => 'هذا الكود لم يبدأ بعد.',
         'expired' => 'انتهت صلاحية هذا الكود.',

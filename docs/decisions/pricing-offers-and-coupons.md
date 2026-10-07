@@ -86,7 +86,13 @@ this protocol is held by review, not by a test.
 `bookings/preview`, `memberships`, `payments` (a plan, or an existing unpaid
 booking / session / registration), `events/{event}/register` and
 `GET payment-methods`. `POST member/coupons/preview` ("Apply" in the app,
-throttled 20/min) prices without writing. A code that cannot be used answers
+throttled 20/min) writes nothing and works in two steps (2026-10-07):
+first it checks the code alone — it exists, is live, this member may use
+it, and, given a `purpose` and an item, that it applies there; then, given
+something with a price, it prices it. Only `code` is required. The answer
+keeps one shape: `message`, `data.coupon` = the coupon's terms and
+`uses_left` plus `applied` / `points_discounted` / `message` from the
+quote, and the price fields, null when nothing was priced. A code that cannot be used answers
 422 `{message, reason}` with a `CouponRejection` reason. Bookings, plan
 purchases and payments return `coupon: {code, applied, points_discounted,
 message}` beside `data`; a registration's price after the code is its own
@@ -157,6 +163,10 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   the price.
 - **`per_user_limit` defaults to 1** when the admin leaves it out on create;
   `null` means unlimited.
+- **`combinable_with_offers` defaults to false** (2026-10-07): a coupon does
+  not stack on an offer or a plan discount unless the admin says so — the
+  member gets the better of the two (`offer_is_better` when the offer wins).
+  Coupons created before keep what they were saved with.
 - **Coupon targets are replaced wholesale on update** — they carry no
   history; uses keep their own copy of the terms.
 - **Coupons at the reception desk and on company plan purchases are refused

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Pricing;
 
+use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
@@ -54,6 +55,22 @@ class SaleLabelsTest extends TestCase
     private function package(int $price): Plan
     {
         return Plan::factory()->create(['price_points' => $price, 'is_active' => true, 'is_public' => true, 'is_subscription' => true]);
+    }
+
+    /** @param  array<string, mixed>  $attributes */
+    private function event(array $attributes = []): Event
+    {
+        return Event::create(array_merge([
+            'title' => ['en' => 'Masterclass', 'ar' => 'دورة'],
+            'start_at' => now()->addDays(3),
+            'end_at' => now()->addDays(3)->addHours(2),
+            'location' => 'Main Hall',
+            'capacity' => 20,
+            'is_free' => false,
+            'price_points' => 100,
+            'status' => 'published',
+            'requires_approval' => false,
+        ], $attributes));
     }
 
     public function test_a_space_with_an_offer_shows_it(): void
@@ -157,5 +174,47 @@ class SaleLabelsTest extends TestCase
         $this->assertSame(16, $sale['discount_percent']);
         $this->assertSame(__('api.package.sale_discount_percent', ['percent' => 16], 'en'), $sale['discount_label']);
         $this->assertSame(__('api.package.sale_ends', ['date' => '2026-10-07 10:00'], 'en'), $sale['ends_label']);
+    }
+
+    public function test_an_event_with_an_offer_shows_it(): void
+    {
+        $event = $this->event();
+        $this->offerOnEvent($event, 75, ['ends_at' => now()->addDays(2)]);
+
+        $sale = $this->fetch("/api/v1/member/events/{$event->id}")->json('data.sale');
+
+        $this->assertNotNull($sale);
+        $this->assertSame(75, $sale['points']);
+        $this->assertSame(100, $sale['original_points']);
+        $this->assertSame(25, $sale['discount_points']);
+        $this->assertSame(25, $sale['discount_percent']);
+        $this->assertSame(__('api.event.sale_discount_percent', ['percent' => 25], 'en'), $sale['discount_label']);
+        $this->assertSame(__('api.event.sale_ends', ['date' => '2026-10-07 10:00'], 'en'), $sale['ends_label']);
+
+        $card = collect($this->fetch('/api/v1/member/events')->json('data'))->firstWhere('id', $event->id);
+        $this->assertSame(75, $card['sale']['points']);
+    }
+
+    /** An offer on everything reaches events too; a free event has nothing to take off. */
+    public function test_an_offer_on_everything_shows_on_paid_events_only(): void
+    {
+        $paid = $this->event();
+        $free = $this->event(['is_free' => true, 'price_points' => 0]);
+        Coupon::factory()->automatic()->percentage(10)->create();
+
+        $this->assertSame(90, $this->fetch("/api/v1/member/events/{$paid->id}")->json('data.sale.points'));
+        // Null, never missing: the response keeps one shape with or without an offer.
+        $this->assertArrayHasKey('sale', $this->fetch("/api/v1/member/events/{$free->id}")->json('data'));
+        $this->assertNull($this->fetch("/api/v1/member/events/{$free->id}")->json('data.sale'));
+    }
+
+    /** Once registered, the member's price is locked: no offer is announced on it. */
+    public function test_a_registered_member_sees_no_offer_on_the_event(): void
+    {
+        $event = $this->event();
+        $this->offerOnEvent($event, 75);
+        $event->attendees()->create(['user_id' => $this->member->id, 'name' => 'Member', 'email' => $this->member->email, 'status' => 'confirmed', 'price_points' => 75]);
+
+        $this->assertNull($this->fetch("/api/v1/member/events/{$event->id}")->json('data.sale'));
     }
 }

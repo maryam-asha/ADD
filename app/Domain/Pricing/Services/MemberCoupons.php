@@ -54,7 +54,7 @@ class MemberCoupons
     }
 
     /** How many more times this member may use it: the tighter of its two limits, or null for no limit. */
-    private function usesLeft(Coupon $coupon, User $member): ?int
+    public function usesLeft(Coupon $coupon, User $member): ?int
     {
         $left = array_filter([
             $coupon->usage_limit === null ? null : $coupon->usage_limit - $this->ledger->liveUsage($coupon),

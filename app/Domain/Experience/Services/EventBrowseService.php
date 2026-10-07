@@ -9,6 +9,7 @@ use App\Http\Resources\Forms\FormFieldResource;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
+use App\Support\Presenters\EventSalePresenter;
 use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
@@ -24,6 +25,9 @@ class EventBrowseService
      * open/full/closed filters agree with the status on each card.
      */
     private const REGISTRATION_CLOSES_AT = 'COALESCE(events.registration_closes_at, events.start_at)';
+
+    /** One per service, so a listing reads the active offers once. */
+    private ?EventSalePresenter $sales = null;
 
     /**
      * Resolve current locale from request header or app locale.
@@ -552,6 +556,9 @@ class EventBrowseService
             'seats_left_text' => $seatsLeftText,
             'is_free' => (bool) ($event->is_free ?? true),
             'pricing' => $price,
+            // The best offer live now for this member: what registering now
+            // would cost. Nothing once they are in — their price is locked.
+            'sale' => $isRegistered ? null : ($this->sales ??= app(EventSalePresenter::class))->for($event, $user, $locale),
             'status' => $computedStatus,
             'is_registered' => $isRegistered,
             // On a card, only a live application: a rejection against every

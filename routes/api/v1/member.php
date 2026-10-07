@@ -210,8 +210,9 @@ Route::get('service-requests/{serviceRequest}', [MemberServiceRequestController:
 // wallet method carries the member's points (docs/decisions/unified-payments.md).
 Route::get('payment-methods', [PaymentMethodsController::class, 'index']);
 
-// "Apply" for a coupon code: what it would take off a plan, a booking, a
-// co-working session or an event registration — writing nothing
+// "Apply" for a coupon code: first whether this member may use it at all,
+// then — given a plan, a booking, a co-working session or an event
+// registration — what it would take off, writing nothing
 // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
 // Throttled, so codes cannot be guessed at speed.
 Route::post('coupons/preview', CouponPreviewController::class)->middleware('throttle:20,1');

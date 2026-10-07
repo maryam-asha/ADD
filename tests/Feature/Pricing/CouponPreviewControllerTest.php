@@ -134,11 +134,31 @@ class CouponPreviewControllerTest extends TestCase
         }
     }
 
-    public function test_the_target_must_be_named(): void
+    /** An item needs its purpose; a purpose alone is only checked, never priced. */
+    public function test_an_item_needs_its_purpose(): void
     {
-        $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase'])
+        $plan = Plan::factory()->create(['price_points' => 120, 'is_active' => true, 'is_public' => true]);
+
+        $this->preview(['code' => 'HALF', 'plan_id' => $plan->id])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['plan_id']);
+            ->assertJsonValidationErrors(['purpose']);
+
+        $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase'])
+            ->assertOk()
+            ->assertJsonPath('data.price_points', null);
+    }
+
+    /** The coupon's terms come back beside the price. */
+    public function test_a_priced_preview_carries_the_coupon_terms(): void
+    {
+        $plan = Plan::factory()->create(['price_points' => 120, 'is_active' => true, 'is_public' => true]);
+
+        $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase', 'plan_id' => $plan->id])
+            ->assertOk()
+            ->assertJsonPath('message', __('api.coupon.valid', [], 'en'))
+            ->assertJsonPath('data.coupon.discount_type', 'percentage')
+            ->assertJsonPath('data.coupon.discount_value', 50)
+            ->assertJsonPath('data.coupon.message', null);
     }
 
     /** The payment methods screen weighs the wallet against the coupon price. */

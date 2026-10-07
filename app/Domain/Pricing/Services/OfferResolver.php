@@ -3,6 +3,7 @@
 namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Services\AmountCalculator;
+use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Plan;
@@ -40,7 +41,7 @@ class OfferResolver
     private readonly array $memberRules;
 
     /**
-     * What the app shows (hourlyNow, planNow) is read once per instance — a
+     * What the app shows (hourlyNow, planNow, eventNow) is read once per instance — a
      * listing shows many cards, and who may use an offer does not depend on
      * the card. A price that is charged reads afresh every time, so a limit
      * is counted from the rows its transaction locked.
@@ -129,6 +130,16 @@ class OfferResolver
     public function planNow(Plan $plan, ?User $member): ?OfferPrice
     {
         return $this->forItem((int) $plan->price_points, PricingTarget::forPlan($plan), $member, now(), new UsageInFlight, shown: true);
+    }
+
+    /** The offer on a paid event live now for this member: what registering now would cost. */
+    public function eventNow(Event $event, ?User $member): ?OfferPrice
+    {
+        $list = ($event->is_free ?? true) ? 0 : (int) ($event->price_points ?? 0);
+
+        return $list > 0
+            ? $this->forItem($list, PricingTarget::forEvent($event), $member, now(), new UsageInFlight, shown: true)
+            : null;
     }
 
     /**
