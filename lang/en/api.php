@@ -641,6 +641,13 @@ return [
         'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
         'offer_is_better' => 'The current offer already gives you a lower price, so the code was not applied.',
         'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
+        // "My coupons" asked about an item: how a code sits beside the offer there now.
+        'with_offer' => [
+            'stacks' => 'Adds on top of the current offer.',
+            'better_of_two' => 'Does not combine with the current offer; you get the better of the two.',
+            'code_is_better' => 'Better than the current offer.',
+            'offer_is_better' => 'The current offer is better than this code.',
+        ],
     ],
 
 ];

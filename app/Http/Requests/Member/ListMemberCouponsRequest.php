@@ -56,6 +56,17 @@ class ListMemberCouponsRequest extends FormRequest
         });
     }
 
+    /** The space, plan or event asked about, if one was. */
+    public function item(): Space|Plan|Event|null
+    {
+        return match (true) {
+            $this->filled('space_id') => Space::findOrFail($this->validated('space_id')),
+            $this->filled('plan_id') => Plan::findOrFail($this->validated('plan_id')),
+            $this->filled('event_id') => Event::findOrFail($this->validated('event_id')),
+            default => null,
+        };
+    }
+
     /** What was asked about, or null for every coupon the member has. */
     public function target(): ?PricingTarget
     {

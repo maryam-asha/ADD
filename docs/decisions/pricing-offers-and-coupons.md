@@ -175,6 +175,15 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   `PricingPurpose::coveredByUntargeted()` holds the rule;
   `AppliesToTarget` applies it, so every path (purchase, preview, the `sale`
   block, "my coupons") agrees.
+- **"My coupons" asked about an item says how each code sits beside the
+  offer there** (2026-10-08): `with_offer` — the offer live now for this
+  member (`OfferResolver::hourlyNow/planNow/eventNow`), whether the code
+  combines, and, on a plan or an event, its exact quote (`price_points`,
+  `applied`) from `PriceQuoteService`. A space's price follows the slot's
+  length, so there it stays at "combines or the better of the two".
+  Computed, not stored: no setting on the space — stacking stays the
+  coupon's `combinable_with_offers`. A plan or event below a code's minimum
+  leaves the code out of the list.
 - **Coupon targets are replaced wholesale on update** — they carry no
   history; uses keep their own copy of the terms.
 - **Coupons at the reception desk and on company plan purchases are refused

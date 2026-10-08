@@ -631,6 +631,13 @@ return [
         'payment_in_progress' => 'هناك عملية دفع جارية لهذا الطلب؛ أكملها أو ألغها قبل تطبيق الكود.',
         'offer_is_better' => 'العرض الحالي يمنحك سعراً أقل، لذلك لم يُطبَّق الكود.',
         'has_redemptions' => 'هذا الكوبون مُستخدَم؛ عطّله بدلاً من حذفه.',
+        // "My coupons" asked about an item: how a code sits beside the offer there now.
+        'with_offer' => [
+            'stacks' => 'يُضاف فوق العرض الحالي.',
+            'better_of_two' => 'لا يُجمع مع العرض الحالي، ستحصل على الأفضل منهما.',
+            'code_is_better' => 'أفضل من العرض الحالي.',
+            'offer_is_better' => 'العرض الحالي أفضل من هذا الكوبون.',
+        ],
     ],
 
 ];

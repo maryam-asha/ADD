@@ -107,8 +107,9 @@ class OfferResolver
      * The offer on a space's hourly rate live now for this member, as the
      * app shows it: the rate rounded UP when a percentage leaves a fraction
      * of a point (E8) — it never understates the price; the charge is exact.
+     * Booked time by default; a co-working session asks for its own offers.
      */
-    public function hourlyNow(Space $space, ?User $member): ?OfferPrice
+    public function hourlyNow(Space $space, ?User $member, PricingPurpose $purpose = PricingPurpose::Booking): ?OfferPrice
     {
         $rate = (int) ($space->hourly_rate_points ?? 0);
 
@@ -117,7 +118,7 @@ class OfferResolver
         }
 
         $best = $this->best(
-            $this->candidates(PricingTarget::forSpace(PricingPurpose::Booking, $space), $member, new UsageInFlight, shown: true)
+            $this->candidates(PricingTarget::forSpace($purpose, $space), $member, new UsageInFlight, shown: true)
                 ->filter(fn (Coupon $offer) => $offer->window()->isLiveAt(now())),
             $rate,
             fn (CouponTerms $terms) => $this->roundedUp($this->timeline->offerRate($rate, $terms) ?? (string) $rate),

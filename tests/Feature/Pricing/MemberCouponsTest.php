@@ -177,4 +177,112 @@ class MemberCouponsTest extends TestCase
         $this->mine(['space_id' => Space::factory()->create()->id])->assertUnprocessable()->assertJsonValidationErrors('purpose');
         $this->mine(['purpose' => 'plan_purchase', 'space_id' => Space::factory()->create()->id])->assertUnprocessable()->assertJsonValidationErrors('space_id');
     }
+
+    /** @return array<string, mixed>|null the `with_offer` of one code in a response */
+    private function besideOffer(TestResponse $response, string $code): ?array
+    {
+        $coupon = collect($response->assertOk()->json('data'))->firstWhere('code', $code);
+        $this->assertNotNull($coupon, "{$code} is not listed");
+        $this->assertArrayHasKey('with_offer', $coupon);
+
+        return $coupon['with_offer'];
+    }
+
+    /** Asked about nothing, there is no offer to sit beside: the key is there, null. */
+    public function test_with_no_item_with_offer_is_null(): void
+    {
+        $this->given(['code' => 'ANY']);
+
+        $this->assertNull($this->besideOffer($this->mine(), 'ANY'));
+    }
+
+    /** A space's price depends on the slot, so it says only whether the code stacks on the offer. */
+    public function test_on_a_space_with_an_offer_it_says_whether_the_code_stacks(): void
+    {
+        $room = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        Coupon::factory()->automatic()->percentage(20)->create(['name' => ['en' => 'Rooms week', 'ar' => 'أسبوع الغرف']])
+            ->targets()->create(['purpose' => 'booking', 'space_type' => 'room']);
+        $this->given(['code' => 'STACK', 'combinable_with_offers' => true]);
+        $this->given(['code' => 'ALONE', 'combinable_with_offers' => false]);
+
+        $response = $this->mine(['purpose' => 'booking', 'space_id' => $room->id]);
+
+        $stack = $this->besideOffer($response, 'STACK');
+        $this->assertSame(['name' => 'Rooms week', 'original_points' => 100, 'points' => 80], $stack['offer']);
+        $this->assertTrue($stack['combines']);
+        $this->assertNull($stack['price_points']);
+        $this->assertNull($stack['applied']);
+        $this->assertSame(__('api.coupon.with_offer.stacks', [], 'en'), $stack['note']);
+
+        $alone = $this->besideOffer($response, 'ALONE');
+        $this->assertFalse($alone['combines']);
+        $this->assertSame(__('api.coupon.with_offer.better_of_two', [], 'en'), $alone['note']);
+    }
+
+    public function test_on_a_space_with_no_offer_there_is_nothing_to_say(): void
+    {
+        $room = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        $this->given(['code' => 'ANY']);
+
+        $beside = $this->besideOffer($this->mine(['purpose' => 'booking', 'space_id' => $room->id]), 'ANY');
+
+        $this->assertNull($beside['offer']);
+        $this->assertNull($beside['note']);
+    }
+
+    /** A plan has one price: each code is quoted as the purchase would quote it. */
+    public function test_on_a_plan_each_code_is_quoted_against_the_offer(): void
+    {
+        $plan = Plan::factory()->create(['price_points' => 120, 'is_active' => true, 'is_public' => true]);
+        Coupon::factory()->automatic()->amountOff(20)->create()
+            ->targets()->create(['purpose' => 'plan_purchase', 'plan_id' => $plan->id]);
+        $this->given(['code' => 'SMALL', 'discount_value' => 10, 'combinable_with_offers' => false]);
+        $this->given(['code' => 'BIG', 'discount_value' => 50, 'combinable_with_offers' => false]);
+        $this->given(['code' => 'ONTOP', 'discount_value' => 10, 'combinable_with_offers' => true]);
+
+        $response = $this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id]);
+
+        // 10% of 120 leaves 108, above the offer's 100: the offer stands.
+        $small = $this->besideOffer($response, 'SMALL');
+        $this->assertSame(['original_points' => 120, 'points' => 100], array_diff_key($small['offer'], ['name' => 1]));
+        $this->assertFalse($small['applied']);
+        $this->assertSame(100, $small['price_points']);
+        $this->assertSame(__('api.coupon.with_offer.offer_is_better', [], 'en'), $small['note']);
+
+        // 50% of 120 leaves 60: the code beats the offer.
+        $big = $this->besideOffer($response, 'BIG');
+        $this->assertTrue($big['applied']);
+        $this->assertSame(60, $big['price_points']);
+        $this->assertSame(__('api.coupon.with_offer.code_is_better', [], 'en'), $big['note']);
+
+        // 10% on top of the offer's 100.
+        $onTop = $this->besideOffer($response, 'ONTOP');
+        $this->assertTrue($onTop['applied']);
+        $this->assertSame(90, $onTop['price_points']);
+        $this->assertSame(__('api.coupon.with_offer.stacks', [], 'en'), $onTop['note']);
+    }
+
+    /** Below a code's minimum price it could not be used here, so it is not listed. */
+    public function test_on_a_plan_below_a_codes_minimum_the_code_is_left_out(): void
+    {
+        $plan = Plan::factory()->create(['price_points' => 120, 'is_active' => true, 'is_public' => true]);
+        $this->given(['code' => 'BIGSPEND', 'min_amount_points' => 500]);
+        $this->given(['code' => 'ANY']);
+
+        $this->assertSame(['ANY'], $this->codes($this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])));
+    }
+
+    public function test_on_an_event_the_offer_targeted_at_events_is_quoted(): void
+    {
+        $event = Event::factory()->create(['is_free' => false, 'price_points' => 80]);
+        Coupon::factory()->automatic()->percentage(25)->forEvents()->create();
+        $this->given(['code' => 'EVENTS', 'combinable_with_offers' => true])->targets()->create(['purpose' => 'event_registration']);
+
+        $beside = $this->besideOffer($this->mine(['purpose' => 'event_registration', 'event_id' => $event->id]), 'EVENTS');
+
+        $this->assertSame(60, $beside['offer']['points']);
+        // 10% on top of the offer's 60.
+        $this->assertSame(54, $beside['price_points']);
+        $this->assertTrue($beside['applied']);
+    }
 }

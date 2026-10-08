@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Pricing\Models\CouponTarget;
+use App\Domain\Pricing\ValueObjects\CouponBesideOffer;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -38,6 +39,34 @@ class MemberCouponResource extends JsonResource
                 'space_type' => $target->space_type,
                 'event_id' => $target->event_id,
             ]),
+            // "My coupons" only, where it is always set — null unless an item was asked about.
+            ...(array_key_exists('with_offer', $this->resource->getAttributes())
+                ? ['with_offer' => $this->withOffer($this->resource->getAttribute('with_offer'))]
+                : []),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function withOffer(?CouponBesideOffer $beside): ?array
+    {
+        if ($beside === null) {
+            return null;
+        }
+
+        $note = $beside->note();
+
+        return [
+            'offer' => $beside->offer === null ? null : [
+                'name' => $beside->offer->offer->translate('name'),
+                'original_points' => $beside->originalPoints,
+                'points' => $beside->offer->points,
+            ],
+            'combines' => $beside->combines,
+            'price_points' => $beside->pricePoints,
+            'applied' => $beside->applied,
+            'note' => $note === null ? null : __("api.coupon.with_offer.{$note}"),
         ];
     }
 }
