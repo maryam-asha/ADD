@@ -4,6 +4,7 @@ namespace App\Domain\Identity\Models;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Enums\ConsentSubjectType;
+use App\Domain\Providers\Models\Provider;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -117,6 +118,12 @@ class User extends Authenticatable
     public function privacyPolicyConsents(): HasMany
     {
         return $this->hasMany(UserPrivacyPolicyConsent::class);
+    }
+
+    /** At most one row: `provider_user.user_id` is unique. */
+    public function providers(): BelongsToMany
+    {
+        return $this->belongsToMany(Provider::class, 'provider_user')->withTimestamps();
     }
 
     /**

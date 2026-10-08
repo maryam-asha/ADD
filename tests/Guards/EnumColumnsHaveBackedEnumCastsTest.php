@@ -75,6 +75,11 @@ use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Models\CouponRevision;
 use App\Domain\Pricing\Models\CouponTarget;
+use App\Domain\Providers\Enums\ProviderRequestStatus;
+use App\Domain\Providers\Enums\ProviderRequestType;
+use App\Domain\Providers\Enums\ProviderStatus;
+use App\Domain\Providers\Models\Provider;
+use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
@@ -228,6 +233,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         FormAnswer::class => [
             'field_type' => FieldType::class,
+        ],
+        Provider::class => [
+            'status' => ProviderStatus::class,
+        ],
+        ProviderRequest::class => [
+            'type' => ProviderRequestType::class,
+            'status' => ProviderRequestStatus::class,
         ],
     ];
 

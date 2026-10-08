@@ -4,6 +4,7 @@ namespace App\Domain\Membership\Models;
 
 use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Providers\Models\Provider;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -46,6 +47,7 @@ class Plan extends Model
         'is_active',
         'is_public',
         'order',
+        'provider_id',
     ];
 
     protected function casts(): array
@@ -273,5 +275,11 @@ class Plan extends Model
     public function resourceGrants(): HasMany
     {
         return $this->hasMany(PlanResourceGrant::class)->orderBy('order');
+    }
+
+    /** The provider that designed this plan; null for ADD's own plans. */
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(Provider::class);
     }
 }
