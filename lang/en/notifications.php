@@ -189,4 +189,15 @@ return [
         ],
     ],
 
+    'provider' => [
+        'request_approved' => [
+            'title' => 'Request approved',
+            'body' => 'Your request has been approved.',
+        ],
+        'request_rejected' => [
+            'title' => 'Request rejected',
+            'body' => 'Your request has been rejected.',
+        ],
+    ],
+
 ];

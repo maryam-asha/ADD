@@ -46,6 +46,7 @@ use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
+use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
@@ -271,6 +272,10 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::patch('providers/{provider}', [ProviderController::class, 'update'])->middleware('permission:providers.update');
     Route::post('providers/{provider}/users/{user}', [ProviderUserController::class, 'store'])->middleware('permission:providers.update');
     Route::delete('providers/{provider}/users/{user}', [ProviderUserController::class, 'destroy'])->middleware('permission:providers.update');
+    Route::get('provider-requests', [ProviderRequestController::class, 'index'])->middleware('permission:provider-requests.view');
+    Route::get('provider-requests/{providerRequest}', [ProviderRequestController::class, 'show'])->middleware('permission:provider-requests.view');
+    Route::post('provider-requests/{providerRequest}/approve', [ProviderRequestController::class, 'approve'])->middleware('permission:provider-requests.approve');
+    Route::post('provider-requests/{providerRequest}/reject', [ProviderRequestController::class, 'reject'])->middleware('permission:provider-requests.reject');
 });
 
 // Mobile client crash/error reports (ingested unauthenticated from

@@ -116,6 +116,8 @@ return [
         'provider_user_unlinked' => 'The account no longer works for this provider.',
         'provider_user_not_provider_role' => 'Only an account with the provider role can work for a provider.',
         'provider_user_taken' => 'This account already works for a provider.',
+        'provider_request_approved' => 'Request approved.',
+        'provider_request_rejected' => 'Request rejected.',
         'branch_updated' => 'Branch updated.',
         'building_updated' => 'Building updated.',
         'floor_updated' => 'Floor updated.',

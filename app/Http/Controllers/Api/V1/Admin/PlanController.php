@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanDiscount;
+use App\Domain\Membership\Services\PlanCreationService;
 use App\Http\Requests\Admin\StorePlanRequest;
 use App\Http\Requests\Admin\UpdatePlanRequest;
 use App\Http\Resources\PlanResource;
@@ -37,39 +38,9 @@ class PlanController extends AdminResourceController
         return new PlanResource($plan);
     }
 
-    public function store(StorePlanRequest $request): PlanResource
+    public function store(StorePlanRequest $request, PlanCreationService $plans): PlanResource
     {
-        $validated = $request->validated();
-        $balancesData = $validated['balances'] ?? [];
-        $featuresData = $validated['features'] ?? [];
-        $discountsData = $validated['discounts'] ?? [];
-        $resourceGrantsData = $validated['resource_grants'] ?? [];
-        unset($validated['balances'], $validated['features'], $validated['discounts'], $validated['resource_grants']);
-
-        $plan = DB::transaction(function () use ($validated, $balancesData, $featuresData, $discountsData, $resourceGrantsData) {
-            $plan = Plan::create(array_merge(
-                ['is_active' => true, 'order' => 0],
-                $validated
-            ));
-
-            if (! empty($balancesData)) {
-                $plan->balances()->createMany($balancesData);
-            }
-
-            if (! empty($featuresData)) {
-                $plan->features()->createMany($featuresData);
-            }
-
-            if (! empty($discountsData)) {
-                $plan->discounts()->createMany($discountsData);
-            }
-
-            if (! empty($resourceGrantsData)) {
-                $plan->resourceGrants()->createMany($resourceGrantsData);
-            }
-
-            return $plan;
-        });
+        $plan = $plans->create($request->validated());
 
         return new PlanResource($plan->load(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']));
     }

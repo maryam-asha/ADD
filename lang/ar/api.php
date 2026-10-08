@@ -116,6 +116,8 @@ return [
         'provider_user_unlinked' => 'لم يعد الحساب يعمل لهذا المزوّد.',
         'provider_user_not_provider_role' => 'لا يعمل لمزوّد إلا حساب يحمل دور المزوّد.',
         'provider_user_taken' => 'هذا الحساب يعمل لمزوّد بالفعل.',
+        'provider_request_approved' => 'وُوفق على الطلب.',
+        'provider_request_rejected' => 'رُفض الطلب.',
         'branch_updated' => 'تم تحديث الفرع.',
         'building_updated' => 'تم تحديث المبنى.',
         'floor_updated' => 'تم تحديث الطابق.',

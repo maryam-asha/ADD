@@ -189,4 +189,15 @@ return [
         ],
     ],
 
+    'provider' => [
+        'request_approved' => [
+            'title' => 'قُبل الطلب',
+            'body' => 'وُوفق على طلبك.',
+        ],
+        'request_rejected' => [
+            'title' => 'رُفض الطلب',
+            'body' => 'رُفض طلبك.',
+        ],
+    ],
+
 ];

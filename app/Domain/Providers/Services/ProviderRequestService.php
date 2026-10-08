@@ -2,12 +2,14 @@
 
 namespace App\Domain\Providers\Services;
 
+use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Exceptions\ProviderRequestException;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
+use App\Domain\Providers\Requests\ProviderRequestHandlers;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -18,6 +20,8 @@ use Illuminate\Support\Facades\DB;
  */
 class ProviderRequestService
 {
+    public function __construct(private readonly ProviderRequestHandlers $handlers) {}
+
     public function submit(Provider $provider, User $submitter, ProviderRequestType $type, ?int $companyId, array $payload): ProviderRequest
     {
         $request = ProviderRequest::create([
@@ -39,11 +43,7 @@ class ProviderRequestService
     public function cancel(ProviderRequest $request): void
     {
         DB::transaction(function () use ($request) {
-            $locked = ProviderRequest::query()->lockForUpdate()->findOrFail($request->id);
-
-            if (! $locked->isPending()) {
-                throw new ProviderRequestException('api.provider.request_not_pending', 409);
-            }
+            $locked = $this->lockPending($request);
 
             $locked->forceFill(['status' => ProviderRequestStatus::Cancelled])->save();
         });
@@ -73,5 +73,106 @@ class ProviderRequestService
             ->where('company_id', $companyId)
             ->when($key !== null, fn ($query) => $query->where($key[0], $key[1]))
             ->exists();
+    }
+
+    /**
+     * Carries the request out under a row lock. Everything that may have
+     * changed since submission is checked again: the provider and the
+     * company still active, the company still this provider's, and the
+     * handler's own preconditions. A refusal leaves the request pending.
+     */
+    public function approve(ProviderRequest $request, User $reviewer, array $overrides = []): ProviderRequest
+    {
+        $approved = DB::transaction(function () use ($request, $reviewer, $overrides) {
+            $locked = $this->lockPending($request);
+            $this->assertStillValid($locked);
+
+            $resultId = $this->handlers->for($locked->type)->handle($locked, $reviewer, $overrides);
+
+            $locked->forceFill([
+                'status' => ProviderRequestStatus::Approved,
+                'reviewed_by' => $reviewer->id,
+                'reviewed_at' => now(),
+                'result_id' => $resultId,
+            ])->save();
+
+            activity()->causedBy($reviewer)->performedOn($locked)
+                ->withProperties(['type' => $locked->type->value, 'result_id' => $resultId, 'overrides' => $overrides])
+                ->log('provider_request_approved');
+
+            return $locked;
+        });
+
+        $this->notify($approved, 'provider.request_approved');
+
+        return $approved;
+    }
+
+    public function reject(ProviderRequest $request, User $reviewer, string $reason): ProviderRequest
+    {
+        $rejected = DB::transaction(function () use ($request, $reviewer, $reason) {
+            $locked = $this->lockPending($request);
+
+            $locked->forceFill([
+                'status' => ProviderRequestStatus::Rejected,
+                'reviewed_by' => $reviewer->id,
+                'reviewed_at' => now(),
+                'rejection_reason' => $reason,
+            ])->save();
+
+            activity()->causedBy($reviewer)->performedOn($locked)
+                ->withProperties(['type' => $locked->type->value, 'reason' => $reason])
+                ->log('provider_request_rejected');
+
+            return $locked;
+        });
+
+        $this->notify($rejected, 'provider.request_rejected');
+
+        return $rejected;
+    }
+
+    private function lockPending(ProviderRequest $request): ProviderRequest
+    {
+        $locked = ProviderRequest::query()->lockForUpdate()->findOrFail($request->id);
+
+        if (! $locked->isPending()) {
+            throw new ProviderRequestException('api.provider.request_not_pending', 409);
+        }
+
+        return $locked;
+    }
+
+    private function assertStillValid(ProviderRequest $request): void
+    {
+        if (! $request->provider->isActive()) {
+            throw new ProviderRequestException('api.provider.inactive');
+        }
+
+        if ($request->company_id !== null) {
+            $company = $request->company;
+
+            if ($company === null || $company->provider_id !== $request->provider_id || $company->status->value !== 'active') {
+                throw new ProviderRequestException('api.provider.company_unavailable');
+            }
+        }
+    }
+
+    /** The provider's accounts and whoever submitted (a company admin, for company_admin). */
+    private function notify(ProviderRequest $request, string $templateKey): void
+    {
+        $recipients = $request->provider->users()->pluck('users.id')
+            ->push($request->submitted_by)
+            ->filter()
+            ->unique();
+
+        foreach ($recipients as $userId) {
+            NotificationLog::create([
+                'user_id' => $userId,
+                'channel' => 'push',
+                'template_key' => $templateKey,
+                'status' => 'sent',
+            ]);
+        }
     }
 }
