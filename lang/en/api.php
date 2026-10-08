@@ -111,6 +111,11 @@ return [
     ],
 
     'admin' => [
+        'provider_updated' => 'Provider updated.',
+        'provider_user_linked' => 'The account now works for this provider.',
+        'provider_user_unlinked' => 'The account no longer works for this provider.',
+        'provider_user_not_provider_role' => 'Only an account with the provider role can work for a provider.',
+        'provider_user_taken' => 'This account already works for a provider.',
         'branch_updated' => 'Branch updated.',
         'building_updated' => 'Building updated.',
         'floor_updated' => 'Floor updated.',

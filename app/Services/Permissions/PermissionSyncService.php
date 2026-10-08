@@ -3,8 +3,12 @@
 namespace App\Services\Permissions;
 
 use App\Http\Controllers\Api\V1\Admin\AdminResourceController;
+use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController;
+use App\Http\Controllers\Api\V1\Admin\ProviderController;
+use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
+use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -62,6 +66,22 @@ class PermissionSyncService
         // access to the ledger once the pilot widens.
         PaymentController::class => [
             'payments' => ['view', 'reverse'],
+        ],
+        // Service providers (docs/decisions/service-providers.md). Every
+        // route is permission-gated, so the decision on a provider request
+        // can be given to operations, or any custom role, from the roles
+        // screen.
+        ProviderController::class => [
+            'providers' => ['view', 'create', 'update', 'status'],
+        ],
+        ProviderUserController::class => [
+            'providers' => ['update'],
+        ],
+        CompanyProviderController::class => [
+            'providers' => ['transfer_company'],
+        ],
+        ProviderRequestController::class => [
+            'provider-requests' => ['view', 'approve', 'reject'],
         ],
     ];
 

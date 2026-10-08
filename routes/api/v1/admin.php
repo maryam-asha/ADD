@@ -45,6 +45,8 @@ use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
+use App\Http\Controllers\Api\V1\Admin\ProviderController;
+use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
@@ -257,6 +259,19 @@ Route::post('companies/{company}/members', [CompanyMemberController::class, 'sto
 Route::patch('companies/{company}/members/{user}', [CompanyMemberController::class, 'updateDoorAccess']);
 Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
 Route::delete('companies/{company}/members/{user}', [CompanyMemberController::class, 'destroy']);
+
+// Service providers (docs/decisions/service-providers.md). Permission-gated
+// like Branches (docs/decisions/rbac-permission-pilot.md): the coarse
+// role:admin|operations check is stripped and each route names its
+// permission, so deciding provider requests can be given to any role.
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::get('providers', [ProviderController::class, 'index'])->middleware('permission:providers.view');
+    Route::post('providers', [ProviderController::class, 'store'])->middleware('permission:providers.create');
+    Route::get('providers/{provider}', [ProviderController::class, 'show'])->middleware('permission:providers.view');
+    Route::patch('providers/{provider}', [ProviderController::class, 'update'])->middleware('permission:providers.update');
+    Route::post('providers/{provider}/users/{user}', [ProviderUserController::class, 'store'])->middleware('permission:providers.update');
+    Route::delete('providers/{provider}/users/{user}', [ProviderUserController::class, 'destroy'])->middleware('permission:providers.update');
+});
 
 // Mobile client crash/error reports (ingested unauthenticated from
 // routes/api/v1/mobile.php) — viewable by both roles, but deleting one is
