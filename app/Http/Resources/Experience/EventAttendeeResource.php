@@ -27,6 +27,7 @@ class EventAttendeeResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'reference' => $this->reference,
             'event_id' => $this->event_id,
             'user_id' => $this->user_id,
             'name' => $this->name,

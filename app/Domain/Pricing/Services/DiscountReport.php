@@ -223,7 +223,7 @@ class DiscountReport
             'record' => [
                 'type' => $type,
                 'id' => (int) $group->{$column},
-                'reference' => $record instanceof Booking ? $record->reference : null,
+                'reference' => $record?->reference,
             ],
             'member' => $record?->user !== null
                 ? ['id' => $record->user->id, 'name' => $record->user->name, 'phone' => $record->user->phone]

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
@@ -35,9 +36,10 @@ use Illuminate\Support\Str;
  */
 class Payment extends Model
 {
-    use HasFactory;
+    use HasFactory, HasReference;
 
     protected $fillable = [
+        'reference',
         'payment_id',
         'callback_token',
         'purpose',
@@ -103,6 +105,15 @@ class Payment extends Model
             'expires_at' => 'datetime',
             'settled_at' => 'datetime',
         ];
+    }
+
+    /**
+     * "PAY-2026-00041" (HasReference): ours, whatever the method — `rrn` is
+     * the bank's and exists only for a card, `payment_id` is the gateway's.
+     */
+    protected function referencePrefix(): string
+    {
+        return 'PAY';
     }
 
     /**

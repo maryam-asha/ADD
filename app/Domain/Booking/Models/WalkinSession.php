@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Booking\Concerns\HasSessionActivity;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
@@ -17,9 +18,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WalkinSession extends Model
 {
-    use HasFactory, HasSessionActivity;
+    use HasFactory, HasReference, HasSessionActivity;
 
     protected $fillable = [
+        'reference',
         'space_id',
         'user_id',
         'membership_id',
@@ -62,6 +64,14 @@ class WalkinSession extends Model
             'accepted_uncovered' => 'boolean',
             'coverage_snapshot' => 'array',
         ];
+    }
+
+    /**
+     * "WS-2026-00041" (HasReference).
+     */
+    protected function referencePrefix(): string
+    {
+        return 'WS';
     }
 
     public function space(): BelongsTo

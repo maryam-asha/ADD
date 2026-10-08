@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Concerns\HasSessionActivity;
@@ -15,7 +16,6 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
-use App\Support\ReferenceSequence;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,7 +26,7 @@ use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class Booking extends Model
 {
-    use HasFactory, HasSessionActivity;
+    use HasFactory, HasReference, HasSessionActivity;
 
     protected $fillable = [
         'space_id',
@@ -83,21 +83,11 @@ class Booking extends Model
     }
 
     /**
-     * Every booking gets its human-readable number ("BK-2026-00041") here,
-     * whichever path creates it — the series restarts each calendar year, as
-     * service requests' "REQ-…" does (docs/decisions/booking-outcomes-and-extension.md).
+     * "BK-2026-00041" (HasReference; docs/decisions/booking-outcomes-and-extension.md).
      */
-    protected static function booted(): void
+    protected function referencePrefix(): string
     {
-        static::creating(function (self $booking) {
-            if ($booking->reference !== null) {
-                return;
-            }
-
-            $key = 'BK-'.($booking->created_at ?? now())->format('Y');
-
-            $booking->reference = sprintf('%s-%05d', $key, ReferenceSequence::next($key));
-        });
+        return 'BK';
     }
 
     /**

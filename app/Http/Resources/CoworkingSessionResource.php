@@ -25,6 +25,7 @@ class CoworkingSessionResource extends JsonResource
         return [
             'type' => $session->coworkingType(),
             'id' => $session->id,
+            'reference' => $session->reference,
             'space' => [
                 'id' => $session->space->id,
                 'name' => $session->space->translate('name'),

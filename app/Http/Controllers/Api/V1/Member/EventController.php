@@ -159,6 +159,7 @@ class EventController extends Controller
 
             return response()->json(['data' => [
                 'ticket_id' => $attendee->id,
+                'ticket_reference' => $attendee->reference,
                 'status' => $attendee->status->value,
                 'payment' => null,
                 'redirect_url' => null,
@@ -177,6 +178,7 @@ class EventController extends Controller
 
         return response()->json(['data' => [
             'ticket_id' => $attendee->id,
+            'ticket_reference' => $attendee->reference,
             'status' => $attendee->refresh()->status->value,
         ] + $this->checkoutFields($outcome) + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : [])]);
     }

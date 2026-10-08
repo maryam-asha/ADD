@@ -62,7 +62,10 @@ class PaymentsTableTest extends TestCase
         $wallet = $this->wallet();
 
         // Put the table back the way production has it, write a row the way
-        // production wrote it, and run the migration over it.
+        // production wrote it, and run the migration over it. The later
+        // `reference` column goes first, so the table is really as it was.
+        $references = require database_path('migrations/2026_10_08_100300_add_reference_to_payments_table.php');
+        $references->down();
         $this->migration()->down();
 
         $id = DB::table('payments')->insertGetId([
@@ -84,6 +87,7 @@ class PaymentsTableTest extends TestCase
         ]);
 
         $this->migration()->up();
+        $references->up();
 
         $payment = Payment::query()->findOrFail($id);
 

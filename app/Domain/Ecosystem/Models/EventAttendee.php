@@ -2,6 +2,7 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Identity\Models\User;
@@ -15,9 +16,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventAttendee extends Model
 {
-    use HasFactory, HasFormSubmissions;
+    use HasFactory, HasFormSubmissions, HasReference;
 
     protected $fillable = [
+        'reference',
         'event_id',
         'user_id',
         'name',
@@ -57,6 +59,14 @@ class EventAttendee extends Model
             'checked_in_by' => 'integer',
             'payment_due_at' => 'datetime',
         ];
+    }
+
+    /**
+     * "EVT-2026-00041" (HasReference).
+     */
+    protected function referencePrefix(): string
+    {
+        return 'EVT';
     }
 
     protected static function booted(): void

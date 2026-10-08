@@ -17,6 +17,7 @@ class ActiveReceptionSessionResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'reference' => $this->reference,
             'type' => $this->type,
             'space_id' => $this->space_id,
             'space_type' => $this->space?->space_type,

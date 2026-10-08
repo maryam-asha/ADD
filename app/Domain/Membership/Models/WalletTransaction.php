@@ -2,6 +2,7 @@
 
 namespace App\Domain\Membership\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
@@ -24,9 +25,10 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  */
 class WalletTransaction extends Model
 {
-    use HasFactory;
+    use HasFactory, HasReference;
 
     protected $fillable = [
+        'reference',
         'wallet_id',
         'amount',
         'description',
@@ -72,6 +74,14 @@ class WalletTransaction extends Model
                 );
             }
         });
+    }
+
+    /**
+     * "TRX-2026-00041" (HasReference).
+     */
+    protected function referencePrefix(): string
+    {
+        return 'TRX';
     }
 
     public function wallet(): BelongsTo

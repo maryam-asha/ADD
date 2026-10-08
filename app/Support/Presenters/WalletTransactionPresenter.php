@@ -86,10 +86,9 @@ class WalletTransactionPresenter
     {
         $locale ??= app()->getLocale();
         $payment = $transaction->payment();
-        $at = $this->time->toLocal($transaction->created_at);
 
         return $this->item($transaction, $viewer, $locale) + [
-            'reference' => sprintf('TRX-%s-%06d', $at?->format('Ymd'), $transaction->id),
+            'reference' => $transaction->reference,
             // The pool the row moved: its category, as `category_label` names it.
             'balance' => [
                 'before' => $this->prices->total($balanceAfter - $transaction->amount, $viewer, $locale),
@@ -98,6 +97,7 @@ class WalletTransactionPresenter
             'expires_at' => $this->time->toLocal($transaction->expires_at)?->toIso8601String(),
             'payment' => $payment === null ? null : [
                 'id' => $payment->id,
+                'reference' => $payment->reference,
                 'status' => $payment->status->value,
                 'purpose' => $payment->purpose->value,
                 // The bank's reference — what a member quotes when disputing.

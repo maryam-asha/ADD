@@ -272,6 +272,25 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.balance.after.points', 300);
     }
 
+    public function test_the_receipt_carries_the_rows_stored_reference(): void
+    {
+        $member = $this->member(300);
+        $payment = $this->paidWalkIn($member);
+        $this->actingAsMember($member);
+
+        $year = now()->format('Y');
+        $first = WalletTransaction::orderBy('id')->first();
+        $debit = WalletTransaction::findOrFail($payment->debit_transaction_id);
+
+        // One series per year, numbered in the order rows were written.
+        $this->assertSame("TRX-{$year}-00001", $first->reference);
+        $this->assertSame("TRX-{$year}-00002", $debit->reference);
+
+        $this->getJson("/api/v1/member/wallet/transactions/{$debit->id}")
+            ->assertOk()
+            ->assertJsonPath('data.reference', $debit->reference);
+    }
+
     public function test_a_payment_names_its_row_in_the_history(): void
     {
         $member = $this->member(300);

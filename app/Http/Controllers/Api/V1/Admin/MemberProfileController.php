@@ -158,7 +158,7 @@ class MemberProfileController extends Controller
         return $this->page($this->paginate($rows, (int) ($filters['per_page'] ?? 20), $request->integer('page', 1)), fn ($session) => [
             'type' => $session->coworkingType(),
             'id' => $session->id,
-            'reference' => $session instanceof Booking ? $session->reference : null,
+            'reference' => $session->reference,
             'space' => ['id' => $session->space?->id, 'name' => $session->space?->displayTitle(app()->getLocale())],
             'checked_in_at' => $this->local($session->checked_in_at),
             'checked_out_at' => $this->local($session->checked_out_at),
@@ -235,6 +235,7 @@ class MemberProfileController extends Controller
 
         return $this->page($paginator, fn (EventAttendee $attendee) => [
             'id' => $attendee->id,
+            'reference' => $attendee->reference,
             'event' => [
                 'id' => $attendee->event?->id,
                 'title' => $attendee->event?->translate('title'),

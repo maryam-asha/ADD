@@ -2,6 +2,7 @@
 
 namespace App\Domain\Services\Models;
 
+use App\Concerns\HasReference;
 use App\Concerns\HasTranslations;
 use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Foundation\Models\Branch;
@@ -9,14 +10,14 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Services\Enums\LocationSource;
 use App\Domain\Services\Enums\RequestStatus;
-use App\Support\ReferenceSequence;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ServiceRequest extends Model
 {
-    use HasFormSubmissions, HasTranslations;
+    use HasFormSubmissions, HasReference, HasTranslations;
 
     protected $fillable = [
         'reference',
@@ -43,22 +44,20 @@ class ServiceRequest extends Model
     }
 
     /**
-     * Every request gets its human-readable number ("REQ-2026-00187") here,
-     * whichever path creates it — the series restarts each calendar year of
-     * `submitted_at`.
+     * "REQ-2026-00187" (HasReference).
      */
-    protected static function booted(): void
+    protected function referencePrefix(): string
     {
-        static::creating(function (self $request) {
-            if ($request->reference !== null) {
-                return;
-            }
+        return 'REQ';
+    }
 
-            $request->submitted_at ??= now();
-            $key = 'REQ-'.$request->submitted_at->format('Y');
-
-            $request->reference = sprintf('%s-%05d', $key, ReferenceSequence::next($key));
-        });
+    /**
+     * The series restarts each calendar year of `submitted_at`, which a
+     * request made without one is stamped with here.
+     */
+    protected function referenceDate(): CarbonInterface
+    {
+        return $this->submitted_at ??= now();
     }
 
     // ── Relationships ────────────────────────────────────────────────────────
