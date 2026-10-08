@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
+use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -15,3 +16,5 @@ use Illuminate\Support\Facades\Route;
 Route::get('companies', [ProviderCompanyController::class, 'index']);
 Route::get('companies/{company}', [ProviderCompanyController::class, 'show']);
 Route::delete('companies/{company}/members/{user}', [ProviderCompanyController::class, 'destroyMember']);
+Route::get('office-requests', [ProviderOfficeRequestController::class, 'index']);
+Route::post('office-requests', [ProviderOfficeRequestController::class, 'store']);

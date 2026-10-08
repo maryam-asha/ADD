@@ -54,6 +54,7 @@ class CompanyController extends Controller
                 'branch_id' => $request->validated('branch_id'),
                 'status' => CompanyStatus::Active,
                 'created_from_request_id' => $poRequest->id,
+                'provider_id' => $poRequest->provider_id,
             ]);
 
             $poRequest->update([
@@ -72,6 +73,7 @@ class CompanyController extends Controller
 
         $this->logSensitiveAction('company_created', $company, [
             'private_office_request_id' => $company->created_from_request_id,
+            'provider_id' => $company->provider_id,
         ]);
 
         return new CompanyResource($company);

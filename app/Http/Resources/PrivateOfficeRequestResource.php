@@ -20,6 +20,11 @@ class PrivateOfficeRequestResource extends JsonResource
             'quote_ref' => $this->quote_ref,
             'contract_ref' => $this->contract_ref,
             'converted_company_id' => $this->converted_company_id,
+            'provider_id' => $this->provider_id,
+            'provider' => $this->whenLoaded('provider', fn () => $this->provider === null ? null : [
+                'id' => $this->provider->id,
+                'name' => $this->provider->name,
+            ]),
             'created_at' => $this->created_at,
         ];
     }

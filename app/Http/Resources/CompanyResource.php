@@ -19,6 +19,7 @@ class CompanyResource extends JsonResource
             'branch_id' => $this->branch_id,
             'status' => $this->status,
             'created_from_request_id' => $this->created_from_request_id,
+            'provider_id' => $this->provider_id,
             'created_at' => $this->created_at,
         ];
     }
