@@ -60,8 +60,8 @@ class WalletTransactionPresenter
             'kind' => $kind,
             'kind_label' => __("api.wallet.kinds.{$kind}", [], $locale),
             'title' => $this->title($transaction, $payment, $kind, $locale),
-            // Signed, as stored: negative is a spend.
-            'points' => $transaction->amount,
+            // Signed both ways ("+300", "-250"), so a credit reads as one.
+            'points' => $this->signed($transaction->amount),
             // Today's value of the points, not what was paid — see `paid`.
             'amount' => $this->prices->total(abs($transaction->amount), $viewer, $locale),
             'paid' => $this->paid($transaction, $locale),
@@ -77,7 +77,7 @@ class WalletTransactionPresenter
 
     /**
      * The receipt for one row: the list row plus the pool's balance either
-     * side of it and the payment it belongs to.
+     * side of it and when the payment it belongs to went through.
      *
      * @param  int  $balanceAfter  WalletService::balanceAfter() for this row
      * @return array<string, mixed>
@@ -95,17 +95,11 @@ class WalletTransactionPresenter
                 'after' => $this->prices->total($balanceAfter, $viewer, $locale),
             ],
             'expires_at' => $this->time->toLocal($transaction->expires_at)?->toIso8601String(),
-            'payment' => $payment === null ? null : [
-                'id' => $payment->id,
-                'reference' => $payment->reference,
-                'status' => $payment->status->value,
-                'purpose' => $payment->purpose->value,
-                // The bank's reference — what a member quotes when disputing.
-                'rrn' => $payment->rrn,
-                'payable' => $payment->payable_type === null
-                    ? null
-                    : ['type' => $payment->payable_type, 'id' => $payment->payable_id],
-            ],
+            // When the payment the row belongs to went through, local time —
+            // for a refund, the original payment it gave back.
+            'paid_at' => $payment === null
+                ? null
+                : $this->time->toLocal($payment->settled_at ?? $payment->created_at)?->toIso8601String(),
         ];
     }
 
@@ -184,6 +178,11 @@ class WalletTransactionPresenter
             $transaction->creditPayment !== null => $transaction->creditPayment->method,
             default => null,
         };
+    }
+
+    private function signed(int $points): string
+    {
+        return $points > 0 ? "+{$points}" : (string) $points;
     }
 
     /**

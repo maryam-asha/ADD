@@ -20,6 +20,7 @@ use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
+use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -209,9 +210,9 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.transactions.0.kind', 'gift')
             ->assertJsonPath('data.transactions.0.title', 'Gift points')
             ->assertJsonPath('data.transactions.0.type', 'credit')
-            ->assertJsonPath('data.transactions.0.points', 20)
+            ->assertJsonPath('data.transactions.0.points', '+20')
             ->assertJsonPath('data.transactions.1.kind', 'top_up')
-            ->assertJsonPath('data.transactions.1.points', 300);
+            ->assertJsonPath('data.transactions.1.points', '+300');
     }
 
     public function test_a_spend_is_named_by_what_it_paid_for(): void
@@ -225,7 +226,7 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.transactions.0.type', 'debit')
             ->assertJsonPath('data.transactions.0.kind', 'coworking_session')
             ->assertJsonPath('data.transactions.0.title', 'Coworking session — Meeting Room A')
-            ->assertJsonPath('data.transactions.0.points', -250)
+            ->assertJsonPath('data.transactions.0.points', '-250')
             ->assertJsonPath('data.transactions.0.amount.points', 250)
             ->assertJsonPath('data.transactions.0.method', 'wallet')
             ->assertJsonPath('data.transactions.0.method_label', 'Wallet points')
@@ -254,9 +255,8 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.balance.before.points', 300)
             ->assertJsonPath('data.balance.after.points', 50)
             ->assertJsonPath('data.paid', null)
-            ->assertJsonPath('data.payment.id', $payment->id)
-            ->assertJsonPath('data.payment.status', 'accepted')
-            ->assertJsonPath('data.payment.payable.type', 'walkin_session');
+            ->assertJsonPath('data.points', '-250')
+            ->assertJsonPath('data.paid_at', app(LocalTime::class)->toLocal($payment->refresh()->settled_at)->toIso8601String());
     }
 
     public function test_an_earlier_row_shows_the_balance_as_it_was_then(): void
@@ -354,7 +354,7 @@ class MemberWalletTest extends TestCase
         $this->getJson('/api/v1/member/wallet/transactions?per_page=2&page=2')
             ->assertOk()
             ->assertJsonCount(1, 'data.transactions')
-            ->assertJsonPath('data.transactions.0.points', 300)
+            ->assertJsonPath('data.transactions.0.points', '+300')
             ->assertJsonPath('meta.current_page', 2)
             ->assertJsonPath('meta.last_page', 2)
             ->assertJsonPath('meta.per_page', 2);
@@ -422,7 +422,7 @@ class MemberWalletTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.kind', 'top_up')
             ->assertJsonPath('data.title', 'Wallet top-up')
-            ->assertJsonPath('data.points', 10)
+            ->assertJsonPath('data.points', '+10')
             ->assertJsonPath('data.method', 'paymera')
             ->assertJsonPath('data.paid.amount', '10000.00')
             ->assertJsonPath('data.paid.currency', 'SYP')

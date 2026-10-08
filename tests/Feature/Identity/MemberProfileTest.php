@@ -151,7 +151,7 @@ class MemberProfileTest extends TestCase
 
         EventAttendee::factory()->create(['user_id' => $this->member->id]);
 
-        $this->profile('wallet-transactions')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.points', 120);
+        $this->profile('wallet-transactions')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.points', '+120');
         $this->profile('memberships')->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.via', 'personal');
         $this->profile('service-requests')->assertOk()->assertJsonPath('meta.total', 0);
         $this->profile('event-registrations')->assertOk()->assertJsonPath('meta.total', 1);
