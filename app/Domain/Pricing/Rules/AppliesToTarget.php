@@ -11,9 +11,10 @@ use App\Domain\Pricing\ValueObjects\UsageInFlight;
 use Carbon\CarbonInterface;
 
 /**
- * A coupon with no targets applies to everything it can be spent on; one
- * with targets applies where one of them names this purpose and, when it
- * names an item, this item.
+ * A coupon with no targets applies to everything it can be spent on except
+ * an event registration (PricingPurpose::coveredByUntargeted()); one with
+ * targets applies where one of them names this purpose and, when it names
+ * an item, this item — so an event takes only what is targeted at events.
  */
 class AppliesToTarget implements CouponRule
 {
@@ -26,7 +27,7 @@ class AppliesToTarget implements CouponRule
         $targets = $coupon->relationLoaded('targets') ? $coupon->targets : $coupon->targets()->get();
 
         if ($targets->isEmpty()) {
-            return null;
+            return $target->purpose->coveredByUntargeted() ? null : CouponRejection::NotApplicable;
         }
 
         return $targets->contains(fn (CouponTarget $t) => $this->matches($t, $target)) ? null : CouponRejection::NotApplicable;

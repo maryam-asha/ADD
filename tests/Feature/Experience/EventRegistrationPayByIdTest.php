@@ -220,7 +220,7 @@ class EventRegistrationPayByIdTest extends TestCase
     public function test_a_pending_registration_a_coupon_made_free_is_not_given_a_new_choice(): void
     {
         $this->member(500);
-        Coupon::factory()->percentage(100)->create(['code' => 'GUEST']);
+        Coupon::factory()->percentage(100)->forEvents()->create(['code' => 'GUEST']);
         $event = $this->paidEvent(80, requiresApproval: true);
         $ticket = $this->register($event->id, ['coupon_code' => 'GUEST'])->assertCreated()->json('data.ticket_id');
 

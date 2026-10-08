@@ -4,6 +4,7 @@ namespace Tests\Feature\Pricing;
 
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -138,6 +139,18 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'OTHERPLAN'])->targets()->create(['purpose' => 'plan_purchase', 'plan_id' => $other->id]);
 
         $this->assertSame(['ANYPLAN', 'THISPLAN'], $this->codes($this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])));
+    }
+
+    /** An event lists only codes targeted at events: one for everything stops short of them. */
+    public function test_asked_about_an_event_lists_only_codes_targeted_at_events(): void
+    {
+        $event = Event::factory()->create(['is_free' => false, 'price_points' => 80]);
+
+        $this->given(['code' => 'ANYTHING']);
+        $this->given(['code' => 'EVENTS'])->targets()->create(['purpose' => 'event_registration']);
+        $this->given(['code' => 'THISEVENT'])->targets()->create(['purpose' => 'event_registration', 'event_id' => $event->id]);
+
+        $this->assertSame(['EVENTS', 'THISEVENT'], $this->codes($this->mine(['purpose' => 'event_registration', 'event_id' => $event->id])));
     }
 
     public function test_shows_what_a_code_takes_off_and_where_it_applies(): void

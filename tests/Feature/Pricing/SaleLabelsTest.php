@@ -195,14 +195,21 @@ class SaleLabelsTest extends TestCase
         $this->assertSame(75, $card['sale']['points']);
     }
 
-    /** An offer on everything reaches events too; a free event has nothing to take off. */
-    public function test_an_offer_on_everything_shows_on_paid_events_only(): void
+    /**
+     * An offer on everything stops short of events; one targeted at events
+     * reaches every paid one — a free event has nothing to take off.
+     */
+    public function test_only_an_offer_targeted_at_events_shows_on_them(): void
     {
         $paid = $this->event();
         $free = $this->event(['is_free' => true, 'price_points' => 0]);
         Coupon::factory()->automatic()->percentage(10)->create();
 
-        $this->assertSame(90, $this->fetch("/api/v1/member/events/{$paid->id}")->json('data.sale.points'));
+        $this->assertNull($this->fetch("/api/v1/member/events/{$paid->id}")->json('data.sale'));
+
+        Coupon::factory()->automatic()->percentage(20)->forEvents()->create();
+
+        $this->assertSame(80, $this->fetch("/api/v1/member/events/{$paid->id}")->json('data.sale.points'));
         // Null, never missing: the response keeps one shape with or without an offer.
         $this->assertArrayHasKey('sale', $this->fetch("/api/v1/member/events/{$free->id}")->json('data'));
         $this->assertNull($this->fetch("/api/v1/member/events/{$free->id}")->json('data.sale'));

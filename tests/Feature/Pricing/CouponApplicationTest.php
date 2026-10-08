@@ -186,7 +186,7 @@ class CouponApplicationTest extends TestCase
 
     public function test_a_coupon_on_a_paid_event_registration(): void
     {
-        Coupon::factory()->amountOff(10)->create(['code' => 'EVENT10']);
+        Coupon::factory()->amountOff(10)->forEvents()->create(['code' => 'EVENT10']);
         $attendee = EventAttendee::factory()->create([
             'event_id' => Event::factory()->create()->id,
             'user_id' => $this->member->id,

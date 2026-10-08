@@ -103,13 +103,19 @@ class CouponPreviewControllerTest extends TestCase
         $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 
+    /** An event takes only a code targeted at events: HALF, untargeted, does not reach it. */
     public function test_an_event(): void
     {
         $event = Event::factory()->create(['is_free' => false, 'price_points' => 80]);
+        Coupon::factory()->percentage(50)->forEvents()->create(['code' => 'EVENTHALF']);
 
-        $this->preview(['code' => 'HALF', 'purpose' => 'event_registration', 'event_id' => $event->id])
+        $this->preview(['code' => 'EVENTHALF', 'purpose' => 'event_registration', 'event_id' => $event->id])
             ->assertOk()
             ->assertJsonPath('data.price_points', 40);
+
+        $this->preview(['code' => 'HALF', 'purpose' => 'event_registration', 'event_id' => $event->id])
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'not_applicable');
     }
 
     public function test_a_code_that_cannot_be_used_says_why(): void

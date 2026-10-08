@@ -20,6 +20,16 @@ enum PricingPurpose: string
     case PlanPurchase = 'plan_purchase';
     case EventRegistration = 'event_registration';
 
+    /**
+     * Whether an offer or coupon with no targets reaches this purpose. An
+     * event registration does not: a discount on an event is decided per
+     * event, so it must be targeted at events to apply to one.
+     */
+    public function coveredByUntargeted(): bool
+    {
+        return $this !== self::EventRegistration;
+    }
+
     public static function fromPaymentPurpose(PaymentPurpose $purpose): ?self
     {
         return match ($purpose) {

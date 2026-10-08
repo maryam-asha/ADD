@@ -71,8 +71,9 @@ class OffersAndCouponsDemoSeeder extends Seeder
         $plan = $this->plan();
 
         return [
-            // On everything a coupon can be spent on: every space, plan and
-            // paid event shows its `sale` block.
+            // On everything a coupon can be spent on: every space and plan
+            // shows its `sale` block. Not events — they take only what is
+            // targeted at them.
             [
                 'name' => ['en' => 'Opening offer', 'ar' => 'عرض الافتتاح'],
                 'description' => ['en' => '10% off everything for a month.', 'ar' => 'خصم 10% على كل شيء لمدة شهر.'],

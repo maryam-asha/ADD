@@ -73,7 +73,7 @@ class EventRegistrationCouponTest extends TestCase
 
     public function test_a_coupon_lowers_what_the_registration_costs(): void
     {
-        $coupon = Coupon::factory()->percentage(30)->create(['code' => 'EARLY']);
+        $coupon = Coupon::factory()->percentage(30)->forEvents()->create(['code' => 'EARLY']);
 
         $this->register($this->event(), 'early')->assertCreated();
 
@@ -100,7 +100,7 @@ class EventRegistrationCouponTest extends TestCase
 
     public function test_a_registration_made_free_is_paid(): void
     {
-        Coupon::factory()->percentage(100)->create(['code' => 'GUEST']);
+        Coupon::factory()->percentage(100)->forEvents()->create(['code' => 'GUEST']);
 
         $this->register($this->event(), 'GUEST', 'cash')->assertCreated();
 
@@ -113,7 +113,7 @@ class EventRegistrationCouponTest extends TestCase
     /** A pending registration holds its use; rejecting it gives the use back. */
     public function test_a_rejected_registration_gives_the_use_back(): void
     {
-        $coupon = Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
+        $coupon = Coupon::factory()->percentage(50)->forEvents()->create(['code' => 'HALF']);
 
         $this->register($this->event(['requires_approval' => true]), 'HALF')->assertCreated();
 
@@ -137,7 +137,7 @@ class EventRegistrationCouponTest extends TestCase
     /** Approval charges what the registration costs with its coupon, not the event's price. */
     public function test_an_approved_registration_is_charged_its_coupon_price(): void
     {
-        Coupon::factory()->percentage(50)->create(['code' => 'HALF']);
+        Coupon::factory()->percentage(50)->forEvents()->create(['code' => 'HALF']);
         $this->register($this->event(['requires_approval' => true]), 'HALF')->assertCreated();
         $this->assertSame(500, $this->balance());
 
@@ -152,7 +152,7 @@ class EventRegistrationCouponTest extends TestCase
     /** A registration a coupon made free has nothing to charge when it is approved. */
     public function test_a_registration_made_free_is_approved_without_a_charge(): void
     {
-        Coupon::factory()->percentage(100)->create(['code' => 'GUEST']);
+        Coupon::factory()->percentage(100)->forEvents()->create(['code' => 'GUEST']);
         $this->register($this->event(['requires_approval' => true]), 'GUEST')->assertCreated();
 
         $this->approve(EventAttendee::sole())->assertOk();
@@ -163,9 +163,33 @@ class EventRegistrationCouponTest extends TestCase
         $this->assertSame(500, $this->balance());
     }
 
+    /** A code for everything stops short of events: registering with it is refused, nothing written. */
+    public function test_an_untargeted_coupon_does_not_reach_an_event(): void
+    {
+        Coupon::factory()->percentage(50)->create(['code' => 'ANYTHING']);
+
+        $this->register($this->event(), 'ANYTHING')
+            ->assertStatus(422)
+            ->assertJsonPath('reason', 'not_applicable');
+
+        $this->assertSame(0, EventAttendee::count());
+    }
+
+    /** Nor does an offer for everything: the registration is charged its full price. */
+    public function test_an_untargeted_offer_does_not_price_an_event(): void
+    {
+        Coupon::factory()->automatic()->percentage(20)->create();
+
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$this->event(['price_points' => 50])->id}/register")->assertCreated();
+
+        $attendee = EventAttendee::sole();
+        $this->assertSame(50, $attendee->price_points);
+        $this->assertNull(app(CouponLedger::class)->offerFor($attendee));
+    }
+
     public function test_a_coupon_on_a_free_event_is_refused(): void
     {
-        Coupon::factory()->create(['code' => 'FREEBIE']);
+        Coupon::factory()->forEvents()->create(['code' => 'FREEBIE']);
 
         $this->register($this->event(['is_free' => true, 'price_points' => 0]), 'FREEBIE')
             ->assertStatus(422)

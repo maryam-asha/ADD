@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Domain\Pricing\Enums\CouponDiscountType;
 use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -16,7 +17,8 @@ class CouponFactory extends Factory
 
     /**
      * 10% off anything, for anyone, any number of times — each test narrows
-     * the one rule it is about.
+     * the one rule it is about. "Anything" stops short of events, which take
+     * only what is targeted at them (forEvents()).
      *
      * @return array<string, mixed>
      */
@@ -48,6 +50,12 @@ class CouponFactory extends Factory
     public function fixedPrice(int $points): static
     {
         return $this->state(['discount_type' => CouponDiscountType::FixedPrice, 'discount_value' => $points]);
+    }
+
+    /** Targeted at every event registration — no event takes an untargeted one. */
+    public function forEvents(): static
+    {
+        return $this->afterCreating(fn (Coupon $coupon) => $coupon->targets()->create(['purpose' => PricingPurpose::EventRegistration]));
     }
 
     public function amountOff(int $points): static

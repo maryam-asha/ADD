@@ -20,7 +20,7 @@ implementing it.
 - **Coupons.** A code a member types. Per coupon: a percentage (capped by
   `max_discount_points`) or a number of points off; what it is for
   (`coupon_targets`; none = every purchase a coupon can be spent on, never a
-  wallet top-up); who may use it (named members, a company's members, new
+  wallet top-up nor — since 2026-10-08 — an event registration); who may use it (named members, a company's members, new
   members only), how often (`usage_limit` = "the first ten", `per_user_limit`),
   a minimum price, a validity window, an active switch, and whether it stacks
   on an offer (`combinable_with_offers`).
@@ -168,6 +168,13 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   not stack on an offer or a plan discount unless the admin says so — the
   member gets the better of the two (`offer_is_better` when the offer wins).
   Coupons created before keep what they were saved with.
+- **Events take only what is targeted at them** (2026-10-08): an offer or a
+  coupon with no targets covers bookings, co-working sessions and plans, not
+  event registrations — a discount on an event is decided per event, by a
+  target naming `event_registration` (with or without an `event_id`).
+  `PricingPurpose::coveredByUntargeted()` holds the rule;
+  `AppliesToTarget` applies it, so every path (purchase, preview, the `sale`
+  block, "my coupons") agrees.
 - **Coupon targets are replaced wholesale on update** — they carry no
   history; uses keep their own copy of the terms.
 - **Coupons at the reception desk and on company plan purchases are refused
