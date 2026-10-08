@@ -50,5 +50,6 @@ class ProviderModelTest extends TestCase
         $this->assertSame(ProviderRequestStatus::Pending, $request->status);
         $this->assertSame(500, $request->payload['points']);
         $this->assertTrue($request->isPending());
+        $this->assertSame($request->company->provider_id, $request->provider_id);
     }
 }

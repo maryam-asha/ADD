@@ -19,13 +19,11 @@ class ProviderRequestFactory extends Factory
     /** A top-up of a company of the same provider, pending. */
     public function definition(): array
     {
-        $provider = Provider::factory();
-
         return [
-            'provider_id' => $provider,
+            'provider_id' => Provider::factory(),
             'submitted_by' => null,
             'type' => ProviderRequestType::WalletTopUp,
-            'company_id' => Company::factory()->for($provider),
+            'company_id' => fn (array $attributes) => Company::factory()->create(['provider_id' => $attributes['provider_id']])->id,
             'payload' => ['points' => 100, 'payer' => 'company'],
             'status' => ProviderRequestStatus::Pending,
         ];
