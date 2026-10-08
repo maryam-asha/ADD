@@ -15,6 +15,7 @@ decided, and what enforces it now.
 - [wallet-subscription-ownership.md](wallet-subscription-ownership.md) — `owner_type` extension on `wallets`/`subscriptions`
 - [space-type-and-resource-status.md](space-type-and-resource-status.md) — `space_type` naming (D.7) and operational status on `resources` (D.11)
 - [rbac-scoping.md](rbac-scoping.md) — D.8: flat spatie roles kept; company door access via one Policy, not a scope system
+- [service-providers.md](service-providers.md) - provider entity managing client companies, ADD approves; ProviderPolicy as a second D.8 exception
 - [staff-operations-rename.md](staff-operations-rename.md) — `staff` role renamed to `operations` to match PRD §4 exactly
 - [district-removed.md](district-removed.md) — deliberate rollback: `District` dropped from the spatial hierarchy after Phase 1 shipped it
 - [phase-3-membership-plan-wallet-mechanics.md](phase-3-membership-plan-wallet-mechanics.md) — base schema for `plans`/`memberships`/`wallets` (unspecified elsewhere), the signature-preserving debit algorithm, and the company-auto-provisioning gap the instructions left unanswered
