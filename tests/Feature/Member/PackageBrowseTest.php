@@ -16,11 +16,11 @@ use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\PlanModuleSeeder;
-use Database\Seeders\PlanSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\LegacyPlanCatalogSeeder;
 use Tests\TestCase;
 
 /**
@@ -40,7 +40,7 @@ class PackageBrowseTest extends TestCase
         $this->seed(SettingSeeder::class);
         $this->seed(CurrencySeeder::class);
         $this->seed(PlanModuleSeeder::class);
-        $this->seed(PlanSeeder::class);
+        $this->seed(LegacyPlanCatalogSeeder::class);
         Carbon::setTestNow(Carbon::parse('2025-05-16 10:00:00', 'Asia/Damascus'));
     }
 

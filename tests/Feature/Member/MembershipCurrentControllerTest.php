@@ -17,11 +17,11 @@ use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Database\Seeders\CurrencySeeder;
 use Database\Seeders\PlanModuleSeeder;
-use Database\Seeders\PlanSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Support\LegacyPlanCatalogSeeder;
 use Tests\TestCase;
 
 /**
@@ -41,7 +41,7 @@ class MembershipCurrentControllerTest extends TestCase
         $this->seed(SettingSeeder::class);
         $this->seed(CurrencySeeder::class);
         $this->seed(PlanModuleSeeder::class);
-        $this->seed(PlanSeeder::class);
+        $this->seed(LegacyPlanCatalogSeeder::class);
         Carbon::setTestNow(Carbon::parse('2025-05-16 10:00:00', 'Asia/Damascus'));
     }
 
@@ -171,7 +171,7 @@ class MembershipCurrentControllerTest extends TestCase
         $benefitKeys = collect($response->json('data.benefits'))->pluck('key')->all();
         $this->assertSame(['cafe_access', 'printing_credits', 'member_discounts'], $benefitKeys);
 
-        // The Free Bird carries real plan_discounts rows (PlanSeeder), not
+        // The Free Bird carries real plan_discounts rows (LegacyPlanCatalogSeeder), not
         // just text — this is the whole point of the discounts key existing.
         $discounts = $response->json('data.discounts');
         $this->assertNotEmpty($discounts);
@@ -182,7 +182,7 @@ class MembershipCurrentControllerTest extends TestCase
      * Meeting Rooms (`space_specific`) is the one category displayed in
      * hours, not dollars — `hourly_rate_points` is per-space and not fixed,
      * so the raw point grant is treated as an hour count 1:1 by product
-     * convention (PlanSeeder literally calls the same figure "Meeting Room
+     * convention (LegacyPlanCatalogSeeder literally calls the same figure "Meeting Room
      * Hours"), not converted through `PointConversionService`.
      */
     public function test_usage_tracks_granted_used_and_remaining_per_category(): void
@@ -237,7 +237,7 @@ class MembershipCurrentControllerTest extends TestCase
         $this->assertSame('60 hours', $meeting['formatted_remaining']);
 
         // Cafe/Printing/Meeting balances plus this plan's real discounts
-        // (PlanSeeder) — all four badges apply.
+        // (LegacyPlanCatalogSeeder) — all four badges apply.
         $benefitKeys = collect($response->json('data.benefits'))->pluck('key')->all();
         $this->assertSame(['cafe_access', 'printing_credits', 'meeting_rooms', 'member_discounts'], $benefitKeys);
     }

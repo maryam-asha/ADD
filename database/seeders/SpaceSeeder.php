@@ -99,7 +99,7 @@ class SpaceSeeder extends Seeder
                 'is_lockable' => false,
                 // Recounted from its desks below (SeatDesk).
                 'capacity' => 0,
-                'hourly_rate_points' => 30,
+                'hourly_rate_points' => 15, // 1.5 USD (price sheet, 2026-10-08)
                 'cancellation_window_minutes' => 60,
                 'slot_granularity_minutes' => 60,
                 'buffer_minutes' => 0,

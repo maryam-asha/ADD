@@ -359,8 +359,8 @@ class BrowseSpacesTest extends TestCase
         $response->assertJsonMissingPath('data.status');
         $response->assertJsonPath('data.badge', 'OPEN SPACE');
         $response->assertJsonPath('data.subtitle', 'Open Workspace');
-        $response->assertJsonPath('data.details.pricing.price_label', '3 $ / hour');
-        $response->assertJsonPath('data.details.pricing.points_label', '30 pts / hour');
+        $response->assertJsonPath('data.details.pricing.price_label', '1.50 $ / hour');
+        $response->assertJsonPath('data.details.pricing.points_label', '15 pts / hour');
         $response->assertJsonPath('data.cta.button_text', 'Book This Space');
         $response->assertJsonPath('data.cta.can_book', true);
     }
