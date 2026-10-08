@@ -10,6 +10,7 @@ use App\Domain\Providers\Exceptions\ProviderRequestException;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Providers\Requests\ProviderRequestHandlers;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -174,5 +175,21 @@ class ProviderRequestService
                 'status' => 'sent',
             ]);
         }
+    }
+
+    /**
+     * Cancels every pending request in $requests, recording why — when a
+     * provider is deactivated or a company leaves it. Returns how many.
+     *
+     * @param  Builder<ProviderRequest>  $requests
+     */
+    public function cancelPending(Builder $requests, string $reason): int
+    {
+        return $requests->where('status', ProviderRequestStatus::Pending)->update([
+            'status' => ProviderRequestStatus::Cancelled->value,
+            'rejection_reason' => $reason,
+            'reviewed_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

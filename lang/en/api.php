@@ -112,6 +112,8 @@ return [
     ],
 
     'admin' => [
+        'provider_status_updated' => 'Provider status updated.',
+        'company_provider_updated' => "The company's provider was changed.",
         'provider_updated' => 'Provider updated.',
         'provider_user_linked' => 'The account now works for this provider.',
         'provider_user_unlinked' => 'The account no longer works for this provider.',

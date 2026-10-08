@@ -17,6 +17,7 @@ use App\Http\Controllers\Api\V1\Admin\BusinessHourExceptionController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
 use App\Http\Controllers\Api\V1\Admin\CouponController;
 use App\Http\Controllers\Api\V1\Admin\CoworkingPoolController;
@@ -272,6 +273,8 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::patch('providers/{provider}', [ProviderController::class, 'update'])->middleware('permission:providers.update');
     Route::post('providers/{provider}/users/{user}', [ProviderUserController::class, 'store'])->middleware('permission:providers.update');
     Route::delete('providers/{provider}/users/{user}', [ProviderUserController::class, 'destroy'])->middleware('permission:providers.update');
+    Route::patch('providers/{provider}/status', [ProviderController::class, 'updateStatus'])->middleware('permission:providers.status');
+    Route::patch('companies/{company}/provider', [CompanyProviderController::class, 'update'])->middleware('permission:providers.transfer_company');
     Route::get('provider-requests', [ProviderRequestController::class, 'index'])->middleware('permission:provider-requests.view');
     Route::get('provider-requests/{providerRequest}', [ProviderRequestController::class, 'show'])->middleware('permission:provider-requests.view');
     Route::post('provider-requests/{providerRequest}/approve', [ProviderRequestController::class, 'approve'])->middleware('permission:provider-requests.approve');

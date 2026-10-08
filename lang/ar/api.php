@@ -112,6 +112,8 @@ return [
     ],
 
     'admin' => [
+        'provider_status_updated' => 'حُدّثت حالة المزوّد.',
+        'company_provider_updated' => 'تغيّر مزوّد الشركة.',
         'provider_updated' => 'حُدّث المزوّد.',
         'provider_user_linked' => 'أصبح الحساب يعمل لهذا المزوّد.',
         'provider_user_unlinked' => 'لم يعد الحساب يعمل لهذا المزوّد.',
