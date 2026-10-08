@@ -94,6 +94,7 @@ return [
     ],
 
     'member' => [
+        'company_admin_requested' => 'Your request has been sent for approval.',
         'currency_preference_updated' => 'Currency preference updated.',
         'language_preference_updated' => 'Language preference updated.',
         'profile_updated' => 'Profile updated.',

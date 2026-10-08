@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\PendingRegistration;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Providers\Services\CompanyInvitationAcceptor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
@@ -191,6 +192,10 @@ class MemberAuthController extends Controller
                 'owner_type' => OwnerType::User,
                 'owner_id' => $user->id,
             ]);
+
+            // A provider's client company may already be waiting for this
+            // phone (docs/decisions/service-providers.md).
+            app(CompanyInvitationAcceptor::class)->acceptFor($user);
 
             // The sign-up is no longer pending. Dropped in the same transaction
             // that creates the account, so the two states can never both exist.

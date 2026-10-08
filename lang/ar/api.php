@@ -94,6 +94,7 @@ return [
     ],
 
     'member' => [
+        'company_admin_requested' => 'أُرسل طلبك للموافقة.',
         'currency_preference_updated' => 'تم تحديث تفضيل العملة.',
         'language_preference_updated' => 'تم تحديث تفضيل اللغة.',
         'profile_updated' => 'تم تحديث الملف الشخصي.',

@@ -3,6 +3,8 @@
 namespace App\Domain\Providers\Requests;
 
 use App\Domain\Providers\Enums\ProviderRequestType;
+use App\Domain\Providers\Requests\Handlers\CompanyAdminHandler;
+use App\Domain\Providers\Requests\Handlers\CompanyMemberHandler;
 use App\Domain\Providers\Requests\Handlers\PlanAssignmentHandler;
 use App\Domain\Providers\Requests\Handlers\PlanDesignHandler;
 use App\Domain\Providers\Requests\Handlers\WalletTopUpHandler;
@@ -15,6 +17,8 @@ class ProviderRequestHandlers
         'plan_design' => PlanDesignHandler::class,
         'plan_assignment' => PlanAssignmentHandler::class,
         'wallet_top_up' => WalletTopUpHandler::class,
+        'company_member' => CompanyMemberHandler::class,
+        'company_admin' => CompanyAdminHandler::class,
     ];
 
     public function for(ProviderRequestType $type): ProviderRequestHandler
