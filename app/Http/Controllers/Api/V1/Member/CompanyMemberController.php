@@ -53,7 +53,14 @@ class CompanyMemberController extends Controller
         Gate::authorize('manageMembers', $company);
 
         if ($company->provider_id !== null && $request->validated('is_admin')) {
-            abort_unless($company->members()->where('users.id', $user->id)->exists(), 404);
+            $member = $company->members()->where('users.id', $user->id)->first();
+            abort_if($member === null, 404);
+
+            if ($member->pivot->is_admin) {
+                return response()->json(['message' => __('api.member.admin_flag_updated')]);
+            }
+
+            abort_unless($company->provider->isActive(), 422, __('api.provider.inactive'));
 
             $payload = ['user_id' => $user->id];
 

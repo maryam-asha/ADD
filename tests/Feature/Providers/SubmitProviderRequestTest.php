@@ -110,6 +110,18 @@ class SubmitProviderRequestTest extends ProviderTestCase
             ->assertStatus(422)->assertJsonValidationErrors('user_id');
     }
 
+    public function test_an_admin_request_with_a_string_user_id_is_deduplicated(): void
+    {
+        $company = $this->clientCompany($this->provider);
+        $member = User::factory()->create();
+        $company->members()->attach($member->id);
+        $body = ['type' => 'company_admin', 'company_id' => $company->id];
+
+        $this->postJson('/api/v1/provider/requests', $body + ['user_id' => (string) $member->id])->assertCreated();
+        $this->postJson('/api/v1/provider/requests', $body + ['user_id' => $member->id])
+            ->assertStatus(422)->assertJsonValidationErrors('user_id');
+    }
+
     public function test_a_plan_design_is_validated_like_an_admin_plan(): void
     {
         $this->postJson('/api/v1/provider/requests', ['type' => 'plan_design', 'name' => ['en' => 'X', 'ar' => 'س']])

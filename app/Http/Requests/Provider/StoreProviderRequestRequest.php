@@ -109,7 +109,14 @@ class StoreProviderRequestRequest extends FormRequest
     /** What the request carries beyond its type and company. */
     public function payload(): array
     {
-        return Arr::except($this->validated(), ['type', 'company_id']);
+        $payload = Arr::except($this->validated(), ['type', 'company_id']);
+
+        // The duplicate lookup and the member path both use an int user_id.
+        if (isset($payload['user_id'])) {
+            $payload['user_id'] = (int) $payload['user_id'];
+        }
+
+        return $payload;
     }
 
     private function checkAssignment(Validator $validator, Company $company): void

@@ -23,7 +23,7 @@ class CompanyProviderController extends Controller
     public function update(UpdateCompanyProviderRequest $request, Company $company, ProviderRequestService $requests): JsonResponse
     {
         $before = $company->provider_id;
-        $after = $request->validated('provider_id');
+        $after = $request->validated('provider_id') === null ? null : (int) $request->validated('provider_id');
 
         DB::transaction(function () use ($company, $before, $after, $requests) {
             if ($before !== null && $before !== $after) {

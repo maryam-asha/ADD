@@ -76,6 +76,34 @@ class ProviderLifecycleTest extends ProviderTestCase
         $this->assertNull($company->fresh()->provider_id);
     }
 
+    public function test_resending_the_current_provider_as_a_string_cancels_nothing(): void
+    {
+        $provider = Provider::factory()->create();
+        $company = $this->clientCompany($provider);
+        $pending = ProviderRequest::factory()->create(['provider_id' => $provider->id, 'company_id' => $company->id]);
+        $this->actingAsAdmin();
+
+        $this->patchJson("/api/v1/admin/companies/{$company->id}/provider", ['provider_id' => (string) $provider->id])->assertOk();
+
+        $this->assertSame($provider->id, $company->fresh()->provider_id);
+        $this->assertSame(ProviderRequestStatus::Pending, $pending->fresh()->status);
+    }
+
+    public function test_moving_a_direct_company_to_a_provider_cancels_nothing(): void
+    {
+        $provider = Provider::factory()->create();
+        $other = Provider::factory()->create();
+        $company = $this->clientCompany($provider);
+        $company->update(['provider_id' => null]);
+        $pending = ProviderRequest::factory()->create(['provider_id' => $other->id, 'company_id' => $company->id]);
+        $this->actingAsAdmin();
+
+        $this->patchJson("/api/v1/admin/companies/{$company->id}/provider", ['provider_id' => $provider->id])->assertOk();
+
+        $this->assertSame($provider->id, $company->fresh()->provider_id);
+        $this->assertSame(ProviderRequestStatus::Pending, $pending->fresh()->status);
+    }
+
     public function test_status_and_transfer_follow_their_permissions(): void
     {
         $provider = Provider::factory()->create();

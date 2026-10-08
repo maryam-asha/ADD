@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Service providers (docs/decisions/service-providers.md). Does not extend
  * AdminResourceController: no `order` column, and a provider is
- * deactivated (updateStatus, Task 9), never deleted — its requests and
+ * deactivated (updateStatus), never deleted — its requests and
  * companies keep pointing at it.
  */
 class ProviderController extends Controller

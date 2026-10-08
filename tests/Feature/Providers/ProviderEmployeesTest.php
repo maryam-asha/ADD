@@ -5,6 +5,7 @@ namespace Tests\Feature\Providers;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Providers\Enums\ProviderRequestType;
+use App\Domain\Providers\Enums\ProviderStatus;
 use App\Domain\Providers\Models\CompanyInvitation;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -111,6 +112,43 @@ class ProviderEmployeesTest extends ProviderTestCase
         $request = ProviderRequest::sole();
         $this->assertSame(ProviderRequestType::CompanyAdmin, $request->type);
         $this->assertSame($admin->id, $request->submitted_by);
+    }
+
+    private function companyAdminWithColleague(): array
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('member');
+        $colleague = User::factory()->create();
+        $this->company->members()->attach($admin->id, ['is_admin' => true]);
+        $this->company->members()->attach($colleague->id);
+        Sanctum::actingAs($admin, ['member-app']);
+
+        return [$admin, $colleague];
+    }
+
+    public function test_granting_admin_to_someone_already_admin_files_nothing(): void
+    {
+        [$admin] = $this->companyAdminWithColleague();
+        $other = User::factory()->create();
+        $this->company->members()->attach($other->id, ['is_admin' => true]);
+
+        $this->patchJson("/api/v1/member/companies/{$this->company->id}/members/{$other->id}/admin", ['is_admin' => true])
+            ->assertOk()
+            ->assertJsonPath('message', __('api.member.admin_flag_updated'));
+
+        $this->assertSame(0, ProviderRequest::count());
+    }
+
+    public function test_granting_admin_through_an_inactive_provider_is_refused(): void
+    {
+        [, $colleague] = $this->companyAdminWithColleague();
+        $this->provider->update(['status' => ProviderStatus::Inactive]);
+
+        $this->patchJson("/api/v1/member/companies/{$this->company->id}/members/{$colleague->id}/admin", ['is_admin' => true])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.provider.inactive'));
+
+        $this->assertSame(0, ProviderRequest::count());
     }
 
     public function test_a_company_admin_of_a_provider_company_still_revokes_directly(): void

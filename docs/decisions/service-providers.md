@@ -72,8 +72,9 @@ lock the request row, require `pending` (a repeat is a 409), recheck that the
 provider and company are active and still linked, then hand over to the
 handler; a failed recheck is a 422 and the request stays `pending`. Inventory
 oversell on a plan assignment is available to the reviewer only
-(`overrides.oversell`) and is logged. Providers cancel their own `pending`
-requests. An invited phone is linked inside the `register/verify` transaction.
+(`override_capacity` on the approve body) and is logged. Providers cancel their own `pending`
+requests. Review "notifications" are `NotificationLog` rows only (no push, no
+inbox yet) — log-only until a dashboard inbox or push exists. An invited phone is linked inside the `register/verify` transaction.
 
 **`provider.active`** (`EnsureActiveProvider`): the account's provider must
 exist and be active, else 403 `api.provider.inactive`; it also puts the
