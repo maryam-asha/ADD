@@ -147,6 +147,7 @@ return [
         'membership_plan_not_subscription' => 'This plan is a one-time package, not a subscription, and cannot be activated as a membership.',
         'membership_plan_inactive' => 'This plan is no longer available.',
         'membership_seats_user_owner' => 'A member\'s own subscription holds exactly one seat; seats are for company subscriptions.',
+        'plan_sale_company_inactive' => 'Cannot sell a plan to an inactive company.',
         'resource_type_updated' => 'Resource type updated.',
         'event_category_updated' => 'Event category updated.',
         'event_updated' => 'Event updated.',

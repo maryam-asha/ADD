@@ -186,9 +186,15 @@ and whether each use still counts. A used coupon is deactivated, not deleted
   leaves the code out of the list.
 - **Coupon targets are replaced wholesale on update** — they carry no
   history; uses keep their own copy of the terms.
-- **Coupons at the reception desk and on company plan purchases are refused
-  for now** (D5); the services already take a coupon, so either is a small
-  follow-up.
+- **Coupons on company plan purchases are refused for now** (D5); the
+  services already take a coupon, so it is a small follow-up. **At the
+  reception desk a member's plan takes one since 2026-10-08** (user ruling):
+  `admin/reception/plan-purchases` and its preview accept `coupon_code` for a
+  `user_id` only — checked for that member, priced and recorded as in the
+  app, refused with `{message, reason}` — see
+  `docs/decisions/unified-payments.md`, "Plans sold at reception". Coupons on
+  the desk's other settlements (bookings, sessions, registrations) are still
+  not taken.
 
 ## Deploying
 
@@ -205,7 +211,8 @@ and whether each use still counts. A used coupon is deactivated, not deleted
 
 ## Explicitly not done here
 
-- Coupons at the reception desk and on company purchases (D5).
+- Coupons on company purchases, and at the desk for anything but a
+  member's plan (D5).
 - Bulk or percentage sales across many items; announcing upcoming sales.
 - Gift codes and referrals — phases 2 and 3, own specs.
 - VAT on the charged total (unchanged).

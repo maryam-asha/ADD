@@ -394,7 +394,57 @@ cover it — or **a card**, subscribed only when the card is accepted
   `pending_purchase`, and `payments:expire-pending` lets it lapse within its
   48 hours. Once none are left, that reading and the job are dead code a
   later change may remove.
-- **A member who wants to pay a plan in cash** tops up their wallet at
-  reception (`admin/reception/wallet-top-ups`) and buys it with points.
+- **A member who wants to pay a plan in cash** pays it at reception, which
+  sells it to them from the dashboard (below) — or tops up their wallet
+  there (`admin/reception/wallet-top-ups`) and buys it with points.
+
+## Plans sold at reception (2026-10-08)
+
+`POST admin/reception/plan-purchases` (`admin|operations`, like the top-up)
+sells a plan to a member (`user_id`) or a company (`company_id`) for the
+money handed over at the desk (`payment_method: cash`), in one request — the
+top-up's shape, with a plan in place of an amount — or from the points the
+owner's wallet already holds (`payment_method: wallet`). Still no subscription without payment: nothing
+is held, the plan is active on the 201 or nothing is written.
+
+- **The amount is the plan's price exactly** (user ruling): the request has
+  no `amount`; the desk picks `currency` (default: the base currency) and
+  takes `pointsToAmount(price)` in it. Nothing over is ever taken, so no
+  change is left in the wallet beyond conversion rounding.
+- **From points** (user ruling, same day): only when the owner's general
+  balance covers the whole price — no mixed payment of points and cash.
+  The payment is a `wallet` one with no credit, spent from the owner's
+  wallet (the company's for a company, whoever is at the desk); short, it
+  is refused with the shape every pay-with-points path gives (`current`,
+  `required`, `shortage`) and nothing is written. `currency` plays no part.
+- **Priced as in the app**: `PriceQuoteService::forPlan`, so a running offer
+  applies and is recorded on the payment. So does a coupon the member
+  brought (`coupon_code`, a member's plan only — `prohibits:company_id`, as
+  in the app; D5 relaxed for this one path), checked for them and refused
+  with `{message, reason}` when it cannot be used.
+- **Through the ledger**: `PaymentService::sellPlanAtReception` opens a cash
+  `plan_purchase` payment on the owner's wallet — the company's for a
+  company — and settles it with the same collection `settleAtReception`
+  uses (credit the money as points, debit the price,
+  `PlanPurchaseFulfiller` activates; audited
+  `membership_purchased_at_reception`, plus `plan_sold_at_reception`).
+- **The payer** is the member; for a company, whoever took the money, as a
+  reception top-up records it. Only a member is notified.
+- **Refused with nothing written**: an owner with a live membership, an
+  inactive or one-time plan, an inactive company, a full seat pool
+  (`first_shortfall_at`), a currency with no rate.
+- `POST admin/reception/plan-purchases/preview` quotes the same body —
+  `list_points`, `points`, `payment_amount` in `payment_currency`, and
+  `balance_points` / `wallet_covers` so the desk offers `wallet` only when
+  the points cover it, the running `offer` (`name`, `discount_type`,
+  `discount_value`, `saved_points`, `ends_at`) and the `coupon`'s outcome
+  (`applied`, `points_discounted`, `message`) — without writing anything.
+  The receipt carries the `discounts` locked on the payment
+  (`AppliedDiscountPresenter`) and the `coupon`'s outcome.
+- `POST admin/memberships` (admin only, `charge: false`) is unchanged: the
+  grant of a plan paid for outside the app, not a sale.
+- Not here: `seats`, `branch_id` and desks — the payment carries none of them
+  to `PlanPurchaseFulfiller`, as in the app.
+- Tests: `Finance/ReceptionPlanPurchaseTest`.
 - `payments.cash_plan_hold_hours` (`PAYMENTS_CASH_PLAN_HOLD_HOURS`) is
   removed; tests build an old hold with `PaymentFactory::cashPlanHold()`.

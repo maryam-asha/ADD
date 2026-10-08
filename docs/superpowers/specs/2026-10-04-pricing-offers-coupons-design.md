@@ -50,7 +50,7 @@ composed — the same "the rule lives once" shape as `AvailabilityService`
 | D2 | A non-combinable coupon when the offer is better | The purchase proceeds at the offer price; the response reports `coupon.applied = false`, reason `offer_is_better` (not a 422) |
 | D3 | `min_amount_points` compares against | The price the coupon applies to (after offers) |
 | D4 | "New member" | No accepted, unrefunded payment of more than 0 points for anything but a top-up; no paid booking/session/registration priced above 0; no live use of another new-members-only coupon. A top-up alone, or a membership staff granted, is not a purchase |
-| D5 | Coupons on a company plan purchase, or entered at the reception desk | Refused in Phase 1; the services accept a coupon so either is a small follow-up |
+| D5 | Coupons on a company plan purchase, or entered at the reception desk | Refused in Phase 1; the services accept a coupon so either is a small follow-up. *2026-10-08: a member's plan sold at the desk takes one (docs/decisions/pricing-offers-and-coupons.md).* |
 | D6 | A reversed plan payment / a no-show booking | Reversed gives the use back; a no-show keeps it |
 | D7 | Extending a booking priced by a sale or a plan discount | Keeps the booking's locked choice; best-of is not re-run; no coupon on the extension |
 | D9 | Plan coverage of a session that crosses a sale window | Covered seconds come off the end (today's convention) |

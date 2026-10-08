@@ -147,6 +147,7 @@ return [
         'membership_plan_not_subscription' => 'هذه الباقة شراء لمرة واحدة وليست اشتراكاً، ولا يمكن تفعيلها كاشتراك.',
         'membership_plan_inactive' => 'هذه الباقة لم تعد متاحة.',
         'membership_seats_user_owner' => 'اشتراك العضو الشخصي يحجز مقعداً واحداً فقط؛ عدد المقاعد لاشتراكات الشركات.',
+        'plan_sale_company_inactive' => 'لا يمكن بيع باقة لشركة غير فعّالة.',
         'resource_type_updated' => 'تم تحديث نوع المورد.',
         'event_category_updated' => 'تم تحديث فئة الفعالية.',
         'event_updated' => 'تم تحديث الفعالية.',

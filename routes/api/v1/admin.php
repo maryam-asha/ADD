@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\PlanPurchaseController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSummaryController;
@@ -360,6 +361,12 @@ Route::get('reception/wallet-balance', [WalletTopUpController::class, 'balance']
 // be swallowed as an id.
 Route::post('reception/wallet-top-ups/preview', [WalletTopUpController::class, 'preview']);
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
+
+// A plan sold for cash at the desk, the way a wallet is topped up: the
+// plan's price exactly, in the currency chosen, becomes points in the
+// owner's wallet and is spent on the plan at once (docs/decisions/unified-payments.md).
+Route::post('reception/plan-purchases/preview', [PlanPurchaseController::class, 'preview']);
+Route::post('reception/plan-purchases', [PlanPurchaseController::class, 'store']);
 Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
 
 // Manual-entry recording of natural-unit resource consumption (Printing,

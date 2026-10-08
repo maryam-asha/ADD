@@ -16,6 +16,7 @@ use App\Domain\Finance\Payments\Contracts\PaymentMethodDriver;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PaymentAmountCalculator;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
@@ -29,6 +30,7 @@ use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Domain\Pricing\Services\QuoteRecorder;
@@ -384,43 +386,157 @@ class PaymentService
                 ? $this->heldForCash($target, $purpose)
                 : $this->openedAtReception($purpose, $target);
 
-            $fulfiller->assertPayable($payment);
-            $due = $fulfiller->pointsDue($payment);
-
-            $handedOver = $amount ?? $this->converter->pointsToAmount($due, $currency);
-            $received = $this->converter->toPoints($handedOver, $currency);
-
-            if ($received->points < $due) {
-                throw new ReceptionActionException('api.payment.amount_short', 422, [
-                    'shortage' => bcsub($this->converter->pointsToAmount($due, $currency), $handedOver, $this->decimals($currency)),
-                    'currency' => $currency,
-                ]);
-            }
-
-            $payment->forceFill([
-                'amount_points' => $due,
-                'points_to_credit' => $received->points,
-                'collected_via' => $collectedVia,
-                'received_amount' => $handedOver,
-                'received_currency' => $currency,
-                'received_by' => $operator->id,
-                'received_at' => now(),
-            ])->save();
-
-            $this->settle($payment, new Funding(
-                points: $received->points,
-                method: $collectedVia,
-                currency: $currency,
-                amount: $handedOver,
-                rateToBase: $received->rateToBase,
-                pointRateUsd: $received->pointRateUsd,
-                performedBy: $operator->id,
-            ));
+            $settled = $this->collect($payment, $fulfiller, $collectedVia, $amount, $currency, $operator);
 
             $this->notifier->received($payment);
 
-            return new SettledAtReception($payment->refresh(), $received->points, (int) $payment->amount_points);
+            return $settled;
         });
+    }
+
+    /**
+     * Reception sells a plan, to be paid one of two ways:
+     *
+     *  - `$collectedVia` given — the money handed over, the way the desk
+     *    tops up a wallet: the plan's price exactly, in `$currency`
+     *    (default: the base currency), becomes points in `$wallet` — its
+     *    owner's, a member's or a company's — and is spent on the plan;
+     *  - null — the points `$wallet` already holds, when its general
+     *    balance covers the price (InsufficientPointsException otherwise).
+     *
+     * Either way the plan is activated for the wallet's owner at once, or
+     * nothing is written: there is still no subscription without payment.
+     *
+     * Priced as the app prices it (PriceQuoteService::forPlan): a running
+     * offer applies, and so does a `$coupon` the member brought — a member's
+     * plan only, checked for them as the app checks it — both recorded on
+     * the payment like any plan purchase.
+     * `$payer` is the member for a member's plan; for a company's, whoever
+     * took the money, as a reception top-up records it — and only a member
+     * is told their payment was received.
+     *
+     * @throws ReceptionActionException when the plan cannot be bought
+     * @throws InsufficientPointsException when paid from points that do not cover it
+     * @throws PaymentPricingException when `$currency` has no exchange rate
+     */
+    public function sellPlanAtReception(
+        Plan $plan,
+        Wallet $wallet,
+        User $payer,
+        ?PaymentMethod $collectedVia,
+        ?string $currency,
+        User $operator,
+        ?Coupon $coupon = null,
+    ): SettledAtReception {
+        $fulfiller = $this->fulfillers->for(PaymentPurpose::PlanPurchase);
+        $currency ??= $this->currencies->baseCurrencyCode();
+        $member = $wallet->owner_type === OwnerType::User ? $payer : null;
+
+        if ($coupon !== null && $member === null) {
+            throw new LogicException('A coupon is the member\'s own: never on a company\'s plan.');
+        }
+
+        return DB::transaction(function () use ($plan, $wallet, $payer, $member, $collectedVia, $currency, $operator, $fulfiller, $coupon) {
+            // The same order start() takes: the coupon's and the limited
+            // offers' rows first, then the quote, before anything is written.
+            $coupon = $this->couponLedger->lockForPricing($coupon);
+            $quote = $this->quotes->forPlan($plan, $member, $coupon, now());
+
+            $payment = new Payment;
+            $payment->forceFill([
+                'method' => $collectedVia === null ? WalletMethod::KEY : CashMethod::KEY,
+                'purpose' => PaymentPurpose::PlanPurchase,
+                'status' => PaymentStatus::Pending,
+                'user_id' => $payer->id,
+                'wallet_id' => $wallet->id,
+                'plan_id' => $plan->id,
+                'list_price_points' => (int) $plan->price_points,
+                'points_to_credit' => 0,
+                'amount_points' => 0,
+            ]);
+
+            $fulfiller->assertPayable($payment);
+            $payment->save();
+
+            // Filed before the price is read, so the fulfiller prices the
+            // payment with the offer locked on it, as start() does.
+            if ($quote->appliedOffer() !== null || $quote->appliedCoupon() !== null || $quote->saving !== null) {
+                $this->recorder->record($quote, $payment, $payer, PricingPurpose::PlanPurchase);
+            }
+
+            // An offer that makes the plan free has no money to take.
+            if ($fulfiller->pointsDue($payment) === 0) {
+                $payment->forceFill(['received_by' => $operator->id])->save();
+                $this->settle($payment);
+
+                return new SettledAtReception($payment->refresh(), 0, 0);
+            }
+
+            // Points the wallet already holds: spent as a wallet payment in
+            // the app spends them, with no money and so no credit.
+            if ($collectedVia === null) {
+                $this->settle($payment);
+
+                return new SettledAtReception($payment->refresh(), 0, (int) $payment->amount_points);
+            }
+
+            $settled = $this->collect($payment, $fulfiller, $collectedVia, null, $currency, $operator);
+
+            if ($member !== null) {
+                $this->notifier->received($payment);
+            }
+
+            return $settled;
+        });
+    }
+
+    /**
+     * Takes the money handed over for `$payment` (null: exactly what is due)
+     * and settles it. Too little is refused with the shortage in
+     * `$currency`; the caller's transaction rolls everything back.
+     */
+    private function collect(
+        Payment $payment,
+        PaymentFulfiller $fulfiller,
+        PaymentMethod $collectedVia,
+        ?string $amount,
+        string $currency,
+        User $operator,
+    ): SettledAtReception {
+        $fulfiller->assertPayable($payment);
+        $due = $fulfiller->pointsDue($payment);
+
+        $handedOver = $amount ?? $this->converter->pointsToAmount($due, $currency);
+        $received = $this->converter->toPoints($handedOver, $currency);
+
+        if ($received->points < $due) {
+            throw new ReceptionActionException('api.payment.amount_short', 422, [
+                'shortage' => bcsub($this->converter->pointsToAmount($due, $currency), $handedOver, $this->decimals($currency)),
+                'currency' => $currency,
+            ]);
+        }
+
+        $payment->forceFill([
+            'amount_points' => $due,
+            'points_to_credit' => $received->points,
+            'collected_via' => $collectedVia,
+            'received_amount' => $handedOver,
+            'received_currency' => $currency,
+            'received_by' => $operator->id,
+            'received_at' => now(),
+        ])->save();
+
+        $this->settle($payment, new Funding(
+            points: $received->points,
+            method: $collectedVia,
+            currency: $currency,
+            amount: $handedOver,
+            rateToBase: $received->rateToBase,
+            pointRateUsd: $received->pointRateUsd,
+            performedBy: $operator->id,
+        ));
+
+        return new SettledAtReception($payment->refresh(), $received->points, (int) $payment->amount_points);
     }
 
     /**
