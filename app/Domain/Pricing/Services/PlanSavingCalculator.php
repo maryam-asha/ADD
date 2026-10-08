@@ -46,6 +46,8 @@ class PlanSavingCalculator
             savingPoints: $savingPoints,
             savingPercent: intdiv($savingPoints * 100, $referencePoints),
             perUnitPoints: bcdiv((string) $plan->price_points, (string) $units, 2),
+            referenceDays: $comparedTo === 'plan' ? (int) $reference->duration_days : null,
+            planDays: $plan->duration_days !== null ? (int) $plan->duration_days : null,
         );
     }
 }

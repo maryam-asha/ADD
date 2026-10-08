@@ -124,7 +124,6 @@ return [
         'co_space_exists' => 'هذا الفرع لديه مساحة عمل مشتركة بالفعل؛ أضف إليها مقاعد بدلاً من ذلك.',
         'coupon_updated' => 'تم تحديث الكوبون.',
         'coupon_target_invalid' => 'هدف الكوبون يحدد عنصراً واحداً على الأكثر، ومن نوع يناسب غرضه: باقة لشراء باقة، مساحة أو نوع مساحة للوقت في مساحة، فعالية للتسجيل.',
-        'offer_fixed_price_family' => 'السعر الثابت يحتاج أهدافاً من نوع واحد: وقت في مساحة، أو باقات، أو فعاليات.',
         'space_status_updated' => 'تم تحديث حالة المساحة.',
         'space_amenities_updated' => 'تم تحديث مرافق المساحة.',
         'space_type_amenities_updated' => 'تم تحديث وسائل الراحة.',
@@ -514,6 +513,22 @@ return [
         'saving_percent' => 'وفّر :percent%',
         'saving_amount' => 'وفّر :amount',
         'per_unit' => ':amount لكل :unit',
+        // التوفير بجملة كاملة (saving_description).
+        'saving_description' => 'احصل على :quantity بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit :per.',
+        'saving_description_plain' => 'احصل عليها بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit لكل :unit.',
+        'saving_description_day' => 'احصل على يوم كامل بـ :price بدلاً من :regular لـ :quantity — وفّر :saving (:points).',
+        'saving_quantity' => [
+            'hour' => '{1} ساعة واحدة|{2} ساعتين|[3,10] :count ساعات|[11,*] :count ساعة',
+            'day' => '{1} يوم واحد|{2} يومين|[3,10] :count أيام|[11,*] :count يوماً',
+            'week' => '{1} أسبوع واحد|{2} أسبوعين|[3,10] :count أسابيع|[11,*] :count أسبوعاً',
+            'month' => '{1} شهر واحد|{2} شهرين|[3,10] :count أشهر|[11,*] :count شهراً',
+        ],
+        'saving_per' => [
+            'hour' => 'للساعة',
+            'day' => 'لليوم',
+            'week' => 'للأسبوع',
+            'month' => 'شهرياً',
+        ],
         'title' => 'الباقات والاشتراكات',
         'subtitle' => 'اختر الباقة المناسبة لأعمالك.',
         'tabs' => [

@@ -8,6 +8,10 @@ namespace App\Domain\Pricing\ValueObjects;
  * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  * It is the plan's own price, not a discount: shown and recorded, never
  * taken off anything. `perUnitPoints` is exact (a bcmath string).
+ * `referenceDays` is a reference plan's period — what one unit is (a day, a
+ * week, a month) — null for a space, whose unit is an hour; `planDays` is
+ * the plan's own period (a day pass is a day, not its hours). Display only:
+ * not part of toArray(), the copy the discount ledger keeps.
  */
 final class PlanSaving
 {
@@ -20,6 +24,8 @@ final class PlanSaving
         public readonly int $savingPoints,
         public readonly int $savingPercent,
         public readonly string $perUnitPoints,
+        public readonly ?int $referenceDays = null,
+        public readonly ?int $planDays = null,
     ) {}
 
     /** @return array<string, mixed> */

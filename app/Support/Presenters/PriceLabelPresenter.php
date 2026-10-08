@@ -178,7 +178,7 @@ class PriceLabelPresenter
      * whole point like an offer rate, E8 — it never understates the price).
      * Null when the plan has no saving.
      *
-     * @return array{compared_to: string, reference_points: int, reference_label: string, saving_points: int, saving_percent: int, saving_label: string, per_unit_label: string}|null
+     * @return array{compared_to: string, reference_points: int, reference_label: string, saving_points: int, saving_percent: int, saving_label: string, per_unit_label: string, saving_description: string}|null
      */
     public function saving(?PlanSaving $saving, ?User $user, ?string $locale = null): ?array
     {
@@ -204,7 +204,53 @@ class PriceLabelPresenter
             'per_unit_label' => $saving->comparedTo === 'space'
                 ? $this->hourly($perUnit, $user, $locale)['price_label']
                 : __('api.package.per_unit', ['amount' => $this->total($perUnit, $user, $locale)['price'], 'unit' => (string) $saving->referenceName], $locale),
+            'saving_description' => $this->savingDescription($saving, $perUnit, $savingAmount, $user, $locale),
         ];
+    }
+
+    /**
+     * The saving as one sentence, where `saving_label` is the badge: "Get 12
+     * months for 900 $ (regular price 1,500 $) — save 40% (6,000 pts).
+     * That's 750 pts/mo." The quantity is counted in the reference's unit —
+     * an hour for a space, the reference plan's period otherwise; a period
+     * that is not a day, a week or a month is named by the reference plan
+     * instead. What one unit comes to is in points (user ruling, 2026-10-08):
+     * a money rate shows fractions ("1.20 $") a whole number of points never
+     * does. A day pass compared with hours of a space is "a full day", its
+     * hours the comparison only — a per-hour rate would say nothing there.
+     */
+    private function savingDescription(PlanSaving $saving, int $perUnit, string $savingAmount, ?User $user, string $locale): string
+    {
+        $unit = $saving->comparedTo === 'space' ? 'hour' : match ($saving->referenceDays) {
+            1 => 'day',
+            7 => 'week',
+            30 => 'month',
+            default => null,
+        };
+
+        $replace = [
+            'price' => $this->total($saving->referencePoints - $saving->savingPoints, $user, $locale)['price'],
+            'regular' => $this->total($saving->referencePoints, $user, $locale)['price'],
+            // Under one percent, "0%" would say nothing: the amount instead.
+            'saving' => $saving->savingPercent >= 1 ? "{$saving->savingPercent}%" : $savingAmount,
+            'points' => $this->pointsLabel($saving->savingPoints, $locale),
+            'per_unit' => $this->pointsLabel($perUnit, $locale),
+        ];
+
+        if ($saving->comparedTo === 'space' && $saving->planDays === 1) {
+            return __('api.package.saving_description_day', $replace + [
+                'quantity' => trans_choice('api.package.saving_quantity.hour', $saving->units, ['count' => number_format($saving->units)], $locale),
+            ], $locale);
+        }
+
+        if ($unit === null) {
+            return __('api.package.saving_description_plain', $replace + ['unit' => (string) $saving->referenceName], $locale);
+        }
+
+        return __('api.package.saving_description', $replace + [
+            'quantity' => trans_choice("api.package.saving_quantity.{$unit}", $saving->units, ['count' => number_format($saving->units)], $locale),
+            'per' => __("api.package.saving_per.{$unit}", [], $locale),
+        ], $locale);
     }
 
     /** The resolved display currency for this request and member. */

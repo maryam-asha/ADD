@@ -13,6 +13,7 @@ use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
+use App\Support\Presenters\PriceLabelPresenter;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -119,6 +120,66 @@ class PlanSavingTest extends TestCase
         $this->assertSame(10, $saving->savingPoints);
         $this->assertSame(20, $saving->savingPercent);
         $this->assertSame('1.60', $saving->perUnitPoints);
+    }
+
+    /** The saving as a sentence beside the badge, counted in the reference's unit. */
+    public function test_the_saving_is_described_in_full(): void
+    {
+        $saving = $this->calculator()->for($this->yearly($this->monthly()));
+        $prices = app(PriceLabelPresenter::class);
+
+        $this->assertSame(
+            "Get 12 months for 90 $ (regular price 150 $) — save 40% (600 pts). That's 75 pts/mo.",
+            $prices->saving($saving, null, 'en')['saving_description'],
+        );
+        $this->assertSame(
+            'احصل على 12 شهراً بـ 90 $ بدلاً من 150 $ — وفّر 40% (600 نقطة). أي 75 نقطة شهرياً.',
+            $prices->saving($saving, null, 'ar')['saving_description'],
+        );
+        $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $prices->saving($saving, null, 'en')['saving_label']);
+    }
+
+    public function test_an_hours_bundle_is_described_in_hours(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 15]);
+        $bundle = Plan::factory()->create(['price_points' => 300, 'reference_space_id' => $space->id, 'reference_units' => 25]);
+
+        $this->assertSame(
+            "Get 25 hours for 30 $ (regular price 37.50 $) — save 20% (75 pts). That's 12 pts/hour.",
+            app(PriceLabelPresenter::class)->saving($this->calculator()->for($bundle), null, 'en')['saving_description'],
+        );
+        $this->assertSame(
+            'احصل على 25 ساعة بـ 30 $ بدلاً من 37.50 $ — وفّر 20% (75 نقطة). أي 12 نقطة للساعة.',
+            app(PriceLabelPresenter::class)->saving($this->calculator()->for($bundle), null, 'ar')['saving_description'],
+        );
+    }
+
+    /** A day pass compared with hours of the space is a full day, not "8 hours". */
+    public function test_a_day_pass_is_described_as_a_full_day(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 15]);
+        $daily = Plan::factory()->create(['price_points' => 60, 'duration_days' => 1, 'reference_space_id' => $space->id, 'reference_units' => 8]);
+        $saving = $this->calculator()->for($daily);
+
+        $this->assertSame(
+            'Get a full day for 6 $ (regular price 12 $ for 8 hours) — save 50% (60 pts).',
+            app(PriceLabelPresenter::class)->saving($saving, null, 'en')['saving_description'],
+        );
+        $this->assertSame(
+            'احصل على يوم كامل بـ 6 $ بدلاً من 12 $ لـ 8 ساعات — وفّر 50% (60 نقطة).',
+            app(PriceLabelPresenter::class)->saving($saving, null, 'ar')['saving_description'],
+        );
+    }
+
+    public function test_a_period_that_is_not_a_day_week_or_month_is_named_by_its_plan(): void
+    {
+        $quarter = Plan::factory()->create(['price_points' => 300, 'duration_days' => 90, 'name' => ['en' => 'Quarter', 'ar' => 'ربع سنوي']]);
+        $plan = Plan::factory()->create(['price_points' => 1000, 'reference_plan_id' => $quarter->id, 'reference_units' => 4]);
+
+        $this->assertSame(
+            "Get it for 100 $ (regular price 120 $) — save 16% (200 pts). That's 250 pts per Quarter.",
+            app(PriceLabelPresenter::class)->saving($this->calculator()->for($plan), null, 'en')['saving_description'],
+        );
     }
 
     public function test_the_percent_rounds_down(): void
