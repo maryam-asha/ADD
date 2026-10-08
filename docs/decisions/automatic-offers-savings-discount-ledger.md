@@ -12,9 +12,13 @@ including the rulings made while implementing it.
 
 - **Offers are coupons that apply themselves.** `coupons.is_automatic`; an
   offer has no code. It shares everything else with a coupon: targets,
-  audience, limits, window, cap, minimum. A third discount type,
-  `fixed_price`, is for offers only. The dashboard manages offers on
-  `admin/coupons?is_automatic=1`.
+  audience, limits, window, cap, minimum, and the two discount types —
+  a percentage or points off. (A third, `fixed_price`, offers only, was
+  dropped on 2026-10-08: on one item it is points off, and on several it
+  meant a different discount per item. Migration `2026_10_08_100000`
+  turned each into the points off that left its one item at that price,
+  and switched off any naming several items, for an admin to set again.)
+  The dashboard manages offers on `admin/coupons?is_automatic=1`.
 - **The sale columns are gone** from `spaces` and `plans`, along with
   `HasSalePrice` and `ValidatesSaleWindow`. Phase 1 never reached
   production, so nothing was migrated.
@@ -105,6 +109,14 @@ saving is not an offer.
   charge is exact.
 - **`saving`** (packages): `{compared_to, reference_points,
   reference_label, saving_points, saving_percent, saving_label,
+  saving_description (2026-10-08: the saving as one sentence — "Get 12
+  months for 90 $ (regular price 150 $) — save 40% (600 pts). That's
+  75 pts/mo." — counted in the reference's unit: hours for a space, else
+  the reference plan's period when it is a day, a week or a month, else
+  named by the reference plan; the unit rate in points, never money (user
+  ruling: no fractions); a day pass compared with a space's hours reads
+  "a full day … for 8 hours", with no unit rate; `saving_label` stays the
+  badge),
   per_unit_label}`, or null. `per_unit_label` is rounded up to a whole
   point, like an offer rate.
 - **Breakdown lines** keep their keys: `sale` (now labelled with the
@@ -125,8 +137,7 @@ saving is not an offer.
 
 - **Offers** use the coupon CRUD with `is_automatic: true` and no `code`
   (sending one is a 422). An update never turns a coupon into an offer or
-  back. A `fixed_price` needs targets of one family: time in a space,
-  plans, or events.
+  back.
 - **Plans** take `reference_plan_id` / `reference_space_id` /
   `reference_units`. Exactly one reference or neither; units are required
   with a reference and refused without one; a plan cannot reference itself.

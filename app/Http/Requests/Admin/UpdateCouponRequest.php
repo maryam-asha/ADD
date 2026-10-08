@@ -31,11 +31,6 @@ class UpdateCouponRequest extends StoreCouponRequest
         return 'sometimes';
     }
 
-    protected function storedTargets(): array
-    {
-        return $this->coupon()?->targets()->get(['purpose'])->map(fn ($target) => ['purpose' => $target->purpose->value])->all() ?? [];
-    }
-
     private function coupon(): ?Coupon
     {
         $coupon = $this->route('coupon');

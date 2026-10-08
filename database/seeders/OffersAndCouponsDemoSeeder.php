@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
@@ -25,7 +24,7 @@ use RuntimeException;
  * docs/decisions/automatic-offers-savings-discount-ledger.md):
  *
  * Offers (automatic, no code) — one on everything; one per family of item
- * (a space type, one space at a fixed rate, a plan with a usage limit); one
+ * (a space type, points off one space's rate, a plan with a usage limit); one
  * for new members only; one scheduled to start next week.
  *
  * Coupons (typed codes) — a public code; one that stacks on offers with a
@@ -92,11 +91,11 @@ class OffersAndCouponsDemoSeeder extends Seeder
                     ['purpose' => PricingPurpose::CoworkingSession, 'space_type' => SpaceType::Room->value],
                 ],
             ],
-            // A fixed rate on one space — only below its normal rate.
+            // Points off one space's hourly rate: a fifth of it.
             $business === null ? $this->skip('Business suite rate offer', 'no business space') : [
                 'name' => ['en' => 'Business suite rate', 'ar' => 'سعر مكتب الأعمال'],
-                'discount_type' => CouponDiscountType::FixedPrice,
-                'discount_value' => max(1, intdiv((int) $business->hourly_rate_points * 80, 100)),
+                'discount_type' => CouponDiscountType::AmountOff,
+                'discount_value' => max(1, intdiv((int) $business->hourly_rate_points, 5)),
                 'ends_at' => $this->now->addDays(14),
                 'targets' => [['purpose' => PricingPurpose::Booking, 'space_id' => $business->id]],
             ],

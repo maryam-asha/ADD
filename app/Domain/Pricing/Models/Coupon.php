@@ -88,10 +88,6 @@ class Coupon extends Model
             if ($value < 1 || ($coupon->discount_type === CouponDiscountType::Percentage && $value > 100)) {
                 throw new InvalidArgumentException('A coupon takes off between 1 and 100 percent, or at least one point.');
             }
-
-            if ($coupon->discount_type === CouponDiscountType::FixedPrice && ! $coupon->is_automatic) {
-                throw new InvalidArgumentException('A fixed price is for automatic offers only.');
-            }
         });
     }
 

@@ -159,11 +159,4 @@ class CouponModelTest extends TestCase
 
         app(CouponEligibility::class)->resolve('');
     }
-
-    public function test_a_fixed_price_is_for_offers_only(): void
-    {
-        $this->expectException(InvalidArgumentException::class);
-
-        Coupon::factory()->fixedPrice(100)->create();
-    }
 }

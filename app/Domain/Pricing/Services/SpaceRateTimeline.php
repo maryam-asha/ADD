@@ -52,15 +52,14 @@ class SpaceRateTimeline
 
     /**
      * The hourly rate inside the offer, exact — `percentage` takes p% off
-     * the rate, `amount_off` that many points (never below 0), `fixed_price`
-     * is the rate itself — or null when it is no lower than the rate.
+     * the rate, `amount_off` that many points (never below 0) — or null when
+     * it is no lower than the rate.
      */
     public function offerRate(int $rate, CouponTerms $offer): ?string
     {
         $offered = match ($offer->type) {
             CouponDiscountType::Percentage => bcdiv(bcmul((string) $rate, (string) (100 - $offer->value)), '100', 2),
             CouponDiscountType::AmountOff => (string) max(0, $rate - $offer->value),
-            CouponDiscountType::FixedPrice => (string) $offer->value,
         };
 
         return bccomp($offered, (string) $rate, 2) < 0 ? $offered : null;

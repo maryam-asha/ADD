@@ -18,7 +18,7 @@ use Tests\TestCase;
 
 /**
  * Offers are coupons with `is_automatic: true` on the same admin endpoints:
- * no code, and `fixed_price` is theirs alone
+ * no code, and the same two discount types
  * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  */
 class AdminOfferControllerTest extends TestCase
@@ -60,20 +60,17 @@ class AdminOfferControllerTest extends TestCase
             ->assertJsonValidationErrors('code');
     }
 
-    public function test_a_fixed_price_is_for_offers_only(): void
+    /** A percentage or points off, for an offer as for a coupon: `fixed_price` is gone. */
+    public function test_a_fixed_price_is_refused(): void
     {
-        $this->postJson('/api/v1/admin/coupons', ['code' => 'FP', 'discount_type' => 'fixed_price', 'discount_value' => 100, 'targets' => [['purpose' => 'plan_purchase']]])
+        $this->postJson('/api/v1/admin/coupons', ['is_automatic' => true, 'discount_type' => 'fixed_price', 'discount_value' => 100, 'targets' => [['purpose' => 'plan_purchase']]])
             ->assertJsonValidationErrors('discount_type');
     }
 
-    public function test_a_fixed_price_offer_needs_targets_of_one_family(): void
+    /** Points off may cover any targets, of any kind, or none. */
+    public function test_points_off_take_targets_of_any_kind(): void
     {
-        $base = ['is_automatic' => true, 'discount_type' => 'fixed_price', 'discount_value' => 100];
-
-        $this->postJson('/api/v1/admin/coupons', $base)->assertJsonValidationErrors('targets');
-        $this->postJson('/api/v1/admin/coupons', $base + ['targets' => [['purpose' => 'booking'], ['purpose' => 'plan_purchase']]])
-            ->assertJsonValidationErrors('targets');
-        $this->postJson('/api/v1/admin/coupons', $base + ['targets' => [['purpose' => 'booking'], ['purpose' => 'coworking_session']]])
+        $this->postJson('/api/v1/admin/coupons', ['is_automatic' => true, 'discount_type' => 'amount_off', 'discount_value' => 20, 'targets' => [['purpose' => 'booking'], ['purpose' => 'plan_purchase']]])
             ->assertCreated();
     }
 

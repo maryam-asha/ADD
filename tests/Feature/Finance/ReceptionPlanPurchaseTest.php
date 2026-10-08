@@ -352,8 +352,8 @@ class ReceptionPlanPurchaseTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.points', 1000)
             ->assertJsonPath('data.offer.name', 'Offer')
-            ->assertJsonPath('data.offer.discount_type', 'fixed_price')
-            ->assertJsonPath('data.offer.discount_value', 1000)
+            ->assertJsonPath('data.offer.discount_type', 'amount_off')
+            ->assertJsonPath('data.offer.discount_value', 200)
             ->assertJsonPath('data.offer.saved_points', 200)
             ->assertJsonPath('data.offer.ends_at', $ends->toIso8601String())
             ->assertJsonPath('data.coupon', null);

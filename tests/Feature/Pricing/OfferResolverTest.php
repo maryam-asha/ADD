@@ -84,7 +84,7 @@ class OfferResolverTest extends TestCase
     public function test_only_the_seconds_inside_the_offer_window_are_discounted(): void
     {
         $space = $this->room(100);
-        $this->offer(['discount_type' => 'fixed_price', 'discount_value' => 70, 'starts_at' => '2026-10-06 10:00:00', 'ends_at' => '2026-10-06 11:00:00'], [['purpose' => 'booking']]);
+        $this->offer(['discount_type' => 'amount_off', 'discount_value' => 30, 'starts_at' => '2026-10-06 10:00:00', 'ends_at' => '2026-10-06 11:00:00'], [['purpose' => 'booking']]);
 
         $this->assertSame(170, $this->forSpace($space, '2026-10-06 10:00', '2026-10-06 12:00')->points);
     }
@@ -93,7 +93,7 @@ class OfferResolverTest extends TestCase
     {
         $space = $this->room(100);
         $wholeDay = $this->offer(['discount_type' => 'percentage', 'discount_value' => 20]);
-        $oneHour = $this->offer(['discount_type' => 'fixed_price', 'discount_value' => 70, 'starts_at' => '2026-10-06 10:00:00', 'ends_at' => '2026-10-06 11:00:00'], [['purpose' => 'booking']]);
+        $oneHour = $this->offer(['discount_type' => 'amount_off', 'discount_value' => 30, 'starts_at' => '2026-10-06 10:00:00', 'ends_at' => '2026-10-06 11:00:00'], [['purpose' => 'booking']]);
 
         $twoHours = $this->forSpace($space, '2026-10-06 10:00', '2026-10-06 12:00');
         $this->assertTrue($twoHours->offer->is($wholeDay));
@@ -136,12 +136,12 @@ class OfferResolverTest extends TestCase
         $this->assertSame(170, $this->forSpace($space, '2026-10-06 09:00', '2026-10-06 11:00')->points);
     }
 
-    public function test_a_fixed_price_at_or_above_the_rate_is_ignored(): void
+    public function test_points_off_beyond_the_rate_leave_it_free_never_below(): void
     {
         $space = $this->room(100);
-        $this->offer(['discount_type' => 'fixed_price', 'discount_value' => 100], [['purpose' => 'booking']]);
+        $this->offer(['discount_type' => 'amount_off', 'discount_value' => 150], [['purpose' => 'booking']]);
 
-        $this->assertNull($this->forSpace($space, '2026-10-06 09:00', '2026-10-06 10:00'));
+        $this->assertSame(0, $this->forSpace($space, '2026-10-06 09:00', '2026-10-06 10:00')->points);
     }
 
     public function test_ineligible_offers_are_dropped_silently(): void
@@ -195,7 +195,7 @@ class OfferResolverTest extends TestCase
     public function test_a_plan_offer_must_be_live_at_the_moment(): void
     {
         $plan = Plan::factory()->create(['price_points' => 120]);
-        $this->offer(['discount_type' => 'fixed_price', 'discount_value' => 100, 'ends_at' => '2026-10-07 00:00:00'], [['purpose' => 'plan_purchase']]);
+        $this->offer(['discount_type' => 'amount_off', 'discount_value' => 20, 'ends_at' => '2026-10-07 00:00:00'], [['purpose' => 'plan_purchase']]);
 
         $this->assertSame(100, $this->resolver()->forItem(120, PricingTarget::forPlan($plan), null, now(), new UsageInFlight)->points);
         $this->assertNull($this->resolver()->forItem(120, PricingTarget::forPlan($plan), null, Carbon::parse('2026-10-07 00:00:00'), new UsageInFlight));

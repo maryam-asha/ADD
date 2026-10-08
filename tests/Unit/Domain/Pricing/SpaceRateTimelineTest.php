@@ -19,10 +19,10 @@ use Tests\TestCase;
  */
 class SpaceRateTimelineTest extends TestCase
 {
-    /** A fixed rate of 80 from 2026-10-05 to 2026-10-12, on a room at 100. */
+    /** 20 points off from 2026-10-05 to 2026-10-12: a room at 100 at 80. */
     private function weekAt80(): CouponTerms
     {
-        return new CouponTerms(CouponDiscountType::FixedPrice, 80, null, SaleWindow::between(
+        return new CouponTerms(CouponDiscountType::AmountOff, 20, null, SaleWindow::between(
             CarbonImmutable::parse('2026-10-05 00:00:00'),
             CarbonImmutable::parse('2026-10-12 00:00:00'),
         ));
@@ -72,10 +72,10 @@ class SpaceRateTimelineTest extends TestCase
         $this->assertSame([[7200, '70']], $this->segments($offer, '2026-10-06 10:00:00', '2026-10-06 12:00:00'));
     }
 
-    /** An offer never raises a price: one no lower than the rate is ignored. */
+    /** An offer that would leave the rate as it is is ignored. */
     public function test_an_offer_no_lower_than_the_rate_is_ignored(): void
     {
-        $offer = new CouponTerms(CouponDiscountType::FixedPrice, 120, null, SaleWindow::between(null, null));
+        $offer = new CouponTerms(CouponDiscountType::AmountOff, 0, null, SaleWindow::between(null, null));
 
         $this->assertSame([[3600, '100']], $this->segments($offer, '2026-10-06 10:00:00', '2026-10-06 11:00:00'));
     }

@@ -16,8 +16,7 @@ use Illuminate\Validation\Rule;
 /**
  * A coupon as the admin writes it
  * (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md) — or
- * an offer, `is_automatic`: no code, and the only kind that may set a
- * `fixed_price`, with targets of one family
+ * an offer, `is_automatic`: no code
  * (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
  *
  * `targets` is what it is for — none: everything a coupon can be spent on;
@@ -56,9 +55,7 @@ class StoreCouponRequest extends FormRequest
                 'code' => $this->isAutomatic()
                     ? ['prohibited']
                     : [$this->codeRequirement(), 'string', 'max:40', 'regex:/^[A-Z0-9_-]+$/', $this->uniqueCode()],
-                'discount_type' => ['required', $this->isAutomatic()
-                    ? Rule::enum(CouponDiscountType::class)
-                    : Rule::enum(CouponDiscountType::class)->except(CouponDiscountType::FixedPrice)],
+                'discount_type' => ['required', Rule::enum(CouponDiscountType::class)],
                 'discount_value' => array_filter([
                     'required', 'integer', 'min:1',
                     $this->input('discount_type') === CouponDiscountType::Percentage->value ? 'max:100' : null,
@@ -105,59 +102,12 @@ class StoreCouponRequest extends FormRequest
     }
 
     /**
-     * The coupon's stored targets, for an update that leaves them out.
-     *
-     * @return list<array<string, mixed>>
-     */
-    protected function storedTargets(): array
-    {
-        return [];
-    }
-
-    /** The purposes a price means the same thing across. */
-    private const FIXED_PRICE_FAMILIES = [
-        [PricingPurpose::Booking, PricingPurpose::CoworkingSession],
-        [PricingPurpose::PlanPurchase],
-        [PricingPurpose::EventRegistration],
-    ];
-
-    /**
-     * A fixed price is a price per hour for time in a space, or a price for
-     * a plan or an event: an offer setting one names at least one target,
-     * all of one family.
-     */
-    private function assertFixedPriceFamily(Validator $validator): void
-    {
-        $type = $this->input('discount_type');
-
-        if (! $this->isAutomatic() || $type !== CouponDiscountType::FixedPrice->value || $validator->errors()->has('targets')) {
-            return;
-        }
-
-        $targets = $this->exists('targets') ? (array) $this->input('targets') : $this->storedTargets();
-        $purposes = array_values(array_unique(array_filter(array_map(
-            fn ($target) => is_array($target) ? PricingPurpose::tryFrom((string) ($target['purpose'] ?? '')) : null,
-            $targets,
-        )), SORT_REGULAR));
-
-        $oneFamily = $purposes !== [] && collect(self::FIXED_PRICE_FAMILIES)->contains(
-            fn (array $family) => collect($purposes)->every(fn (PricingPurpose $purpose) => in_array($purpose, $family, true)),
-        );
-
-        if (! $oneFamily) {
-            $validator->errors()->add('targets', __('api.admin.offer_fixed_price_family'));
-        }
-    }
-
-    /**
      * A target names at most one item, and one its purpose buys — a 422
      * here rather than the model's exception later.
      */
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            $this->assertFixedPriceFamily($validator);
-
             foreach ((array) $this->input('targets', []) as $index => $target) {
                 $purpose = is_array($target) ? PricingPurpose::tryFrom((string) ($target['purpose'] ?? '')) : null;
 

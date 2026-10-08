@@ -7,13 +7,12 @@ namespace App\Domain\Pricing\Enums;
  * `max_discount_points`); `amount_off` takes a flat `discount_value` points
  * off. Neither ever takes off more than the price it applies to.
  *
- * `fixed_price` is for automatic offers only: `discount_value` is then the
- * price itself — points per hour for time in a space, points for a plan or
- * an event. A fixed price at or above the normal one takes nothing off.
+ * Offers and coupons share these two. A third, `fixed_price` (the price
+ * itself), was dropped on 2026-10-08: on one item it is a number of points
+ * off, and on several it read differently per item.
  */
 enum CouponDiscountType: string
 {
     case Percentage = 'percentage';
     case AmountOff = 'amount_off';
-    case FixedPrice = 'fixed_price';
 }

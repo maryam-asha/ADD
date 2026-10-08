@@ -47,11 +47,6 @@ class CouponFactory extends Factory
         return $this->state(['is_automatic' => true, 'code' => null, 'per_user_limit' => null]);
     }
 
-    public function fixedPrice(int $points): static
-    {
-        return $this->state(['discount_type' => CouponDiscountType::FixedPrice, 'discount_value' => $points]);
-    }
-
     /** Targeted at every event registration — no event takes an untargeted one. */
     public function forEvents(): static
     {
