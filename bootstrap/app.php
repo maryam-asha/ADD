@@ -4,6 +4,7 @@ use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
+use App\Http\Middleware\EnsureActiveProvider;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -75,6 +76,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // docblock for why `redirectGuestsTo(fn () => null)` below only
             // covers the opposite direction.
             'guest' => RedirectIfAuthenticated::class,
+            // The provider route group (docs/decisions/service-providers.md):
+            // the account's provider exists and is active.
+            'provider.active' => EnsureActiveProvider::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —

@@ -33,6 +33,15 @@ Route::prefix('v1')->group(function () {
         ->prefix('member')
         ->group(base_path('routes/api/v1/member.php'));
 
+    // Service providers (docs/decisions/service-providers.md): dashboard
+    // accounts, so the same 'abilities:dashboard' boundary as the admin
+    // group, but their own role and their own file — a provider never
+    // reaches an admin route, and provider.active cuts off every account of
+    // a deactivated provider.
+    Route::middleware(['auth:sanctum', 'abilities:dashboard', 'role:provider', 'provider.active'])
+        ->prefix('provider')
+        ->group(base_path('routes/api/v1/provider.php'));
+
     /*
      * Paymera's two return paths. Unauthenticated by necessity: the gateway
      * presents no credentials, and the member comes back from an external

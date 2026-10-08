@@ -35,7 +35,7 @@ class RbacStaysFlatTest extends TestCase
         $this->assertSame([], $violations, "D.8 — no scoped-role system; only a flag on company_user:\n".implode("\n", $violations));
     }
 
-    public function test_company_policy_is_the_only_policy_class_in_the_app(): void
+    public function test_company_and_provider_policies_are_the_only_policy_classes_in_the_app(): void
     {
         $policyFiles = [];
 
@@ -44,10 +44,15 @@ class RbacStaysFlatTest extends TestCase
             $policyFiles[] = str_replace('\\', '/', $relative);
         }
 
+        sort($policyFiles);
+
         $this->assertSame(
-            ['app/Domain/Identity/Policies/CompanyPolicy.php'],
+            [
+                'app/Domain/Identity/Policies/CompanyPolicy.php',
+                'app/Domain/Providers/Policies/ProviderPolicy.php',
+            ],
             $policyFiles,
-            'D.8 — CompanyPolicy is the one deliberate exception to flat RBAC; a second Policy needs its own decision record, not a silent addition.'
+            'D.8 — CompanyPolicy and ProviderPolicy (docs/decisions/service-providers.md) are the only exceptions to flat RBAC; another Policy needs its own decision record, not a silent addition.'
         );
     }
 }

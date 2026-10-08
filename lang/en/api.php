@@ -668,4 +668,10 @@ return [
         ],
     ],
 
+    // Service providers (docs/decisions/service-providers.md).
+    'provider' => [
+        'inactive' => 'This provider account is not active.',
+        'member_removed' => 'The employee was removed from the company.',
+    ],
+
 ];

@@ -4,9 +4,8 @@ namespace App\Providers;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Policies\CompanyPolicy;
+use App\Domain\Providers\Policies\ProviderPolicy;
 use App\Domain\Settings\Services\SettingService;
-use App\Events\Finance\PaymentAccepted;
-use App\Events\Finance\PaymentReversed;
 use App\Listeners\EnsureAuthenticatedUserIsActive;
 use App\Listeners\Finance\FulfilAcceptedPayment;
 use App\Listeners\Finance\ReverseWalletCreditOnPaymentReversed;
@@ -86,8 +85,9 @@ class AppServiceProvider extends ServiceProvider
 
         // Models live under App\Domain\<Domain>\Policies, not App\Policies, so
         // Laravel's convention-based policy discovery misses these — register
-        // explicitly. This is the only Policy in the app (D.8).
+        // explicitly. With ProviderPolicy (the gate below) these are the only Policies in the app (D.8).
         Gate::policy(Company::class, CompanyPolicy::class);
+        Gate::define('provider.manage-company', [ProviderPolicy::class, 'manageCompany']);
 
         $this->registerLoginRateLimiter();
 
