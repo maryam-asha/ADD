@@ -181,6 +181,7 @@ return [
         'protected_delete' => 'This role cannot be deleted.',
         'role_in_use' => 'This role is currently assigned to one or more users. Reassign them before deleting it.',
         'member_out_of_scope' => "Member accounts don't participate in the admin permission system; the member role can't be assigned any admin-panel permissions.",
+        'provider_out_of_scope' => "Provider accounts don't participate in the admin permission system; the provider role can't be assigned any admin-panel permissions.",
     ],
 
     'access' => [

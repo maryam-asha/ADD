@@ -51,13 +51,12 @@ class RoleController extends Controller
             return response()->json(['message' => __('api.role.protected_rename')], 422);
         }
 
-        // member is entirely out of scope for the admin permission system —
-        // members never touch the admin dashboard, so the member role must
-        // never hold an admin-panel permission (docs/decisions/rbac-permission-pilot.md).
-        // Only member is restricted this way: admin/operations permission
-        // edits are an intentional, already-accepted part of this pilot.
-        if ($role->name === 'member' && $request->has('permissions')) {
-            return response()->json(['message' => __('api.role.member_out_of_scope')], 422);
+        // member and provider are entirely out of scope for the admin
+        // permission system — neither ever touches the admin dashboard's
+        // routes, so neither may hold an admin-panel permission
+        // (docs/decisions/rbac-permission-pilot.md, docs/decisions/service-providers.md).
+        if (in_array($role->name, ProtectedRoles::OUTSIDE_ADMIN_PERMISSIONS, true) && $request->has('permissions')) {
+            return response()->json(['message' => __("api.role.{$role->name}_out_of_scope")], 422);
         }
 
         $before = ['name' => $role->name, 'permissions' => $role->permissions()->pluck('name')];
