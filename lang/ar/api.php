@@ -665,6 +665,13 @@ return [
     'provider' => [
         'inactive' => 'حساب المزوّد هذا غير فعّال.',
         'member_removed' => 'أُزيل الموظف من الشركة.',
+        'company_unavailable' => 'هذه الشركة ليست من شركاتك، أو أنها غير فعّالة.',
+        'plan_unavailable' => 'لا يمكن إسناد هذه الباقة.',
+        'duplicate_request' => 'طُلب هذا أو تمّ من قبل.',
+        'not_a_company_member' => 'هذا الشخص ليس موظفاً في الشركة.',
+        'already_company_admin' => 'هذا الموظف مشرف الشركة بالفعل.',
+        'request_cancelled' => 'أُلغي الطلب.',
+        'request_not_pending' => 'بُتّ في هذا الطلب من قبل.',
     ],
 
 ];

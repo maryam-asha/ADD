@@ -677,6 +677,13 @@ return [
     'provider' => [
         'inactive' => 'This provider account is not active.',
         'member_removed' => 'The employee was removed from the company.',
+        'company_unavailable' => 'This company is not one of yours, or it is not active.',
+        'plan_unavailable' => 'This plan cannot be assigned.',
+        'duplicate_request' => 'This has already been requested or done.',
+        'not_a_company_member' => 'This person is not an employee of the company.',
+        'already_company_admin' => 'This employee is already the company admin.',
+        'request_cancelled' => 'The request was cancelled.',
+        'request_not_pending' => 'This request has already been decided.',
     ],
 
 ];
