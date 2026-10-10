@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\Member\AccountController;
 use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Member\CompanyOfficeLeaseController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
@@ -130,6 +131,10 @@ Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberControlle
 // wallet (CompanyPolicy::manageMembers) — see
 // docs/decisions/wallet-points-categorization.md.
 Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationController::class, 'store']);
+
+// The company admin's view of the company's office leases — dates only, no
+// prices (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+Route::get('companies/{company}/office-leases', [CompanyOfficeLeaseController::class, 'index']);
 
 // Browse the package catalog — "Packages" tab. Each entry carries
 // `is_current`; the member's own subscription and usage is a separate call.
