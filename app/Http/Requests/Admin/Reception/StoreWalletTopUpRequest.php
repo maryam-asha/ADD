@@ -9,10 +9,20 @@ use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
+use App\Domain\Membership\Services\TopUpMinimum;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
+/**
+ * The dashboard converts between points and cash itself and sends both
+ * (docs/superpowers/specs/2026-10-10-wallet-top-up-points-entry-design.md
+ * §3). This is where that client arithmetic is verified: `points` must be
+ * exactly what `amount` buys at today's rates, floored once on the exact
+ * value. A mismatch — usually an exchange rate that moved after the form
+ * read it — is refused, so the operator is never told one number while the
+ * wallet receives another.
+ */
 class StoreWalletTopUpRequest extends FormRequest
 {
     public function authorize(): bool
@@ -26,12 +36,25 @@ class StoreWalletTopUpRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:0.01'],
+            'points' => ['required', 'integer', 'min:'.app(TopUpMinimum::class)->points()],
+            // decimal:0,2 matches payment_amount's decimal(14,2), so the amount
+            // verified below is exactly the amount stored.
+            'amount' => ['required', 'numeric', 'min:0.01', 'decimal:0,2'],
             'currency' => ['nullable', 'string', 'exists:currencies,code'],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
             'company_id' => ['required_without:user_id', 'integer', 'exists:companies,id'],
             'description' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return [
+            'points.min' => __('api.wallet.min_points', ['min' => app(TopUpMinimum::class)->points()]),
         ];
     }
 
@@ -53,26 +76,15 @@ class StoreWalletTopUpRequest extends FormRequest
                 }
             }
 
-            // Credits floor (Invariant 2), so a payment worth less than one
-            // whole point would credit nothing at all while still writing a
-            // transaction row recording the full amount taken. Refuse it at
-            // the door rather than swallow the money.
-            $amount = $this->input('amount');
+            if ($validator->errors()->hasAny(['points', 'amount', 'currency'])) {
+                return;
+            }
 
-            if ($amount !== null && ! $validator->errors()->has('amount') && ! $validator->errors()->has('currency')) {
-                $points = app(PointConversionService::class);
-                $conversion = app(CurrencyConversionService::class);
+            $currency = $this->input('currency') ?? app(CurrencyConversionService::class)->baseCurrencyCode();
+            $buys = app(PointConversionService::class)->currencyToPoints((string) $this->input('amount'), $currency);
 
-                $base = $conversion->baseCurrencyCode();
-                $currency = $this->input('currency') ?? $base;
-
-                $usd = $currency === $base
-                    ? (string) $amount
-                    : (string) $conversion->convert((float) $amount, $currency, $base);
-
-                if ($points->usdToPoints($usd) < 1) {
-                    $validator->errors()->add('amount', __('api.wallet.amount_below_one_point'));
-                }
+            if ($buys !== (int) $this->input('points')) {
+                $validator->errors()->add('points', __('api.wallet.quote_stale'));
             }
         });
     }

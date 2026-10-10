@@ -24,11 +24,12 @@ use Illuminate\Support\Facades\DB;
  * top-up mechanism; reuses the existing wallet transaction categorisation
  * fields exactly as they are.
  *
- * The ledger is point-denominated. Cash taken at the till converts to
- * points exactly once, here, on the way in; every currency figure this
- * controller reports is derived back out of the stored point count, never
- * carried over from the pre-conversion payment, so a receipt can never
- * claim a value the wallet does not hold (Invariant 3).
+ * The ledger is point-denominated. The dashboard quotes the points and
+ * StoreWalletTopUpRequest verifies them against the cash — floored once on
+ * the exact value — so store() credits exactly the figure the operator read
+ * out. Every currency figure this controller reports is derived back out of
+ * the stored point count, never carried over from the payment, so a receipt
+ * can never claim a value the wallet does not hold (Invariant 3).
  */
 class WalletTopUpController extends Controller
 {
@@ -104,14 +105,14 @@ class WalletTopUpController extends Controller
         $baseCurrency = $conversion->baseCurrencyCode();
         $paymentCurrency = $request->validated('currency') ?? $baseCurrency;
         $paymentAmount = (string) $request->validated('amount');
+        $exchangeRate = $paymentCurrency === $baseCurrency
+            ? null
+            : (string) ExchangeRate::current($paymentCurrency)->rate_to_base;
 
-        [$usd, $exchangeRate] = $this->paymentInBaseCurrency($paymentAmount, $paymentCurrency, $baseCurrency);
-
-        // Credit direction: floor. The member is never credited more value
-        // than the cash actually covers (Invariant 2). A payment too small
-        // to buy a single point never reaches here — StoreWalletTopUpRequest
-        // rejects it rather than write a row that credits nothing.
-        $pointsCredited = $points->usdToPoints($usd);
+        // StoreWalletTopUpRequest has proved this is exactly what the amount
+        // buys at today's rates, floored once (Invariant 2), and it is the
+        // figure the operator read out to the member.
+        $pointsCredited = (int) $request->validated('points');
         $pointRate = $points->rate();
 
         $previousBalancePoints = $wallets->generalBalance($wallet);
@@ -194,55 +195,5 @@ class WalletTopUpController extends Controller
                 'created_at' => $transaction->created_at?->toISOString() ?? now()->toISOString(),
             ],
         ], 201);
-    }
-
-    /**
-     * What a given cash amount would credit, without writing anything.
-     * Exists so the top-up dialog can show a live point preview without
-     * reimplementing the rounding rules in TypeScript (Invariant 4).
-     */
-    public function preview(
-        StoreWalletTopUpRequest $request,
-        PointConversionService $points,
-        CurrencyConversionService $conversion,
-    ): JsonResponse {
-        $baseCurrency = $conversion->baseCurrencyCode();
-        $paymentCurrency = $request->validated('currency') ?? $baseCurrency;
-        $paymentAmount = (string) $request->validated('amount');
-
-        [$usd, $exchangeRate] = $this->paymentInBaseCurrency($paymentAmount, $paymentCurrency, $baseCurrency);
-
-        return response()->json([
-            'data' => [
-                'points' => $points->usdToPoints($usd),
-                'usd' => $usd,
-                'payment_amount' => $paymentAmount,
-                'payment_currency' => $paymentCurrency,
-                'exchange_rate' => $exchangeRate,
-                'point_rate_usd' => $points->rate(),
-            ],
-        ]);
-    }
-
-    /**
-     * The base-currency value of a payment, plus the FX rate applied (null
-     * when the payment was already in base currency). Shared by store() and
-     * preview() so the preview can never disagree with what a real top-up
-     * would credit.
-     *
-     * @return array{0: string, 1: ?string}
-     */
-    private function paymentInBaseCurrency(string $paymentAmount, string $paymentCurrency, string $baseCurrency): array
-    {
-        if ($paymentCurrency === $baseCurrency) {
-            return [$paymentAmount, null];
-        }
-
-        $exchangeRate = (string) ExchangeRate::current($paymentCurrency)->rate_to_base;
-
-        return [
-            number_format((float) $paymentAmount * (float) $exchangeRate, 2, '.', ''),
-            $exchangeRate,
-        ];
     }
 }

@@ -177,6 +177,9 @@ Files: `src/add-os/modules/payments/` and `modules/members/`.
   endpoint, not in the frontend. Duplicating the floor/rate logic in
   TypeScript would violate Invariant 4 and drift the moment the rate
   changes.
+  *Superseded 2026-10-10:* the dashboard now converts locally and the
+  server verifies every top-up instead; the preview endpoint is gone. See
+  [2026-10-10-wallet-top-up-points-entry-design.md](2026-10-10-wallet-top-up-points-entry-design.md).
 - **`WalletTopUpsPage.vue`** — add a points column; keep the cash
   columns.
 - **Balance displays** — show points as the primary figure with the

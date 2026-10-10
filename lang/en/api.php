@@ -35,7 +35,8 @@ return [
     'wallet' => [
         'insufficient_balance' => 'Insufficient general balance to allocate this amount.',
         'insufficient_balance_for_plan' => 'Insufficient general balance to purchase this plan.',
-        'amount_below_one_point' => 'The amount paid is too small to credit a single point.',
+        'min_points' => 'A top-up must be at least :min points.',
+        'quote_stale' => 'Rates changed since this top-up was prepared. Review the new figures and submit again.',
     ],
 
     'system' => [

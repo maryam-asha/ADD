@@ -2,12 +2,18 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\TopUpMinimum;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
@@ -41,6 +47,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 250,
             'amount' => '25.00',
             'payment_method' => 'cash',
         ]);
@@ -64,6 +71,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
+            'points' => 500,
             'amount' => '50.00',
             'payment_method' => 'syriatel',
         ]);
@@ -81,6 +89,7 @@ class WalletTopUpControllerTest extends TestCase
         $company = Company::factory()->create();
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'points' => 100,
             'amount' => '10.00',
             'payment_method' => 'cash',
         ])->assertStatus(422);
@@ -88,6 +97,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'company_id' => $company->id,
+            'points' => 100,
             'amount' => '10.00',
             'payment_method' => 'cash',
         ])->assertStatus(422);
@@ -101,6 +111,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 100,
             'amount' => '10.00',
             'payment_method' => 'visa',
         ])->assertStatus(422);
@@ -114,6 +125,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 10,
             'amount' => '0',
             'payment_method' => 'cash',
         ])->assertStatus(422);
@@ -122,12 +134,13 @@ class WalletTopUpControllerTest extends TestCase
     public function test_top_up_rejects_an_inactive_company(): void
     {
         $this->actingAsOperations();
-        $company = Company::factory()->create(['status' => \App\Domain\Identity\Enums\CompanyStatus::Active]);
+        $company = Company::factory()->create(['status' => CompanyStatus::Active]);
         Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        $company->update(['status' => \App\Domain\Identity\Enums\CompanyStatus::Inactive]);
+        $company->update(['status' => CompanyStatus::Inactive]);
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
+            'points' => 500,
             'amount' => '50.00',
             'payment_method' => 'cash',
         ]);
@@ -174,6 +187,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 100,
             'amount' => '10.00',
             'payment_method' => 'cash',
         ])->assertForbidden();
@@ -185,24 +199,25 @@ class WalletTopUpControllerTest extends TestCase
         $member = User::factory()->create();
         $wallet = Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
 
-        \App\Domain\Finance\Models\Currency::firstOrCreate(
+        Currency::firstOrCreate(
             ['code' => 'USD'],
             ['name' => 'US Dollar', 'symbol' => '$', 'is_base' => true, 'is_active' => true]
         );
-        \App\Domain\Finance\Models\Currency::firstOrCreate(
+        Currency::firstOrCreate(
             ['code' => 'SYP'],
             ['name' => 'Syrian Pound', 'symbol' => 'LS', 'is_base' => false, 'is_active' => true]
         );
 
-        \App\Domain\Finance\Models\ExchangeRate::create([
+        ExchangeRate::create([
             'currency_code' => 'SYP',
             'rate_to_base' => '0.0000666667',
-            'source' => \App\Domain\Finance\Enums\ExchangeRateSource::Manual,
+            'source' => ExchangeRateSource::Manual,
             'effective_from' => now()->subMinute(),
         ]);
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 100,
             'amount' => '150000.00',
             'currency' => 'SYP',
             'payment_method' => 'cash',
@@ -239,12 +254,13 @@ class WalletTopUpControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 340,
             'amount' => '500000',
             'currency' => 'SYP',
             'payment_method' => 'cash',
         ]);
 
-        // 500,000 SYP -> $34.01 -> /0.10 -> 340.1 -> floor -> 340
+        // 500,000 SYP -> $34.0136 exactly -> /0.10 -> 340.136 -> floor -> 340
         $response->assertCreated()
             ->assertJsonPath('data.points_credited', 340)
             ->assertJsonPath('data.payment_currency', 'SYP')
@@ -256,23 +272,6 @@ class WalletTopUpControllerTest extends TestCase
             'payment_amount' => '500000.00',
             'performed_by_user_id' => $operator->id,
         ]);
-    }
-
-    public function test_a_payment_too_small_to_buy_one_point_is_rejected(): void
-    {
-        $member = User::factory()->create();
-        $member->assignRole('member');
-        Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
-
-        $operator = User::factory()->create();
-        $operator->assignRole('admin');
-        Sanctum::actingAs($operator, ['dashboard']);
-
-        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
-            'user_id' => $member->id,
-            'amount' => '0.05',
-            'payment_method' => 'cash',
-        ])->assertJsonValidationErrors('amount');
     }
 
     /**
@@ -290,6 +289,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 100,
             'amount' => '10.05',
             'payment_method' => 'cash',
         ]);
@@ -327,6 +327,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
+            'points' => 250,
             'amount' => '25.00',
             'payment_method' => 'cash',
         ])->assertCreated();
@@ -340,51 +341,146 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertSame('0.1000', (string) $transaction->point_rate_usd);
     }
 
-    public function test_preview_reports_the_points_a_payment_would_buy_without_writing_anything(): void
+    private function memberWithWallet(): User
     {
-        $this->actingAsOperations();
         $member = User::factory()->create();
         Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
 
-        ExchangeRate::factory()->create([
-            'currency_code' => 'SYP',
-            'rate_to_base' => '0.0000680272',
-        ]);
+        return $member;
+    }
 
-        $this->postJson('/api/v1/admin/reception/wallet-top-ups/preview', [
+    public function test_a_top_up_below_the_minimum_is_rejected(): void
+    {
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
-            'amount' => '500000',
-            'currency' => 'SYP',
+            'points' => 9,
+            'amount' => '0.90',
             'payment_method' => 'cash',
-        ])->assertOk()
-            ->assertJsonPath('data.points', 340)
-            ->assertJsonPath('data.usd', '34.01')
-            ->assertJsonPath('data.payment_currency', 'SYP')
-            ->assertJsonPath('data.point_rate_usd', '0.10');
+        ])->assertJsonValidationErrors(['points' => __('api.wallet.min_points', ['min' => 10])]);
 
-        // Preview is a pure read — nothing may land in the ledger.
         $this->assertDatabaseCount('wallet_transactions', 0);
     }
 
-    public function test_preview_applies_the_same_floor_as_a_real_top_up(): void
+    public function test_the_minimum_follows_the_setting(): void
+    {
+        app(SettingService::class)->set(TopUpMinimum::SETTING_KEY, 25, SettingValueType::Int);
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 20,
+            'amount' => '2.00',
+            'payment_method' => 'cash',
+        ])->assertJsonValidationErrors('points');
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 25,
+            'amount' => '2.50',
+            'payment_method' => 'cash',
+        ])->assertCreated();
+    }
+
+    /**
+     * Too many points would credit value nobody paid for; too few would
+     * credit less than the operator promised the member. Both are refused.
+     */
+    public function test_points_that_do_not_match_the_amount_are_rejected_and_nothing_is_written(): void
     {
         $this->actingAsOperations();
-        $member = User::factory()->create();
-        Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        $member = $this->memberWithWallet();
 
-        $this->postJson('/api/v1/admin/reception/wallet-top-ups/preview', [
+        foreach ([249, 251] as $points) {
+            $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+                'user_id' => $member->id,
+                'points' => $points,
+                'amount' => '25.00',
+                'payment_method' => 'cash',
+            ])->assertJsonValidationErrors(['points' => __('api.wallet.quote_stale')]);
+        }
+
+        $this->assertDatabaseCount('wallet_transactions', 0);
+    }
+
+    public function test_the_cents_rounding_that_over_credited_is_gone(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272']);
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        // $34.09523264 exactly. The old path rounded it to 34.10 and credited 341.
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
-            'amount' => '10.05',
+            'points' => 341,
+            'amount' => '501200',
+            'currency' => 'SYP',
             'payment_method' => 'cash',
-        ])->assertOk()
-            ->assertJsonPath('data.points', 100);
+        ])->assertJsonValidationErrors('points');
 
-        // And it refuses what a real top-up would refuse, so the dialog
-        // cannot promise a credit the store endpoint would reject.
-        $this->postJson('/api/v1/admin/reception/wallet-top-ups/preview', [
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
-            'amount' => '0.05',
+            'points' => 340,
+            'amount' => '501200',
+            'currency' => 'SYP',
+            'payment_method' => 'cash',
+        ])->assertCreated()->assertJsonPath('data.points_credited', 340);
+    }
+
+    public function test_a_rate_change_after_the_dashboard_quoted_is_rejected(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272']);
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        // The dashboard quoted 500,000 SYP as 340 points; then the rate moved
+        // so the same cash now buys 350.
+        ExchangeRate::factory()->create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000700000',
+            'effective_from' => now()->subMinute(),
+        ]);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 340,
+            'amount' => '500000',
+            'currency' => 'SYP',
+            'payment_method' => 'cash',
+        ])->assertJsonValidationErrors(['points' => __('api.wallet.quote_stale')]);
+
+        $this->assertDatabaseCount('wallet_transactions', 0);
+    }
+
+    public function test_an_amount_with_more_than_two_decimals_is_rejected(): void
+    {
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 100,
+            'amount' => '10.005',
             'payment_method' => 'cash',
         ])->assertJsonValidationErrors('amount');
+
+        // decimal:0,2 is also what keeps exponent notation away from bcmath,
+        // which would throw a ValueError (a 500) on a string like this.
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 10000,
+            'amount' => '1e3',
+            'payment_method' => 'cash',
+        ])->assertJsonValidationErrors('amount');
+    }
+
+    public function test_the_preview_endpoint_no_longer_exists(): void
+    {
+        $this->actingAsOperations();
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups/preview', [])->assertNotFound();
     }
 }

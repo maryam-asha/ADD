@@ -220,10 +220,6 @@ Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArr
 Route::post('reception/arrival-requests/{arrivalRequest}/reject', [ReceptionArrivalRequestController::class, 'reject']);
 
 Route::get('reception/wallet-balance', [WalletTopUpController::class, 'balance']);
-// Registered before the top-up route itself: should wallet-top-ups ever grow
-// a wildcard segment (`{topUp}`), a literal /preview declared after it would
-// be swallowed as an id.
-Route::post('reception/wallet-top-ups/preview', [WalletTopUpController::class, 'preview']);
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
 Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
 
