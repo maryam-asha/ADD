@@ -28,6 +28,7 @@ class UpdateCurrencyRequest extends FormRequest
             [
                 'symbol' => ['nullable', 'string', 'max:10'],
                 'decimal_places' => ['required', 'integer', 'min:0', 'max:6'],
+                'cash_step' => ['sometimes', 'numeric', 'gt:0', 'decimal:0,2'],
                 'order' => ['nullable', 'integer', 'min:0'],
             ]
         );

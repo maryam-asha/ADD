@@ -6,6 +6,7 @@ use App\Concerns\HasTranslations;
 use Database\Factories\CurrencyFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Cache;
 
 /**
  * Admin-managed currency lookup, replacing the hardcoded
@@ -25,11 +26,20 @@ class Currency extends Model
 
     protected $keyType = 'string';
 
+    /**
+     * A currency created without a step serializes the same "1.00" the
+     * column default stores, instead of null until it is re-read.
+     */
+    protected $attributes = [
+        'cash_step' => '1.00',
+    ];
+
     protected $fillable = [
         'code',
         'name',
         'symbol',
         'decimal_places',
+        'cash_step',
         'is_base',
         'is_default',
         'is_active',
@@ -41,6 +51,7 @@ class Currency extends Model
         return [
             'name' => 'array',
             'decimal_places' => 'integer',
+            'cash_step' => 'decimal:2',
             'is_base' => 'boolean',
             'is_default' => 'boolean',
             'is_active' => 'boolean',
@@ -49,7 +60,7 @@ class Currency extends Model
 
     public static function defaultCode(): string
     {
-        return \Illuminate\Support\Facades\Cache::rememberForever('default_currency_code', function () {
+        return Cache::rememberForever('default_currency_code', function () {
             return static::where('is_default', true)->value('code')
                 ?? static::where('is_base', true)->value('code')
                 ?? 'USD';
@@ -78,13 +89,13 @@ class Currency extends Model
         });
 
         static::saved(function () {
-            \Illuminate\Support\Facades\Cache::forget('default_currency_code');
-            \Illuminate\Support\Facades\Cache::forget('active_currencies_list');
+            Cache::forget('default_currency_code');
+            Cache::forget('active_currencies_list');
         });
 
         static::deleted(function (Currency $currency) {
-            \Illuminate\Support\Facades\Cache::forget('default_currency_code');
-            \Illuminate\Support\Facades\Cache::forget('active_currencies_list');
+            Cache::forget('default_currency_code');
+            Cache::forget('active_currencies_list');
 
             if ($currency->is_default || $currency->is_base) {
                 $next = static::where('code', '!=', $currency->code)->orderBy('order')->first();

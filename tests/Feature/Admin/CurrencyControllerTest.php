@@ -203,4 +203,52 @@ class CurrencyControllerTest extends TestCase
     {
         $this->getJson('/api/v1/admin/currencies')->assertUnauthorized();
     }
+
+    public function test_a_new_currency_defaults_to_a_cash_step_of_one(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/currencies', [
+            'code' => 'EUR',
+            'name' => ['en' => 'Euro', 'ar' => 'يورو'],
+            'decimal_places' => 2,
+        ])->assertCreated()->assertJsonPath('data.cash_step', '1.00');
+
+        $this->assertSame('1.00', Currency::find('EUR')->cash_step);
+    }
+
+    public function test_an_admin_can_set_a_currencys_cash_step(): void
+    {
+        $this->actingAsAdmin();
+        $currency = Currency::factory()->create(['code' => 'EUR']);
+
+        $this->patchJson("/api/v1/admin/currencies/{$currency->code}", [
+            'name' => ['en' => 'Euro', 'ar' => 'يورو'],
+            'decimal_places' => 2,
+            'cash_step' => '0.50',
+        ])->assertOk();
+
+        $this->assertSame('0.50', $currency->fresh()->cash_step);
+        $this->getJson("/api/v1/admin/currencies/{$currency->code}")->assertJsonPath('data.cash_step', '0.50');
+    }
+
+    public function test_a_cash_step_must_be_positive_with_at_most_two_decimals(): void
+    {
+        $this->actingAsAdmin();
+        $currency = Currency::factory()->create(['code' => 'EUR']);
+
+        foreach (['0', '-1', '0.005', 'abc'] as $step) {
+            $this->patchJson("/api/v1/admin/currencies/{$currency->code}", [
+                'name' => ['en' => 'Euro', 'ar' => 'يورو'],
+                'decimal_places' => 2,
+                'cash_step' => $step,
+            ])->assertJsonValidationErrors('cash_step');
+        }
+    }
+
+    public function test_existing_currencies_get_a_cash_step_of_one(): void
+    {
+        $this->assertSame('1.00', Currency::find('SYP')->cash_step);
+        $this->assertSame('1.00', Currency::find('USD')->cash_step);
+    }
 }

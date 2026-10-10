@@ -17,6 +17,7 @@ class AdminCurrencyResource extends JsonResource
             'name' => $this->name,
             'symbol' => $this->symbol,
             'decimal_places' => $this->decimal_places,
+            'cash_step' => $this->cash_step,
             'is_base' => (bool) $this->is_base,
             'is_default' => (bool) ($this->is_default ?? $this->is_base),
             'is_active' => (bool) $this->is_active,

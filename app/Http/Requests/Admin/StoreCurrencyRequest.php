@@ -28,6 +28,7 @@ class StoreCurrencyRequest extends FormRequest
                 'code' => ['required', 'string', 'size:3', 'regex:/^[A-Z]{3}$/', 'unique:currencies,code'],
                 'symbol' => ['nullable', 'string', 'max:10'],
                 'decimal_places' => ['required', 'integer', 'min:0', 'max:6'],
+                'cash_step' => ['sometimes', 'numeric', 'gt:0', 'decimal:0,2'],
                 'is_active' => ['nullable', 'boolean'],
                 'order' => ['nullable', 'integer', 'min:0'],
             ]
