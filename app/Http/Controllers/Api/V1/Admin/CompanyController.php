@@ -45,7 +45,7 @@ class CompanyController extends Controller
 
     public function show(Company $company): CompanyResource
     {
-        return new CompanyResource($company->load('provider'));
+        return new CompanyResource($company->load(['provider', 'officeLeases.space.building']));
     }
 
     /**

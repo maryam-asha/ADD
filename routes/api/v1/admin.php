@@ -292,6 +292,8 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
 
     // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
     Route::post('private-office-requests/{privateOfficeRequest}/lease', [OfficeLeaseController::class, 'store'])->middleware('permission:office-leases.create');
+    Route::get('office-leases', [OfficeLeaseController::class, 'index'])->middleware('permission:office-leases.view');
+    Route::get('office-leases/{officeLease}', [OfficeLeaseController::class, 'show'])->middleware('permission:office-leases.view');
     Route::post('office-leases/{officeLease}/terminate', [OfficeLeaseController::class, 'terminate'])->middleware('permission:office-leases.terminate');
 });
 
