@@ -704,5 +704,19 @@ return [
         'payment_voided' => 'Payment voided.',
         'too_many_decimals' => 'This currency takes at most :places decimal places.',
     ],
+    'lease' => [
+        'request_not_quoted' => 'This request must be quoted before a lease can be made from it.',
+        'request_has_no_company' => 'This request is for a new company; create the company with its lease instead.',
+        'request_is_for_existing_company' => 'This request is for an existing company; create the lease from the request instead.',
+        'company_inactive' => 'The company is not active.',
+        'not_an_office' => 'Only a private office can be leased.',
+        'office_unavailable' => 'This office is under maintenance or out of service.',
+        'office_taken' => 'This office is already leased for part of these dates.',
+        'payer_required' => 'Choose who pays: the provider or the company.',
+        'invalid_cycle' => 'The billing period must be 1, 3 or 6 months, or the whole term, and divide the term exactly.',
+        'not_active' => 'Only an active lease can be terminated.',
+        'termination_out_of_range' => 'The termination date must fall between the lease start and end dates.',
+        'terminated' => 'The lease was terminated.',
+    ],
 
 ];
