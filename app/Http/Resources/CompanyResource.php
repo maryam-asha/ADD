@@ -20,6 +20,10 @@ class CompanyResource extends JsonResource
             'status' => $this->status,
             'created_from_request_id' => $this->created_from_request_id,
             'provider_id' => $this->provider_id,
+            'provider' => $this->whenLoaded('provider', fn () => $this->provider === null ? null : [
+                'id' => $this->provider->id,
+                'name' => $this->provider->name,
+            ]),
             'created_at' => $this->created_at,
         ];
     }

@@ -4,7 +4,9 @@ use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
 use App\Http\Controllers\Api\V1\Provider\ProviderInvoiceController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
+use App\Http\Controllers\Api\V1\Provider\ProviderProfileController;
 use App\Http\Controllers\Api\V1\Provider\ProviderRequestController;
+use App\Http\Controllers\Api\V1\Provider\ProviderSummaryController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -16,6 +18,9 @@ use Illuminate\Support\Facades\Route;
  * ProviderRoutesStayIsolatedTest. Never point a route here at an Admin\ or
  * Member\ controller.
  */
+Route::get('profile', [ProviderProfileController::class, 'show']);
+Route::get('summary', [ProviderSummaryController::class, 'show']);
+
 Route::get('companies', [ProviderCompanyController::class, 'index']);
 Route::get('companies/{company}', [ProviderCompanyController::class, 'show']);
 Route::delete('companies/{company}/members/{user}', [ProviderCompanyController::class, 'destroyMember']);

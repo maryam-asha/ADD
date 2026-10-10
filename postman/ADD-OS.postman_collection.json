@@ -10920,7 +10920,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/companies",
+                                    "raw": "{{base_url}}/api/v1/admin/companies?provider_id=1&direct=1&status=active&branch_id=1&search=acme&per_page=15",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -10929,8 +10929,47 @@
                                         "v1",
                                         "admin",
                                         "companies"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "provider_id",
+                                            "value": "1",
+                                            "description": "Companies of this provider",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "direct",
+                                            "value": "1",
+                                            "description": "Only companies with no provider",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "active",
+                                            "description": "active | inactive",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "1",
+                                            "description": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": "acme",
+                                            "description": "Part of the legal name",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "description": "1-100",
+                                            "disabled": true
+                                        }
                                     ]
-                                }
+                                },
+                                "description": "Paginated (per_page, default 15). Filters: provider_id, direct=1 (companies with no provider; cannot be combined with provider_id), status (active|inactive), branch_id, search (legal name, literal match). Each company carries provider {id, name} or null."
                             }
                         },
                         {
@@ -24472,6 +24511,68 @@
             "name": "Provider (Dashboard)",
             "description": "Service-provider surface (docs/decisions/service-providers.md): /api/v1/provider, dashboard token of an account holding the provider role. A company that is not this provider answers 404.",
             "item": [
+                {
+                    "name": "Profile",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/profile",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "profile"
+                            ]
+                        },
+                        "description": "The provider this account works for: id, name, contract_ref, payment_terms_days (null = the default terms), status, companies_count."
+                    }
+                },
+                {
+                    "name": "Summary (home page)",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/summary",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "summary"
+                            ]
+                        },
+                        "description": "Home-page counts: companies {total, active}, employees, pending_requests, open_office_requests, invoices {open, overdue, outstanding[]}. outstanding is one row per currency (never summed across currencies): owed_by_provider, owed_by_companies, overdue."
+                    }
+                },
                 {
                     "name": "List Companies",
                     "request": {

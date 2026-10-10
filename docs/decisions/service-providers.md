@@ -177,6 +177,22 @@ Also:
   (`api.invoice.amount_too_small`). Cancelling is refused while any active
   (non-voided) payment exists.
 
+## Dashboard gaps closed before Phase 3
+
+- **`GET provider/profile`** — the account's own provider (`ProviderResource`
+  without its user list). `auth/me` stays about the user only.
+- **`GET provider/summary`** — the portal home page: company counts,
+  employees, pending requests, open office requests, and open/overdue invoice
+  counts with what is outstanding **per currency** (owed by the provider,
+  owed by its companies, overdue), never summed across currencies. Reports
+  proper remain Phase 5.
+- **`GET admin/companies`** is now **paginated** (`per_page`, default 15 —
+  it used to return every company) and filters by `provider_id`, `direct=1`
+  (no provider; exclusive with `provider_id`), `status`, `branch_id` and
+  `search` (legal name, `%`/`_` matched literally). Each company carries
+  `provider {id, name}` or `null`. Dashboard screens that read the whole list
+  from `data` must now page through it.
+
 ## Phase order
 
 1 core and approvals (shipped) -> 2 invoicing (this section) -> 3 office
