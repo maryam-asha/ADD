@@ -16,6 +16,7 @@ class UpdateProviderRequest extends FormRequest
         return [
             'name' => ['sometimes', 'string', 'max:255'],
             'contract_ref' => ['sometimes', 'string', 'max:255'],
+            'payment_terms_days' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

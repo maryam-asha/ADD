@@ -29,6 +29,14 @@ class ProviderRequestResource extends JsonResource
             'reviewed_at' => $this->reviewed_at?->toIso8601String(),
             'rejection_reason' => $this->rejection_reason,
             'result_id' => $this->result_id,
+            'invoice_preview' => $this->invoice_preview,
+            'invoice' => $this->relationLoaded('invoice') && $this->invoice !== null ? [
+                'id' => $this->invoice->id,
+                'reference' => $this->invoice->reference,
+                'status' => $this->invoice->status,
+                'amount' => (string) $this->invoice->amount,
+                'currency' => $this->invoice->currency,
+            ] : null,
             'created_at' => $this->created_at?->toIso8601String(),
         ];
     }

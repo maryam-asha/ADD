@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Invoicing\Data\InvoiceTerms;
+use App\Domain\Invoicing\Services\InvoiceIssuer;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Exceptions\ProviderRequestException;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -39,20 +41,44 @@ class ProviderRequestController extends Controller
         );
     }
 
-    public function show(ProviderRequest $providerRequest): ProviderRequestResource
+    public function show(ProviderRequest $providerRequest, InvoiceIssuer $invoices): ProviderRequestResource
     {
-        return new ProviderRequestResource($providerRequest->load(['provider', 'company', 'submitter']));
+        $providerRequest->load(['provider', 'company', 'submitter', 'invoice']);
+        $providerRequest->setAttribute('invoice_preview', $this->preview($providerRequest, $invoices));
+
+        return new ProviderRequestResource($providerRequest);
     }
 
     public function approve(ApproveProviderRequestRequest $request, ProviderRequest $providerRequest): JsonResponse
     {
         try {
-            $this->requests->approve($providerRequest, $request->user(), $request->validated());
+            $this->requests->approve(
+                $providerRequest,
+                $request->user(),
+                $request->safe()->only(['override_capacity']),
+                InvoiceTerms::fromArray($request->validated()),
+            );
         } catch (ProviderRequestException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         return response()->json(['message' => __('api.admin.provider_request_approved')]);
+    }
+
+    /**
+     * What approving would invoice, for a pending billable request; null
+     * otherwise. A currency with no rate is not an error here - the
+     * preview is in the base currency.
+     */
+    private function preview(ProviderRequest $providerRequest, InvoiceIssuer $invoices): ?array
+    {
+        if (! $providerRequest->isPending()) {
+            return null;
+        }
+
+        $draft = $invoices->draftFor($providerRequest);
+
+        return $draft === null ? null : $invoices->quote($draft, new InvoiceTerms)->toArray();
     }
 
     public function reject(RejectProviderRequestRequest $request, ProviderRequest $providerRequest): JsonResponse

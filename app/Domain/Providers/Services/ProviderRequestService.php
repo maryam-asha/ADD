@@ -4,6 +4,9 @@ namespace App\Domain\Providers\Services;
 
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
+use App\Domain\Invoicing\Data\InvoiceTerms;
+use App\Domain\Invoicing\Exceptions\InvoicingException;
+use App\Domain\Invoicing\Services\InvoiceIssuer;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Exceptions\ProviderRequestException;
@@ -21,7 +24,10 @@ use Illuminate\Support\Facades\DB;
  */
 class ProviderRequestService
 {
-    public function __construct(private readonly ProviderRequestHandlers $handlers) {}
+    public function __construct(
+        private readonly ProviderRequestHandlers $handlers,
+        private readonly InvoiceIssuer $invoices,
+    ) {}
 
     public function submit(Provider $provider, User $submitter, ProviderRequestType $type, ?int $companyId, array $payload): ProviderRequest
     {
@@ -80,15 +86,24 @@ class ProviderRequestService
      * Carries the request out under a row lock. Everything that may have
      * changed since submission is checked again: the provider and the
      * company still active, the company still this provider's, and the
-     * handler's own preconditions. A refusal leaves the request pending.
+     * handler's own preconditions. An assignment or a top-up also issues its
+     * invoice in the same transaction. A refusal leaves the request pending.
      */
-    public function approve(ProviderRequest $request, User $reviewer, array $overrides = []): ProviderRequest
+    public function approve(ProviderRequest $request, User $reviewer, array $overrides = [], ?InvoiceTerms $terms = null): ProviderRequest
     {
-        $approved = DB::transaction(function () use ($request, $reviewer, $overrides) {
+        $approved = DB::transaction(function () use ($request, $reviewer, $overrides, $terms) {
             $locked = $this->lockPending($request);
             $this->assertStillValid($locked);
 
             $resultId = $this->handlers->for($locked->type)->handle($locked, $reviewer, $overrides);
+
+            // Phase 2: an assignment or a top-up is invoiced in the same
+            // transaction - a pricing refusal undoes the grant with it.
+            try {
+                $this->invoices->issueForProviderRequest($locked, $reviewer, $terms ?? new InvoiceTerms);
+            } catch (InvoicingException $e) {
+                throw new ProviderRequestException($e->messageKey, $e->status, $e->params);
+            }
 
             $locked->forceFill([
                 'status' => ProviderRequestStatus::Approved,
