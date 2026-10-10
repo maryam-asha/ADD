@@ -278,6 +278,10 @@
             "value": ""
         },
         {
+            "key": "office_lease_id",
+            "value": ""
+        },
+        {
             "key": "invoice_payment_id",
             "value": ""
         }
@@ -5999,6 +6003,48 @@
                                 },
                                 "description": "Gap found in the Task 15 Postman audit. Company-admin only (CompanyPolicy::manageMembers) -- reallocates from the company wallet's general balance, it does not add new money. restricted_space_id is required when category is space_specific and prohibited otherwise; category general is rejected."
                             }
+                        },
+                        {
+                            "name": "Company Office Leases",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/companies/{{company_id}}/office-leases",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "companies",
+                                        "{{company_id}}",
+                                        "office-leases"
+                                    ]
+                                },
+                                "description": "Company admin only. Office and dates, no prices."
+                            }
                         }
                     ]
                 },
@@ -10768,7 +10814,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"prospect_name\": \"Levant Textiles LLC\",\n  \"contact\": \"+963 999 111 222\"\n}",
+                                    "raw": "{\n  \"prospect_name\": \"Levant Textiles LLC\",\n  \"contact\": \"+963 999 111 222\",\n  \"company_id\": null,\n  \"payer\": null\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -10787,7 +10833,7 @@
                                         "private-office-requests"
                                     ]
                                 },
-                                "description": "Starts at status 'requested'."
+                                "description": "Starts at status 'requested'. company_id: another office for an existing company."
                             }
                         },
                         {
@@ -11007,7 +11053,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"private_office_request_id\": {{private_office_request_id}},\n  \"legal_name\": \"Levant Textiles LLC\",\n  \"contract_ref\": \"C-2026-0001\"\n}",
+                                    "raw": "{\n  \"private_office_request_id\": \"{{private_office_request_id}}\",\n  \"legal_name\": \"Acme LLC\",\n  \"contract_ref\": \"C-2026-013\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -11026,7 +11072,7 @@
                                         "companies"
                                     ]
                                 },
-                                "description": "422 if private_office_request_id isn't currently 'quoted' \u00e2\u20ac\u201d run Private Office Requests/Mark as Quoted first. Note: branch_id is optional; if omitted, the backend ResolveDefaultBranch middleware automatically injects the default branch."
+                                "description": "Creates the company, its wallet and its first lease; the branch is the office's. 422 if private_office_request_id isn't currently 'quoted' - run Private Office Requests/Mark as Quoted first."
                             }
                         },
                         {
@@ -11104,6 +11150,203 @@
                                     ]
                                 },
                                 "description": "status must be \"active\" or \"inactive\" \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c anything else is a 422. Returns `{\"message\": \"...\"}` on success, not the updated resource."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Office Leases",
+                    "item": [
+                        {
+                            "name": "List Office Leases",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/office-leases?company_id=&provider_id=&space_id=&branch_id=&status=&ending_within_days=&per_page=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "office-leases"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "company_id",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "provider_id",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "space_id",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "branch_id",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "ending_within_days",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Permission office-leases.view. Filters are optional; status is active|ended|terminated."
+                            }
+                        },
+                        {
+                            "name": "Show Office Lease",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/office-leases/{{office_lease_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "office-leases",
+                                        "{{office_lease_id}}"
+                                    ]
+                                },
+                                "description": "Permission office-leases.view. The lease with its periods, each period's invoice and the door access state."
+                            }
+                        },
+                        {
+                            "name": "Create Lease from Request",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/private-office-requests/{{private_office_request_id}}/lease",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "private-office-requests",
+                                        "{{private_office_request_id}}",
+                                        "lease"
+                                    ]
+                                },
+                                "description": "Permission office-leases.create. For an existing company: the request must be 'quoted' and carry company_id. A new company's first lease is created by Companies/Create Company.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"contract_ref\": \"C-2026-014\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\",\n  \"billed_to\": \"provider\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Terminate Lease",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/office-leases/{{office_lease_id}}/terminate",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "office-leases",
+                                        "{{office_lease_id}}",
+                                        "terminate"
+                                    ]
+                                },
+                                "description": "Permission office-leases.terminate. terminated_on is the first day without access (access runs through the day before); periods starting on or after it are cancelled.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"terminated_on\": \"2027-05-01\",\n  \"reason\": \"Contract clause 7\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             }
                         }
                     ]
@@ -24722,7 +24965,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"prospect_name\": \"Acme\",\n    \"contact\": \"0944444444\"\n}",
+                            "raw": "{\n    \"prospect_name\": \"Acme\",\n    \"contact\": \"0944444444\",\n    \"company_id\": \"{{provider_company_id}}\",\n    \"payer\": \"provider\"\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -24741,7 +24984,7 @@
                                 "office-requests"
                             ]
                         },
-                        "description": "Rides the private-office pipeline; operations quotes and contracts it."
+                        "description": "Rides the private-office pipeline; operations quotes and contracts it. company_id optional - omit for a new client company; payer required."
                     }
                 },
                 {
@@ -25212,6 +25455,102 @@
                             ]
                         },
                         "description": "Another provider's invoice answers 404."
+                    }
+                },
+                {
+                    "name": "List Office Leases",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/office-leases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "office-leases"
+                            ]
+                        },
+                        "description": "Leases of the provider's current companies, with prices and invoices."
+                    }
+                },
+                {
+                    "name": "Show Office Lease",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/office-leases/{{office_lease_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "office-leases",
+                                "{{office_lease_id}}"
+                            ]
+                        },
+                        "description": "404 for a lease of a company that is not the provider's."
+                    }
+                },
+                {
+                    "name": "Company Office Leases",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/companies/{{provider_company_id}}/office-leases",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "companies",
+                                "{{provider_company_id}}",
+                                "office-leases"
+                            ]
+                        },
+                        "description": "404 when the company is not this provider's."
                     }
                 }
             ]

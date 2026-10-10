@@ -1,6 +1,6 @@
 # تصميم: عقود إيجار المكاتب الخاصة (المرحلة 3)
 
-**الحالة:** تصميم معتمد بالمحادثة 2026-10-10، بانتظار مراجعة هذا الملف. **المالكة:** Maryam Asha.
+**الحالة:** معتمد ومنفّذ (الخطة docs/superpowers/plans/2026-10-11-office-leases.md). **المالكة:** Maryam Asha.
 **يبني على:** `docs/superpowers/specs/2026-10-08-service-providers-design.md` (المرحلة 1) و`docs/superpowers/specs/2026-10-10-provider-invoicing-design.md` (المرحلة 2)، وكلاهما منفّذ.
 الكود والتعليقات والتوثيق في المستودع بالإنجليزية، والتواصل مع المستخدمة بالعربية.
 
@@ -85,6 +85,7 @@
 - **لا تداخل:** لا عقدان `active` لنفس المكتب بتواريخ وصول متداخلة. يُفحص داخل المعاملة بعد `lockForUpdate` على صف المساحة، فطلبان متزامنان لنفس المكتب يُرفض ثانيهما.
 - **المساحة:** `space_type = business` و`status = active` (ليست `maintenance`/`retired`).
 - **المكتب المؤجَّر** يختفي من قائمة المكاتب المتاحة في `SpaceBrowseService` طوال مدة وصول عقده.
+- مكتب في الصيانة: لا يُصدر له رمز؛ رموز قفله تُلغى كما لأي حجز، ويُعاد الرمز في أول تشغيل يومي بعد عودته.
 
 ## التدفق
 
@@ -99,7 +100,7 @@
 1. **`POST admin/companies`** (الحالي، لطلب بلا `company_id`): يأخذ مع بيانات الشركة حقول العقد: `space_id`، `starts_on`، `duration_months`، `billing_cycle_months`، `monthly_amount`، `currency`، و`billed_to` (لطلبات المزوّد؛ افتراضه `payer` الطلب). **فرع الشركة = فرع المكتب**؛ حقل `branch_id` الحالي يُشتق من المساحة ولا يُطلب.
 2. **`POST admin/private-office-requests/{request}/lease`** (جديد، لطلب فيه `company_id`): حقول العقد فقط و`contract_ref`. المكتب يمكن أن يكون في **أي فرع**.
 
-**في معاملة واحدة:** (الشركة ومحفظتها إن كانت جديدة) ← قفل المساحة وفحص التداخل ← العقد ← كل فتراته ← **فاتورة الفترة الأولى** عبر `InvoiceIssuer` ← الطلب `contracted` مع `contract_ref` و`converted_company_id`. ثم **بعد** نجاح المعاملة: إن كان `starts_on ≤ اليوم` يصدر رمز الباب فوراً (فشل خدمة الأقفال لا يُبطل العقد؛ المهمة اليومية تعيد المحاولة).
+**في معاملة واحدة:** (الشركة ومحفظتها إن كانت جديدة) ← قفل المساحة وفحص التداخل ← العقد ← كل فتراته ← **فاتورة الفترة الأولى، وفاتورة كل فترة بدأت قبل اليوم (عقد بتاريخ سابق)** عبر `InvoiceIssuer` ← الطلب `contracted` مع `contract_ref` و`converted_company_id`. ثم **بعد** نجاح المعاملة: إن كان `starts_on ≤ اليوم` يصدر رمز الباب فوراً (فشل خدمة الأقفال لا يُبطل العقد؛ المهمة اليومية تعيد المحاولة).
 
 **الرفض (422 برسالة مترجمة في `lang/{en,ar}/api.php` تحت `lease`):**
 - الطلب ليس `quoted`.
@@ -135,15 +136,16 @@
 - **مربوط بالعقد** (`office_lease_id`) والقفل من `lockFor($lease->space)`.
 - **يصدر مفعّلاً** (`status = activated`، `activated_at = now`، `must_activate_by` غير ذي معنى): رموز الحجوزات تحتاج تأكيد وصول من الكشك خلال 24 ساعة وإلا يسقطها `expireOverdue()`؛ هذا لا يصح لمكتب مؤجَّر. يجب أن يتخطى `expireOverdue()` رموز العقود.
 - **الصلاحية حتى نهاية الوصول:** `expires_at` = نهاية يوم `accessEndsOn()`، ونافذة TTLock كذلك (بدل 5 سنوات).
-- **من يدخل:** `UnlockService` يقبل اليوم منحة الشركة لأعضائها الذين `door_access_enabled = true` — بلا تغيير. مدير الشركة يرى رمز لوحة المفاتيح في استجابة عقود الأعضاء.
+- **من يدخل:** `UnlockService` يقبل اليوم منحة الشركة لأعضائها الذين `door_access_enabled = true` — بلا تغيير. لا رمز لوحة مفاتيح في أي استجابة لتطبيق الأعضاء (قرار مقفل: LockCredentialsNeverReachMemberTest)؛ الأعضاء يفتحون الباب من التطبيق.
 - **مكتب بلا قفل:** لا يُرفض العقد؛ لا يصدر رمز، وتعرض استجابة الإدارة `access_warning: "no_lock"`.
 - **الإلغاء:** دالة `revokeForLease(OfficeLease)` تحذف الرمز من TTLock وتجعله `revoked`.
 
 ### الإنهاء الاستثنائي
 `POST admin/office-leases/{lease}/terminate` بـ `terminated_on` و`reason`، صلاحية `office-leases.terminate`. تحت قفل صف العقد:
+- `terminated_on` هو **أول يوم بلا دخول**: الدخول حتى اليوم السابق له. المسموح: من تاريخ البداية حتى تاريخ النهاية. تُلغى الفترات التي تبدأ في terminated_on أو بعده.
 - يُرفض إن لم يكن `active`، أو `terminated_on` قبل `starts_on` أو بعد `ends_on`.
 - `status = terminated` مع التاريخ والفاعل والسبب.
-- كل فترة `upcoming` **تبدأ بعد** `terminated_on` ← `cancelled`. ما يبدأ في `terminated_on` أو قبله ولم يصدر بعد (إنهاء بتاريخ مستقبلي) يصدر في موعده كالمعتاد.
+- كل فترة `upcoming` **تبدأ في** `terminated_on` أو بعده ← `cancelled`. ما يبدأ في `terminated_on` أو قبله ولم يصدر بعد (إنهاء بتاريخ مستقبلي) يصدر في موعده كالمعتاد.
 - إن كان `terminated_on ≤ اليوم`: إلغاء الرمز فوراً (بعد المعاملة؛ الفشل تعيده المهمة). وإلا تلغيه المهمة صباح ذلك اليوم.
 - الفواتير الصادرة تبقى. يُسجَّل `lease_terminated` في سجل النشاط.
 
@@ -170,7 +172,7 @@
 
 ### تطبيق الأعضاء
 - `GET member/companies/{company}/office-leases` — لمن له `is_admin` على الشركة (`CompanyPolicy`)، وإلا 403.
-- المعروض: المرجع، المكتب، فرعه، `starts_on`، `ends_on`/`terminated_on`، الحالة، ورمز لوحة المفاتيح إن كان فعّالاً. **لا أسعار، ولا فترات، ولا فواتير** — `Resource` منفصل لا يحتوي هذه الحقول أصلاً.
+- المعروض: المرجع، المكتب، فرعه، `starts_on`، `ends_on`/`terminated_on`، الحالة. **لا أسعار، ولا فترات، ولا فواتير** — `Resource` منفصل لا يحتوي هذه الحقول أصلاً.
 
 ## البنية
 - نطاق جديد `App\Domain\Leasing`: `Models/{OfficeLease,OfficeLeasePeriod}`، `Enums/{OfficeLeaseStatus,LeasePeriodStatus}`، `Services/{OfficeLeaseService,LeaseScheduleBuilder,LeaseDailyRunner}`، `Data/LeaseTerms`، `Exceptions/LeasingException`.

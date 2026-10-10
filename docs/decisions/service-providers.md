@@ -195,12 +195,11 @@ Also:
 
 ## Phase order
 
-1 core and approvals (shipped) -> 2 invoicing (this section) -> 3 office
-leases -> 4 auto-renewal -> 5 reports.
+1 core and approvals (shipped) -> 2 invoicing (this section) -> 3 office leases (shipped — docs/decisions/office-leases.md) -> 4 auto-renewal -> 5 reports.
 
 ## Explicitly not done here
 
-- **Office leases (Phase 3)**, **auto-renewal (Phase 4)**, **reports (Phase 5)**.
+- **auto-renewal (Phase 4)**, **reports (Phase 5)**.
 - No per-provider contractual discount (deferred until it recurs).
 
 ## Deploy
