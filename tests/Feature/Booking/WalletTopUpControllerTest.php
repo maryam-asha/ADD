@@ -455,6 +455,32 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertDatabaseCount('wallet_transactions', 0);
     }
 
+    /**
+     * Spec §6: a rate update too small to move the floor must not strand the
+     * dashboard's quote. 500,000 SYP is 340.136 points at the first rate and
+     * 340.136...+ at the second — still 340 — so the same request succeeds.
+     */
+    public function test_a_rate_change_too_small_to_move_the_floor_still_succeeds(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272']);
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        ExchangeRate::factory()->create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000680273',
+            'effective_from' => now()->subMinute(),
+        ]);
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 340,
+            'amount' => '500000',
+            'currency' => 'SYP',
+            'payment_method' => 'cash',
+        ])->assertCreated()->assertJsonPath('data.points_credited', 340);
+    }
+
     public function test_an_amount_with_more_than_two_decimals_is_rejected(): void
     {
         $this->actingAsOperations();
@@ -500,7 +526,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $response = $this->getJson("/api/v1/admin/reception/wallet-balance?user_id={$member->id}")->assertOk();
 
-        $response->assertJsonPath('data.top_up.point_rate_usd', '0.10')
+        $response->assertJsonPath('data.top_up.point_rate_usd', '0.1000')
             ->assertJsonPath('data.top_up.min_points', 25);
 
         $currencies = collect($response->json('data.top_up.currencies'))->keyBy('code');
@@ -510,5 +536,23 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertSame(2, $currencies['SYP']['decimal_places']);
         $this->assertSame('1', $currencies['USD']['rate_to_base']);
         $this->assertSame('1.00', $currencies['USD']['cash_step']);
+    }
+
+    /**
+     * The dashboard's exact arithmetic parses only plain decimals, so the
+     * server decides the published form whatever an admin typed.
+     */
+    public function test_the_balance_publishes_the_point_rate_as_a_plain_four_decimal_string(): void
+    {
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        foreach (['.05' => '0.0500', '5.' => '5.0000', '+0.10' => '0.1000', '0.1' => '0.1000'] as $stored => $published) {
+            app(SettingService::class)->set('point.rate_usd', $stored, SettingValueType::String);
+
+            $this->getJson("/api/v1/admin/reception/wallet-balance?user_id={$member->id}")
+                ->assertOk()
+                ->assertJsonPath('data.top_up.point_rate_usd', $published);
+        }
     }
 }

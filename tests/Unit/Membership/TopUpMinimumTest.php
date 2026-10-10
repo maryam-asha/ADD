@@ -25,6 +25,17 @@ class TopUpMinimumTest extends TestCase
         $this->assertSame(25, app(TopUpMinimum::class)->points());
     }
 
+    /**
+     * The API refuses anything below 1, but a stored 0 (a direct write) must
+     * not let a 0-point top-up record cash and credit nothing.
+     */
+    public function test_a_stored_zero_reads_as_one(): void
+    {
+        app(SettingService::class)->set(TopUpMinimum::SETTING_KEY, 0, SettingValueType::Int);
+
+        $this->assertSame(1, app(TopUpMinimum::class)->points());
+    }
+
     /** The settings page can only edit a row that exists, so the seeder must create it. */
     public function test_the_setting_seeder_creates_the_row_the_settings_page_edits(): void
     {

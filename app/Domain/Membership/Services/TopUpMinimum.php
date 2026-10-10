@@ -18,8 +18,13 @@ class TopUpMinimum
 
     public function __construct(private readonly SettingService $settings) {}
 
+    /**
+     * Never below 1: the API refuses a smaller value, but a stored 0 (only
+     * reachable by a non-API write) would let a 0-point top-up record cash
+     * and credit nothing.
+     */
     public function points(): int
     {
-        return (int) $this->settings->get(self::SETTING_KEY, self::DEFAULT_POINTS);
+        return max(1, (int) $this->settings->get(self::SETTING_KEY, self::DEFAULT_POINTS));
     }
 }

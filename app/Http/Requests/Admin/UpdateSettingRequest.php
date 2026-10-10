@@ -25,7 +25,9 @@ class UpdateSettingRequest extends FormRequest
         }
 
         if ($this->targetSetting()->key === PointConversionService::SETTING_KEY) {
-            return ['value' => ['required', 'numeric', 'gt:0', 'decimal:0,4']];
+            // `numeric|decimal:0,4` alone also lets `.05`, `5.` and `+0.10`
+            // through; the regex keeps the stored string a plain decimal.
+            return ['value' => ['required', 'numeric', 'gt:0', 'decimal:0,4', 'regex:/^\d+(\.\d{1,4})?$/']];
         }
 
         if ($this->targetSetting()->key === TopUpMinimum::SETTING_KEY) {

@@ -62,18 +62,19 @@ and logged but never read back into a balance**. They record what was
 owed at a moment in time, not a spendable balance. Converting them is a
 separate schema change with USD assertions across five test files.
 
-## 4. The FX leg still uses float
+## 4. The FX leg still uses float — ✅ resolved for the credit path 2026-10-10
 
-The point conversion itself is strictly bcmath, so Invariant 5 holds at
-the point boundary. But the SYP→USD leg upstream of it still does
-`(float) $amount * (float) $rate`, carried over from pre-existing code.
+Resolved for the credit path on 2026-10-10: top-up credits now go through
+`CurrencyConversionService::toBaseExact()` +
+`PointConversionService::currencyToPoints()` (bcmath, floored once), see
+[2026-10-10-wallet-top-up-points-entry-design.md](../superpowers/specs/2026-10-10-wallet-top-up-points-entry-design.md).
+The two float call sites this section recorded (a validator-side check and
+a controller-side `paymentInBaseCurrency()`) are gone, so there is no
+longer a second computation that could desync "will this be rejected" from
+"what actually gets credited."
 
-There are also two independent call sites computing it —
-`StoreWalletTopUpRequest::withValidator()` and
-`WalletTopUpController::paymentInBaseCurrency()`. They agree today (both
-round to 2dp off the same rate), but a future change to one rounding
-rule without the other would desync "will this be rejected" from "what
-actually gets credited."
+Display conversion is unchanged: `pointsToCurrency()` still goes through
+the float `convert()`. It only renders a figure and never writes a balance.
 
 ## 5. `PointRateIsNeverFloatTest` has a blind spot
 

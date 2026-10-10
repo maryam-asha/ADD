@@ -30,6 +30,17 @@ class PointConversionServiceTest extends TestCase
         $this->assertSame('0.10', $this->points->rate());
     }
 
+    public function test_the_published_rate_is_always_a_plain_four_decimal_string(): void
+    {
+        $this->assertSame('0.1000', $this->points->publishedRate());
+
+        foreach (['.05' => '0.0500', '5.' => '5.0000', '+0.10' => '0.1000', '12.3456' => '12.3456'] as $stored => $published) {
+            app(SettingService::class)->set('point.rate_usd', $stored, SettingValueType::String);
+
+            $this->assertSame($published, app(PointConversionService::class)->publishedRate());
+        }
+    }
+
     public function test_it_converts_points_to_usd(): void
     {
         $this->assertSame('50.00', $this->points->pointsToUsd(500));

@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Admin;
 
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingValueType;
@@ -153,5 +154,29 @@ class SettingControllerTest extends TestCase
 
         $this->patchJson('/api/v1/admin/settings/wallet.top_up_min_points', ['value' => 25])->assertOk();
         $this->assertSame(25, app(TopUpMinimum::class)->points());
+    }
+
+    /**
+     * `numeric|decimal:0,4` alone also accepts `.05`, `5.` and `+0.10`, which
+     * the dashboard's exact arithmetic cannot parse — only plain decimals.
+     */
+    public function test_the_point_rate_must_be_a_plain_decimal_of_at_most_four_places(): void
+    {
+        app(SettingService::class)->set(PointConversionService::SETTING_KEY, '0.10', SettingValueType::String);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        foreach (['.05', '5.', '+0.10', '0.00001', '-1', '0', 'abc', '1e-2'] as $invalid) {
+            $this->patchJson('/api/v1/admin/settings/point.rate_usd', ['value' => $invalid])
+                ->assertJsonValidationErrors('value');
+        }
+
+        $this->assertSame('0.10', app(PointConversionService::class)->rate());
+
+        foreach (['0.05', '0.0500', '5', '12.5'] as $valid) {
+            $this->patchJson('/api/v1/admin/settings/point.rate_usd', ['value' => $valid])->assertOk();
+            $this->assertSame($valid, app(PointConversionService::class)->rate());
+        }
     }
 }

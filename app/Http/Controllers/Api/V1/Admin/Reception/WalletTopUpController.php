@@ -235,7 +235,7 @@ class WalletTopUpController extends Controller
         }
 
         return [
-            'point_rate_usd' => $points->rate(),
+            'point_rate_usd' => $points->publishedRate(),
             'min_points' => $minimum->points(),
             'currencies' => $currencies,
         ];

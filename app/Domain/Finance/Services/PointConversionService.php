@@ -39,6 +39,16 @@ class PointConversionService
     }
 
     /**
+     * The rate as clients receive it: always a plain 4-decimal string
+     * ("0.1000"), whatever form an admin typed it in. The dashboard's
+     * exact arithmetic parses only plain decimals.
+     */
+    public function publishedRate(): string
+    {
+        return bcadd($this->rate(), '0', 4);
+    }
+
+    /**
      * Exact, unrounded USD value of a point count. Accepts negatives —
      * the ledger stores debits as negative integers and a refund needs
      * to render them.
