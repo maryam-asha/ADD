@@ -292,6 +292,7 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
 
     // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
     Route::post('private-office-requests/{privateOfficeRequest}/lease', [OfficeLeaseController::class, 'store'])->middleware('permission:office-leases.create');
+    Route::post('office-leases/{officeLease}/terminate', [OfficeLeaseController::class, 'terminate'])->middleware('permission:office-leases.terminate');
 });
 
 // Mobile client crash/error reports (ingested unauthenticated from

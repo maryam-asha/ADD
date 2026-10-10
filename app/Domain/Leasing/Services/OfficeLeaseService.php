@@ -205,4 +205,65 @@ class OfficeLeaseService
 
         return $chosen ?? $request->payer ?? throw new LeasingException('api.lease.payer_required');
     }
+
+    /**
+     * Ends an active lease early (spec "Exceptional termination").
+     * $terminatedOn is the first day without access; it may be the start
+     * date (no access at all) up to the end date. Periods starting on or
+     * after it are cancelled; issued invoices stay. The door closes now
+     * when the date has come, else on the daily run of that date.
+     */
+    public function terminate(OfficeLease $lease, string $terminatedOn, string $reason, User $actor): OfficeLease
+    {
+        $lease = DB::transaction(function () use ($lease, $terminatedOn, $reason, $actor) {
+            $locked = OfficeLease::query()->whereKey($lease->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== OfficeLeaseStatus::Active) {
+                throw new LeasingException('api.lease.not_active', 409);
+            }
+
+            if ($terminatedOn < $locked->starts_on->toDateString() || $terminatedOn > $locked->ends_on->toDateString()) {
+                throw new LeasingException('api.lease.termination_out_of_range');
+            }
+
+            $locked->update([
+                'status' => OfficeLeaseStatus::Terminated,
+                'terminated_on' => $terminatedOn,
+                'terminated_by' => $actor->id,
+                'termination_reason' => $reason,
+            ]);
+
+            OfficeLeasePeriod::query()
+                ->where('office_lease_id', $locked->id)
+                ->where('status', LeasePeriodStatus::Upcoming)
+                ->whereDate('starts_on', '>=', $terminatedOn)
+                ->update(['status' => LeasePeriodStatus::Cancelled]);
+
+            return $locked;
+        });
+
+        activity()->causedBy($actor)->performedOn($lease)->withProperties([
+            'terminated_on' => $terminatedOn,
+            'reason' => $reason,
+        ])->log('lease_terminated');
+
+        if ($terminatedOn <= now()->toDateString()) {
+            $this->closeDoor($lease);
+        }
+
+        return $lease;
+    }
+
+    /** Revokes the lease's live grants. Never throws; a failure is logged. */
+    public function closeDoor(OfficeLease $lease): void
+    {
+        try {
+            $this->passcodes->revokeForLease($lease);
+        } catch (\Throwable $e) {
+            Log::error('Failed to revoke the office lock grant of a lease', [
+                'office_lease_id' => $lease->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
 }
