@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Provider\Concerns;
 
 use App\Domain\Identity\Models\Company;
+use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Providers\Models\Provider;
 use App\Http\Middleware\EnsureActiveProvider;
 use Illuminate\Http\Request;
@@ -23,5 +24,11 @@ trait ActsForProvider
     protected function authorizeCompany(Request $request, Company $company): void
     {
         abort_if(Gate::denies('provider.manage-company', $company), 404);
+    }
+
+    /** 404, as for companies: a provider must not learn another provider's invoice exists. */
+    protected function authorizeInvoice(Request $request, Invoice $invoice): void
+    {
+        abort_unless($invoice->provider_id === $this->provider($request)->id, 404);
     }
 }

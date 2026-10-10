@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
+use App\Http\Controllers\Api\V1\Provider\ProviderInvoiceController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
 use App\Http\Controllers\Api\V1\Provider\ProviderRequestController;
@@ -27,3 +28,6 @@ Route::get('requests', [ProviderRequestController::class, 'index']);
 Route::post('requests', [ProviderRequestController::class, 'store']);
 Route::get('requests/{providerRequest}', [ProviderRequestController::class, 'show']);
 Route::patch('requests/{providerRequest}/cancel', [ProviderRequestController::class, 'cancel']);
+
+Route::get('invoices', [ProviderInvoiceController::class, 'index']);
+Route::get('invoices/{invoice}', [ProviderInvoiceController::class, 'show']);

@@ -7,8 +7,8 @@ use Tests\TestCase;
 /**
  * docs/decisions/service-providers.md: the provider surface never borrows
  * an admin or member controller, and every provider controller that takes
- * a company checks it is the provider's own (authorizeCompany — 404
- * otherwise). Written prose is a request, not a guarantee (PRD §9).
+ * a company or an invoice checks it is the provider's own
+ * (authorizeCompany / authorizeInvoice — 404 otherwise). Written prose is a request, not a guarantee (PRD §9).
  */
 class ProviderRoutesStayIsolatedTest extends TestCase
 {
@@ -22,7 +22,7 @@ class ProviderRoutesStayIsolatedTest extends TestCase
             'routes/api/v1/provider.php may only use App\Http\Controllers\Api\V1\Provider\* controllers.');
     }
 
-    public function test_every_provider_controller_taking_a_company_authorizes_it(): void
+    public function test_every_provider_controller_taking_a_company_or_invoice_authorizes_it(): void
     {
         $violations = [];
 
@@ -30,10 +30,14 @@ class ProviderRoutesStayIsolatedTest extends TestCase
             $source = file_get_contents($file);
 
             if (str_contains($source, 'Company $company') && ! str_contains($source, 'authorizeCompany(')) {
-                $violations[] = basename($file);
+                $violations[] = basename($file).' (company)';
+            }
+
+            if (str_contains($source, 'Invoice $invoice') && ! str_contains($source, 'authorizeInvoice(')) {
+                $violations[] = basename($file).' (invoice)';
             }
         }
 
-        $this->assertSame([], $violations, 'Provider controllers taking a {company} must call authorizeCompany().');
+        $this->assertSame([], $violations, 'Provider controllers taking a {company} must call authorizeCompany() and one taking an {invoice} must call authorizeInvoice().');
     }
 }
