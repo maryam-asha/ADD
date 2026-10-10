@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
@@ -11,6 +12,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Membership\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StoreWalletTopUpRequest;
@@ -40,6 +42,7 @@ class WalletTopUpController extends Controller
         WalletService $wallets,
         PointConversionService $points,
         CurrencyConversionService $conversion,
+        TopUpMinimum $minimum,
     ): JsonResponse {
         $validated = $request->validate([
             'user_id' => ['required_without:company_id', 'prohibits:company_id', 'integer', 'exists:users,id'],
@@ -86,6 +89,9 @@ class WalletTopUpController extends Controller
                 'currency' => $baseCurrency,
                 'converted_balance' => $convertedBalance,
                 'display_currency' => $displayCurrency,
+                // Everything the dashboard needs to convert points <-> cash
+                // locally; store() verifies whatever it sends.
+                'top_up' => $this->topUpQuoteConfig($points, $conversion, $minimum),
             ],
         ]);
     }
@@ -195,5 +201,43 @@ class WalletTopUpController extends Controller
                 'created_at' => $transaction->created_at?->toISOString() ?? now()->toISOString(),
             ],
         ], 201);
+    }
+
+    /**
+     * Spec 2026-10-10 §4. A non-base currency with no current rate is left
+     * out: it cannot be quoted, and store() refuses it anyway.
+     *
+     * @return array{point_rate_usd: string, min_points: int, currencies: list<array{code: string, rate_to_base: string, cash_step: string, decimal_places: int}>}
+     */
+    private function topUpQuoteConfig(
+        PointConversionService $points,
+        CurrencyConversionService $conversion,
+        TopUpMinimum $minimum,
+    ): array {
+        $baseCurrency = $conversion->baseCurrencyCode();
+        $currencies = [];
+
+        foreach (Currency::query()->where('is_active', true)->orderBy('order')->get() as $currency) {
+            $rate = $currency->code === $baseCurrency
+                ? '1'
+                : ExchangeRate::current($currency->code)?->rate_to_base;
+
+            if ($rate === null) {
+                continue;
+            }
+
+            $currencies[] = [
+                'code' => $currency->code,
+                'rate_to_base' => (string) $rate,
+                'cash_step' => (string) $currency->cash_step,
+                'decimal_places' => $currency->decimal_places,
+            ];
+        }
+
+        return [
+            'point_rate_usd' => $points->rate(),
+            'min_points' => $minimum->points(),
+            'currencies' => $currencies,
+        ];
     }
 }

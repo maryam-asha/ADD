@@ -483,4 +483,32 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups/preview', [])->assertNotFound();
     }
+
+    public function test_the_balance_carries_what_the_dashboard_needs_to_quote_a_top_up(): void
+    {
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+        app(SettingService::class)->set(TopUpMinimum::SETTING_KEY, 25, SettingValueType::Int);
+
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0068027211']);
+        Currency::find('SYP')->update(['cash_step' => '10.00']);
+        // Active but no rate: cannot be quoted, so it must not be offered.
+        Currency::factory()->create(['code' => 'GBP', 'is_base' => false, 'is_active' => true]);
+        // Has a rate but is inactive: not offered either.
+        Currency::factory()->create(['code' => 'EUR', 'is_base' => false, 'is_active' => false]);
+        ExchangeRate::factory()->create(['currency_code' => 'EUR', 'rate_to_base' => '1.0800000000']);
+
+        $response = $this->getJson("/api/v1/admin/reception/wallet-balance?user_id={$member->id}")->assertOk();
+
+        $response->assertJsonPath('data.top_up.point_rate_usd', '0.10')
+            ->assertJsonPath('data.top_up.min_points', 25);
+
+        $currencies = collect($response->json('data.top_up.currencies'))->keyBy('code');
+        $this->assertEqualsCanonicalizing(['SYP', 'USD'], $currencies->keys()->all());
+        $this->assertSame('0.0068027211', $currencies['SYP']['rate_to_base']);
+        $this->assertSame('10.00', $currencies['SYP']['cash_step']);
+        $this->assertSame(2, $currencies['SYP']['decimal_places']);
+        $this->assertSame('1', $currencies['USD']['rate_to_base']);
+        $this->assertSame('1.00', $currencies['USD']['cash_step']);
+    }
 }
