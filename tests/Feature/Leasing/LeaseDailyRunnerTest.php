@@ -3,6 +3,7 @@
 namespace Tests\Feature\Leasing;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
@@ -13,7 +14,9 @@ use App\Domain\Leasing\Enums\OfficeLeaseStatus;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Leasing\Services\LeaseDailyRunner;
 use App\Domain\Leasing\Services\OfficeLeaseService;
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Http;
+use Spatie\Activitylog\Models\Activity;
 
 class LeaseDailyRunnerTest extends LeasingTestCase
 {
@@ -130,10 +133,55 @@ class LeaseDailyRunnerTest extends LeasingTestCase
         $this->assertSame(1, $first->accessGrants()->count());
     }
 
-    public function test_the_command_is_scheduled_daily(): void
+    public function test_a_terminated_lease_past_its_end_stays_terminated(): void
+    {
+        $lease = $this->lease($this->leasableOffice(withLock: false), ['duration_months' => 3, 'billing_cycle_months' => 3]);
+        app(OfficeLeaseService::class)->terminate($lease, $lease->ends_on->toDateString(), 'Moving out', auth()->user());
+
+        $this->travelTo($lease->ends_on->addDay()->setTime(6, 0));
+
+        $this->assertSame(0, $this->runDaily()['ended']);
+        $this->assertSame(OfficeLeaseStatus::Terminated, $lease->fresh()->status);
+    }
+
+    /** Terminated between the run reading the lease and ending it: the termination wins. */
+    public function test_ending_never_overwrites_a_termination_made_meanwhile(): void
+    {
+        $lease = $this->lease($this->leasableOffice(withLock: false), ['duration_months' => 3, 'billing_cycle_months' => 3]);
+        $this->travelTo($lease->ends_on->addDay()->setTime(6, 0));
+
+        OfficeLease::retrieved(function (OfficeLease $read) {
+            OfficeLease::query()->whereKey($read->id)->update(['status' => OfficeLeaseStatus::Terminated, 'terminated_on' => $read->ends_on]);
+        });
+
+        $this->assertSame(0, app(LeaseDailyRunner::class)->endExpired());
+        // Read past the model, whose retrieved hook above would fire again.
+        $this->assertSame('terminated', OfficeLease::query()->toBase()->where('id', $lease->id)->value('status'));
+        $this->assertSame(0, Activity::query()->where('description', 'lease_ended')->count());
+    }
+
+    public function test_a_door_that_failed_to_close_is_not_counted_closed(): void
+    {
+        $this->fakeTtlock();
+        $lease = $this->lease($this->leasableOffice(), ['starts_on' => now()->toDateString(), 'duration_months' => 3, 'billing_cycle_months' => 3]);
+        $this->assertSame(1, $lease->accessGrants()->count());
+
+        $this->partialMock(PasscodeIssuanceService::class, fn ($mock) => $mock->shouldReceive('revokeForLease')->andThrow(new \RuntimeException('Lock service down')));
+        $this->travelTo($lease->ends_on->addDay()->setTime(6, 0));
+
+        $this->assertSame(0, app(LeaseDailyRunner::class)->closeDoors());
+    }
+
+    public function test_the_command_is_scheduled_hourly(): void
     {
         $this->artisan('leases:run-daily')->assertSuccessful();
 
         $this->artisan('schedule:list')->expectsOutputToContain('leases:run-daily');
+
+        // Hourly, not once a day: a door whose lock call failed, or a lease
+        // made after the morning run, is opened within the hour.
+        $event = collect(app(Schedule::class)->events())->sole(fn ($event) => str_contains((string) $event->command, 'leases:run-daily'));
+        $this->assertSame('0 * * * *', $event->expression);
+        $this->assertTrue($event->withoutOverlapping);
     }
 }

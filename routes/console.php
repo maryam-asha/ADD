@@ -113,6 +113,10 @@ Schedule::command('payments:cancel-expired-prepayments')->everyMinute()->without
  * Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md):
  * invoice each billing period on its first day, open the office lock on the
  * lease's first day, end leases past their last day and close their lock.
- * Every step catches up on what a missed run left behind.
+ * Every step catches up on what a missed run left behind. Hourly, despite the
+ * name: a lock call that failed, or a door a lease reopens (maintenance over,
+ * a lease made after a run), is retried within the hour rather than the next
+ * morning. Each step is idempotent: a period is invoiced once, a door opened
+ * only while it has no live grant.
  */
-Schedule::command('leases:run-daily')->dailyAt('06:00')->timezone('Asia/Damascus')->withoutOverlapping();
+Schedule::command('leases:run-daily')->hourly()->withoutOverlapping();

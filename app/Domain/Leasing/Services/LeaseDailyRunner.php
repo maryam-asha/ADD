@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * The once-a-day lease run (leases:run-daily). Every step looks for a state
+ * The lease run (leases:run-daily, scheduled hourly). Every step looks for a state
  * that should not exist — a started period with no invoice, a lease with
  * access and no live grant, a live grant on a lease without access — so a
  * missed day or a failed lock call is simply caught up on the next run.
@@ -79,7 +79,7 @@ class LeaseDailyRunner
 
         OfficeLease::query()
             ->where('status', '!=', OfficeLeaseStatus::Ended)
-            ->whereDate('starts_on', '<=', $this->today())
+            ->holdingOn($this->today())
             ->whereDoesntHave('accessGrants', fn ($q) => $q->whereIn('status', self::LIVE))
             ->chunkById(100, function ($leases) use (&$opened) {
                 foreach ($leases as $lease) {
@@ -92,7 +92,11 @@ class LeaseDailyRunner
         return $opened;
     }
 
-    /** Active leases past their last day. */
+    /**
+     * Active leases past their last day. The update is conditional on the
+     * lease still being active, so a termination made after the lease was
+     * read is never overwritten; only a lease this run ended is logged.
+     */
     public function endExpired(): int
     {
         $ended = 0;
@@ -102,9 +106,22 @@ class LeaseDailyRunner
             ->whereDate('ends_on', '<', $this->today())
             ->chunkById(100, function ($leases) use (&$ended) {
                 foreach ($leases as $lease) {
-                    $lease->update(['status' => OfficeLeaseStatus::Ended]);
-                    activity()->performedOn($lease)->log('lease_ended');
-                    $ended++;
+                    try {
+                        $changed = OfficeLease::query()
+                            ->whereKey($lease->id)
+                            ->where('status', OfficeLeaseStatus::Active)
+                            ->update(['status' => OfficeLeaseStatus::Ended]);
+
+                        if ($changed === 1) {
+                            activity()->performedOn($lease)->log('lease_ended');
+                            $ended++;
+                        }
+                    } catch (\Throwable $e) {
+                        Log::error('Failed to end an expired office lease', [
+                            'office_lease_id' => $lease->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
                 }
             });
 
@@ -121,8 +138,7 @@ class LeaseDailyRunner
             ->whereHas('accessGrants', fn ($q) => $q->whereIn('status', self::LIVE))
             ->chunkById(100, function ($leases) use (&$closed, $today) {
                 foreach ($leases as $lease) {
-                    if (! $lease->grantsAccessOn($today)) {
-                        $this->leases->closeDoor($lease);
+                    if (! $lease->grantsAccessOn($today) && $this->leases->closeDoor($lease)) {
                         $closed++;
                     }
                 }

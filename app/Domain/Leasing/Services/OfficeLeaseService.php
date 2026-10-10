@@ -262,16 +262,23 @@ class OfficeLeaseService
         return $lease;
     }
 
-    /** Revokes the lease's live grants. Never throws; a failure is logged. */
-    public function closeDoor(OfficeLease $lease): void
+    /**
+     * Revokes the lease's live grants: true when that went through. Never
+     * throws; a failure is logged and the next run retries.
+     */
+    public function closeDoor(OfficeLease $lease): bool
     {
         try {
             $this->passcodes->revokeForLease($lease);
+
+            return true;
         } catch (\Throwable $e) {
             Log::error('Failed to revoke the office lock grant of a lease', [
                 'office_lease_id' => $lease->id,
                 'error' => $e->getMessage(),
             ]);
+
+            return false;
         }
     }
 }
