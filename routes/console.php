@@ -108,3 +108,11 @@ Schedule::command('payments:expire-pending')->hourly()->withoutOverlapping();
  * another method by then is let go. The window is minutes, so every minute.
  */
 Schedule::command('payments:cancel-expired-prepayments')->everyMinute()->withoutOverlapping();
+
+/*
+ * Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md):
+ * invoice each billing period on its first day, open the office lock on the
+ * lease's first day, end leases past their last day and close their lock.
+ * Every step catches up on what a missed run left behind.
+ */
+Schedule::command('leases:run-daily')->dailyAt('06:00')->timezone('Asia/Damascus')->withoutOverlapping();
