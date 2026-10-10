@@ -11072,7 +11072,7 @@
                                         "companies"
                                     ]
                                 },
-                                "description": "Creates the company, its wallet and its first lease; the branch is the office's. 422 if private_office_request_id isn't currently 'quoted' - run Private Office Requests/Mark as Quoted first."
+                                "description": "Needs permission office-leases.create on top of the admin/operations role. Creates the company, its wallet and its first lease; the branch is the office's. office_leases is in the response only with office-leases.view. 422 if private_office_request_id isn't currently 'quoted' - run Private Office Requests/Mark as Quoted first."
                             }
                         },
                         {
@@ -11291,7 +11291,7 @@
                                         "lease"
                                     ]
                                 },
-                                "description": "Permission office-leases.create. For an existing company: the request must be 'quoted' and carry company_id. A new company's first lease is created by Companies/Create Company.",
+                                "description": "Permission office-leases.create. For an existing company: the request must be 'quoted' and carry company_id. A new company's first lease is created by Companies/Create Company. billed_to is optional and only matters for a provider's company. 409 when the office is already leased or has bookings still to happen in these dates.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n  \"contract_ref\": \"C-2026-014\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\",\n  \"billed_to\": \"provider\"\n}",
@@ -24376,7 +24376,7 @@
                                         "provider"
                                     ]
                                 },
-                                "description": "provider_id null makes it a direct company."
+                                "description": "provider_id null makes it a direct company. The company's leases not yet ended move with it (billed_to becomes company when it goes direct); issued invoices stay with whoever they were billed to."
                             }
                         },
                         {
