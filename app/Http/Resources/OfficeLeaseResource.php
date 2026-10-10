@@ -3,6 +3,7 @@
 namespace App\Http\Resources;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Invoicing\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -41,7 +42,7 @@ class OfficeLeaseResource extends JsonResource
                 'ends_on' => $period->ends_on->toDateString(),
                 'amount' => (string) $period->amount,
                 'status' => $period->status,
-                'invoice' => $period->relationLoaded('invoice') && $period->invoice !== null ? [
+                'invoice' => $period->relationLoaded('invoice') && $period->invoice !== null && $this->showsInvoice($period->invoice, $request) ? [
                     'id' => $period->invoice->id,
                     'reference' => $period->invoice->reference,
                     'status' => $period->invoice->status,
@@ -55,6 +56,12 @@ class OfficeLeaseResource extends JsonResource
             'created_at' => $this->created_at,
             ...$this->staffFields(),
         ];
+    }
+
+    /** Staff see every period's invoice. */
+    protected function showsInvoice(Invoice $invoice, Request $request): bool
+    {
+        return true;
     }
 
     /** ADD-internal fields — the provider view leaves these out. */
