@@ -81,9 +81,11 @@ class SpaceBrowseService
             ...$this->branchWeek($branch, $periods, $timezone),
         ];
 
-        // 3. Query Active Spaces for Branch
+        // 3. Query Active Spaces for Branch — a private office held by a
+        // lease today is not on offer (docs/superpowers/specs/2026-10-10-office-leases-design.md).
         $spacesQuery = Space::query()
             ->active()
+            ->whereDoesntHave('officeLeases', fn ($q) => $q->holdingOn(now()->toDateString()))
             ->with(['resources', 'amenities', 'building', 'zone.floor'])
             ->whereHas('building', fn ($q) => $q->where('branch_id', $branch->id));
 
