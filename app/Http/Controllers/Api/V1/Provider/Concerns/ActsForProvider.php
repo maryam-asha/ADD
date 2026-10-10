@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Provider\Concerns;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Providers\Models\Provider;
 use App\Http\Middleware\EnsureActiveProvider;
 use Illuminate\Http\Request;
@@ -30,5 +31,11 @@ trait ActsForProvider
     protected function authorizeInvoice(Request $request, Invoice $invoice): void
     {
         abort_unless($invoice->provider_id === $this->provider($request)->id, 404);
+    }
+
+    /** 404, as for companies: the lease of a company this provider does not manage now does not exist for it. */
+    protected function authorizeLease(Request $request, OfficeLease $lease): void
+    {
+        abort_unless($lease->company()->where('provider_id', $this->provider($request)->id)->exists(), 404);
     }
 }

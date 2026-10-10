@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
 use App\Http\Controllers\Api\V1\Provider\ProviderInvoiceController;
+use App\Http\Controllers\Api\V1\Provider\ProviderOfficeLeaseController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
 use App\Http\Controllers\Api\V1\Provider\ProviderProfileController;
@@ -26,6 +27,9 @@ Route::get('companies/{company}', [ProviderCompanyController::class, 'show']);
 Route::delete('companies/{company}/members/{user}', [ProviderCompanyController::class, 'destroyMember']);
 Route::get('office-requests', [ProviderOfficeRequestController::class, 'index']);
 Route::post('office-requests', [ProviderOfficeRequestController::class, 'store']);
+Route::get('office-leases', [ProviderOfficeLeaseController::class, 'index']);
+Route::get('office-leases/{officeLease}', [ProviderOfficeLeaseController::class, 'show']);
+Route::get('companies/{company}/office-leases', [ProviderOfficeLeaseController::class, 'forCompany']);
 
 Route::get('plans', [ProviderPlanController::class, 'index']);
 

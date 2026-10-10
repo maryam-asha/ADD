@@ -8,7 +8,7 @@ use Tests\TestCase;
  * docs/decisions/service-providers.md: the provider surface never borrows
  * an admin or member controller, and every provider controller that takes
  * a company or an invoice checks it is the provider's own
- * (authorizeCompany / authorizeInvoice — 404 otherwise). Written prose is a request, not a guarantee (PRD §9).
+ * (authorizeCompany / authorizeInvoice / authorizeLease — 404 otherwise). Written prose is a request, not a guarantee (PRD §9).
  */
 class ProviderRoutesStayIsolatedTest extends TestCase
 {
@@ -36,8 +36,12 @@ class ProviderRoutesStayIsolatedTest extends TestCase
             if (str_contains($source, 'Invoice $invoice') && ! str_contains($source, 'authorizeInvoice(')) {
                 $violations[] = basename($file).' (invoice)';
             }
+
+            if (str_contains($source, 'OfficeLease $officeLease') && ! str_contains($source, 'authorizeLease(')) {
+                $violations[] = basename($file).' (office lease)';
+            }
         }
 
-        $this->assertSame([], $violations, 'Provider controllers taking a {company} must call authorizeCompany() and one taking an {invoice} must call authorizeInvoice().');
+        $this->assertSame([], $violations, 'Provider controllers taking a {company} must call authorizeCompany() and one taking an {invoice} must call authorizeInvoice() and one taking an {officeLease} must call authorizeLease().');
     }
 }
