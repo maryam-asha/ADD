@@ -164,6 +164,12 @@ class BookingController extends Controller
             ! $availability->isValidGranularity($start, $rules) => 'api.booking.invalid_start_time',
             ! $availability->isLongEnough($start, $end, $rules) => 'api.booking.duration_too_short',
             ! $availability->matchesDurationGranularity($start, $end, $rules) => 'api.booking.duration_invalid_granularity',
+            $availability->isHeldByLease(
+                $availability->blockingLeases($space->id, $start, $end, $rules->timezone),
+                $start,
+                $end,
+                $rules->timezone,
+            ) => 'api.booking.office_leased',
             // A co_space's seat comes from its branch's pool, counted on the
             // member's subscription as the POST counts it; a room may be lent
             // to co-working (docs/decisions/coworking-seat-pool.md).

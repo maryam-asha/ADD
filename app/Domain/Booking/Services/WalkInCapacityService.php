@@ -71,6 +71,18 @@ class WalkInCapacityService
 
             $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
 
+            // A leased office is its tenant's today (docs/decisions/office-leases.md).
+            $timezone = $this->availability->rulesFor($locked)->timezone;
+
+            if ($this->availability->isHeldByLease(
+                $this->availability->blockingLeases($locked->id, now(), now()->addSecond(), $timezone),
+                now(),
+                now()->addSecond(),
+                $timezone,
+            )) {
+                throw new ReceptionActionException('api.booking.office_leased');
+            }
+
             // At most one open coworking session per member, whichever path
             // starts it (docs/decisions/coworking-self-service-sessions.md);
             // the scan returns the open one before it ever gets here. Rooms

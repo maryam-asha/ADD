@@ -4,6 +4,7 @@ namespace App\Domain\Leasing\Services;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Access\Services\PasscodeIssuanceService;
+use App\Domain\Booking\Services\AvailabilityService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
@@ -35,6 +36,7 @@ class OfficeLeaseService
         private readonly LeaseScheduleBuilder $schedule,
         private readonly InvoiceIssuer $invoices,
         private readonly PasscodeIssuanceService $passcodes,
+        private readonly AvailabilityService $availability,
     ) {}
 
     /**
@@ -63,6 +65,12 @@ class OfficeLeaseService
 
             if (OfficeLease::query()->overlapping($space->id, $terms->startsOn, $endsOn)->exists()) {
                 throw new LeasingException('api.lease.office_taken', 409);
+            }
+
+            // The reverse of AvailabilityService::isHeldByLease(): a booking
+            // still to happen in the window keeps its day, so the lease waits.
+            if ($this->availability->hasOpenBookingsOn($space, $terms->startsOn, $endsOn)) {
+                throw new LeasingException('api.lease.office_booked', 409);
             }
 
             $company = $newCompanyName === null

@@ -26,6 +26,9 @@ enum SlotState: string
     // A room lent to co-working for this stretch: its seats are in the
     // branch's pool, so it takes no room booking meanwhile.
     case CoworkingMode = 'coworking_mode';
+    // An office a company leases for this day (docs/decisions/office-leases.md):
+    // the tenant holds it for whole days, so it takes no booking.
+    case Leased = 'leased';
 
     public function isBookable(): bool
     {
@@ -55,7 +58,7 @@ enum SlotState: string
         return match ($this) {
             self::Available => self::Available,
             self::Past, self::TooSoon => self::Past,
-            self::Booked, self::AtCapacity, self::Buffer, self::OutsideHours, self::TooFarAhead, self::CoworkingMode => self::Booked,
+            self::Booked, self::AtCapacity, self::Buffer, self::OutsideHours, self::TooFarAhead, self::CoworkingMode, self::Leased => self::Booked,
         };
     }
 

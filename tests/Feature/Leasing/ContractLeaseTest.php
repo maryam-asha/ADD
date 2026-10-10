@@ -3,6 +3,7 @@
 namespace Tests\Feature\Leasing;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
@@ -198,6 +199,32 @@ class ContractLeaseTest extends LeasingTestCase
         );
         $this->assertSame(1, OfficeLease::query()->count());
         $this->assertSame(1, Company::query()->count());
+    }
+
+    /** The reverse of a leased office refusing bookings: bookings still to happen refuse the lease. */
+    public function test_an_office_with_a_booking_still_to_happen_in_the_window_is_refused(): void
+    {
+        $office = $this->leasableOffice();
+        Booking::factory()->create(['space_id' => $office->id, 'start_at' => now()->addMonth()->setTime(10, 0), 'end_at' => now()->addMonth()->setTime(11, 0)]);
+
+        $this->assertRefused(
+            fn () => $this->service()->contract(PrivateOfficeRequest::factory()->quoted()->create(), $this->terms($office), $this->actor, 'Acme LLC'),
+            'api.lease.office_booked',
+            409,
+        );
+        $this->assertSame(0, OfficeLease::query()->count());
+    }
+
+    public function test_cancelled_bookings_and_bookings_outside_the_window_do_not_block_a_lease(): void
+    {
+        $office = $this->leasableOffice();
+        Booking::factory()->cancelled()->create(['space_id' => $office->id, 'start_at' => now()->addMonth()->setTime(10, 0), 'end_at' => now()->addMonth()->setTime(11, 0)]);
+        // Today, the day before the lease starts tomorrow.
+        Booking::factory()->create(['space_id' => $office->id, 'start_at' => now()->setTime(8, 0), 'end_at' => now()->setTime(9, 0)]);
+
+        $this->service()->contract(PrivateOfficeRequest::factory()->quoted()->create(), $this->terms($office), $this->actor, 'Acme LLC');
+
+        $this->assertSame(1, OfficeLease::query()->count());
     }
 
     public function test_the_office_is_free_again_the_day_after_a_lease_ends(): void

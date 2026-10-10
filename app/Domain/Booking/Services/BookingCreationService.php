@@ -100,6 +100,7 @@ class BookingCreationService
             // Read off the locked row, so a space put into maintenance while
             // this request was in flight is refused rather than booked.
             $this->assertAcceptsBookings($locked);
+            $this->assertNotLeased($locked, $startAt, $endAt, $rules);
 
             // A member who went back from the confirm screen and picked
             // another time would be refused by their own hold: holds of
@@ -245,6 +246,16 @@ class BookingCreationService
     {
         if (! $this->availability->acceptsBookings($space)) {
             throw new ReceptionActionException('api.booking.space_not_bookable');
+        }
+    }
+
+    /** An office a company leases on that day takes no booking (docs/decisions/office-leases.md). */
+    private function assertNotLeased(Space $space, CarbonInterface $start, CarbonInterface $end, SpaceBookingRules $rules): void
+    {
+        $leases = $this->availability->blockingLeases($space->id, $start, $end, $rules->timezone);
+
+        if ($this->availability->isHeldByLease($leases, $start, $end, $rules->timezone)) {
+            throw new ReceptionActionException('api.booking.office_leased');
         }
     }
 

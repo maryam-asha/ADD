@@ -156,6 +156,8 @@ class AvailabilityRulesAreCentralizedTest extends TestCase
             'usesBranchPool',
             'exceedsPool',
             'isInCoworkingMode',
+            // A leased office (docs/decisions/office-leases.md).
+            'isHeldByLease',
         ] as $predicate) {
             $this->assertStringContainsString(
                 "function {$predicate}(",

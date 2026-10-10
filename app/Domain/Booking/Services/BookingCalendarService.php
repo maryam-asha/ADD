@@ -8,6 +8,7 @@ use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Support\Presenters\AvailabilityPresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonImmutable;
@@ -95,6 +96,12 @@ class BookingCalendarService
             ? $this->availability->poolTimeline($spaces->first(fn (Space $space) => $this->availability->usesBranchPool($space)), $from->utc(), $to->addDay()->utc())
             : null;
 
+        // The offices a company leases over the range, in one query: a lease
+        // day is the tenant's, never a free day (docs/decisions/office-leases.md).
+        $leases = $this->availability
+            ->blockingLeases($spaces->pluck('id'), $from->utc(), $to->addDay()->utc(), $timezone)
+            ->groupBy('space_id');
+
         $memberId = isset($filters['member_id']) ? (int) $filters['member_id'] : null;
 
         $resources = $spaces
@@ -107,6 +114,7 @@ class BookingCalendarService
                 $locale,
                 $this->availability->usesBranchPool($space) ? $pool : null,
                 $memberId,
+                $leases->get($space->id) ?? collect(),
             ))
             ->values()
             ->all();
@@ -162,6 +170,7 @@ class BookingCalendarService
      *
      * @param  Collection<int, Booking>  $bookings
      * @param  array<string, array<int, array{open_time: string, close_time: string}>>  $periodsByDate
+     * @param  Collection<int, OfficeLease>|null  $leases
      * @return array<string, mixed>
      */
     private function resourceRow(
@@ -173,6 +182,7 @@ class BookingCalendarService
         string $locale,
         ?PoolTimeline $pool = null,
         ?int $memberId = null,
+        ?Collection $leases = null,
     ): array {
         $rules = $this->availability->rulesFor($space);
         $days = [];
@@ -198,7 +208,13 @@ class BookingCalendarService
                 'date' => $key,
                 'weekday' => strtoupper($date->format('D')),
                 'day' => $date->format('d'),
-                'state' => $periods === [] ? 'closed' : 'open',
+                // `leased`: a company holds the office all day, so the desk
+                // cannot book it whatever the hours say.
+                'state' => match (true) {
+                    $periods === [] => 'closed',
+                    $this->availability->isHeldByLease($leases ?? collect(), $dayStart, $dayEnd, $rules->timezone) => 'leased',
+                    default => 'open',
+                },
                 'periods' => $periods,
                 'occupancy' => $pool !== null
                     ? $this->poolOccupancy($pool, $periods, $date)

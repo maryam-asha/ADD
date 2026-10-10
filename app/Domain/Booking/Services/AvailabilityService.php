@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
@@ -18,6 +19,7 @@ use App\Domain\Foundation\Models\BusinessHourException;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -408,6 +410,89 @@ class AvailabilityService
         );
     }
 
+    // ---------------------------------------------------------------
+    // Office leases (docs/decisions/office-leases.md)
+    // ---------------------------------------------------------------
+
+    /**
+     * Whether a lease holds the office on any local day [$start, $end)
+     * touches, and so it takes no booking then: the tenant has the room for
+     * whole days, and a stranger's booking would put a second passcode on
+     * their lock.
+     *
+     * A lease is a run of local calendar dates (starts_on through
+     * accessEndsOn(), terminated_on being the first day without access);
+     * the window's instants are read as dates in the district's timezone.
+     *
+     * @param  Collection<int, OfficeLease>  $leases
+     */
+    public function isHeldByLease(Collection $leases, CarbonInterface $start, CarbonInterface $end, string $timezone): bool
+    {
+        [$first, $last] = $this->localDates($start, $end, $timezone);
+
+        return $leases->contains(
+            fn (OfficeLease $lease) => $lease->starts_on->toDateString() <= $last
+                && $lease->accessEndsOn()->toDateString() >= $first
+        );
+    }
+
+    /**
+     * The leases holding any of $spaceIds on a local day [$from, $to)
+     * touches, fetched once, through OfficeLease::scopeHoldingBetween() (the
+     * shared definition of a lease's window).
+     *
+     * @param  int|iterable<int>  $spaceIds
+     * @return Collection<int, OfficeLease>
+     */
+    public function blockingLeases(int|iterable $spaceIds, CarbonInterface $from, CarbonInterface $to, string $timezone): Collection
+    {
+        [$first, $last] = $this->localDates($from, $to, $timezone);
+
+        return OfficeLease::query()
+            ->whereIn('space_id', is_int($spaceIds) ? [$spaceIds] : collect($spaceIds)->all())
+            ->holdingBetween($first, $last)
+            ->get()
+            ->toBase();
+    }
+
+    /**
+     * Whether the office has a booking still to happen (held for its
+     * payment, awaiting approval, or confirmed) on any local date of
+     * [$fromDate, $toDate] (Y-m-d, inclusive). The reverse of
+     * isHeldByLease(): a lease is refused over the bookings already made.
+     * A final booking (completed, no-show, rejected, cancelled) holds
+     * nothing any more.
+     */
+    public function hasOpenBookingsOn(Space $space, string $fromDate, string $toDate): bool
+    {
+        $timezone = $this->rulesFor($space)->timezone;
+
+        return Booking::query()
+            ->forSpace($space->id)
+            ->whereIn('status', BookingStatus::open())
+            ->overlapping(
+                CarbonImmutable::parse($fromDate.' 00:00:00', $timezone)->utc(),
+                CarbonImmutable::parse($toDate.' 00:00:00', $timezone)->addDay()->utc(),
+            )
+            ->exists();
+    }
+
+    /**
+     * The first and last local dates the half-open window [$start, $end)
+     * touches, as Y-m-d.
+     *
+     * @return array{0: string, 1: string}
+     */
+    private function localDates(CarbonInterface $start, CarbonInterface $end, string $timezone): array
+    {
+        $first = $start->copy()->setTimezone($timezone)->format('Y-m-d');
+        $last = $end->greaterThan($start)
+            ? $end->copy()->subSecond()->setTimezone($timezone)->format('Y-m-d')
+            : $first;
+
+        return [$first, $last];
+    }
+
     /**
      * The one read of the pool for a space's booking decisions: its branch's
      * timeline over the range, with the candidate folded in when given.
@@ -449,15 +534,20 @@ class AvailabilityService
      * — daysInRange() handing a month's to each day — costs nothing more.
      *
      * @param  Collection<int, SpaceCoworkingWindow>|null  $windows
-     * @return array{0: PoolTimeline|null, 1: Collection<int, SpaceCoworkingWindow>}
+     * @param  Collection<int, OfficeLease>|null  $leases
+     * @return array{0: PoolTimeline|null, 1: Collection<int, SpaceCoworkingWindow>, 2: Collection<int, OfficeLease>}
      */
-    private function contention(Space $space, SpaceBookingRules $rules, CarbonInterface $from, CarbonInterface $to, ?PoolTimeline $pool = null, ?Collection $windows = null): array
+    private function contention(Space $space, SpaceBookingRules $rules, CarbonInterface $from, CarbonInterface $to, ?PoolTimeline $pool = null, ?Collection $windows = null, ?Collection $leases = null): array
     {
         if ($rules->usesBranchPool) {
-            return [$pool ?? $this->poolTimeline($space, $from, $to), $windows ?? new Collection];
+            return [$pool ?? $this->poolTimeline($space, $from, $to), $windows ?? new Collection, $leases ?? new Collection];
         }
 
-        return [null, $windows ?? $this->blockingCoworkingWindows($space, $from, $to)];
+        return [
+            null,
+            $windows ?? $this->blockingCoworkingWindows($space, $from, $to),
+            $leases ?? $this->blockingLeases($space->id, $from, $to, $rules->timezone),
+        ];
     }
 
     // ---------------------------------------------------------------
@@ -527,6 +617,7 @@ class AvailabilityService
         bool $eachCellAlone = false,
         ?PoolTimeline $pool = null,
         ?Collection $windows = null,
+        ?Collection $leases = null,
     ): array {
         $rules ??= $this->rulesFor($space);
         $branch = $space->building->branch;
@@ -541,7 +632,7 @@ class AvailabilityService
         }
 
         $existing = $prefetched ?? $this->blockingBookings($space, $dayStart->utc(), $dayEnd->utc(), $rules);
-        [$pool, $windows] = $this->contention($space, $rules, $dayStart->utc(), $dayEnd->utc(), $pool, $windows);
+        [$pool, $windows, $leases] = $this->contention($space, $rules, $dayStart->utc(), $dayEnd->utc(), $pool, $windows, $leases);
 
         $now = CarbonImmutable::now('UTC');
         $slots = [];
@@ -575,6 +666,7 @@ class AvailabilityService
                         $now,
                         $pool,
                         $windows,
+                        $leases,
                     ),
                 );
 
@@ -593,6 +685,7 @@ class AvailabilityService
      *
      * @param  Collection<int, Booking>  $existing
      * @param  Collection<int, SpaceCoworkingWindow>  $windows
+     * @param  Collection<int, OfficeLease>  $leases
      */
     private function stateFor(
         CarbonInterface $start,
@@ -603,6 +696,7 @@ class AvailabilityService
         CarbonInterface $now,
         ?PoolTimeline $pool,
         Collection $windows,
+        Collection $leases,
     ): SlotState {
         if ($start->lessThan($now)) {
             return SlotState::Past;
@@ -618,6 +712,10 @@ class AvailabilityService
 
         if ($end->greaterThan($periodClose)) {
             return SlotState::OutsideHours;
+        }
+
+        if ($this->isHeldByLease($leases, $start, $end, $rules->timezone)) {
+            return SlotState::Leased;
         }
 
         if ($this->isInCoworkingMode($windows, $start, $end)) {
@@ -671,7 +769,7 @@ class AvailabilityService
         $reasonsByDate = $this->closureReasonsForRange($from, $to, $branch);
 
         $existing = $this->blockingBookings($space, $from->utc(), $to->addDay()->utc(), $rules);
-        [$pool, $windows] = $this->contention($space, $rules, $from->utc(), $to->addDay()->utc());
+        [$pool, $windows, $leases] = $this->contention($space, $rules, $from->utc(), $to->addDay()->utc());
 
         $today = CarbonImmutable::now($rules->timezone)->startOfDay();
         $days = [];
@@ -719,7 +817,7 @@ class AvailabilityService
                 continue;
             }
 
-            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, pool: $pool, windows: $windows);
+            $slots = $this->slotsForDay($space, $date, $rules, $existing, $periods, pool: $pool, windows: $windows, leases: $leases);
             $available = count(array_filter($slots, fn (SlotAvailability $slot) => $slot->isAvailable()));
 
             $days[] = new DayAvailability(

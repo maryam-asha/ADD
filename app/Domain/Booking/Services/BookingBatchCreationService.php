@@ -154,6 +154,17 @@ class BookingBatchCreationService
 
                 $rules = $this->availability->rulesFor($space);
 
+                if ($this->availability->isHeldByLease(
+                    $this->availability->blockingLeases($space->id, $window['start'], $window['end'], $rules->timezone),
+                    $window['start'],
+                    $window['end'],
+                    $rules->timezone,
+                )) {
+                    $failures[] = $this->failure($window, 'api.booking.office_leased');
+
+                    continue;
+                }
+
                 if ($rules->usesBranchPool) {
                     $reasonKey = $this->poolFailure($space, $member, $window, $accepted);
 
