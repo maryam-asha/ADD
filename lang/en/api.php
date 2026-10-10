@@ -691,4 +691,10 @@ return [
         'request_not_pending' => 'This request has already been decided.',
     ],
 
+    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+    'invoice' => [
+        'no_exchange_rate' => 'There is no exchange rate for :currency yet.',
+    ],
+
 ];

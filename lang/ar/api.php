@@ -679,4 +679,8 @@ return [
         'request_not_pending' => 'بُتّ في هذا الطلب من قبل.',
     ],
 
+    'invoice' => [
+        'no_exchange_rate' => 'لا يوجد سعر صرف لـ :currency بعد.',
+    ],
+
 ];
