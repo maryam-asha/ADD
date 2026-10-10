@@ -31,8 +31,17 @@ land somewhere; this design puts it in one explicit, visible place.
 - **Conversion runs in the dashboard**, instantly, with no request per
   keystroke. The server stays the authority (§3).
 - **Per-currency cash step**, editable on the Currencies page: new column
-  `currencies.cash_step`, defaults **SYP = 100, USD = 1**, every other
-  currency 1.
+  `currencies.cash_step`, default **1 for every currency**.
+  *Correction (2026-10-10, while planning):* SYP = 100 was agreed against
+  the old-pound figures used in §1. SYP is the new pound (two zeros
+  removed, in circulation since 2026-01-01 — see `WalletTopUpsPage.vue`),
+  so one point is ~14.7 SYP and a step of 100 would add up to ~6.8 points
+  to a top-up. 1 matches the dashboard's existing whole-pound rule; an
+  admin raises it per currency if the till cannot give change that small.
+
+The worked examples in §1 and the test vectors keep the old-pound rate
+`0.0000680272` because ADDCore's existing tests and `ExchangeRateFactory`
+use it; the arithmetic is rate-agnostic. §6 adds new-pound vectors.
 
 ## 3. The rule, and who enforces it
 
@@ -47,6 +56,10 @@ Let `R` = `point.rate_usd`, `F(c)` = current `rate_to_base` of currency `c`
   into a cash figure the till can actually take. By construction
   `pointsFor(amountFor(p)) ≥ p` — it may be *more* than requested
   (345 points in USD → $35 → 350 points), and the dialog shows that.
+- **Amount mode accepts only multiples of `S(c)`** — cash the till can
+  actually take. This replaces the dashboard's hard-coded "SYP is whole
+  pounds" rule with the per-currency setting. With USD at its default
+  step of 1, amount mode no longer accepts cents (it did before).
 - **What is stored:** `payment_amount` = the cash actually taken;
   `points` = `pointsFor(payment_amount)`. Every top-up satisfies this,
   whichever field the operator typed in.
@@ -121,10 +134,14 @@ The dashboard was its only consumer. Route, controller method and tests go.
 - `SettingSeeder`: `setDefault('wallet.top_up_min_points', 10, Int)`.
   `UpdateSettingRequest` validates that key as `integer|min:1`. Read with a
   default of 10, so tests and fresh installs work before seeding.
-- Migration: `currencies.cash_step decimal(14,2) default 1.00`, then SYP set
-  to 100. `Currency` fillable/cast, `CurrencySeeder`,
+- Migration: `currencies.cash_step decimal(14,2) default 1.00` for every
+  row. `Currency` fillable/cast plus a model-level default (so a freshly
+  created currency serializes `"1.00"`, not null),
   `StoreCurrencyRequest`/`UpdateCurrencyRequest`
   (`sometimes|numeric|gt:0|decimal:0,2`), `AdminCurrencyResource`.
+  `CurrencySeeder` is deliberately **not** touched: it is an idempotent
+  `updateOrCreate`, and listing `cash_step` there would reset an
+  admin-edited step on every re-seed.
 
 ### Lang (`lang/{en,ar}/api.php`, `wallet` group)
 
@@ -179,6 +196,10 @@ One table of vectors (`R = 0.10`, `F(SYP) = 0.0000680272`), asserted in
 | minimum, SYP | 10 points | 14,800 SYP → 10 points |
 | points → USD, step 1 | 345 points | $35 → 350 points |
 | remainder | 500,000 SYP | 199.92 SYP below one point |
+| new pound (`F = 0.0068027211`) | 5,000 SYP | 340 points |
+| new pound, step 1 | 340 points | 4,998 SYP → 340 points |
+| new pound, step 10 | 340 points | 5,000 SYP → 340 points |
+| new pound, minimum | 10 points | 147 SYP → 10 points |
 
 `amountFor` and the remainder are dashboard-only, so those rows run in Vitest
 only.
