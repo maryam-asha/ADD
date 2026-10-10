@@ -6,6 +6,7 @@ use App\Concerns\HasReference;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Leasing\Models\OfficeLeasePeriod;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -31,6 +32,7 @@ class Invoice extends Model
         'company_id',
         'billed_to',
         'provider_request_id',
+        'office_lease_period_id',
         'description',
         'points',
         'currency',
@@ -83,6 +85,11 @@ class Invoice extends Model
     public function providerRequest(): BelongsTo
     {
         return $this->belongsTo(ProviderRequest::class);
+    }
+
+    public function leasePeriod(): BelongsTo
+    {
+        return $this->belongsTo(OfficeLeasePeriod::class, 'office_lease_period_id');
     }
 
     public function issuer(): BelongsTo

@@ -8,6 +8,7 @@ use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Models\Device;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ class AccessGrant extends Model
 
     protected $fillable = [
         'lock_id', 'grantee_type', 'grantee_id', 'source_type', 'source_id',
+        'office_lease_id',
         'allocation_model', 'passcode_type', 'passcode_value', 'vendor_keyboard_pwd_id',
         'issued_at', 'must_activate_by', 'activated_at', 'expires_at', 'status',
     ];
@@ -73,6 +75,11 @@ class AccessGrant extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class, 'source_id');
+    }
+
+    public function lease(): BelongsTo
+    {
+        return $this->belongsTo(OfficeLease::class, 'office_lease_id');
     }
 
     public function events(): HasMany

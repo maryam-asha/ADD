@@ -7,6 +7,7 @@ use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Leasing\Models\OfficeLease;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -126,6 +127,11 @@ class Space extends Model
     public function devices(): HasMany
     {
         return $this->hasMany(Device::class);
+    }
+
+    public function officeLeases(): HasMany
+    {
+        return $this->hasMany(OfficeLease::class);
     }
 
     public function resources(): HasMany

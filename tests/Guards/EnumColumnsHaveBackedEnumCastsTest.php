@@ -62,6 +62,10 @@ use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
+use App\Domain\Leasing\Enums\LeasePeriodStatus;
+use App\Domain\Leasing\Enums\OfficeLeaseStatus;
+use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Leasing\Models\OfficeLeasePeriod;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -194,6 +198,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         PrivateOfficeRequest::class => [
             'status' => PrivateOfficeRequestStatus::class,
+            'payer' => Payer::class,
         ],
         ErrorLog::class => [
             'platform' => ErrorLogPlatform::class,
@@ -252,6 +257,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         InvoicePayment::class => [
             'method' => InvoicePaymentMethod::class,
+        ],
+        OfficeLease::class => [
+            'status' => OfficeLeaseStatus::class,
+            'billed_to' => Payer::class,
+        ],
+        OfficeLeasePeriod::class => [
+            'status' => LeasePeriodStatus::class,
         ],
     ];
 

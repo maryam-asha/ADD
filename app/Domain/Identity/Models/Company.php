@@ -4,6 +4,7 @@ namespace App\Domain\Identity\Models;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Enums\CompanyStatus;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Providers\Models\CompanyInvitation;
 use App\Domain\Providers\Models\Provider;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -69,5 +70,10 @@ class Company extends Model
     public function invitations(): HasMany
     {
         return $this->hasMany(CompanyInvitation::class);
+    }
+
+    public function officeLeases(): HasMany
+    {
+        return $this->hasMany(OfficeLease::class);
     }
 }
