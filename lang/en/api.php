@@ -701,6 +701,8 @@ return [
         'already_cancelled' => 'This invoice is already cancelled.',
         'payment_already_voided' => 'This payment is already voided.',
         'amount_too_small' => 'The amount is too small to record.',
+        'cancelled' => 'Invoice cancelled.',
+        'payment_voided' => 'Payment voided.',
     ],
 
 ];

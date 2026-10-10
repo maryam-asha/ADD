@@ -5,6 +5,8 @@ namespace App\Services\Permissions;
 use App\Http\Controllers\Api\V1\Admin\AdminResourceController;
 use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
+use App\Http\Controllers\Api\V1\Admin\InvoiceController;
+use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
@@ -66,6 +68,14 @@ class PermissionSyncService
         // access to the ledger once the pilot widens.
         PaymentController::class => [
             'payments' => ['view', 'reverse'],
+        ],
+        // Provider invoicing - each action its own grant, so recording money
+        // can be given to accounts staff without the right to void or cancel.
+        InvoiceController::class => [
+            'invoices' => ['view', 'cancel'],
+        ],
+        InvoicePaymentController::class => [
+            'invoices' => ['record_payment', 'void_payment'],
         ],
         // Service providers (docs/decisions/service-providers.md). Every
         // route is permission-gated, so the decision on a provider request

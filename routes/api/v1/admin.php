@@ -33,6 +33,8 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
+use App\Http\Controllers\Api\V1\Admin\InvoiceController;
+use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
 use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
@@ -279,6 +281,13 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::get('provider-requests/{providerRequest}', [ProviderRequestController::class, 'show'])->middleware('permission:provider-requests.view');
     Route::post('provider-requests/{providerRequest}/approve', [ProviderRequestController::class, 'approve'])->middleware('permission:provider-requests.approve');
     Route::post('provider-requests/{providerRequest}/reject', [ProviderRequestController::class, 'reject'])->middleware('permission:provider-requests.reject');
+
+    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+    Route::get('invoices', [InvoiceController::class, 'index'])->middleware('permission:invoices.view');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoices.view');
+    Route::post('invoices/{invoice}/payments', [InvoicePaymentController::class, 'store'])->middleware('permission:invoices.record_payment');
+    Route::post('invoice-payments/{invoicePayment}/void', [InvoicePaymentController::class, 'void'])->middleware('permission:invoices.void_payment');
+    Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.cancel');
 });
 
 // Mobile client crash/error reports (ingested unauthenticated from

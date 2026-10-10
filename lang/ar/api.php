@@ -687,6 +687,8 @@ return [
         'already_cancelled' => 'هذه الفاتورة ملغاة بالفعل.',
         'payment_already_voided' => 'هذه الدفعة مُبطلة بالفعل.',
         'amount_too_small' => 'المبلغ أصغر من أن يُسجَّل.',
+        'cancelled' => 'أُلغيت الفاتورة.',
+        'payment_voided' => 'أُبطلت الدفعة.',
     ],
 
 ];
