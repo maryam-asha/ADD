@@ -14,14 +14,14 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
- * Owns the access_grants lifecycle end to end: issue (booking or tenancy),
+ * Owns the access_grants lifecycle end to end: issue (booking or lease),
  * activate (kiosk-confirmed arrival), revoke (maintenance conflict),
  * expire (never activated in time). docs/decisions/qr-lock-unlock.md §2.
  */
@@ -59,33 +59,53 @@ class PasscodeIssuanceService
         ]);
     }
 
-    public function issueForTenancy(Company $company, Device $lock): AccessGrant
+    /**
+     * The office lock for a lease's company: activated at once (there is no
+     * kiosk arrival for a tenancy, so expireOverdue() — Issued grants only —
+     * never touches it) and live through the lease's last access day, on
+     * the keypad and in our own expires_at alike.
+     */
+    public function issueForLease(OfficeLease $lease): AccessGrant
     {
+        $lock = $this->lockFor($lease->space);
         $issuedAt = now();
-        // TTLock's Period type requires a bounded endDate; a tenancy grant
-        // is conceptually open-ended, so the vendor-side window is set far
-        // enough out to be operationally permanent. Our own status/
-        // expires_at (left null below) are what actually gate access —
-        // this bound only exists to satisfy the vendor API's shape.
-        $vendorEnd = $issuedAt->copy()->addYears(5);
+        $endsAt = $lease->accessEndsOn()->endOfDay();
 
-        $vendor = $this->ttlock->addPeriodPasscode($lock, $issuedAt, $vendorEnd);
+        $vendor = $this->ttlock->addPeriodPasscode($lock, $issuedAt, $endsAt);
 
         return AccessGrant::create([
             'lock_id' => $lock->id,
             'grantee_type' => OwnerType::Company,
-            'grantee_id' => $company->id,
+            'grantee_id' => $lease->company_id,
             'source_type' => AccessSourceType::Tenancy,
             'source_id' => null,
+            'office_lease_id' => $lease->id,
             'allocation_model' => AllocationModel::Tenancy,
             'passcode_type' => PasscodeType::Period,
             'passcode_value' => $vendor['passcode'],
             'vendor_keyboard_pwd_id' => $vendor['vendor_passcode_id'],
             'issued_at' => $issuedAt,
-            'must_activate_by' => $issuedAt->copy()->addHours(24),
-            'expires_at' => null,
-            'status' => AccessGrantStatus::Issued,
+            'must_activate_by' => $issuedAt,
+            'activated_at' => $issuedAt,
+            'expires_at' => $endsAt,
+            'status' => AccessGrantStatus::Activated,
         ]);
+    }
+
+    /** Ends every live grant of the lease, on the lock too. */
+    public function revokeForLease(OfficeLease $lease): void
+    {
+        AccessGrant::query()
+            ->where('office_lease_id', $lease->id)
+            ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
+            ->with('lock')
+            ->get()
+            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $grant->lock));
+    }
+
+    public function hasLock(Space $space): bool
+    {
+        return $space->devices()->where('type', 'lock')->exists();
     }
 
     public function activate(AccessGrant $grant, User $actor): void
