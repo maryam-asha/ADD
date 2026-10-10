@@ -58,6 +58,10 @@ use App\Domain\Identity\Models\ErrorLog;
 use App\Domain\Identity\Models\OtpVerification;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\UserPersonalProfile;
+use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
+use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\InvoicePayment;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -75,6 +79,7 @@ use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Models\CouponRevision;
 use App\Domain\Pricing\Models\CouponTarget;
+use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Enums\ProviderStatus;
@@ -240,6 +245,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ProviderRequest::class => [
             'type' => ProviderRequestType::class,
             'status' => ProviderRequestStatus::class,
+        ],
+        Invoice::class => [
+            'status' => InvoiceStatus::class,
+            'billed_to' => Payer::class,
+        ],
+        InvoicePayment::class => [
+            'method' => InvoicePaymentMethod::class,
         ],
     ];
 

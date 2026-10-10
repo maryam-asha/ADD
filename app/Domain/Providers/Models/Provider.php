@@ -23,6 +23,7 @@ class Provider extends Model
     protected $fillable = [
         'name',
         'contract_ref',
+        'payment_terms_days',
         'status',
     ];
 
@@ -30,6 +31,7 @@ class Provider extends Model
     {
         return [
             'status' => ProviderStatus::class,
+            'payment_terms_days' => 'integer',
         ];
     }
 

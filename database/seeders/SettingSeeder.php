@@ -49,5 +49,8 @@ class SettingSeeder extends Seeder
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
         $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
+        // Provider invoicing: days from issue to due when the provider has
+        // no payment terms of its own (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+        $settings->setDefault('invoices.default_due_days', 15, SettingValueType::Int);
     }
 }

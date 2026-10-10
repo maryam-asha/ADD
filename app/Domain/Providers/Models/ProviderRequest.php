@@ -4,12 +4,14 @@ namespace App\Domain\Providers\Models;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * One thing a provider asked ADD to grant, waiting for (or past) a review.
@@ -57,6 +59,12 @@ class ProviderRequest extends Model
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /** The invoice approval issued, for an assignment or a top-up. */
+    public function invoice(): HasOne
+    {
+        return $this->hasOne(Invoice::class);
     }
 
     public function scopePending(Builder $query): Builder
