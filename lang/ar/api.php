@@ -681,6 +681,11 @@ return [
 
     'invoice' => [
         'no_exchange_rate' => 'لا يوجد سعر صرف لـ :currency بعد.',
+        'not_payable' => 'هذه الفاتورة مدفوعة أو ملغاة؛ لا تقبل دفعة.',
+        'overpayment' => 'المبلغ أكبر من المتبقي على الفاتورة (:remaining :currency).',
+        'has_payments' => 'على هذه الفاتورة دفعات؛ أبطلها قبل الإلغاء.',
+        'already_cancelled' => 'هذه الفاتورة ملغاة بالفعل.',
+        'payment_already_voided' => 'هذه الدفعة مُبطلة بالفعل.',
     ],
 
 ];

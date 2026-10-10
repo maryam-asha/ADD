@@ -695,6 +695,11 @@ return [
     // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
     'invoice' => [
         'no_exchange_rate' => 'There is no exchange rate for :currency yet.',
+        'not_payable' => 'This invoice is paid or cancelled; it takes no payment.',
+        'overpayment' => 'That is more than what is left on this invoice (:remaining :currency).',
+        'has_payments' => 'This invoice has payments; void them before cancelling it.',
+        'already_cancelled' => 'This invoice is already cancelled.',
+        'payment_already_voided' => 'This payment is already voided.',
     ],
 
 ];
