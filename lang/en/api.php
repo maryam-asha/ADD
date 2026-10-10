@@ -692,7 +692,6 @@ return [
     ],
 
     // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
-    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
     'invoice' => [
         'no_exchange_rate' => 'There is no exchange rate for :currency yet.',
         'not_payable' => 'This invoice is paid or cancelled; it takes no payment.',

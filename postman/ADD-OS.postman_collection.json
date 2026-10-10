@@ -272,6 +272,14 @@
         {
             "key": "provider_request_id",
             "value": ""
+        },
+        {
+            "key": "invoice_id",
+            "value": ""
+        },
+        {
+            "key": "invoice_payment_id",
+            "value": ""
         }
     ],
     "event": [
@@ -24179,7 +24187,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"override_capacity\": false\n}",
+                                    "raw": "{\n    \"override_capacity\": false,\n    \"invoice_currency\": \"USD\",\n    \"invoice_amount\": \"1200.00\",\n    \"invoice_due_at\": \"2026-10-25\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -24200,7 +24208,7 @@
                                         "approve"
                                     ]
                                 },
-                                "description": "Needs provider-requests.approve."
+                                "description": "Needs provider-requests.approve. For a plan assignment or a top-up it also issues the invoice: invoice_currency (default: the reviewer's currency), invoice_amount (override of the points-priced amount) and invoice_due_at (default: provider payment_terms_days, else 15 days) are optional. A currency without an exchange rate refuses the whole approval (422)."
                             }
                         },
                         {
@@ -24247,6 +24255,213 @@
                                     ]
                                 },
                                 "description": "Needs provider-requests.reject; reason is required."
+                            }
+                        },
+                        {
+                            "name": "List Invoices",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/invoices?overdue=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "overdue",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Needs invoices.view. Filters: status, overdue, provider_id, company_id, billed_to, per_page."
+                            }
+                        },
+                        {
+                            "name": "Show Invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/invoices/{{invoice_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "invoices",
+                                        "{{invoice_id}}"
+                                    ]
+                                },
+                                "description": "Needs invoices.view. Includes payments (voided ones too) and the staff fields."
+                            }
+                        },
+                        {
+                            "name": "Record Payment",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"amount\": \"500.00\",\n    \"currency\": \"USD\",\n    \"method\": \"bank_transfer\",\n    \"receipt_number\": \"TRF-1042\",\n    \"paid_at\": \"2026-10-10\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/invoices/{{invoice_id}}/payments",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "payments"
+                                    ]
+                                },
+                                "description": "Needs invoices.record_payment. Any currency, converted at the day's rate and truncated to the invoice currency; partial payments allowed, overpayment refused (422). method: bank_transfer|cash|cheque|other."
+                            }
+                        },
+                        {
+                            "name": "Void Payment",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"reason\": \"Recorded against the wrong invoice\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/invoice-payments/{{invoice_payment_id}}/void",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "invoice-payments",
+                                        "{{invoice_payment_id}}",
+                                        "void"
+                                    ]
+                                },
+                                "description": "Needs invoices.void_payment. The payment is kept, marked voided; reason is required."
+                            }
+                        },
+                        {
+                            "name": "Cancel Invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"reason\": \"Issued in error\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/invoices/{{invoice_id}}/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Needs invoices.cancel. Refused while any active (non-voided) payment exists; the assigned plan is unaffected. reason is required."
                             }
                         }
                     ]
@@ -24833,6 +25048,69 @@
                             ]
                         },
                         "description": "Pending requests only."
+                    }
+                },
+                {
+                    "name": "List Invoices",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/invoices",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "invoices"
+                            ]
+                        },
+                        "description": "The provider's own invoices, read only, without staff fields."
+                    }
+                },
+                {
+                    "name": "Show Invoice",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/invoices/{{invoice_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "invoices",
+                                "{{invoice_id}}"
+                            ]
+                        },
+                        "description": "Another provider's invoice answers 404."
                     }
                 }
             ]

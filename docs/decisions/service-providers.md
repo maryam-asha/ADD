@@ -5,7 +5,8 @@
 `docs/superpowers/specs/2026-10-08-service-providers-design.md` (Arabic,
 user-approved); plan: `docs/superpowers/plans/2026-10-08-service-providers.md`.
 This file describes the code as shipped, including the rulings made while
-implementing it. Phase 1 of 4 (core and approvals).
+implementing it. Phase 1 of 5 (core and approvals); Phase 2 (invoicing) is
+described in **Invoicing (Phase 2)** below.
 
 ## What this adds
 
@@ -26,7 +27,7 @@ access or seats or moves money.
 | Who decides | `provider-requests.approve` / `.reject` are permissions, assignable to any role, not admin-only. |
 | New company | A private-office request carrying `provider_id`, on the existing `requested -> quoted -> contracted` pipeline. |
 | Deactivation | Cuts off the provider's accounts and cancels its pending requests; companies carry on; admin moves them to another provider or to ADD direct. |
-| Payment | Phase 1 activates with no charge. Invoices (payer = provider or company) are Phase 2. |
+| Payment | Phase 1 activated with no charge; Phase 2 issues an invoice on approval (payer = provider or company), see **Invoicing (Phase 2)**. |
 
 ## Decisions this revises
 
@@ -106,12 +107,72 @@ Other rulings:
 - A member-app grant of company admin on a provider's company answers 202 and
   files a `company_admin` request (deduplicated); a revoke stays direct.
 
+## Invoicing (Phase 2)
+
+Spec: `docs/superpowers/specs/2026-10-10-provider-invoicing-design.md`
+(Arabic). Approvals now leave a recorded receivable, so the Phase 1 warning
+against shipping without invoices no longer applies.
+
+**What an approval issues.** `ProviderRequestService::approve()` calls
+`InvoiceIssuer` inside the approval transaction, for the two types that carry a
+charge: a `plan_assignment` (plan price x seats) and a `wallet_top_up` (the
+points). `billed_to` is the request's `payer` (provider or company). The amount
+is priced with `ReceivedMoneyConverter::pointsToAmount()` in the reviewer's
+currency and frozen on the invoice together with the rate used. The due date is
+the provider's `payment_terms_days`, else the setting `invoices.default_due_days`
+(15). A currency without an exchange rate refuses the whole approval
+(`api.invoice.no_exchange_rate`, 422): nothing is activated or credited
+without its invoice.
+
+**Approve body and admin view.** The approve body gains three optional fields:
+`invoice_currency`, `invoice_amount` (overrides the points-priced amount) and
+`invoice_due_at`. The admin request view returns an `invoice_preview` block
+while the request is pending and an `invoice` block once it is approved.
+
+**Payments.** Recorded from the dashboard only (`invoices.record_payment`),
+outside the points ledger and the cash drawer: an invoice payment moves no
+wallet and no drawer balance. A payment may be in any currency; it is converted
+at the day's rate and truncated to the invoice currency's decimals, and a
+shortfall under one minor unit settles the remainder. Partial payments are
+allowed; overpayment is refused. A payment is voided, never deleted
+(`invoices.void_payment`), which reopens the balance. An invoice is cancelled
+(`invoices.cancel`) only when it has no active payment; cancelling does not
+touch the plan or the credit that was granted.
+
+**Provider view.** `GET provider/invoices` and `provider/invoices/{invoice}`,
+read only, without staff fields. Another provider's invoice is a 404.
+
+**Sources.** An invoice points at what produced it through separate nullable
+foreign keys, today only `provider_request_id`. Office leases (Phase 3) add
+their own column rather than a morph.
+
+**Permissions.** `invoices.view`, `invoices.record_payment`,
+`invoices.void_payment`, `invoices.cancel`; run `permissions:sync` on deploy.
+
+### Rulings made while implementing
+
+| Spec says | Done | Why |
+|---|---|---|
+| amount via `PointConversionService::pointsToCurrency()` | `ReceivedMoneyConverter::pointsToAmount($points, $currency)` | Same rate source, but bcmath end to end; `pointsToCurrency()` goes through floats. |
+| payment conversion "rounded up" | rounded **down** (truncated) to the invoice currency's decimals; a shortfall under one minor unit settles the remainder exactly | Money received is credited conservatively everywhere else (points floor); rounding up would credit more than was paid. The one-unit rule keeps an exact equivalent payment from leaving `0.01` open. |
+| (spec silent) | `ReceivedMoneyConverter` throws `PaymentPricingException` (a 503 plus a Paymera log); the issuer catches it and throws `InvoicingException('api.invoice.no_exchange_rate')` (422) | A missing invoice-currency rate is the reviewer's choice, not a gateway outage. |
+
+Also:
+
+- The one-minor-unit settle rule applies only when the payment currency differs
+  from the invoice currency (it absorbs conversion truncation); a same-currency
+  payment one unit short stays partially paid.
+- A payment whose amount is not positive, or converts to zero, is refused
+  (`api.invoice.amount_too_small`). Cancelling is refused while any active
+  (non-voided) payment exists.
+
+## Phase order
+
+1 core and approvals (shipped) -> 2 invoicing (this section) -> 3 office
+leases -> 4 auto-renewal -> 5 reports.
 ## Explicitly not done here
 
-- **Invoices (Phase 2).** Approval activates plans and credits wallets with no
-  charge. Do not ship to production without Phase 2 unless collection outside
-  the system is explicitly accepted.
-- **Auto-renewal (Phase 3)**, **reports (Phase 4)**.
+- **Office leases (Phase 3)**, **auto-renewal (Phase 4)**, **reports (Phase 5)**.
 - No per-provider contractual discount (deferred until it recurs).
 
 ## Deploy
