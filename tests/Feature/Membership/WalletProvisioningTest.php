@@ -34,6 +34,7 @@ class WalletProvisioningTest extends TestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();

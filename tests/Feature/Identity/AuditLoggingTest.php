@@ -61,6 +61,7 @@ class AuditLoggingTest extends IdentityTestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();

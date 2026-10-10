@@ -255,7 +255,9 @@ Route::apiResource('private-office-requests', PrivateOfficeRequestController::cl
 // deactivate, they don't hard-delete, same reasoning as UserController), and
 // "update" is specifically the status transition, not a free-form PATCH.
 Route::get('companies', [CompanyController::class, 'index']);
-Route::post('companies', [CompanyController::class, 'store']);
+// Creating a company contracts its first lease, so it needs that permission
+// on top of the group's role gate (docs/decisions/office-leases.md).
+Route::post('companies', [CompanyController::class, 'store'])->middleware('permission:office-leases.create');
 Route::get('companies/{company}', [CompanyController::class, 'show']);
 Route::patch('companies/{company}/status', [CompanyController::class, 'updateStatus']);
 

@@ -9,7 +9,10 @@ use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
 use Database\Seeders\CurrencySeeder;
+use Database\Seeders\PermissionSeeder;
 use Illuminate\Support\Facades\Http;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 /** Offices, lease request bodies and a fake TTLock, for any test that contracts a lease. */
 trait BuildsOfficeLeases
@@ -48,6 +51,19 @@ trait BuildsOfficeLeases
             'currency' => 'USD',
             ...$overrides,
         ];
+    }
+
+    /**
+     * POST admin/companies contracts a lease, so it needs office-leases.create
+     * on top of the role (docs/decisions/office-leases.md): grant it to $role.
+     */
+    protected function grantLeaseCreation(string $role = 'operations'): void
+    {
+        if (! Permission::query()->where('name', 'office-leases.create')->exists()) {
+            $this->seed(PermissionSeeder::class);
+        }
+
+        Role::findByName($role, 'web')->givePermissionTo('office-leases.create');
     }
 
     /** TTLock answering every call: passcode 112233 / id 5 on creation, success on delete. */

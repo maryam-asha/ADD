@@ -23,6 +23,7 @@ class CompanyLifecycleTest extends IdentityTestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();
@@ -49,6 +50,7 @@ class CompanyLifecycleTest extends IdentityTestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->create(); // still 'requested', no quote issued
@@ -93,6 +95,7 @@ class CompanyLifecycleTest extends IdentityTestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $office = $this->leasableOffice($branch = Branch::factory()->create());

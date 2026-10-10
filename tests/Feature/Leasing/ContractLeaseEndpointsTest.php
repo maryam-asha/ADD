@@ -6,8 +6,10 @@ use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\User;
+use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Providers\Models\Provider;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 
 class ContractLeaseEndpointsTest extends LeasingTestCase
 {
@@ -53,6 +55,43 @@ class ContractLeaseEndpointsTest extends LeasingTestCase
             ->assertJsonPath('data.billed_to', 'company')
             ->assertJsonPath('data.access.status', 'none')
             ->assertJsonPath('data.access.warning', null);
+    }
+
+    /** POST admin/companies contracts a lease, so it needs the lease permission too. */
+    public function test_creating_a_company_needs_the_lease_permission(): void
+    {
+        $body = fn () => [
+            'private_office_request_id' => PrivateOfficeRequest::factory()->quoted()->create()->id,
+            'legal_name' => 'Acme LLC',
+            'contract_ref' => 'C-3003',
+            ...$this->leasePayload($this->leasableOffice()),
+        ];
+
+        $operations = User::factory()->create();
+        $operations->assignRole('operations');
+        Sanctum::actingAs($operations, ['*']);
+        $this->postJson('/api/v1/admin/companies', $body())->assertForbidden();
+        $this->assertSame(0, Company::query()->count());
+
+        Role::findByName('operations', 'web')->givePermissionTo('office-leases.create');
+        $this->postJson('/api/v1/admin/companies', $body())
+            ->assertCreated()
+            // Creating is not reading: without office-leases.view no lease is shown.
+            ->assertJsonMissingPath('data.office_leases');
+    }
+
+    public function test_a_company_shows_its_leases_only_to_who_may_view_leases(): void
+    {
+        $lease = OfficeLease::factory()->create();
+        $url = "/api/v1/admin/companies/{$lease->company_id}";
+
+        $operations = User::factory()->create();
+        $operations->assignRole('operations');
+        Sanctum::actingAs($operations, ['*']);
+        $this->getJson($url)->assertOk()->assertJsonMissingPath('data.office_leases');
+
+        Role::findByName('operations', 'web')->givePermissionTo('office-leases.view');
+        $this->getJson($url)->assertOk()->assertJsonPath('data.office_leases.0.id', $lease->id);
     }
 
     public function test_lease_fields_are_validated(): void

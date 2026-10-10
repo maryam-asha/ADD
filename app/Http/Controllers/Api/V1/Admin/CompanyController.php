@@ -15,6 +15,7 @@ use App\Http\Requests\Admin\UpdateCompanyStatusRequest;
 use App\Http\Resources\CompanyResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 
 /**
@@ -43,9 +44,16 @@ class CompanyController extends Controller
         return CompanyResource::collection($companies);
     }
 
-    public function show(Company $company): CompanyResource
+    public function show(Request $request, Company $company): CompanyResource
     {
-        return new CompanyResource($company->load(['provider', 'officeLeases.space.building']));
+        $company->load('provider');
+
+        // Leases are read under office-leases.view, here as on their own routes.
+        if ($request->user()->can('office-leases.view')) {
+            $company->load('officeLeases.space.building');
+        }
+
+        return new CompanyResource($company);
     }
 
     /**
@@ -73,9 +81,13 @@ class CompanyController extends Controller
             'provider_id' => $company->provider_id,
         ]);
 
-        return (new CompanyResource($company->load([
-            'provider', 'officeLeases.company', 'officeLeases.space.building', 'officeLeases.provider', 'officeLeases.periods.invoice', 'officeLeases.accessGrants',
-        ])))->response()->setStatusCode(201);
+        $company->load('provider');
+
+        if ($request->user()->can('office-leases.view')) {
+            $company->load(['officeLeases.company', 'officeLeases.space.building', 'officeLeases.provider', 'officeLeases.periods.invoice', 'officeLeases.accessGrants']);
+        }
+
+        return (new CompanyResource($company))->response()->setStatusCode(201);
     }
 
     public function updateStatus(UpdateCompanyStatusRequest $request, Company $company): JsonResponse
