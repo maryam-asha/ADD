@@ -2,19 +2,21 @@
 
 namespace Tests\Feature\Providers;
 
-use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Providers\Models\Provider;
+use Tests\Concerns\BuildsOfficeLeases;
 
 class ProviderOfficeRequestTest extends ProviderTestCase
 {
+    use BuildsOfficeLeases;
+
     public function test_a_provider_requests_offices_for_a_client(): void
     {
         $provider = Provider::factory()->create();
         $account = $this->providerAccount($provider);
 
-        $this->postJson('/api/v1/provider/office-requests', ['prospect_name' => 'Acme', 'contact' => '0944444444'])
+        $this->postJson('/api/v1/provider/office-requests', ['prospect_name' => 'Acme', 'contact' => '0944444444', 'payer' => 'provider'])
             ->assertCreated()
             ->assertJsonPath('data.status', 'requested')
             ->assertJsonPath('data.provider_id', $provider->id);
@@ -52,6 +54,7 @@ class ProviderOfficeRequestTest extends ProviderTestCase
         $provider = Provider::factory()->create();
         $request = PrivateOfficeRequest::factory()->quoted()->create([
             'provider_id' => $provider->id,
+            'payer' => 'provider',
         ]);
         $this->actingAsAdmin();
 
@@ -59,7 +62,7 @@ class ProviderOfficeRequestTest extends ProviderTestCase
             'private_office_request_id' => $request->id,
             'legal_name' => 'Acme LLC',
             'contract_ref' => 'C-9',
-            'branch_id' => Branch::factory()->create()->id,
+            ...$this->leasePayload($this->leasableOffice()),
         ])->assertCreated()->assertJsonPath('data.provider_id', $provider->id);
 
         $this->assertSame($provider->id, Company::sole()->provider_id);

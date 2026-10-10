@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\InvoiceController;
 use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
+use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
@@ -92,6 +93,11 @@ class PermissionSyncService
         ],
         ProviderRequestController::class => [
             'provider-requests' => ['view', 'approve', 'reject'],
+        ],
+        // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+        // Ending a lease early is its own grant.
+        OfficeLeaseController::class => [
+            'office-leases' => ['view', 'create', 'terminate'],
         ],
     ];
 

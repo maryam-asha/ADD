@@ -41,6 +41,7 @@ use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
 use App\Http\Controllers\Api\V1\Admin\OfferReportController;
+use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
 use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
 use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
@@ -288,6 +289,9 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::post('invoices/{invoice}/payments', [InvoicePaymentController::class, 'store'])->middleware('permission:invoices.record_payment');
     Route::post('invoice-payments/{invoicePayment}/void', [InvoicePaymentController::class, 'void'])->middleware('permission:invoices.void_payment');
     Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.cancel');
+
+    // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+    Route::post('private-office-requests/{privateOfficeRequest}/lease', [OfficeLeaseController::class, 'store'])->middleware('permission:office-leases.create');
 });
 
 // Mobile client crash/error reports (ingested unauthenticated from

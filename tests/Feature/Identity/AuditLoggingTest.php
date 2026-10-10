@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\User;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Activitylog\Models\Activity;
+use Tests\Concerns\BuildsOfficeLeases;
 
 /**
  * PRD §5.1: every sensitive action is audit-logged with the actor and a
@@ -16,6 +17,8 @@ use Spatie\Activitylog\Models\Activity;
  */
 class AuditLoggingTest extends IdentityTestCase
 {
+    use BuildsOfficeLeases;
+
     public function test_a_role_change_is_audit_logged_with_before_and_after(): void
     {
         $admin = User::factory()->create();
@@ -67,7 +70,7 @@ class AuditLoggingTest extends IdentityTestCase
             'private_office_request_id' => $poRequest->id,
             'legal_name' => 'ACME LLC',
             'contract_ref' => 'C-9001',
-            'branch_id' => $branch->id,
+            ...$this->leasePayload($this->leasableOffice($branch)),
         ])->assertCreated();
 
         $activity = Activity::where('description', 'company_created')->latest('id')->first();

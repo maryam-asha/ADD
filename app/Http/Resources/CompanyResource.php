@@ -24,6 +24,7 @@ class CompanyResource extends JsonResource
                 'id' => $this->provider->id,
                 'name' => $this->provider->name,
             ]),
+            'office_leases' => OfficeLeaseResource::collection($this->whenLoaded('officeLeases')),
             'created_at' => $this->created_at,
         ];
     }

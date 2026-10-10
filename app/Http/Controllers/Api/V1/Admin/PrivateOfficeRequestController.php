@@ -31,7 +31,7 @@ class PrivateOfficeRequestController extends AdminResourceController
     /** Each request names the provider that brought it, and the list filters by one. */
     protected function applyIndexFilters(Builder $query, Request $request): void
     {
-        $query->with('provider')
+        $query->with(['provider', 'company'])
             ->when($request->filled('provider_id'), fn (Builder $q) => $q->where('provider_id', $request->integer('provider_id')));
     }
 
