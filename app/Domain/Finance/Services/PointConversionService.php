@@ -75,6 +75,18 @@ class PointConversionService
     }
 
     /**
+     * Points a cash payment buys — credit direction. Floors once, on the
+     * exact base-currency value (Invariant 2); nothing is rounded before the
+     * floor. Null when the currency has no current exchange rate.
+     */
+    public function currencyToPoints(string $amount, string $currencyCode): ?int
+    {
+        $usd = $this->currency->toBaseExact($amount, $currencyCode);
+
+        return $usd === null ? null : $this->usdToPoints($usd);
+    }
+
+    /**
      * Null when the target currency has no exchange rate, matching
      * CurrencyConversionService's existing contract so callers keep
      * their null handling.

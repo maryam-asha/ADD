@@ -60,4 +60,26 @@ class CurrencyConversionService
 
         return round($amountInBase / (float) $toRate->rate_to_base, 2);
     }
+
+    /**
+     * The exact base-currency value of an amount, as a bcmath string — no
+     * rounding at all. For the top-up credit path, where the result is
+     * floored into points: rounding to cents first, as convert() does, can
+     * lift it across a point boundary and credit more than was paid.
+     * Null when the currency has no current rate, matching convert().
+     */
+    public function toBaseExact(string $amount, string $fromCurrency): ?string
+    {
+        if ($fromCurrency === $this->baseCurrencyCode()) {
+            return $amount;
+        }
+
+        $rate = ExchangeRate::current($fromCurrency);
+
+        if ($rate === null) {
+            return null;
+        }
+
+        return bcmul($amount, (string) $rate->rate_to_base, 20);
+    }
 }
