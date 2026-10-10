@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
 use Illuminate\Database\Seeder;
@@ -31,5 +32,6 @@ class SettingSeeder extends Seeder
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
         $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
+        $settings->setDefault(TopUpMinimum::SETTING_KEY, TopUpMinimum::DEFAULT_POINTS, SettingValueType::Int);
     }
 }

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Admin;
 
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
 use Database\Seeders\RoleSeeder;
@@ -136,5 +137,21 @@ class SettingControllerTest extends TestCase
         $this->assertSame($admin->id, $activity->causer_id);
         $this->assertSame(0, $activity->properties['before']);
         $this->assertSame(15, $activity->properties['after']);
+    }
+
+    public function test_the_minimum_top_up_must_be_a_whole_number_of_at_least_one_point(): void
+    {
+        app(SettingService::class)->set(TopUpMinimum::SETTING_KEY, 10, SettingValueType::Int);
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        foreach ([0, -5, 2.5, 'ten'] as $invalid) {
+            $this->patchJson('/api/v1/admin/settings/wallet.top_up_min_points', ['value' => $invalid])
+                ->assertJsonValidationErrors('value');
+        }
+
+        $this->patchJson('/api/v1/admin/settings/wallet.top_up_min_points', ['value' => 25])->assertOk();
+        $this->assertSame(25, app(TopUpMinimum::class)->points());
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
@@ -25,6 +26,10 @@ class UpdateSettingRequest extends FormRequest
 
         if ($this->targetSetting()->key === PointConversionService::SETTING_KEY) {
             return ['value' => ['required', 'numeric', 'gt:0', 'decimal:0,4']];
+        }
+
+        if ($this->targetSetting()->key === TopUpMinimum::SETTING_KEY) {
+            return ['value' => ['required', 'integer', 'min:1']];
         }
 
         return [
