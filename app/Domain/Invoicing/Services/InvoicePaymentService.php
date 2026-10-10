@@ -27,8 +27,17 @@ class InvoicePaymentService
                 throw new InvoicingException('api.invoice.not_payable', 409);
             }
 
+            if (bccomp((string) $data['amount'], '0', 8) <= 0) {
+                throw new InvoicingException('api.invoice.amount_too_small');
+            }
+
             $converted = $this->money->toInvoiceCurrency((string) $data['amount'], $data['currency'], $locked->currency);
             $amount = $converted['amount'];
+
+            if (bccomp($amount, '0', 2) <= 0) {
+                throw new InvoicingException('api.invoice.amount_too_small');
+            }
+
             $remaining = $locked->remaining();
             $shortfall = bcsub($remaining, $amount, 2);
 
@@ -36,9 +45,11 @@ class InvoicePaymentService
                 throw new InvoicingException('api.invoice.overpayment', 422, ['remaining' => $remaining, 'currency' => $locked->currency]);
             }
 
-            // Truncation can leave less than one minor unit open on a payment
-            // worth exactly the remainder: that payment settles it.
-            if (bccomp($shortfall, '0', 2) > 0 && bccomp($shortfall, $this->money->minorUnit($locked->currency), 2) <= 0) {
+            // Converting from another currency truncates, which can leave less than
+            // one minor unit open on a payment worth exactly the remainder: that
+            // payment settles it. A same-currency payment is never rounded, so
+            // one unit short stays open.
+            if ($data['currency'] !== $locked->currency && bccomp($shortfall, '0', 2) > 0 && bccomp($shortfall, $this->money->minorUnit($locked->currency), 2) <= 0) {
                 $amount = $remaining;
             }
 
@@ -96,7 +107,7 @@ class InvoicePaymentService
                 throw new InvoicingException('api.invoice.already_cancelled', 409);
             }
 
-            if (bccomp((string) $locked->paid_amount, '0', 2) > 0) {
+            if ($locked->payments()->active()->exists()) {
                 throw new InvoicingException('api.invoice.has_payments');
             }
 

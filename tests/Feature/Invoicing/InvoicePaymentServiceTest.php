@@ -127,6 +127,56 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
         $this->service()->void($payment->fresh(), 'y', $this->staff);
     }
 
+    public function test_a_same_currency_payment_one_unit_short_stays_partially_paid(): void
+    {
+        $invoice = Invoice::factory()->create(['amount' => '100.00']);
+
+        $this->pay($invoice, '99.99');
+
+        $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->fresh()->status);
+        $this->assertSame('0.01', $invoice->fresh()->remaining());
+    }
+
+    public function test_a_converted_payment_two_units_short_does_not_settle(): void
+    {
+        $this->syp('0.0001');
+        $invoice = Invoice::factory()->create(['amount' => '10.00']);
+
+        $this->pay($invoice, '99800', 'SYP'); // 9.98 USD
+
+        $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->fresh()->status);
+        $this->assertSame('9.98', (string) $invoice->fresh()->paid_amount);
+    }
+
+    public function test_an_amount_that_converts_to_nothing_is_refused(): void
+    {
+        $this->syp('0.0001');
+        $invoice = Invoice::factory()->create(['amount' => '10.00']);
+
+        foreach ([['1', 'SYP'], ['0', 'USD']] as [$amount, $currency]) {
+            try {
+                $this->pay($invoice, $amount, $currency);
+                $this->fail('A zero-value payment was accepted.');
+            } catch (InvoicingException $e) {
+                $this->assertSame('api.invoice.amount_too_small', $e->messageKey);
+            }
+        }
+
+        $this->assertSame(0, InvoicePayment::query()->count());
+    }
+
+    public function test_a_whole_unit_currency_invoice_settles_and_voiding_one_of_two_payments_reopens_it(): void
+    {
+        $invoice = Invoice::factory()->create(['amount' => '1000', 'currency' => 'SYP']);
+
+        $first = $this->pay($invoice, '400', 'SYP');
+        $this->pay($invoice, '600', 'SYP');
+        $this->assertSame(InvoiceStatus::Paid, $invoice->fresh()->status);
+
+        $this->service()->void($first, 'Mistake', $this->staff);
+        $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->fresh()->status);
+    }
+
     public function test_a_currency_with_no_rate_is_refused(): void
     {
         $this->expectException(InvoicingException::class);

@@ -700,6 +700,7 @@ return [
         'has_payments' => 'This invoice has payments; void them before cancelling it.',
         'already_cancelled' => 'This invoice is already cancelled.',
         'payment_already_voided' => 'This payment is already voided.',
+        'amount_too_small' => 'The amount is too small to record.',
     ],
 
 ];
