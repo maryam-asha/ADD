@@ -12,6 +12,8 @@ use App\Domain\Invoicing\Data\InvoiceTerms;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Leasing\Enums\LeasePeriodStatus;
+use App\Domain\Leasing\Models\OfficeLeasePeriod;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Enums\ProviderRequestType;
@@ -24,7 +26,7 @@ use App\Domain\Settings\Services\SettingService;
  * (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md):
  * points priced in the reviewer's currency at today's rate, due after the
  * provider's terms or the default. The draft is source-agnostic; each
- * source gets a thin wrapper (issueForProviderRequest today).
+ * source gets a thin wrapper (issueForProviderRequest, issueForLeasePeriod).
  */
 class InvoiceIssuer
 {
@@ -64,32 +66,42 @@ class InvoiceIssuer
 
     public function quote(InvoiceDraft $draft, InvoiceTerms $terms): InvoiceQuote
     {
-        $currency = $terms->currency ?? $this->currencies->baseCurrencyCode();
+        $currency = $draft->isFixed()
+            ? $draft->fixedCurrency
+            : ($terms->currency ?? $this->currencies->baseCurrencyCode());
 
-        try {
-            $computed = $this->money->pointsToAmount($draft->points, $currency);
-        } catch (PaymentPricingException) {
-            throw new InvoicingException('api.invoice.no_exchange_rate', 422, ['currency' => $currency]);
+        if ($draft->isFixed()) {
+            $computed = $draft->fixedAmount;
+        } else {
+            try {
+                $computed = $this->money->pointsToAmount($draft->points, $currency);
+            } catch (PaymentPricingException) {
+                throw new InvoicingException('api.invoice.no_exchange_rate', 422, ['currency' => $currency]);
+            }
         }
 
         $rate = $currency === $this->currencies->baseCurrencyCode()
             ? '1'
             : $this->currencies->rateToBase($currency);
 
-        $issuedAt = now()->toDateString();
+        // A fixed amount needs no conversion, but the rate is stored with
+        // every invoice for reference — without one there is nothing to store.
+        if ($rate === null) {
+            throw new InvoicingException('api.invoice.no_exchange_rate', 422, ['currency' => $currency]);
+        }
 
         return new InvoiceQuote(
             points: $draft->points,
             currency: $currency,
             computedAmount: $computed,
-            amount: $terms->amount ?? $computed,
+            amount: $draft->isFixed() ? $computed : ($terms->amount ?? $computed),
             exchangeRateToBase: (string) $rate,
-            issuedAt: $issuedAt,
+            issuedAt: now()->toDateString(),
             dueAt: $terms->dueAt ?? now()->addDays($this->dueDays($draft->providerId))->toDateString(),
         );
     }
 
-    public function issue(InvoiceDraft $draft, InvoiceTerms $terms, User $reviewer): Invoice
+    public function issue(InvoiceDraft $draft, InvoiceTerms $terms, ?User $reviewer): Invoice
     {
         $quote = $this->quote($draft, $terms);
 
@@ -108,7 +120,7 @@ class InvoiceIssuer
             'status' => InvoiceStatus::Unpaid,
             'issued_at' => $quote->issuedAt,
             'due_at' => $quote->dueAt,
-            'issued_by' => $reviewer->id,
+            'issued_by' => $reviewer?->id,
         ]);
 
         activity()->causedBy($reviewer)->performedOn($invoice)->withProperties([
@@ -126,6 +138,38 @@ class InvoiceIssuer
         $draft = $this->draftFor($request);
 
         return $draft === null ? null : $this->issue($draft, $terms, $reviewer);
+    }
+
+    /**
+     * Bills one lease period at its fixed amount and marks it invoiced. The
+     * caller holds the period's row lock inside its transaction
+     * (OfficeLeaseService::contract(), LeaseDailyRunner); $issuer is null
+     * when the daily run issues it.
+     */
+    public function issueForLeasePeriod(OfficeLeasePeriod $period, ?User $issuer): Invoice
+    {
+        $lease = $period->lease()->with('space')->firstOrFail();
+
+        $invoice = $this->issue(new InvoiceDraft(
+            companyId: $lease->company_id,
+            providerId: $lease->provider_id,
+            billedTo: $lease->billed_to,
+            points: null,
+            description: sprintf(
+                'Office lease %s: %s, %s – %s',
+                $lease->reference,
+                $lease->space->displayTitle('en'),
+                $period->starts_on->toDateString(),
+                $period->ends_on->toDateString(),
+            ),
+            source: ['office_lease_period_id' => $period->id],
+            fixedAmount: (string) $period->amount,
+            fixedCurrency: $lease->currency,
+        ), new InvoiceTerms, $issuer);
+
+        $period->update(['status' => LeasePeriodStatus::Invoiced]);
+
+        return $invoice;
     }
 
     /** @return array{0: int, 1: string} */

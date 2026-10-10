@@ -21,6 +21,7 @@ class InvoiceResource extends JsonResource
             'provider' => $this->whenLoaded('provider', fn () => $this->provider === null ? null : ['id' => $this->provider->id, 'name' => $this->provider->name]),
             'company' => $this->whenLoaded('company', fn () => ['id' => $this->company->id, 'legal_name' => $this->company->legal_name]),
             'provider_request_id' => $this->provider_request_id,
+            'office_lease_period_id' => $this->office_lease_period_id,
             'description' => $this->description,
             'points' => $this->points,
             'currency' => $this->currency,

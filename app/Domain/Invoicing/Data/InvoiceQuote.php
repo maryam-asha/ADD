@@ -6,7 +6,7 @@ namespace App\Domain\Invoicing\Data;
 final class InvoiceQuote
 {
     public function __construct(
-        public readonly int $points,
+        public readonly ?int $points,
         public readonly string $currency,
         public readonly string $computedAmount,
         public readonly string $amount,
@@ -15,7 +15,7 @@ final class InvoiceQuote
         public readonly string $dueAt,
     ) {}
 
-    /** @return array<string, int|string> */
+    /** @return array<string, int|string|null> */
     public function toArray(): array
     {
         return [
