@@ -13,8 +13,8 @@ use App\Domain\Providers\Requests\ProviderRequestHandler;
 
 /**
  * Credits the client company's wallet — the pool its admin allocates to
- * employees from. Not a way of paying ADD: what it costs is invoiced
- * (Phase 2).
+ * employees from. Not a way of paying ADD: approval issues an invoice
+ * for what it costs, through InvoiceIssuer.
  */
 class WalletTopUpHandler implements ProviderRequestHandler
 {

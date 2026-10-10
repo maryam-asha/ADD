@@ -47,7 +47,8 @@ class InvoiceIssuer
             default => [null, null],
         };
 
-        if ($points === null) {
+        // Nothing to bill: another request type, or a free plan.
+        if ($points === null || $points <= 0) {
             return null;
         }
 
@@ -78,6 +79,7 @@ class InvoiceIssuer
         $issuedAt = now()->toDateString();
 
         return new InvoiceQuote(
+            points: $draft->points,
             currency: $currency,
             computedAmount: $computed,
             amount: $terms->amount ?? $computed,

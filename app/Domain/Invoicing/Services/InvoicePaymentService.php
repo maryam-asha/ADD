@@ -31,7 +31,7 @@ class InvoicePaymentService
                 throw new InvoicingException('api.invoice.amount_too_small');
             }
 
-            $converted = $this->money->toInvoiceCurrency((string) $data['amount'], $data['currency'], $locked->currency);
+            $converted = $this->money->toInvoiceCurrency((string) $data['amount'], $data['currency'], $locked->currency, $data['paid_at']);
             $amount = $converted['amount'];
 
             if (bccomp($amount, '0', 2) <= 0) {

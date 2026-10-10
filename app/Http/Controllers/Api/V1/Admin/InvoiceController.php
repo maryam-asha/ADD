@@ -27,7 +27,7 @@ class InvoiceController extends Controller
 
     public function show(Invoice $invoice): InvoiceResource
     {
-        return new InvoiceResource($invoice->load(['provider', 'company', 'issuer', 'payments.recorder']));
+        return new InvoiceResource($invoice->load(['provider', 'company', 'issuer', 'payments.recorder', 'payments.voider']));
     }
 
     public function cancel(ReasonRequest $request, Invoice $invoice, InvoicePaymentService $payments): JsonResponse

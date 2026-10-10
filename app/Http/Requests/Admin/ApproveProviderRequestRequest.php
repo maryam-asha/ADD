@@ -2,13 +2,32 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Invoicing\Services\InvoiceMoney;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ApproveProviderRequestRequest extends FormRequest
 {
     public function authorize(): bool
     {
         return true;
+    }
+
+    public function after(): array
+    {
+        return [function (Validator $validator) {
+            if ($validator->errors()->hasAny(['invoice_amount', 'invoice_currency']) || ! $this->filled('invoice_amount')) {
+                return;
+            }
+
+            $money = app(InvoiceMoney::class);
+            $currency = $this->input('invoice_currency') ?? app(CurrencyConversionService::class)->baseCurrencyCode();
+
+            if ($money->exceedsDecimals((string) $this->input('invoice_amount'), $currency)) {
+                $validator->errors()->add('invoice_amount', __('api.invoice.too_many_decimals', ['places' => $money->decimals($currency)]));
+            }
+        }];
     }
 
     public function rules(): array

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Invoicing\Data\InvoiceTerms;
+use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Invoicing\Services\InvoiceIssuer;
 use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Exceptions\ProviderRequestException;
@@ -12,6 +13,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ApproveProviderRequestRequest;
 use App\Http\Requests\Admin\RejectProviderRequestRequest;
 use App\Http\Resources\ProviderRequestResource;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -76,9 +78,14 @@ class ProviderRequestController extends Controller
             return null;
         }
 
-        $draft = $invoices->draftFor($providerRequest);
+        // The preview must never break the request view.
+        try {
+            $draft = $invoices->draftFor($providerRequest);
 
-        return $draft === null ? null : $invoices->quote($draft, new InvoiceTerms)->toArray();
+            return $draft === null ? null : $invoices->quote($draft, new InvoiceTerms)->toArray();
+        } catch (InvoicingException|ModelNotFoundException) {
+            return null;
+        }
     }
 
     public function reject(RejectProviderRequestRequest $request, ProviderRequest $providerRequest): JsonResponse

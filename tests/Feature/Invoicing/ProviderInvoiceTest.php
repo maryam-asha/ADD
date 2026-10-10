@@ -55,7 +55,24 @@ class ProviderInvoiceTest extends InvoicingTestCase
             ->assertJsonPath('data.payments.0.amount', '10.00')
             ->assertJsonMissingPath('data.issued_by')
             ->assertJsonMissingPath('data.computed_amount')
-            ->assertJsonMissingPath('data.payments.0.recorded_by');
+            ->assertJsonMissingPath('data.payments.0.recorded_by')
+            ->assertJsonMissingPath('data.exchange_rate_to_base')
+            ->assertJsonMissingPath('data.cancelled_by')
+            ->assertJsonMissingPath('data.cancellation_reason')
+            ->assertJsonMissingPath('data.payments.0.voided_by')
+            ->assertJsonMissingPath('data.payments.0.void_reason')
+            ->assertJsonMissingPath('data.payments.0.exchange_rate');
+    }
+
+    public function test_the_provider_list_leaves_out_staff_fields(): void
+    {
+        $this->mine();
+
+        $this->getJson('/api/v1/provider/invoices')
+            ->assertOk()
+            ->assertJsonMissingPath('data.0.issued_by')
+            ->assertJsonMissingPath('data.0.computed_amount')
+            ->assertJsonMissingPath('data.0.cancellation_reason');
     }
 
     public function test_a_provider_cannot_record_a_payment(): void

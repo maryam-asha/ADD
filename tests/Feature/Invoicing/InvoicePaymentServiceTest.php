@@ -2,12 +2,14 @@
 
 namespace Tests\Feature\Invoicing;
 
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
 use App\Domain\Invoicing\Services\InvoicePaymentService;
+use Illuminate\Support\Facades\Cache;
 
 class InvoicePaymentServiceTest extends InvoicingTestCase
 {
@@ -24,11 +26,11 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
         return app(InvoicePaymentService::class);
     }
 
-    private function pay(Invoice $invoice, string $amount, string $currency = 'USD'): InvoicePayment
+    private function pay(Invoice $invoice, string $amount, string $currency = 'USD', ?string $paidAt = null): InvoicePayment
     {
         return $this->service()->record($invoice, [
             'amount' => $amount, 'currency' => $currency, 'method' => 'bank_transfer',
-            'receipt_number' => 'R-1', 'paid_at' => now()->toDateString(),
+            'receipt_number' => 'R-1', 'paid_at' => $paidAt ?? now()->toDateString(),
         ], $this->staff);
     }
 
@@ -181,5 +183,32 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
     {
         $this->expectException(InvoicingException::class);
         $this->pay(Invoice::factory()->create(), '1000', 'SYP');
+    }
+
+    public function test_a_payment_converts_at_the_rate_of_its_paid_at_day(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001', 'effective_from' => now()->subDays(10)]);
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0002', 'effective_from' => now()->subDay()]);
+        Cache::forget('exchange_rate_current_SYP');
+        $invoice = Invoice::factory()->create(['amount' => '100.00']);
+
+        $old = $this->pay($invoice, '100000', 'SYP', now()->subDays(5)->toDateString());
+        $today = $this->pay($invoice, '100000', 'SYP');
+
+        $this->assertSame('10.00', (string) $old->amount);
+        $this->assertSame('20.00', (string) $today->amount);
+    }
+
+    public function test_a_paid_at_before_any_rate_existed_is_refused(): void
+    {
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001', 'effective_from' => now()->subDays(3)]);
+        $invoice = Invoice::factory()->create(['amount' => '100.00']);
+
+        try {
+            $this->pay($invoice, '1000', 'SYP', now()->subDays(30)->toDateString());
+            $this->fail('A payment was converted without a rate.');
+        } catch (InvoicingException $e) {
+            $this->assertSame('api.invoice.no_exchange_rate', $e->messageKey);
+        }
     }
 }

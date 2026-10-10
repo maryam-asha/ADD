@@ -132,15 +132,26 @@ while the request is pending and an `invoice` block once it is approved.
 **Payments.** Recorded from the dashboard only (`invoices.record_payment`),
 outside the points ledger and the cash drawer: an invoice payment moves no
 wallet and no drawer balance. A payment may be in any currency; it is converted
-at the day's rate and truncated to the invoice currency's decimals, and a
+at the rate in force on its `paid_at` day (not today's) and truncated to the invoice currency's decimals, and a
 shortfall under one minor unit settles the remainder. Partial payments are
 allowed; overpayment is refused. A payment is voided, never deleted
 (`invoices.void_payment`), which reopens the balance. An invoice is cancelled
 (`invoices.cancel`) only when it has no active payment; cancelling does not
 touch the plan or the credit that was granted.
 
+**Zero-point requests.** A request that prices to 0 points (a free plan) issues
+no invoice and the preview is null; the membership still activates.
+
+**Decimals.** `invoice_amount` and a payment's `amount` may have no more decimal
+places than their currency's `decimal_places` (USD 2, SYP 0; trailing zeros are
+ignored), else 422 `api.invoice.too_many_decimals` on the amount field.
+
 **Provider view.** `GET provider/invoices` and `provider/invoices/{invoice}`,
-read only, without staff fields. Another provider's invoice is a 404.
+read only. The invoice shows amounts, status, dates, points and its payments
+(amount, received amount and currency, method, receipt, `paid_at`, voided flag);
+it omits `computed_amount`, `exchange_rate_to_base`, `issued_by`, `cancelled_by`,
+`cancellation_reason`, and per payment `recorded_by`, `exchange_rate`,
+`voided_by`, `void_reason`. Another provider's invoice is a 404.
 
 **Sources.** An invoice points at what produced it through separate nullable
 foreign keys, today only `provider_request_id`. Office leases (Phase 3) add
@@ -170,6 +181,7 @@ Also:
 
 1 core and approvals (shipped) -> 2 invoicing (this section) -> 3 office
 leases -> 4 auto-renewal -> 5 reports.
+
 ## Explicitly not done here
 
 - **Office leases (Phase 3)**, **auto-renewal (Phase 4)**, **reports (Phase 5)**.
@@ -179,4 +191,5 @@ leases -> 4 auto-renewal -> 5 reports.
 
 Run `php artisan migrate`, then `php artisan permissions:sync` (nobody, admin
 included, reaches the provider admin routes before it). `php artisan db:seed
---class=RoleSeeder` creates the `provider` role.
+--class=RoleSeeder` creates the `provider` role. `php artisan db:seed
+--class=SettingSeeder` creates `invoices.default_due_days`.

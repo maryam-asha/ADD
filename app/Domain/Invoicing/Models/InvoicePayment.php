@@ -50,6 +50,11 @@ class InvoicePayment extends Model
         return $this->belongsTo(User::class, 'recorded_by');
     }
 
+    public function voider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->whereNull('voided_at');

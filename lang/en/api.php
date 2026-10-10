@@ -702,6 +702,7 @@ return [
         'amount_too_small' => 'The amount is too small to record.',
         'cancelled' => 'Invoice cancelled.',
         'payment_voided' => 'Payment voided.',
+        'too_many_decimals' => 'This currency takes at most :places decimal places.',
     ],
 
 ];

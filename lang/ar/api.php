@@ -689,6 +689,7 @@ return [
         'amount_too_small' => 'المبلغ أصغر من أن يُسجَّل.',
         'cancelled' => 'أُلغيت الفاتورة.',
         'payment_voided' => 'أُبطلت الدفعة.',
+        'too_many_decimals' => 'هذه العملة تقبل :places منازل عشرية على الأكثر.',
     ],
 
 ];

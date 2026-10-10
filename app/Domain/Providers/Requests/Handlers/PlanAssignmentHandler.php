@@ -13,10 +13,11 @@ use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Providers\Requests\ProviderRequestHandler;
 
 /**
- * Activates the plan for the client company with no charge: in the
- * provider flow money is invoiced, never taken from a wallet
- * (docs/decisions/service-providers.md; invoices are Phase 2). Only the
- * reviewer may sell past a full pool.
+ * Activates the plan for the client company with no wallet charge: in the
+ * provider flow money is invoiced, never taken from a wallet. Approval
+ * issues the invoice through InvoiceIssuer in the same transaction
+ * (docs/decisions/service-providers.md). Only the reviewer may sell past
+ * a full pool.
  */
 class PlanAssignmentHandler implements ProviderRequestHandler
 {

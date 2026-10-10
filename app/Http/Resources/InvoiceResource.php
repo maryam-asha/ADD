@@ -30,7 +30,6 @@ class InvoiceResource extends JsonResource
             'issued_at' => $this->issued_at?->toDateString(),
             'due_at' => $this->due_at?->toDateString(),
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
-            'cancellation_reason' => $this->cancellation_reason,
             'payments' => $this->whenLoaded('payments', fn () => $this->paymentResource::collection($this->payments)),
             ...$this->staffFields(),
         ];
@@ -44,6 +43,7 @@ class InvoiceResource extends JsonResource
             'exchange_rate_to_base' => (string) $this->exchange_rate_to_base,
             'issued_by' => $this->whenLoaded('issuer', fn () => $this->issuer === null ? null : ['id' => $this->issuer->id, 'name' => $this->issuer->name]),
             'cancelled_by' => $this->cancelled_by,
+            'cancellation_reason' => $this->cancellation_reason,
         ];
     }
 }

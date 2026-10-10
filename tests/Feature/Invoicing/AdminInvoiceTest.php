@@ -105,4 +105,46 @@ class AdminInvoiceTest extends InvoicingTestCase
         $this->providerAccount();
         $this->getJson('/api/v1/admin/invoices')->assertForbidden();
     }
+
+    public function test_a_payment_amount_must_fit_the_currencys_decimals(): void
+    {
+        $this->syp('0.0001');
+        $invoice = Invoice::factory()->create(['amount' => '200.00']);
+        $this->actingAsAdmin();
+        $base = ['method' => 'cash', 'paid_at' => now()->toDateString()];
+
+        $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [...$base, 'amount' => '100.5', 'currency' => 'SYP'])
+            ->assertStatus(422)->assertJsonValidationErrors('amount');
+        $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [...$base, 'amount' => '100.50', 'currency' => 'USD'])
+            ->assertCreated();
+    }
+
+    public function test_voiding_a_payment_reopens_the_invoice_and_names_who_did_it(): void
+    {
+        $invoice = Invoice::factory()->create(['amount' => '50.00', 'paid_amount' => '50.00', 'status' => InvoiceStatus::Paid]);
+        $payment = InvoicePayment::factory()->create(['invoice_id' => $invoice->id, 'amount' => '50.00']);
+        $staff = $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/admin/invoice-payments/{$payment->id}/void", ['reason' => 'Wrong invoice'])
+            ->assertOk()->assertJsonPath('message', __('api.invoice.payment_voided'));
+
+        $this->assertSame(InvoiceStatus::Unpaid, $invoice->fresh()->status);
+        $this->getJson("/api/v1/admin/invoices/{$invoice->id}")
+            ->assertJsonPath('data.payments.0.voided', true)
+            ->assertJsonPath('data.payments.0.voided_by.id', $staff->id);
+    }
+
+    public function test_void_and_cancel_have_their_own_permissions(): void
+    {
+        $invoice = Invoice::factory()->create(['amount' => '100.00']);
+        $payment = InvoicePayment::factory()->create();
+        $role = Role::findOrCreate('accounts', 'web');
+        $role->syncPermissions(['invoices.view', 'invoices.record_payment']);
+        $user = User::factory()->create();
+        $user->assignRole('accounts');
+        Sanctum::actingAs($user, ['*']);
+
+        $this->postJson("/api/v1/admin/invoice-payments/{$payment->id}/void", ['reason' => 'x'])->assertForbidden();
+        $this->postJson("/api/v1/admin/invoices/{$invoice->id}/cancel", ['reason' => 'x'])->assertForbidden();
+    }
 }

@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Schema;
  * provider_request_id — so a later source (office leases) adds a column
  * rather than a morph. `paid_amount` is the sum of active payments, kept
  * under the invoice's row lock; "overdue" is derived, never stored.
+ * A provider or provider request that has an invoice cannot be deleted
+ * (restrict): intended for financial records.
  */
 return new class extends Migration
 {
@@ -28,7 +30,7 @@ return new class extends Migration
             $table->string('billed_to', 20);
             $table->foreignId('provider_request_id')->nullable()->unique()->constrained()->restrictOnDelete();
             $table->string('description');
-            $table->unsignedInteger('points');
+            $table->unsignedBigInteger('points');
             $table->string('currency', 3);
             $table->foreign('currency')->references('code')->on('currencies');
             $table->decimal('computed_amount', 14, 2);

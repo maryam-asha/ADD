@@ -11,6 +11,8 @@ use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 
 class InvoiceIssuerTest extends InvoicingTestCase
@@ -101,8 +103,37 @@ class InvoiceIssuerTest extends InvoicingTestCase
     {
         $draft = $this->issuer()->draftFor($this->assignment(Provider::factory()->create(), Plan::factory()->create(), 1));
 
-        $this->expectException(InvoicingException::class);
-        $this->issuer()->quote($draft, new InvoiceTerms('SYP'));
+        try {
+            $this->issuer()->quote($draft, new InvoiceTerms('SYP'));
+            $this->fail('A currency with no rate was quoted.');
+        } catch (InvoicingException $e) {
+            $this->assertSame('api.invoice.no_exchange_rate', $e->messageKey);
+            $this->assertSame(422, $e->status);
+            $this->assertSame('SYP', $e->params['currency']);
+        }
+    }
+
+    public function test_the_default_due_days_setting_is_used(): void
+    {
+        Carbon::setTestNow('2026-10-10');
+        app(SettingService::class)->set('invoices.default_due_days', 20, SettingValueType::Int);
+        $draft = $this->issuer()->draftFor($this->assignment(Provider::factory()->create(), Plan::factory()->create(), 1));
+
+        $this->assertSame('2026-10-30', $this->issuer()->quote($draft, new InvoiceTerms)->dueAt);
+    }
+
+    public function test_a_zero_point_request_bills_nothing(): void
+    {
+        $free = Plan::factory()->create(['price_points' => 0]);
+
+        $this->assertNull($this->issuer()->draftFor($this->assignment(Provider::factory()->create(), $free, 3)));
+    }
+
+    public function test_the_quote_carries_the_points(): void
+    {
+        $draft = $this->issuer()->draftFor($this->assignment(Provider::factory()->create(), Plan::factory()->create(['price_points' => 900]), 2));
+
+        $this->assertSame(1800, $this->issuer()->quote($draft, new InvoiceTerms)->points);
     }
 
     public function test_issuing_freezes_the_quote_on_an_invoice(): void

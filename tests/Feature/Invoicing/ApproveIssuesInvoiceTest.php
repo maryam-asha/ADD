@@ -10,6 +10,7 @@ use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class ApproveIssuesInvoiceTest extends InvoicingTestCase
 {
@@ -113,6 +114,7 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
             ->assertOk()
             ->assertJsonPath('data.invoice_preview.amount', '450.00')
             ->assertJsonPath('data.invoice_preview.currency', 'USD')
+            ->assertJsonPath('data.invoice_preview.points', 4500)
             ->assertJsonPath('data.invoice_preview.due_at', '2026-11-09')
             ->assertJsonPath('data.invoice', null);
 
@@ -133,5 +135,48 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
 
         $this->patchJson("/api/v1/admin/providers/{$this->provider->id}", ['payment_terms_days' => null])->assertOk();
         $this->assertNull($this->provider->fresh()->payment_terms_days);
+    }
+
+    public function test_a_free_plan_activates_without_an_invoice_or_preview(): void
+    {
+        $branch = $this->branchWithSeats(50);
+        $request = ProviderRequest::factory()->create([
+            'provider_id' => $this->provider->id,
+            'company_id' => $this->clientCompany($this->provider, ['branch_id' => $branch->id])->id,
+            'type' => ProviderRequestType::PlanAssignment,
+            'payload' => ['plan_id' => Plan::factory()->create(['price_points' => 0])->id, 'seats' => 2, 'payer' => 'provider'],
+        ]);
+        $this->actingAsAdmin();
+
+        $this->getJson("/api/v1/admin/provider-requests/{$request->id}")->assertOk()->assertJsonPath('data.invoice_preview', null);
+        $this->postJson("/api/v1/admin/provider-requests/{$request->id}/approve")->assertOk();
+
+        $this->assertSame(0, Invoice::count());
+        $this->assertSame(1, Membership::query()->where('owner_type', OwnerType::Company)->count());
+    }
+
+    public function test_a_request_whose_plan_is_gone_still_shows(): void
+    {
+        $request = $this->assignment();
+        DB::table('plans')->delete();
+        $this->actingAsAdmin();
+
+        $this->getJson("/api/v1/admin/provider-requests/{$request->id}")
+            ->assertOk()
+            ->assertJsonPath('data.invoice_preview', null);
+    }
+
+    public function test_the_invoice_amount_must_fit_the_currencys_decimals(): void
+    {
+        $this->syp('0.0001');
+        $request = $this->assignment(1);
+        $this->actingAsAdmin();
+
+        $this->postJson("/api/v1/admin/provider-requests/{$request->id}/approve", ['invoice_currency' => 'SYP', 'invoice_amount' => '100.5'])
+            ->assertStatus(422)->assertJsonValidationErrors('invoice_amount');
+        $this->assertTrue($request->fresh()->isPending());
+
+        $this->postJson("/api/v1/admin/provider-requests/{$request->id}/approve", ['invoice_amount' => '100.50'])->assertOk();
+        $this->assertSame('100.50', (string) Invoice::sole()->amount);
     }
 }

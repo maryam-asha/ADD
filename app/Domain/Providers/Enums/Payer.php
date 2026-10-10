@@ -3,8 +3,8 @@
 namespace App\Domain\Providers\Enums;
 
 /**
- * Who an assignment or a top-up is invoiced to. Recorded from Phase 1 on;
- * read by invoicing (Phase 2).
+ * Who an assignment or a top-up is invoiced to. Recorded on the request and
+ * read by InvoiceIssuer when approval issues the invoice.
  */
 enum Payer: string
 {
