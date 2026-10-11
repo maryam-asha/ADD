@@ -284,6 +284,10 @@
         {
             "key": "invoice_payment_id",
             "value": ""
+        },
+        {
+            "key": "membership_id",
+            "value": ""
         }
     ],
     "event": [
@@ -3891,7 +3895,7 @@
                                             "key": "status",
                                             "value": "active",
                                             "disabled": true,
-                                            "description": "active | expired \u2014 omit for both"
+                                            "description": "active | expired | upcoming (a renewal made ahead that has not started) \u2014 omit for all"
                                         },
                                         {
                                             "key": "via",
@@ -11053,7 +11057,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"private_office_request_id\": \"{{private_office_request_id}}\",\n  \"legal_name\": \"Acme LLC\",\n  \"contract_ref\": \"C-2026-013\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\"\n}",
+                                    "raw": "{\n  \"private_office_request_id\": \"{{private_office_request_id}}\",\n  \"legal_name\": \"Acme LLC\",\n  \"contract_ref\": \"C-2026-013\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\",\n  \"auto_renew\": true\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -11294,7 +11298,7 @@
                                 "description": "Permission office-leases.create. For an existing company: the request must be 'quoted' and carry company_id. A new company's first lease is created by Companies/Create Company. billed_to is optional and only matters for a provider's company. 409 when the office is already leased or has bookings still to happen in these dates.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"contract_ref\": \"C-2026-014\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\",\n  \"billed_to\": \"provider\"\n}",
+                                    "raw": "{\n  \"contract_ref\": \"C-2026-014\",\n  \"space_id\": \"{{space_id}}\",\n  \"starts_on\": \"2026-11-01\",\n  \"duration_months\": 12,\n  \"billing_cycle_months\": 3,\n  \"monthly_amount\": \"500.00\",\n  \"currency\": \"USD\",\n  \"billed_to\": \"provider\",\n  \"auto_renew\": true\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -24747,6 +24751,239 @@
                             }
                         }
                     ]
+                },
+                {
+                    "name": "Renewals",
+                    "item": [
+                        {
+                            "name": "List Stopped Renewals",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/renewals/stopped",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "renewals",
+                                        "stopped"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "type",
+                                            "value": "membership",
+                                            "disabled": true,
+                                            "description": "membership | lease"
+                                        },
+                                        {
+                                            "key": "provider_id",
+                                            "value": "{{provider_id}}",
+                                            "disabled": true,
+                                            "description": "Only this provider's companies"
+                                        },
+                                        {
+                                            "key": "reason",
+                                            "value": "overdue_invoice",
+                                            "disabled": true,
+                                            "description": "overdue_invoice | no_seats | plan_inactive | company_inactive | office_unavailable | office_taken"
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "20",
+                                            "disabled": true,
+                                            "description": ""
+                                        }
+                                    ]
+                                },
+                                "description": "Permission renewals.manage. Auto-renewing subscriptions and leases whose renewal stopped, with renewal_stop_reason. Retried every hourly run until they end."
+                            }
+                        },
+                        {
+                            "name": "Renew Membership",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/memberships/{{membership_id}}/renew",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "memberships",
+                                        "{{membership_id}}",
+                                        "renew"
+                                    ]
+                                },
+                                "description": "Permission renewals.manage. Renews by hand past an overdue invoice, nothing else (seats, plan and company checks still apply)."
+                            }
+                        },
+                        {
+                            "name": "Renew Lease",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/office-leases/{{office_lease_id}}/renew",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "office-leases",
+                                        "{{office_lease_id}}",
+                                        "renew"
+                                    ]
+                                },
+                                "description": "Permission renewals.manage. Renews by hand past an overdue invoice, nothing else (the office must still be available)."
+                            }
+                        },
+                        {
+                            "name": "Membership Auto-Renew",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/memberships/{{membership_id}}/auto-renew",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "memberships",
+                                        "{{membership_id}}",
+                                        "auto-renew"
+                                    ]
+                                },
+                                "description": "Permission renewals.manage. Turns auto-renew on or off for a provider company's subscription; turning it off clears renewal_stop_reason.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"auto_renew\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Lease Auto-Renew",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/office-leases/{{office_lease_id}}/auto-renew",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "office-leases",
+                                        "{{office_lease_id}}",
+                                        "auto-renew"
+                                    ]
+                                },
+                                "description": "Permission renewals.manage. Turns auto-renew on or off. 409 api.renewal.lease_not_active when the lease is not active.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"auto_renew\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
                 }
             ]
         },
@@ -25083,7 +25320,7 @@
                         ],
                         "body": {
                             "mode": "raw",
-                            "raw": "{\n    \"type\": \"plan_assignment\",\n    \"company_id\": \"{{provider_company_id}}\",\n    \"plan_id\": \"{{plan_id}}\",\n    \"seats\": 5,\n    \"payer\": \"provider\"\n}",
+                            "raw": "{\n  \"type\": \"plan_assignment\",\n  \"company_id\": \"{{provider_company_id}}\",\n  \"plan_id\": \"{{plan_id}}\",\n  \"seats\": 5,\n  \"payer\": \"provider\",\n  \"auto_renew\": true\n}",
                             "options": {
                                 "raw": {
                                     "language": "json"
@@ -25551,6 +25788,99 @@
                             ]
                         },
                         "description": "404 when the company is not this provider's."
+                    }
+                },
+                {
+                    "name": "Membership Auto-Renew",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/companies/{{provider_company_id}}/membership/auto-renew",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "companies",
+                                "{{provider_company_id}}",
+                                "membership",
+                                "auto-renew"
+                            ]
+                        },
+                        "description": "Turn auto-renew on or off for this company's subscription. 404 when the company has no renewable subscription this provider assigned.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"auto_renew\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "Lease Auto-Renew",
+                    "request": {
+                        "method": "PATCH",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/provider/office-leases/{{office_lease_id}}/auto-renew",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "provider",
+                                "office-leases",
+                                "{{office_lease_id}}",
+                                "auto-renew"
+                            ]
+                        },
+                        "description": "Turn auto-renew on or off for a lease of one of this provider's companies. 409 when the lease is not active.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"auto_renew\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
                     }
                 }
             ]
