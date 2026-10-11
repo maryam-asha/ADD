@@ -76,6 +76,8 @@ return [
     'validation' => [
         'amount_must_be_whole' => 'An amount in :currency must be a whole number, with no decimals.',
         'amount_too_precise' => 'An amount in :currency can have at most :decimals decimal places.',
+        'cash_step_must_be_whole' => 'The cash step must be a whole number: this currency has no decimals.',
+        'cash_step_too_precise' => 'The cash step can have at most :decimals decimal places, as many as the currency.',
         'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
         'vocabulary_not_an_object' => 'Validation settings must be an object.',
         'constraint_not_allowed_for_type' => '":key" is not a setting a :type field accepts.',

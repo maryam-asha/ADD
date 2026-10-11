@@ -251,4 +251,61 @@ class CurrencyControllerTest extends TestCase
         $this->assertSame('1.00', Currency::find('SYP')->cash_step);
         $this->assertSame('1.00', Currency::find('USD')->cash_step);
     }
+
+    /**
+     * Amounts in a currency carry no more decimals than it uses
+     * (AmountFitsCurrency), so a step finer than that would have the
+     * dashboard quote amounts the top-up then refuses — 0.50 for a
+     * pound with no decimals.
+     */
+    public function test_a_cash_step_cannot_be_finer_than_the_currencys_decimals(): void
+    {
+        $this->actingAsAdmin();
+        $currency = Currency::factory()->create(['code' => 'EUR', 'decimal_places' => 2]);
+        $patch = fn (array $fields) => $this->withHeader('lang', 'en')->patchJson(
+            "/api/v1/admin/currencies/{$currency->code}",
+            ['name' => ['en' => 'Euro', 'ar' => 'يورو'], ...$fields],
+        );
+
+        $patch(['decimal_places' => 0, 'cash_step' => '0.50'])
+            ->assertJsonValidationErrors(['cash_step' => __('api.validation.cash_step_must_be_whole')]);
+        $patch(['decimal_places' => 1, 'cash_step' => '0.25'])
+            ->assertJsonValidationErrors(['cash_step' => __('api.validation.cash_step_too_precise', ['decimals' => 1])]);
+
+        // Trailing zeros are not precision: 5.00 is a whole 5.
+        $patch(['decimal_places' => 0, 'cash_step' => '5.00'])->assertOk();
+        $patch(['decimal_places' => 1, 'cash_step' => '0.5'])->assertOk();
+    }
+
+    public function test_dropping_decimals_below_the_stored_cash_step_is_refused(): void
+    {
+        $this->actingAsAdmin();
+        $currency = Currency::factory()->create(['code' => 'EUR', 'decimal_places' => 2, 'cash_step' => '0.50']);
+
+        $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/currencies/{$currency->code}", [
+            'name' => ['en' => 'Euro', 'ar' => 'يورو'],
+            'decimal_places' => 0,
+        ])->assertJsonValidationErrors(['cash_step' => __('api.validation.cash_step_must_be_whole')]);
+
+        $this->assertSame(2, $currency->fresh()->decimal_places);
+    }
+
+    public function test_a_new_currency_cannot_have_a_cash_step_finer_than_its_decimals(): void
+    {
+        $this->actingAsAdmin();
+        $currency = fn (string $code, array $fields) => [
+            'code' => $code,
+            'name' => ['en' => $code, 'ar' => $code],
+            ...$fields,
+        ];
+
+        $this->withHeader('lang', 'en')
+            ->postJson('/api/v1/admin/currencies', $currency('TRY', ['decimal_places' => 0, 'cash_step' => '0.5']))
+            ->assertJsonValidationErrors(['cash_step' => __('api.validation.cash_step_must_be_whole')]);
+
+        // No step given: the default of 1 fits any currency.
+        $this->postJson('/api/v1/admin/currencies', $currency('TRY', ['decimal_places' => 0]))
+            ->assertCreated()
+            ->assertJsonPath('data.cash_step', '1.00');
+    }
 }

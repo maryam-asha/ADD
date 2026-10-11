@@ -76,6 +76,8 @@ return [
     'validation' => [
         'amount_must_be_whole' => 'المبلغ بعملة :currency يجب أن يكون عدداً صحيحاً بدون فواصل عشرية.',
         'amount_too_precise' => 'المبلغ بعملة :currency لا يقبل أكثر من :decimals منازل عشرية.',
+        'cash_step_must_be_whole' => 'يجب أن تكون خطوة المبلغ النقدي عدداً صحيحاً، لأن هذه العملة بلا منازل عشرية.',
+        'cash_step_too_precise' => 'خطوة المبلغ النقدي لا تقبل أكثر من :decimals منازل عشرية، بقدر منازل العملة.',
         'reserved_field_key' => 'الحقل ":key" يؤخذ من حساب العضو ولا يمكن تعريفه في الفورم.',
         'vocabulary_not_an_object' => 'إعدادات التحقق يجب أن تكون كائناً.',
         'constraint_not_allowed_for_type' => '":key" ليس إعداداً يقبله حقل من نوع :type.',
