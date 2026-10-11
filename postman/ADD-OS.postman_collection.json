@@ -15813,7 +15813,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"user_id\": {{user_id}},\n  \"amount\": \"25.00\",\n  \"payment_method\": \"cash\",\n  \"description\": \"Front-desk cash top-up\"\n}",
+                                            "raw": "{\n  \"user_id\": {{user_id}},\n  \"amount\": \"25.00\",\n  \"points\": 250,\n  \"payment_method\": \"cash\",\n  \"description\": \"Front-desk cash top-up\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -15833,7 +15833,7 @@
                                                 "wallet-top-ups"
                                             ]
                                         },
-                                        "description": "**Top Up Member Wallet** (the request as saved). \n\n### Cases \u2014 see this request's saved examples\n- **Top Up Company Wallet**\n- **Error: No Target Specified** \u2014 422 -- exactly one of user_id/company_id is required."
+                                        "description": "**Top Up Member Wallet** (the request as saved).\n\nThe dashboard quotes the top-up itself (rates come from **Get Wallet Balance** `data.top_up`) and sends both figures: `amount` is the cash taken (a plain decimal that fits the currency's decimals \u2014 SYP whole), `points` the whole points the operator read out to the member. The server re-derives the points from the amount at today's rates (ReceivedMoneyConverter, floored once) and refuses any mismatch, so the wallet never receives a figure other than the one quoted.\n\n`points` is required, an integer, and at least the `wallet.top_up_min_points` setting (default 10).\n\n### Cases \u2014 see this request's saved examples\n- **Top Up Company Wallet**\n- **Error: No Target Specified** \u2014 422 -- exactly one of user_id/company_id is required.\n- 422 on `points` with \"Rates changed since this top-up was prepared...\" (`api.wallet.quote_stale`) \u2014 the points do not match the amount (usually an exchange rate that moved after the quote): re-read Get Wallet Balance and quote again; never resubmit automatically.\n- 422 on `points` with \"A top-up must be at least :min points.\" \u2014 below the minimum."
                                     },
                                     "response": [
                                         {
@@ -15853,7 +15853,7 @@
                                                 ],
                                                 "body": {
                                                     "mode": "raw",
-                                                    "raw": "{\n  \"company_id\": {{company_id}},\n  \"amount\": \"50.00\",\n  \"payment_method\": \"syriatel\"\n}",
+                                                    "raw": "{\n  \"company_id\": {{company_id}},\n  \"amount\": \"50.00\",\n  \"points\": 500,\n  \"payment_method\": \"cash\"\n}",
                                                     "options": {
                                                         "raw": {
                                                             "language": "json"
@@ -15901,7 +15901,7 @@
                                                 ],
                                                 "body": {
                                                     "mode": "raw",
-                                                    "raw": "{\n  \"amount\": \"25.00\",\n  \"payment_method\": \"cash\"\n}",
+                                                    "raw": "{\n  \"amount\": \"25.00\",\n  \"points\": 250,\n  \"payment_method\": \"cash\"\n}",
                                                     "options": {
                                                         "raw": {
                                                             "language": "json"
@@ -17038,49 +17038,7 @@
                                         }
                                     ]
                                 },
-                                "description": "The owner's point balance plus its value in the requested currency, for the top-up dialog and the receipt view. Exactly one of user_id / company_id. Every currency figure is derived from the stored point count, so a receipt can never claim a value the wallet does not hold."
-                            }
-                        },
-                        {
-                            "name": "Preview a Wallet Top-up",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "currency",
-                                        "value": "{{currency}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/admin/reception/wallet-top-ups/preview",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "admin",
-                                        "reception",
-                                        "wallet-top-ups",
-                                        "preview"
-                                    ]
-                                },
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n  \"user_id\": 2,\n  \"amount\": \"150000\",\n  \"currency\": \"SYP\",\n  \"payment_method\": \"cash\"\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                },
-                                "description": "What a given cash amount would credit, without writing anything. Exists so the top-up dialog can show a live point preview without reimplementing the rounding rules client-side \u2014 credits floor, so the member is never credited more than the cash covers."
+                                "description": "The owner's point balance plus its value in the requested currency, for the top-up dialog and the receipt view. Exactly one of user_id / company_id. Every currency figure is derived from the stored point count, so a receipt can never claim a value the wallet does not hold.\n\n`data.top_up` carries everything the dashboard needs to quote a top-up locally: `point_rate_usd` (always a 4-decimal string, e.g. \"0.1000\"), `min_points`, and `currencies[]` \u2014 one per active currency that has a current rate \u2014 with `code`, `rate_to_base` (\"1\" for the base currency), `cash_step` (smallest amount the till takes, e.g. \"1.00\") and `decimal_places`."
                             }
                         },
                         {
