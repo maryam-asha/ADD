@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamp('balances_granted_at')->nullable()->after('current_period_end');
         });
 
-        DB::table('memberships')->update(['balances_granted_at' => DB::raw('created_at')]);
+        DB::table('memberships')->update(['balances_granted_at' => DB::raw('COALESCE(created_at, current_period_start)')]);
 
         Schema::table('office_leases', function (Blueprint $table) {
             $table->boolean('auto_renew')->default(false)->after('status');
