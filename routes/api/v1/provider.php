@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
 use App\Http\Controllers\Api\V1\Provider\ProviderProfileController;
 use App\Http\Controllers\Api\V1\Provider\ProviderRenewalController;
+use App\Http\Controllers\Api\V1\Provider\ProviderReportController;
 use App\Http\Controllers\Api\V1\Provider\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderSummaryController;
 use Illuminate\Support\Facades\Route;
@@ -43,3 +44,5 @@ Route::patch('requests/{providerRequest}/cancel', [ProviderRequestController::cl
 
 Route::get('invoices', [ProviderInvoiceController::class, 'index']);
 Route::get('invoices/{invoice}', [ProviderInvoiceController::class, 'show']);
+
+Route::get('reports/invoices', [ProviderReportController::class, 'invoices']);
