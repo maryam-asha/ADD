@@ -71,7 +71,7 @@ class MoneyAmountSpellingTest extends TestCase
             'user_id' => $member->id,
             'checked_in_at' => now()->subHours(2),
             'checked_out_at' => now()->subHour(),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'price_points' => 100,
             'payment_state' => PaymentState::Unpaid,
             'payment_source' => null,
@@ -95,7 +95,7 @@ class MoneyAmountSpellingTest extends TestCase
             'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash', 'amount' => ' 5',
         ])
             ->assertStatus(422)
-            ->assertJsonPath('shortage', '5.00');
+            ->assertJsonPath('shortage', '5');
 
         $this->assertSame(0, Payment::count());
     }

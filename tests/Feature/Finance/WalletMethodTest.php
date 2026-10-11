@@ -95,7 +95,7 @@ class WalletMethodTest extends TestCase
 
         // 2.5 hours at 100 points an hour.
         $this->assertSame(250, $session->price_points);
-        $this->assertSame('25.00', (string) $session->amount_owed);
+        $this->assertSame('25', (string) $session->amount_owed);
     }
 
     public function test_a_closed_walk_in_is_paid_from_the_wallet(): void

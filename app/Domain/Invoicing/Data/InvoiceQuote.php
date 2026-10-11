@@ -2,6 +2,8 @@
 
 namespace App\Domain\Invoicing\Data;
 
+use App\Support\PlainAmount;
+
 /** A priced draft: what issuing would store. Dates are Y-m-d. */
 final class InvoiceQuote
 {
@@ -21,8 +23,8 @@ final class InvoiceQuote
         return [
             'points' => $this->points,
             'currency' => $this->currency,
-            'computed_amount' => $this->computedAmount,
-            'amount' => $this->amount,
+            'computed_amount' => PlainAmount::of($this->computedAmount),
+            'amount' => PlainAmount::of($this->amount),
             'issued_at' => $this->issuedAt,
             'due_at' => $this->dueAt,
         ];

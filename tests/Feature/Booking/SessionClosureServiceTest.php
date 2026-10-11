@@ -52,7 +52,7 @@ class SessionClosureServiceTest extends TestCase
         $session->refresh();
         $this->assertNotNull($session->checked_out_at);
         $this->assertSame('reception', $session->termination_source->value);
-        $this->assertSame('25.00', (string) $session->amount_owed);
+        $this->assertSame('25', (string) $session->amount_owed);
         $this->assertSame('USD', $session->currency);
     }
 
@@ -67,7 +67,7 @@ class SessionClosureServiceTest extends TestCase
 
         $this->closures->closeOut($booking, Carbon::parse('2026-08-17 10:00:00'));
 
-        $this->assertSame('10.00', (string) $booking->fresh()->amount_owed);
+        $this->assertSame('10', (string) $booking->fresh()->amount_owed);
     }
 
     public function test_checkout_time_exactly_at_closing_succeeds(): void
@@ -156,7 +156,7 @@ class SessionClosureServiceTest extends TestCase
             'space_id' => $space->id,
             'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus'),
             'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
         ]);
 
         $this->closures->settlePayment($session, PaymentMethod::Cash, $operator);
@@ -176,7 +176,7 @@ class SessionClosureServiceTest extends TestCase
             'space_id' => $space->id,
             'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus'),
             'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus'),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'payment_state' => PaymentState::Paid,
         ]);
 

@@ -32,6 +32,7 @@ use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
 use App\Http\Requests\Admin\Reception\StoreReceptionBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Http\Resources\PendingApprovalBookingResource;
+use App\Support\PlainAmount;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -130,7 +131,7 @@ class BookingReceptionController extends Controller
         $amounts = Currency::query()->where('is_active', true)->orderByDesc('is_base')->orderBy('order')->pluck('code')
             ->map(function (string $code) use ($converter, $points) {
                 try {
-                    return ['currency' => $code, 'value' => $converter->pointsToAmount($points, $code)];
+                    return ['currency' => $code, 'value' => PlainAmount::of($converter->pointsToAmount($points, $code))];
                 } catch (PaymentPricingException) {
                     return null;
                 }

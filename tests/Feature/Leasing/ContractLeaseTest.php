@@ -83,7 +83,7 @@ class ContractLeaseTest extends LeasingTestCase
             $lease->periods->pluck('status')->all(),
         );
         $invoice = $lease->periods->first()->invoice;
-        $this->assertSame('1500.00', (string) $invoice->amount);
+        $this->assertSame('1500', (string) $invoice->amount);
         $this->assertSame($this->actor->id, $invoice->issued_by);
 
         $request->refresh();

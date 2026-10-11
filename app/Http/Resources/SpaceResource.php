@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -38,9 +39,9 @@ class SpaceResource extends JsonResource
             'main_image' => $this->main_image,
             'images' => $this->images,
             'hourly_rate_points' => $rate,
-            'hourly_rate_usd' => $rate !== null ? $points->pointsToUsd($rate) : null,
+            'hourly_rate_usd' => $rate !== null ? PlainAmount::of($points->pointsToUsd($rate)) : null,
             'hourly_rate_display' => $rate !== null
-                ? ($points->pointsToCurrency($rate, $targetCurrency) ?? $points->pointsToUsd($rate))
+                ? PlainAmount::of($points->pointsToCurrency($rate, $targetCurrency) ?? $points->pointsToUsd($rate))
                 : null,
             'currency' => $targetCurrency,
             // Null on a space not refreshed since creation: the column's

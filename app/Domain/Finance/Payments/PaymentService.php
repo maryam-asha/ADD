@@ -34,6 +34,7 @@ use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Support\PlainAmount;
 use Illuminate\Database\DetectsConcurrencyErrors;
 use Illuminate\Database\DetectsLostConnections;
 use Illuminate\Database\Eloquent\Model;
@@ -511,7 +512,7 @@ class PaymentService
 
         if ($received->points < $due) {
             throw new ReceptionActionException('api.payment.amount_short', 422, [
-                'shortage' => bcsub($this->converter->pointsToAmount($due, $currency), $handedOver, $this->decimals($currency)),
+                'shortage' => PlainAmount::of(bcsub($this->converter->pointsToAmount($due, $currency), $handedOver, $this->decimals($currency))),
                 'currency' => $currency,
             ]);
         }

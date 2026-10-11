@@ -145,7 +145,7 @@ class BookingReceptionControllerTest extends TestCase
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Checked out.']);
-        $this->assertSame('20.00', (string) $booking->fresh()->amount_owed);
+        $this->assertSame('20', (string) $booking->fresh()->amount_owed);
     }
 
     public function test_check_out_fails_if_entered_time_is_before_check_in(): void
@@ -207,7 +207,7 @@ class BookingReceptionControllerTest extends TestCase
             'space_id' => $space->id,
             'checked_in_at' => Carbon::parse('2026-08-17 09:00:00', 'Asia/Damascus')->setTimezone('UTC'),
             'checked_out_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", [
@@ -227,7 +227,7 @@ class BookingReceptionControllerTest extends TestCase
         $booking = Booking::factory()->checkedIn()->create([
             'space_id' => $space->id,
             'checked_out_at' => now(),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'payment_state' => PaymentState::Paid,
         ]);
 
@@ -256,7 +256,7 @@ class BookingReceptionControllerTest extends TestCase
         $booking = Booking::factory()->checkedIn()->create([
             'space_id' => $this->openSpace()->id,
             'checked_out_at' => now(),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
         ]);
 
         $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", ['payment_method' => 'visa'])

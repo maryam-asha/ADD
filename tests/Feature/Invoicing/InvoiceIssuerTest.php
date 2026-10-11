@@ -147,8 +147,8 @@ class InvoiceIssuerTest extends InvoicingTestCase
         $this->assertSame($request->id, $invoice->provider_request_id);
         $this->assertSame($request->company_id, $invoice->company_id);
         $this->assertSame(Payer::Company, $invoice->billed_to);
-        $this->assertSame('450.00', (string) $invoice->computed_amount);
-        $this->assertSame('400.00', (string) $invoice->amount);
+        $this->assertSame('450', (string) $invoice->computed_amount);
+        $this->assertSame('400', (string) $invoice->amount);
         $this->assertSame(InvoiceStatus::Unpaid, $invoice->status);
         $this->assertSame($reviewer->id, $invoice->issued_by);
     }

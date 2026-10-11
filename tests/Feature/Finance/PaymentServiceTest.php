@@ -186,7 +186,7 @@ class PaymentServiceTest extends TestCase
         $this->assertSame(__('api.payment.credit_description', ['reference' => 'pay-123']), $credit->description);
         $this->assertSame(PaymentMethod::Paymera, $credit->payment_method);
         $this->assertSame('USD', $credit->payment_currency);
-        $this->assertSame('10.00', (string) $credit->payment_amount);
+        $this->assertSame('10', (string) $credit->payment_amount);
         $this->assertNull($credit->exchange_rate_to_base);
         $this->assertNull($credit->point_rate_usd);
         $this->assertNull($credit->performed_by_user_id);
@@ -227,7 +227,7 @@ class PaymentServiceTest extends TestCase
         $credit = $payment->refresh()->walletTransaction;
         $this->assertSame(1000, (int) $credit->amount);
         $this->assertSame('SYP', $credit->payment_currency);
-        $this->assertSame('1470000.00', (string) $credit->payment_amount);
+        $this->assertSame('1470000', (string) $credit->payment_amount);
         $this->assertSame('0.0000680272', (string) $credit->exchange_rate_to_base);
         $this->assertNull($credit->point_rate_usd);
     }
@@ -423,7 +423,7 @@ class PaymentServiceTest extends TestCase
         $this->assertSame(120, (int) $credit->amount);
         $this->assertSame(PaymentMethod::Cash, $credit->payment_method);
         $this->assertSame('USD', $credit->payment_currency);
-        $this->assertSame('12.00', (string) $credit->payment_amount);
+        $this->assertSame('12', (string) $credit->payment_amount);
         $this->assertNull($credit->exchange_rate_to_base);
         $this->assertSame('0.1000', (string) $credit->point_rate_usd);
         $this->assertSame($operator->id, $credit->performed_by_user_id);

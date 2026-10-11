@@ -75,7 +75,7 @@ class SessionReportTest extends TestCase
         $this->assertSame(['time', 'plan', 3], [$report['lines'][0]['kind'], $report['lines'][0]['source'], $report['lines'][0]['quantity']]);
         $this->assertSame(3, $report['plan']['hours_used']);
         $this->assertSame(37, $report['plan']['hours_remaining']);
-        $this->assertSame('0.00', $report['totals']['amount_owed']);
+        $this->assertSame('0', $report['totals']['amount_owed']);
         $this->assertSame('paid', $report['totals']['payment_state']);
         $this->assertSame(10800, $report['session']['duration_seconds']);
     }
@@ -88,7 +88,7 @@ class SessionReportTest extends TestCase
         $lines = $this->report('walkin', $session->id)['lines'];
 
         $this->assertSame(['plan', 2, null], [$lines[0]['source'], $lines[0]['quantity'], $lines[0]['amount']]);
-        $this->assertSame(['charge', 1, 100, '10.00'], [$lines[1]['source'], $lines[1]['quantity'], $lines[1]['points'], $lines[1]['amount']]);
+        $this->assertSame(['charge', 1, 100, '10'], [$lines[1]['source'], $lines[1]['quantity'], $lines[1]['points'], $lines[1]['amount']]);
     }
 
     public function test_printing_during_the_session_is_its_own_line(): void

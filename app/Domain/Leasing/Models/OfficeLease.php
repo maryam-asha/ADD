@@ -2,6 +2,7 @@
 
 namespace App\Domain\Leasing\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Foundation\Models\Space;
@@ -56,7 +57,7 @@ class OfficeLease extends Model
         return [
             'billed_to' => Payer::class,
             'status' => OfficeLeaseStatus::class,
-            'monthly_amount' => 'decimal:2',
+            'monthly_amount' => PlainDecimal::class,
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
             'terminated_on' => 'immutable_date',

@@ -15,6 +15,7 @@ use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\PlainAmount;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -48,7 +49,7 @@ class OutstandingItems
         ];
 
         foreach ($items as &$item) {
-            $item['amount'] = ['value' => $this->converter->pointsToAmount($item['amount_points'], $currency), 'currency' => $currency];
+            $item['amount'] = ['value' => PlainAmount::of($this->converter->pointsToAmount($item['amount_points'], $currency)), 'currency' => $currency];
         }
         unset($item);
 
@@ -57,7 +58,7 @@ class OutstandingItems
         return [
             'items' => $items,
             'total_points' => $total,
-            'total_amount' => ['value' => $this->converter->pointsToAmount($total, $currency), 'currency' => $currency],
+            'total_amount' => ['value' => PlainAmount::of($this->converter->pointsToAmount($total, $currency)), 'currency' => $currency],
         ];
     }
 

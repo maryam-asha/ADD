@@ -141,7 +141,7 @@ class CloseOverdueReceptionSessionsCommandTest extends TestCase
 
         $session->refresh();
         $this->assertSame(TerminationSource::Reception, $session->termination_source);
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
     }
 
     /**

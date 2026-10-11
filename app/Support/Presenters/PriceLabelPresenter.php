@@ -8,6 +8,7 @@ use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Pricing\ValueObjects\OfferPrice;
 use App\Domain\Pricing\ValueObjects\PlanSaving;
+use App\Support\PlainAmount;
 use App\Support\Time\LocalTime;
 use Illuminate\Http\Request;
 
@@ -311,6 +312,6 @@ class PriceLabelPresenter
         $currency = $this->currencyFor($user);
         $amount = $this->points->pointsToCurrency($points, $currency);
 
-        return $amount === null ? [$this->points->pointsToUsd($points), 'USD'] : [$amount, $currency];
+        return $amount === null ? [PlainAmount::of($this->points->pointsToUsd($points)), 'USD'] : [PlainAmount::of($amount), $currency];
     }
 }

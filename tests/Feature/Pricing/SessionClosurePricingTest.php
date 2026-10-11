@@ -66,7 +66,7 @@ class SessionClosurePricingTest extends TestCase
         // 30 min at 60/h + 30 min at 100/h.
         $this->assertSame(80, $walkin->price_points);
         $this->assertSame(100, $walkin->list_price_points);
-        $this->assertSame('8.00', (string) $walkin->amount_owed);
+        $this->assertSame('8', (string) $walkin->amount_owed);
 
         $row = app(CouponLedger::class)->offerFor($walkin);
         $this->assertSame($offer->id, $row->coupon_id);

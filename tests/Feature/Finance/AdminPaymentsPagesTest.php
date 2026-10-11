@@ -115,7 +115,7 @@ class AdminPaymentsPagesTest extends TestCase
             ->assertJsonPath('data.accepted.points', 200)
             ->assertJsonPath('data.cash.0.currency', 'SYP')
             ->assertJsonPath('data.card.0.currency', 'USD')
-            ->assertJsonPath('data.card.0.amount', '10.00');
+            ->assertJsonPath('data.card.0.amount', '10');
 
         $this->assertEquals(6000, (float) $response->json('data.cash.0.amount'));
 

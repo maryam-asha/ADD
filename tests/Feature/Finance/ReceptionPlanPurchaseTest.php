@@ -91,7 +91,7 @@ class ReceptionPlanPurchaseTest extends TestCase
         $this->sell(['plan_id' => $this->plan->id, 'user_id' => $member->id, 'payment_method' => 'cash'])
             ->assertCreated()
             ->assertJsonPath('data.points_charged', 1200)
-            ->assertJsonPath('data.payment_amount', '120.00')
+            ->assertJsonPath('data.payment_amount', '120')
             ->assertJsonPath('data.payment_currency', 'USD')
             ->assertJsonPath('data.owner_type', 'user')
             ->assertJsonPath('data.owner_id', $member->id)
@@ -218,7 +218,7 @@ class ReceptionPlanPurchaseTest extends TestCase
         $this->sell(['plan_id' => $this->plan->id, 'user_id' => $member->id, 'payment_method' => 'cash'])
             ->assertCreated()
             ->assertJsonPath('data.points_charged', 1000)
-            ->assertJsonPath('data.payment_amount', '100.00');
+            ->assertJsonPath('data.payment_amount', '100');
 
         $this->assertSame(1200, (int) Payment::sole()->list_price_points);
         $this->assertSame(0, $this->balance(OwnerType::User, $member->id));
@@ -375,7 +375,7 @@ class ReceptionPlanPurchaseTest extends TestCase
         $this->preview($body)
             ->assertOk()
             ->assertJsonPath('data.points', 600)
-            ->assertJsonPath('data.payment_amount', '60.00')
+            ->assertJsonPath('data.payment_amount', '60')
             ->assertJsonPath('data.coupon.code', 'HALF')
             ->assertJsonPath('data.coupon.applied', true)
             ->assertJsonPath('data.coupon.points_discounted', 600);
@@ -384,7 +384,7 @@ class ReceptionPlanPurchaseTest extends TestCase
         $this->sell($body)
             ->assertCreated()
             ->assertJsonPath('data.points_charged', 600)
-            ->assertJsonPath('data.payment_amount', '60.00')
+            ->assertJsonPath('data.payment_amount', '60')
             ->assertJsonPath('data.coupon.applied', true)
             ->assertJsonPath('data.discounts.0.kind', 'coupon')
             ->assertJsonPath('data.discounts.0.code', 'HALF')

@@ -186,7 +186,7 @@ class EventTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('data.is_free', false);
         $response->assertJsonPath('data.price_points', 150);
-        $response->assertJsonPath('data.price_usd', '15.00');
+        $response->assertJsonPath('data.price_usd', '15');
 
         $this->assertDatabaseHas('events', [
             'is_free' => false,
@@ -210,7 +210,7 @@ class EventTest extends TestCase
         $response->assertCreated();
         $response->assertJsonPath('data.is_free', true);
         $response->assertJsonPath('data.price_points', 0);
-        $response->assertJsonPath('data.price_usd', '0.00');
+        $response->assertJsonPath('data.price_usd', '0');
 
         $this->assertDatabaseHas('events', [
             'is_free' => true,

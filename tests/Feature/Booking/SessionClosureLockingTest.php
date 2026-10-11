@@ -86,7 +86,7 @@ class SessionClosureLockingTest extends TestCase
 
         $this->assertNotNull($session->checked_out_at);
         $this->assertSame(TerminationSource::Reception, $session->termination_source);
-        $this->assertSame('10.00', (string) $session->amount_owed);
+        $this->assertSame('10', (string) $session->amount_owed);
     }
 
     public function test_the_desk_checkouts_still_audit_the_amount_owed(): void
@@ -108,7 +108,7 @@ class SessionClosureLockingTest extends TestCase
         $this->postJson("/api/v1/admin/reception/walk-ins/{$walkIn->id}/check-out", $checkOut)->assertOk();
         $this->postJson("/api/v1/admin/reception/bookings/{$booking->id}/check-out", $checkOut)->assertOk();
 
-        $this->assertSame('10.00', Activity::where('description', 'walkin_session_checked_out')->sole()->properties->get('amount_owed'));
-        $this->assertSame('20.00', Activity::where('description', 'booking_checked_out')->sole()->properties->get('amount_owed'));
+        $this->assertSame('10', Activity::where('description', 'walkin_session_checked_out')->sole()->properties->get('amount_owed'));
+        $this->assertSame('20', Activity::where('description', 'booking_checked_out')->sole()->properties->get('amount_owed'));
     }
 }

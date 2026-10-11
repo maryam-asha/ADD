@@ -95,7 +95,7 @@ class BookingCouponCreationTest extends TestCase
 
         $this->assertSame(80, $booking->price_points);
         $this->assertSame(100, $booking->list_price_points);
-        $this->assertSame('8.00', (string) $booking->amount_owed);
+        $this->assertSame('8', (string) $booking->amount_owed);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(920, $this->balance($member));
 

@@ -6,6 +6,7 @@ use App\Domain\Experience\Models\Event;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 
 /**
@@ -90,8 +91,8 @@ class EventPricePresenter
         $pricePoints = (int) ($event->price_points ?? 0);
         $isFree = (bool) ($event->is_free ?? true) || $pricePoints <= 0;
 
-        $priceUsd = $this->points->pointsToUsd($pricePoints);
-        $priceDisplay = $this->points->pointsToCurrency($pricePoints, $targetCurrency) ?? $priceUsd;
+        $priceUsd = PlainAmount::of($this->points->pointsToUsd($pricePoints));
+        $priceDisplay = PlainAmount::of($this->points->pointsToCurrency($pricePoints, $targetCurrency)) ?? $priceUsd;
 
         return [
             'price_points' => $pricePoints,

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Models\AccessGrant;
@@ -70,7 +71,7 @@ class Booking extends Model
             'checked_in_via' => SessionStartSource::class,
             'checked_out_at' => 'datetime',
             'termination_source' => TerminationSource::class,
-            'amount_owed' => 'decimal:2',
+            'amount_owed' => PlainDecimal::class,
             'price_points' => 'integer',
             'list_price_points' => 'integer',
             'payment_method' => PaymentMethod::class,

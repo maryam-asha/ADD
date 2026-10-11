@@ -110,7 +110,7 @@ class ReceptionSettlementTest extends TestCase
         $payment = Payment::sole();
         $this->assertSame(PaymentStatus::Accepted, $payment->status);
         $this->assertSame($this->operator->id, $payment->received_by);
-        $this->assertSame('10.00', (string) $payment->received_amount);
+        $this->assertSame('10', (string) $payment->received_amount);
 
         $credit = WalletTransaction::findOrFail($payment->wallet_transaction_id);
         $this->assertSame(100, (int) $credit->amount);
@@ -151,7 +151,7 @@ class ReceptionSettlementTest extends TestCase
 
         $this->settle(['purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash', 'amount' => '7.50'])
             ->assertStatus(422)
-            ->assertJsonPath('shortage', '2.50')
+            ->assertJsonPath('shortage', '2.5')
             ->assertJsonPath('currency', 'USD');
 
         $this->assertSame(PaymentState::Unpaid, $booking->refresh()->payment_state);
@@ -264,7 +264,7 @@ class ReceptionSettlementTest extends TestCase
         $session = WalkinSession::factory()->create([
             'user_id' => $member->id,
             'checked_out_at' => now()->subHour(),
-            'amount_owed' => '15.00',
+            'amount_owed' => '15',
             'price_points' => 150,
             'payment_state' => PaymentState::Unpaid,
         ]);
@@ -286,7 +286,7 @@ class ReceptionSettlementTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 250,
-            'amount' => '25.00',
+            'amount' => '25',
             'payment_method' => 'cash',
         ])->assertCreated();
 

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Membership\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Payment;
@@ -52,7 +53,7 @@ class WalletTransaction extends Model
             'source' => WalletTransactionSource::class,
             'expires_at' => 'datetime',
             'payment_method' => PaymentMethod::class,
-            'payment_amount' => 'decimal:2',
+            'payment_amount' => PlainDecimal::class,
             'exchange_rate_to_base' => 'decimal:10',
             'point_rate_usd' => 'decimal:4',
         ];

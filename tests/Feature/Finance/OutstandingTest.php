@@ -92,9 +92,9 @@ class OutstandingTest extends TestCase
             $items->map(fn ($i) => [$i['purpose'], $i['payable_id'] ?? $i['payment_id']])->all(),
         );
         $this->assertSame(1530, $response->json('data.total_points'));
-        $this->assertSame('153.00', $response->json('data.total_amount.value'));
+        $this->assertSame('153', $response->json('data.total_amount.value'));
         $this->assertSame('USD', $response->json('data.total_amount.currency'));
-        $this->assertSame('10.00', $items->first()['amount']['value']);
+        $this->assertSame('10', $items->first()['amount']['value']);
     }
 
     public function test_a_member_owing_nothing_gets_an_empty_list(): void

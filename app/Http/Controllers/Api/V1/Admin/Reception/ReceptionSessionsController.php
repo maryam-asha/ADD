@@ -20,6 +20,7 @@ use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\ActiveReceptionSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
+use App\Support\PlainAmount;
 use App\Support\Time\LocalTime;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -136,12 +137,12 @@ class ReceptionSessionsController extends Controller
                         'owner_type' => $payment->wallet->owner_type?->value ?? (string) $payment->wallet->owner_type,
                     ],
                     'cash' => $payment->received_amount === null ? null : [
-                        'amount' => (string) $payment->received_amount,
+                        'amount' => PlainAmount::of($payment->received_amount),
                         'currency' => $payment->received_currency,
                         'received_by' => $payment->receivedBy?->name,
                     ],
                     'card' => $payment->amount_minor === null ? null : [
-                        'amount' => bcdiv((string) $payment->amount_minor, bcpow('10', (string) ($payment->currency_exponent ?? 2), 0), (int) ($payment->currency_exponent ?? 2)),
+                        'amount' => PlainAmount::of(bcdiv((string) $payment->amount_minor, bcpow('10', (string) ($payment->currency_exponent ?? 2), 0), (int) ($payment->currency_exponent ?? 2))),
                         'currency' => $payment->currency,
                         'reference' => $payment->rrn,
                     ],
@@ -163,7 +164,7 @@ class ReceptionSessionsController extends Controller
         return Currency::query()->where('is_active', true)->orderByDesc('is_base')->orderBy('order')->pluck('code')
             ->map(function (string $code) use ($converter, $points) {
                 try {
-                    return ['currency' => $code, 'value' => $converter->pointsToAmount($points, $code)];
+                    return ['currency' => $code, 'value' => PlainAmount::of($converter->pointsToAmount($points, $code))];
                 } catch (PaymentPricingException) {
                     return null;
                 }

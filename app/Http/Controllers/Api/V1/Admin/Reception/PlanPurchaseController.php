@@ -27,6 +27,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StorePlanPurchaseRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
+use App\Support\PlainAmount;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Http\JsonResponse;
@@ -184,7 +185,7 @@ class PlanPurchaseController extends Controller
         $balance = $wallet === null ? 0 : $wallets->generalBalance($wallet);
 
         try {
-            $amount = $converter->pointsToAmount($quote->finalPoints, $currency);
+            $amount = PlainAmount::of($converter->pointsToAmount($quote->finalPoints, $currency));
         } catch (PaymentPricingException) {
             return response()->json(['message' => __('api.payment.currency_unavailable')], 422);
         }

@@ -10,6 +10,7 @@ use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
 use App\Domain\Finance\Services\ReversePayment;
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Finance\PaymentResource;
+use App\Support\PlainAmount;
 use App\Support\Time\LocalTime;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
@@ -95,7 +96,7 @@ class PaymentController extends Controller
             ->groupBy('received_currency')
             ->toBase()
             ->get()
-            ->map(fn (object $row) => ['currency' => $row->currency, 'amount' => (string) $row->amount])
+            ->map(fn (object $row) => ['currency' => $row->currency, 'amount' => PlainAmount::of($row->amount)])
             ->values();
 
         $card = $this->filtered($validated)
@@ -110,7 +111,7 @@ class PaymentController extends Controller
 
                 return [
                     'currency' => $row->currency,
-                    'amount' => bcdiv((string) $row->minor, bcpow('10', (string) $exponent, 0), $exponent),
+                    'amount' => PlainAmount::of(bcdiv((string) $row->minor, bcpow('10', (string) $exponent, 0), $exponent)),
                 ];
             })
             ->values();

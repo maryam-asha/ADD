@@ -42,13 +42,13 @@ class HistoricalExchangeRateSnapshotTest extends TestCase
             'user_id' => $member->id,
             'start_at' => now()->addDay(),
             'end_at' => now()->addDay()->addHours(2),
-            'amount_owed' => '100.00',
+            'amount_owed' => '100',
             'currency' => 'USD',
             'status' => 'confirmed',
             'payment_state' => 'unpaid',
         ]);
 
-        $this->assertEquals('100.00', (string) $booking->fresh()->amount_owed);
+        $this->assertEquals('100', (string) $booking->fresh()->amount_owed);
         $this->assertSame('USD', $booking->fresh()->currency);
 
         // 3. Exchange rate updates substantially the next day: 1 USD = 16,000 SYP
@@ -61,7 +61,7 @@ class HistoricalExchangeRateSnapshotTest extends TestCase
 
         // 4. Assert that the past booking remains 100.00 USD and was NOT recalculated or altered
         $freshBooking = $booking->fresh();
-        $this->assertEquals('100.00', (string) $freshBooking->amount_owed);
+        $this->assertEquals('100', (string) $freshBooking->amount_owed);
         $this->assertSame('USD', $freshBooking->currency);
     }
 }

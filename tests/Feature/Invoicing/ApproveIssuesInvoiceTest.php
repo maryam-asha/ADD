@@ -45,7 +45,7 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
         $invoice = Invoice::sole();
         $this->assertSame($request->id, $invoice->provider_request_id);
         $this->assertSame(4500, $invoice->points);
-        $this->assertSame('450.00', (string) $invoice->amount);
+        $this->assertSame('450', (string) $invoice->amount);
         $this->assertSame('USD', $invoice->currency);
         $this->assertSame('provider', $invoice->billed_to->value);
         $this->assertSame('2026-11-09', $invoice->due_at->toDateString());
@@ -65,8 +65,8 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
 
         $invoice = Invoice::sole();
         $this->assertSame('SYP', $invoice->currency);
-        $this->assertSame('900000.00', (string) $invoice->computed_amount);
-        $this->assertSame('850000.00', (string) $invoice->amount);
+        $this->assertSame('900000', (string) $invoice->computed_amount);
+        $this->assertSame('850000', (string) $invoice->amount);
         $this->assertSame('2026-12-01', $invoice->due_at->toDateString());
     }
 
@@ -112,7 +112,7 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
 
         $this->getJson("/api/v1/admin/provider-requests/{$request->id}")
             ->assertOk()
-            ->assertJsonPath('data.invoice_preview.amount', '450.00')
+            ->assertJsonPath('data.invoice_preview.amount', '450')
             ->assertJsonPath('data.invoice_preview.currency', 'USD')
             ->assertJsonPath('data.invoice_preview.points', 4500)
             ->assertJsonPath('data.invoice_preview.due_at', '2026-11-09')
@@ -176,7 +176,7 @@ class ApproveIssuesInvoiceTest extends InvoicingTestCase
             ->assertStatus(422)->assertJsonValidationErrors('invoice_amount');
         $this->assertTrue($request->fresh()->isPending());
 
-        $this->postJson("/api/v1/admin/provider-requests/{$request->id}/approve", ['invoice_amount' => '100.50'])->assertOk();
-        $this->assertSame('100.50', (string) Invoice::sole()->amount);
+        $this->postJson("/api/v1/admin/provider-requests/{$request->id}/approve", ['invoice_amount' => '100.5'])->assertOk();
+        $this->assertSame('100.5', (string) Invoice::sole()->amount);
     }
 }

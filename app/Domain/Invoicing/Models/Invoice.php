@@ -2,6 +2,7 @@
 
 namespace App\Domain\Invoicing\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -11,6 +12,7 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
+use App\Support\PlainAmount;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -54,9 +56,9 @@ class Invoice extends Model
             'billed_to' => Payer::class,
             'status' => InvoiceStatus::class,
             'points' => 'integer',
-            'computed_amount' => 'decimal:2',
-            'amount' => 'decimal:2',
-            'paid_amount' => 'decimal:2',
+            'computed_amount' => PlainDecimal::class,
+            'amount' => PlainDecimal::class,
+            'paid_amount' => PlainDecimal::class,
             'issued_at' => 'date',
             'due_at' => 'date',
             'cancelled_at' => 'datetime',
@@ -115,7 +117,7 @@ class Invoice extends Model
     {
         $left = bcsub((string) $this->amount, (string) $this->paid_amount, 2);
 
-        return bccomp($left, '0', 2) < 0 ? '0.00' : $left;
+        return PlainAmount::of(bccomp($left, '0', 2) < 0 ? '0' : $left);
     }
 
     /** Status from `paid_amount`, in one place. A cancelled invoice stays cancelled. */

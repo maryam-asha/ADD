@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Booking\Concerns\HasSessionActivity;
 use App\Domain\Booking\Enums\PaymentSource;
@@ -53,7 +54,7 @@ class WalkinSession extends Model
             'payment_state' => PaymentState::class,
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
-            'amount_owed' => 'decimal:2',
+            'amount_owed' => PlainDecimal::class,
             'price_points' => 'integer',
             'list_price_points' => 'integer',
             'plan_covered_seconds' => 'integer',

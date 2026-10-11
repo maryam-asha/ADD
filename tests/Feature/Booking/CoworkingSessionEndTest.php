@@ -132,7 +132,7 @@ class CoworkingSessionEndTest extends TestCase
 
         $session->refresh();
         $this->assertTrue($session->checked_out_at->equalTo(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')));
-        $this->assertSame('20.00', (string) $session->amount_owed); // 2 h at 100 points, 0.10 USD/point
+        $this->assertSame('20', (string) $session->amount_owed); // 2 h at 100 points, 0.10 USD/point
         $this->assertSame(SessionEndRequestStatus::Confirmed, SessionEndRequest::sole()->status);
         Notification::assertSentTo($member, GeneralNotification::class);
     }
@@ -229,7 +229,7 @@ class CoworkingSessionEndTest extends TestCase
             ->assertJsonPath('data.payments.0.method_label', 'Wallet points')
             ->assertJsonPath('data.payments.0.points', 200)
             ->assertJsonPath('data.payments.0.points_value.0.currency', 'USD')
-            ->assertJsonPath('data.payments.0.points_value.0.value', '20.00')
+            ->assertJsonPath('data.payments.0.points_value.0.value', '20')
             ->assertJsonPath('data.payments.0.cash', null);
 
         $other = $this->actingAsMember();
@@ -245,7 +245,7 @@ class CoworkingSessionEndTest extends TestCase
         $this->withHeader('lang', 'en')->getJson("/api/v1/admin/reception/sessions/walkin/{$cashSession->id}/report")
             ->assertOk()
             ->assertJsonPath('data.payments.0.method', 'cash')
-            ->assertJsonPath('data.payments.0.cash.amount', '20.00')
+            ->assertJsonPath('data.payments.0.cash.amount', '20')
             ->assertJsonPath('data.payments.0.cash.currency', 'USD');
     }
 
@@ -271,7 +271,7 @@ class CoworkingSessionEndTest extends TestCase
 
         $properties = Activity::where('description', 'session_end_confirmed')->sole()->properties;
         $this->assertSame($endRequest->id, $properties->get('end_request_id'));
-        $this->assertSame('20.00', $properties->get('amount_owed'));
+        $this->assertSame('20', $properties->get('amount_owed'));
     }
 
     public function test_reception_can_set_a_different_time(): void

@@ -19,6 +19,7 @@ use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Domain\Pricing\ValueObjects\PriceLine;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
+use App\Support\PlainAmount;
 use App\Support\Presenters\AvailabilityPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -109,7 +110,7 @@ class BookingPresentationService
                 'coupon' => __('api.booking.coupon_label', ['code' => $line->code], $locale),
             },
             'points' => $line->points,
-            'amount' => $line->points < 0 ? -$this->points->pointsToUsd(-$line->points) : $this->points->pointsToUsd($line->points),
+            'amount' => PlainAmount::of($line->points < 0 ? '-'.$this->points->pointsToUsd(-$line->points) : $this->points->pointsToUsd($line->points)),
             'formatted' => $line->points < 0 ? '-'.$this->money(-$line->points) : $this->money($line->points),
         ], $quote->lines());
 
@@ -117,19 +118,19 @@ class BookingPresentationService
             'lines' => $lines,
             'subtotal' => [
                 'points' => $points,
-                'amount' => $this->points->pointsToUsd($points),
+                'amount' => PlainAmount::of($this->points->pointsToUsd($points)),
                 'formatted' => $this->money($points),
             ],
             'vat' => [
                 'rate_percent' => $vatPercent,
                 'label' => __('api.booking.vat_label', ['percent' => $vatPercent], $locale),
                 'points' => $vatPoints,
-                'amount' => $this->points->pointsToUsd($vatPoints),
+                'amount' => PlainAmount::of($this->points->pointsToUsd($vatPoints)),
                 'formatted' => $this->money($vatPoints),
             ],
             'total' => [
                 'points' => $totalPoints,
-                'amount' => $this->points->pointsToUsd($totalPoints),
+                'amount' => PlainAmount::of($this->points->pointsToUsd($totalPoints)),
                 'formatted' => $this->money($totalPoints),
             ],
             'currency' => 'USD',

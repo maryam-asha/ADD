@@ -424,7 +424,7 @@ class MemberWalletTest extends TestCase
             ->assertJsonPath('data.title', 'Wallet top-up')
             ->assertJsonPath('data.points', '+10')
             ->assertJsonPath('data.method', 'paymera')
-            ->assertJsonPath('data.paid.amount', '10000.00')
+            ->assertJsonPath('data.paid.amount', '10000')
             ->assertJsonPath('data.paid.currency', 'SYP')
             ->assertJsonPath('data.balance.before.points', 0)
             ->assertJsonPath('data.balance.after.points', 10);
@@ -433,7 +433,7 @@ class MemberWalletTest extends TestCase
         // rate — the receipt and the row agree.
         $this->getJson('/api/v1/member/wallet/transactions')
             ->assertOk()
-            ->assertJsonPath('data.transactions.0.paid.amount', '10000.00')
+            ->assertJsonPath('data.transactions.0.paid.amount', '10000')
             ->assertJsonPath('data.transactions.0.paid.currency', 'SYP');
 
         $this->getJson('/api/v1/member/wallet')->assertJsonPath('data.balance.points', 10);

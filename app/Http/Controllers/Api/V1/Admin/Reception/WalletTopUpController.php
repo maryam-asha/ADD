@@ -21,6 +21,7 @@ use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Membership\Services\WalletService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StoreWalletTopUpRequest;
+use App\Support\PlainAmount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -77,7 +78,7 @@ class WalletTopUpController extends Controller
         $convertedBalance = null;
 
         if ($requestedCurrency !== null && $requestedCurrency !== $baseCurrency) {
-            $convertedBalance = $points->pointsToCurrency($generalBalancePoints, $requestedCurrency);
+            $convertedBalance = PlainAmount::of($points->pointsToCurrency($generalBalancePoints, $requestedCurrency));
         }
 
         return response()->json([
@@ -88,12 +89,12 @@ class WalletTopUpController extends Controller
                 'owner_phone' => $ownerType === OwnerType::Company ? $owner?->contract_ref : $owner?->phone,
                 'status' => $owner?->status?->value ?? (string) $owner?->status,
                 'balance_points' => $generalBalancePoints,
-                'balance_usd' => $points->pointsToUsd($generalBalancePoints),
-                'balance_display' => $points->pointsToCurrency($generalBalancePoints, $displayCurrency),
+                'balance_usd' => PlainAmount::of($points->pointsToUsd($generalBalancePoints)),
+                'balance_display' => PlainAmount::of($points->pointsToCurrency($generalBalancePoints, $displayCurrency)),
                 // Retained for the dashboard's current receipt view, which
                 // still reads these: both are derived from the point balance
                 // above, so they cannot drift from it.
-                'general_balance' => $points->pointsToUsd($generalBalancePoints),
+                'general_balance' => PlainAmount::of($points->pointsToUsd($generalBalancePoints)),
                 'currency' => $baseCurrency,
                 'converted_balance' => $convertedBalance,
                 'display_currency' => $displayCurrency,
@@ -227,7 +228,7 @@ class WalletTopUpController extends Controller
                 'previous_balance_points' => $previousBalancePoints,
                 'new_balance_points' => $newBalancePoints,
                 'point_rate_usd' => (string) $transaction->point_rate_usd,
-                'payment_amount' => $paymentAmount,
+                'payment_amount' => PlainAmount::of($paymentAmount),
                 'payment_currency' => $paymentCurrency,
                 'exchange_rate' => $exchangeRate,
                 'source' => $transaction->source->value,
@@ -244,10 +245,10 @@ class WalletTopUpController extends Controller
                 // so they agree with points_credited by construction — where
                 // the old `amount` echoed the untruncated payment and could
                 // overstate it by up to one point's worth.
-                'amount' => $points->pointsToUsd($pointsCredited),
+                'amount' => PlainAmount::of($points->pointsToUsd($pointsCredited)),
                 'currency' => $baseCurrency,
-                'previous_balance' => $points->pointsToUsd($previousBalancePoints),
-                'new_balance' => $points->pointsToUsd($newBalancePoints),
+                'previous_balance' => PlainAmount::of($points->pointsToUsd($previousBalancePoints)),
+                'new_balance' => PlainAmount::of($points->pointsToUsd($newBalancePoints)),
                 'created_at' => $transaction->created_at?->toISOString() ?? now()->toISOString(),
             ],
         ], 201);

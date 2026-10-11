@@ -68,8 +68,8 @@ class PlanPriceConversionTest extends TestCase
         // rather than compared against price_usd from the same response —
         // a self-comparison holds whatever value both fields carry, so it
         // could not tell a correct price from a 10x-inflated one.
-        $response->assertJsonPath('data.price_usd', '10.00');
-        $response->assertJsonPath('data.price_display', '10.00');
+        $response->assertJsonPath('data.price_usd', '10');
+        $response->assertJsonPath('data.price_display', '10');
         $response->assertJsonMissingPath('data.converted_amount');
         $response->assertJsonMissingPath('data.converted_currency');
     }
@@ -123,8 +123,8 @@ class PlanPriceConversionTest extends TestCase
         // the 0.10 point rate, i.e. $10.00. Pinned as a literal rather than
         // compared against price_usd from the same response, which would
         // hold for any value the two fields happened to share.
-        $response->assertJsonPath('data.price_usd', '10.00');
-        $response->assertJsonPath('data.price_display', '10.00');
+        $response->assertJsonPath('data.price_usd', '10');
+        $response->assertJsonPath('data.price_display', '10');
     }
 
     /**
@@ -146,7 +146,7 @@ class PlanPriceConversionTest extends TestCase
         $response = $this->getJson("/api/v1/admin/plans/{$plan->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('data.price_display', '10.00');
+        $response->assertJsonPath('data.price_display', '10');
         $response->assertJsonPath('data.currency', 'USD');
     }
 
@@ -173,7 +173,7 @@ class PlanPriceConversionTest extends TestCase
         $response = $this->withHeader('currency', 'USD')->getJson('/api/v1/plans');
 
         $response->assertOk();
-        $response->assertJsonPath('data.0.price_display', '10.00');
+        $response->assertJsonPath('data.0.price_display', '10');
         $response->assertJsonPath('data.0.currency', 'USD');
     }
 
@@ -222,7 +222,7 @@ class PlanPriceConversionTest extends TestCase
             ->getJson('/api/v1/plans');
 
         $response->assertOk();
-        $response->assertJsonPath('data.0.price_display', '10.00');
+        $response->assertJsonPath('data.0.price_display', '10');
         $response->assertJsonPath('data.0.currency', 'USD');
     }
 }

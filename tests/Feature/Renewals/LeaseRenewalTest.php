@@ -58,7 +58,7 @@ class LeaseRenewalTest extends RenewalsTestCase
         $this->assertCount(8, $periods);
         $this->assertSame([5, 6, 7, 8], $periods->where('status', LeasePeriodStatus::Upcoming)->where('sequence', '>', 4)->pluck('sequence')->values()->all());
         $this->assertSame($oldEnd->addDay()->toDateString(), $periods->firstWhere('sequence', 5)->starts_on->toDateString());
-        $this->assertSame('1500.00', (string) $periods->firstWhere('sequence', 8)->amount);
+        $this->assertSame('1500', (string) $periods->firstWhere('sequence', 8)->amount);
 
         $this->assertSame(AccessGrantStatus::Revoked, $oldGrant->fresh()->status);
         $live = $extended->accessGrants()->where('status', AccessGrantStatus::Activated)->sole();

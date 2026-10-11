@@ -44,13 +44,13 @@ class BookingModelTest extends TestCase
             'payment_method' => PaymentMethod::Cash,
             'paid_by' => $operator->id,
             'paid_at' => now(),
-            'amount_owed' => '12.50',
+            'amount_owed' => '12.5',
             'currency' => 'USD',
         ]);
 
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(PaymentSource::Cash, $booking->payment_source);
         $this->assertSame(PaymentMethod::Cash, $booking->payment_method);
-        $this->assertSame('12.50', (string) $booking->amount_owed);
+        $this->assertSame('12.5', (string) $booking->amount_owed);
     }
 }

@@ -129,8 +129,8 @@ class PaymeraChargeCurrencyTest extends TestCase
         $this->assertSame('SYP', $transaction->payment_currency);
 
         // The SYP amount actually charged — not its ~100.00 USD value.
-        $this->assertSame('1470000.00', (string) $transaction->payment_amount);
-        $this->assertNotSame('100.00', (string) $transaction->payment_amount);
+        $this->assertSame('1470000', (string) $transaction->payment_amount);
+        $this->assertNotSame('100', (string) $transaction->payment_amount);
 
         // And the rate that makes the USD value re-derivable later.
         $this->assertSame(
@@ -170,7 +170,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         $transaction = $payment->refresh()->walletTransaction;
 
         $this->assertSame('USD', $transaction->payment_currency);
-        $this->assertSame('10.00', (string) $transaction->payment_amount);
+        $this->assertSame('10', (string) $transaction->payment_amount);
         $this->assertNull($transaction->exchange_rate_to_base);
     }
 

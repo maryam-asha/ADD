@@ -27,7 +27,7 @@ class InvoiceModelTest extends TestCase
         $invoice->paid_amount = '40.00';
         $invoice->refreshStatus();
         $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->status);
-        $this->assertSame('60.00', $invoice->remaining());
+        $this->assertSame('60', $invoice->remaining());
 
         $invoice->paid_amount = '100.00';
         $invoice->refreshStatus();

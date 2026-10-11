@@ -133,7 +133,7 @@ class BookingExtensionOwedTest extends TestCase
             'user_id' => $member->id,
             'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
             'end_at' => Carbon::parse('2026-08-17 11:00', 'Asia/Damascus')->utc(),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'price_points' => 100,
             'payment_state' => PaymentState::Unpaid,
             'payment_source' => null,
@@ -220,7 +220,7 @@ class BookingExtensionOwedTest extends TestCase
         ])
             ->assertCreated()
             ->assertJsonPath('data.points_charged', 100)
-            ->assertJsonPath('data.payment.received_amount', '10.00');
+            ->assertJsonPath('data.payment.received_amount', '10');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame(0, $this->owedPoints($member));

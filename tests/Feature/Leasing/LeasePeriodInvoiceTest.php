@@ -22,7 +22,7 @@ class LeasePeriodInvoiceTest extends LeasingTestCase
             'office_lease_id' => $lease->id,
             'starts_on' => '2026-04-01',
             'ends_on' => '2026-06-30',
-            'amount' => '1500.00',
+            'amount' => '1500',
             ...$periodAttributes,
         ]);
     }
@@ -34,8 +34,8 @@ class LeasePeriodInvoiceTest extends LeasingTestCase
         $invoice = app(InvoiceIssuer::class)->issueForLeasePeriod($period, null);
 
         $this->assertNull($invoice->points);
-        $this->assertSame('1500.00', (string) $invoice->amount);
-        $this->assertSame('1500.00', (string) $invoice->computed_amount);
+        $this->assertSame('1500', (string) $invoice->amount);
+        $this->assertSame('1500', (string) $invoice->computed_amount);
         $this->assertSame('USD', $invoice->currency);
         $this->assertSame(0, bccomp((string) $invoice->exchange_rate_to_base, '1', 10));
         $this->assertSame($period->id, $invoice->office_lease_period_id);
@@ -80,7 +80,7 @@ class LeasePeriodInvoiceTest extends LeasingTestCase
         $payments = app(InvoicePaymentService::class);
 
         $payment = $payments->record($invoice, [
-            'amount' => '500.00', 'currency' => 'USD', 'method' => 'bank_transfer',
+            'amount' => '500', 'currency' => 'USD', 'method' => 'bank_transfer',
             'receipt_number' => 'TRF-1', 'paid_at' => now()->toDateString(),
         ], $admin);
         $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->fresh()->status);

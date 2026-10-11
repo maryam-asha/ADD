@@ -40,7 +40,7 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
 
         $this->pay($invoice, '40');
         $this->assertSame(InvoiceStatus::PartiallyPaid, $invoice->fresh()->status);
-        $this->assertSame('60.00', $invoice->fresh()->remaining());
+        $this->assertSame('60', $invoice->fresh()->remaining());
 
         $this->pay($invoice, '60');
         $this->assertSame(InvoiceStatus::Paid, $invoice->fresh()->status);
@@ -53,10 +53,10 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
 
         $payment = $this->pay($invoice, '300000', 'SYP');
 
-        $this->assertSame('30.00', (string) $payment->amount);
-        $this->assertSame('300000.00', (string) $payment->received_amount);
+        $this->assertSame('30', (string) $payment->amount);
+        $this->assertSame('300000', (string) $payment->received_amount);
         $this->assertSame('SYP', $payment->received_currency);
-        $this->assertSame('30.00', (string) $invoice->fresh()->paid_amount);
+        $this->assertSame('30', (string) $invoice->fresh()->paid_amount);
     }
 
     public function test_an_exact_equivalent_settles_the_invoice_despite_truncation(): void
@@ -67,7 +67,7 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
         $this->pay($invoice, '147000', 'SYP'); // 9.9999984 USD, truncated 9.99
 
         $this->assertSame(InvoiceStatus::Paid, $invoice->fresh()->status);
-        $this->assertSame('10.00', (string) $invoice->fresh()->paid_amount);
+        $this->assertSame('10', (string) $invoice->fresh()->paid_amount);
     }
 
     public function test_more_than_what_is_left_is_refused(): void
@@ -113,7 +113,7 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
 
         $this->service()->void($payment, 'Typed the wrong invoice', $this->staff);
         $this->assertSame(InvoiceStatus::Unpaid, $invoice->fresh()->status);
-        $this->assertSame('0.00', (string) $invoice->fresh()->paid_amount);
+        $this->assertSame('0', (string) $invoice->fresh()->paid_amount);
 
         $this->service()->cancel($invoice->fresh(), 'Waived', $this->staff);
         $this->assertSame(InvoiceStatus::Cancelled, $invoice->fresh()->status);
@@ -195,8 +195,8 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
         $old = $this->pay($invoice, '100000', 'SYP', now()->subDays(5)->toDateString());
         $today = $this->pay($invoice, '100000', 'SYP');
 
-        $this->assertSame('10.00', (string) $old->amount);
-        $this->assertSame('20.00', (string) $today->amount);
+        $this->assertSame('10', (string) $old->amount);
+        $this->assertSame('20', (string) $today->amount);
     }
 
     public function test_a_paid_at_before_any_rate_existed_is_refused(): void

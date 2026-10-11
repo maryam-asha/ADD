@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasTranslations;
 use Database\Factories\CurrencyFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -51,7 +52,7 @@ class Currency extends Model
         return [
             'name' => 'array',
             'decimal_places' => 'integer',
-            'cash_step' => 'decimal:2',
+            'cash_step' => PlainDecimal::class,
             'is_base' => 'boolean',
             'is_default' => 'boolean',
             'is_active' => 'boolean',

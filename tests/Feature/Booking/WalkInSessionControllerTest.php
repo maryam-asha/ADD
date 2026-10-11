@@ -118,7 +118,7 @@ class WalkInSessionControllerTest extends TestCase
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Checked out.']);
-        $this->assertSame('20.00', (string) $session->fresh()->amount_owed);
+        $this->assertSame('20', (string) $session->fresh()->amount_owed);
     }
 
     public function test_check_out_fails_if_the_walk_in_session_was_never_checked_in(): void
@@ -150,7 +150,7 @@ class WalkInSessionControllerTest extends TestCase
         $session = WalkinSession::factory()->create([
             'space_id' => $space->id,
             'checked_out_at' => now(),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
         ]);
 
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", [

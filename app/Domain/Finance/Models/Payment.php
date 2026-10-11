@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasReference;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -94,7 +95,7 @@ class Payment extends Model
             'points_to_credit' => 'integer',
             'amount_points' => 'integer',
             'list_price_points' => 'integer',
-            'received_amount' => 'decimal:2',
+            'received_amount' => PlainDecimal::class,
             'check_attempts' => 'integer',
             'raw_response' => 'array',
             'gateway_created_at' => 'datetime',

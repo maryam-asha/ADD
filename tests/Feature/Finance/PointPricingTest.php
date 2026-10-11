@@ -32,7 +32,7 @@ class PointPricingTest extends TestCase
 
         $response->assertOk()
             ->assertJsonPath('data.0.price_points', 500)
-            ->assertJsonPath('data.0.price_usd', '50.00')
+            ->assertJsonPath('data.0.price_usd', '50')
             ->assertJsonPath('data.0.currency', 'USD');
     }
 
@@ -61,7 +61,7 @@ class PointPricingTest extends TestCase
             ->assertJsonPath('data.0.price_points', 500)
             ->assertJsonPath('data.0.currency', 'SYP');
 
-        $this->assertNotSame('50.00', $response->json('data.0.price_display'));
+        $this->assertNotSame('50', $response->json('data.0.price_display'));
     }
 
     public function test_changing_the_rate_revalues_the_display_without_touching_the_row(): void
@@ -72,7 +72,7 @@ class PointPricingTest extends TestCase
 
         $this->getJson('/api/v1/plans')
             ->assertOk()
-            ->assertJsonPath('data.0.price_usd', '60.00')
+            ->assertJsonPath('data.0.price_usd', '60')
             ->assertJsonPath('data.0.price_points', 500);
 
         $this->assertSame(500, $plan->fresh()->price_points);

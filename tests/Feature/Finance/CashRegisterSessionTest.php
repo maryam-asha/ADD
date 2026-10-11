@@ -44,19 +44,19 @@ class CashRegisterSessionTest extends TestCase
     {
         $response = $this->postJson('/api/v1/admin/reception/cash-register-sessions/open', [
             'branch_id' => $this->branch->id,
-            'opening_balance' => '150.00',
+            'opening_balance' => '150',
             'notes' => 'Morning shift',
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.status', 'open');
-        $response->assertJsonPath('data.opening_balance', '150.00');
+        $response->assertJsonPath('data.opening_balance', '150');
 
         $this->assertDatabaseHas('cash_register_sessions', [
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'status' => 'open',
-            'opening_balance' => '150.00',
+            'opening_balance' => '150',
         ]);
     }
 
@@ -66,13 +66,13 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'opened_at' => now(),
-            'opening_balance' => '100.00',
+            'opening_balance' => '100',
             'status' => CashRegisterSessionStatus::Open,
         ]);
 
         $response = $this->postJson('/api/v1/admin/reception/cash-register-sessions/open', [
             'branch_id' => $this->branch->id,
-            'opening_balance' => '50.00',
+            'opening_balance' => '50',
         ]);
 
         $response->assertUnprocessable();
@@ -85,7 +85,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'opened_at' => now(),
-            'opening_balance' => '200.00',
+            'opening_balance' => '200',
             'status' => CashRegisterSessionStatus::Open,
         ]);
 
@@ -93,7 +93,7 @@ class CashRegisterSessionTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.id', $session->id);
-        $response->assertJsonPath('data.opening_balance', '200.00');
+        $response->assertJsonPath('data.opening_balance', '200');
     }
 
     public function test_operator_can_close_session_and_reconcile_cash(): void
@@ -102,7 +102,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'opened_at' => now()->subHours(4),
-            'opening_balance' => '100.00',
+            'opening_balance' => '100',
             'status' => CashRegisterSessionStatus::Open,
         ]);
 
@@ -110,14 +110,14 @@ class CashRegisterSessionTest extends TestCase
             'owner_type' => OwnerType::User,
             'owner_id' => $this->operator->id,
             'currency' => 'USD',
-            'balance' => '0.00',
+            'balance' => '0',
         ]);
 
         // Add cash transactions conducted by this operator during the shift
         WalletTransaction::create([
             'wallet_id' => $wallet->id,
-            'amount' => '50.00',
-            'balance_after' => '50.00',
+            'amount' => '50',
+            'balance_after' => '50',
             'currency' => 'USD',
             'source' => WalletTransactionSource::TopUp,
             'category' => WalletTransactionCategory::General,
@@ -125,29 +125,29 @@ class CashRegisterSessionTest extends TestCase
             'payment_method' => PaymentMethod::Cash->value,
             // The money handed over, which is what the drawer holds — not
             // the points it bought.
-            'payment_amount' => '50.00',
+            'payment_amount' => '50',
             'payment_currency' => 'USD',
             'created_at' => now()->subHours(2),
         ]);
 
         // 100 opening + 50 cash collected = 150 expected. Operator counts 155 (5 overage)
         $response = $this->postJson("/api/v1/admin/reception/cash-register-sessions/{$session->id}/close", [
-            'closing_balance' => '155.00',
+            'closing_balance' => '155',
             'notes' => 'Shift ended smoothly',
         ]);
 
         $response->assertOk();
         $response->assertJsonPath('data.status', 'closed');
-        $response->assertJsonPath('data.closing_balance', '155.00');
-        $response->assertJsonPath('data.expected_balance', '150.00');
-        $response->assertJsonPath('data.difference', '5.00');
+        $response->assertJsonPath('data.closing_balance', '155');
+        $response->assertJsonPath('data.expected_balance', '150');
+        $response->assertJsonPath('data.difference', '5');
 
         $this->assertDatabaseHas('cash_register_sessions', [
             'id' => $session->id,
             'status' => 'closed',
-            'closing_balance' => '155.00',
-            'expected_balance' => '150.00',
-            'difference' => '5.00',
+            'closing_balance' => '155',
+            'expected_balance' => '150',
+            'difference' => '5',
         ]);
     }
 
@@ -157,7 +157,7 @@ class CashRegisterSessionTest extends TestCase
 
         // branch_id is completely omitted from the payload
         $response = $this->postJson('/api/v1/admin/reception/cash-register-sessions/open', [
-            'opening_balance' => '200.00',
+            'opening_balance' => '200',
             'notes' => 'Automatic branch session',
         ]);
 
@@ -169,7 +169,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'status' => 'open',
-            'opening_balance' => '200.00',
+            'opening_balance' => '200',
         ]);
     }
 
@@ -179,7 +179,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $this->operator->id,
             'branch_id' => $this->branch->id,
             'opened_at' => now()->subHour(),
-            'opening_balance' => '0.00',
+            'opening_balance' => '0',
             'status' => CashRegisterSessionStatus::Open,
         ]);
     }
@@ -204,7 +204,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $member->id, 'points' => 250, 'amount' => '25.00', 'payment_method' => 'cash',
         ])->assertCreated();
 
-        $this->assertSame('25.00', $this->closeFor($session));
+        $this->assertSame('25', $this->closeFor($session));
     }
 
     /**
@@ -221,7 +221,7 @@ class CashRegisterSessionTest extends TestCase
             'user_id' => $member->id, 'points' => 150, 'amount' => '150000', 'currency' => 'SYP', 'payment_method' => 'cash',
         ])->assertCreated();
 
-        $this->assertSame('15.00', $this->closeFor($session));
+        $this->assertSame('15', $this->closeFor($session));
     }
 
     public function test_cash_taken_to_settle_a_booking_is_counted(): void
@@ -231,16 +231,16 @@ class CashRegisterSessionTest extends TestCase
         $booking = Booking::factory()->create([
             'user_id' => $member->id,
             'checked_out_at' => now()->subMinutes(10),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'price_points' => 100,
             'payment_state' => BookingPaymentState::Unpaid,
         ]);
 
         $this->postJson('/api/v1/admin/reception/payments/settle', [
-            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash', 'amount' => '12.00',
+            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash', 'amount' => '12',
         ])->assertCreated();
 
-        $this->assertSame('12.00', $this->closeFor($session));
+        $this->assertSame('12', $this->closeFor($session));
     }
 
     public function test_reception_takes_cash_only(): void
@@ -250,7 +250,7 @@ class CashRegisterSessionTest extends TestCase
         $booking = Booking::factory()->create([
             'user_id' => $member->id,
             'checked_out_at' => now()->subMinutes(10),
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
             'price_points' => 100,
             'payment_state' => BookingPaymentState::Unpaid,
         ]);
@@ -266,6 +266,6 @@ class CashRegisterSessionTest extends TestCase
         }
 
         $this->assertSame(BookingPaymentState::Unpaid, $booking->fresh()->payment_state);
-        $this->assertSame('0.00', $this->closeFor($session));
+        $this->assertSame('0', $this->closeFor($session));
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Models;
 
+use App\Casts\PlainDecimal;
 use App\Domain\Finance\Enums\CashRegisterSessionStatus;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
@@ -32,10 +33,10 @@ class CashRegisterSession extends Model
             'opened_at' => 'datetime',
             'closed_at' => 'datetime',
             'status' => CashRegisterSessionStatus::class,
-            'opening_balance' => 'decimal:2',
-            'closing_balance' => 'decimal:2',
-            'expected_balance' => 'decimal:2',
-            'difference' => 'decimal:2',
+            'opening_balance' => PlainDecimal::class,
+            'closing_balance' => PlainDecimal::class,
+            'expected_balance' => PlainDecimal::class,
+            'difference' => PlainDecimal::class,
         ];
     }
 

@@ -212,9 +212,9 @@ class CurrencyControllerTest extends TestCase
             'code' => 'EUR',
             'name' => ['en' => 'Euro', 'ar' => 'يورو'],
             'decimal_places' => 2,
-        ])->assertCreated()->assertJsonPath('data.cash_step', '1.00');
+        ])->assertCreated()->assertJsonPath('data.cash_step', '1');
 
-        $this->assertSame('1.00', Currency::find('EUR')->cash_step);
+        $this->assertSame('1', Currency::find('EUR')->cash_step);
     }
 
     public function test_an_admin_can_set_a_currencys_cash_step(): void
@@ -225,11 +225,11 @@ class CurrencyControllerTest extends TestCase
         $this->patchJson("/api/v1/admin/currencies/{$currency->code}", [
             'name' => ['en' => 'Euro', 'ar' => 'يورو'],
             'decimal_places' => 2,
-            'cash_step' => '0.50',
+            'cash_step' => '0.5',
         ])->assertOk();
 
-        $this->assertSame('0.50', $currency->fresh()->cash_step);
-        $this->getJson("/api/v1/admin/currencies/{$currency->code}")->assertJsonPath('data.cash_step', '0.50');
+        $this->assertSame('0.5', $currency->fresh()->cash_step);
+        $this->getJson("/api/v1/admin/currencies/{$currency->code}")->assertJsonPath('data.cash_step', '0.5');
     }
 
     public function test_a_cash_step_must_be_positive_with_at_most_two_decimals(): void
@@ -248,8 +248,8 @@ class CurrencyControllerTest extends TestCase
 
     public function test_existing_currencies_get_a_cash_step_of_one(): void
     {
-        $this->assertSame('1.00', Currency::find('SYP')->cash_step);
-        $this->assertSame('1.00', Currency::find('USD')->cash_step);
+        $this->assertSame('1', Currency::find('SYP')->cash_step);
+        $this->assertSame('1', Currency::find('USD')->cash_step);
     }
 
     /**
@@ -273,7 +273,7 @@ class CurrencyControllerTest extends TestCase
             ->assertJsonValidationErrors(['cash_step' => __('api.validation.cash_step_too_precise', ['decimals' => 1])]);
 
         // Trailing zeros are not precision: 5.00 is a whole 5.
-        $patch(['decimal_places' => 0, 'cash_step' => '5.00'])->assertOk();
+        $patch(['decimal_places' => 0, 'cash_step' => '5'])->assertOk();
         $patch(['decimal_places' => 1, 'cash_step' => '0.5'])->assertOk();
     }
 
@@ -306,6 +306,6 @@ class CurrencyControllerTest extends TestCase
         // No step given: the default of 1 fits any currency.
         $this->postJson('/api/v1/admin/currencies', $currency('TRY', ['decimal_places' => 0]))
             ->assertCreated()
-            ->assertJsonPath('data.cash_step', '1.00');
+            ->assertJsonPath('data.cash_step', '1');
     }
 }

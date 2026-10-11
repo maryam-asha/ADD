@@ -6,6 +6,7 @@ use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -106,10 +107,10 @@ class PlanResource extends JsonResource
         $targetCurrency = app(CurrencyResolver::class)->resolve($request, $user);
         $baseCurrency = app(CurrencyConversionService::class)->baseCurrencyCode();
 
-        $convertedDisplay = $points->pointsToCurrency((int) $this->price_points, $targetCurrency);
+        $convertedDisplay = PlainAmount::of($points->pointsToCurrency((int) $this->price_points, $targetCurrency));
 
         $data['price_points'] = (int) $this->price_points;
-        $data['price_usd'] = $points->pointsToUsd((int) $this->price_points);
+        $data['price_usd'] = PlainAmount::of($points->pointsToUsd((int) $this->price_points));
         $data['price_display'] = $convertedDisplay ?? $data['price_usd'];
         $data['currency'] = $targetCurrency;
 

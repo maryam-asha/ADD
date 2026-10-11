@@ -165,7 +165,7 @@ class PaymentsTableTest extends TestCase
         $fresh = Payment::query()->findOrFail($payment->id);
 
         $this->assertSame(PaymentMethod::Cash, $fresh->collected_via);
-        $this->assertSame('12.50', $fresh->received_amount);
+        $this->assertSame('12.5', $fresh->received_amount);
         $this->assertSame(40, $fresh->amount_points);
         $this->assertTrue($fresh->receivedBy->is($receiver));
         $this->assertSame('2026-10-03 09:00:00', $fresh->received_at->toDateTimeString());
@@ -195,7 +195,7 @@ class PaymentsTableTest extends TestCase
             'payable_type' => 'booking',
             'payable_id' => $booking->id,
             'collected_via' => 'cash',
-            'received_amount' => '5.00',
+            'received_amount' => '5',
             'received_currency' => 'USD',
             'received_by' => User::factory()->create()->id,
             'received_at' => now(),
@@ -229,7 +229,7 @@ class PaymentsTableTest extends TestCase
         $payment = $this->nonGatewayPayment($this->wallet(), [
             'method' => 'cash',
             'collected_via' => 'cash',
-            'received_amount' => '5.00',
+            'received_amount' => '5',
             'received_currency' => 'USD',
             'received_by' => $receiver->id,
             'received_at' => '2026-10-03 09:00:00',
@@ -243,7 +243,7 @@ class PaymentsTableTest extends TestCase
         $this->assertSame('cash', $row['method']);
         $this->assertNull($row['payable']);
         $this->assertSame('cash', $row['collected_via']);
-        $this->assertSame('5.00', $row['received_amount']);
+        $this->assertSame('5', $row['received_amount']);
         $this->assertSame('USD', $row['received_currency']);
         $this->assertSame($receiver->id, $row['received_by']);
         $this->assertNotNull($row['received_at']);

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Leasing\Models;
 
+use App\Casts\PlainDecimal;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Leasing\Enums\LeasePeriodStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -29,7 +30,7 @@ class OfficeLeasePeriod extends Model
             'sequence' => 'integer',
             'starts_on' => 'immutable_date',
             'ends_on' => 'immutable_date',
-            'amount' => 'decimal:2',
+            'amount' => PlainDecimal::class,
             'status' => LeasePeriodStatus::class,
         ];
     }

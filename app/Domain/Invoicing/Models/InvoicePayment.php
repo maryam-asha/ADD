@@ -2,6 +2,7 @@
 
 namespace App\Domain\Invoicing\Models;
 
+use App\Casts\PlainDecimal;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
 use Illuminate\Database\Eloquent\Builder;
@@ -33,8 +34,8 @@ class InvoicePayment extends Model
     {
         return [
             'method' => InvoicePaymentMethod::class,
-            'received_amount' => 'decimal:2',
-            'amount' => 'decimal:2',
+            'received_amount' => PlainDecimal::class,
+            'amount' => PlainDecimal::class,
             'paid_at' => 'date',
             'voided_at' => 'datetime',
         ];

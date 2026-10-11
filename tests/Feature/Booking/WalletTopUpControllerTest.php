@@ -50,12 +50,12 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 250,
-            'amount' => '25.00',
+            'amount' => '25',
             'payment_method' => 'cash',
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.amount', '25.00');
+        $response->assertJsonPath('data.amount', '25');
 
         $transaction = $wallet->fresh()->transactions()->latest('id')->first();
         $this->assertSame($operator->id, $transaction->performed_by_user_id);
@@ -74,14 +74,14 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
             'points' => 500,
-            'amount' => '50.00',
+            'amount' => '50',
             'payment_method' => 'cash',
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.recipient_name', $company->legal_name);
-        $response->assertJsonPath('data.previous_balance', '0.00');
-        $response->assertJsonPath('data.new_balance', '50.00');
+        $response->assertJsonPath('data.previous_balance', '0');
+        $response->assertJsonPath('data.new_balance', '50');
     }
 
     public function test_top_up_requires_exactly_one_target(): void
@@ -92,7 +92,7 @@ class WalletTopUpControllerTest extends TestCase
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'points' => 100,
-            'amount' => '10.00',
+            'amount' => '10',
             'payment_method' => 'cash',
         ])->assertStatus(422);
 
@@ -100,7 +100,7 @@ class WalletTopUpControllerTest extends TestCase
             'user_id' => $member->id,
             'company_id' => $company->id,
             'points' => 100,
-            'amount' => '10.00',
+            'amount' => '10',
             'payment_method' => 'cash',
         ])->assertStatus(422);
     }
@@ -114,7 +114,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 100,
-            'amount' => '10.00',
+            'amount' => '10',
             'payment_method' => 'visa',
         ])->assertStatus(422);
     }
@@ -143,7 +143,7 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'company_id' => $company->id,
             'points' => 500,
-            'amount' => '50.00',
+            'amount' => '50',
             'payment_method' => 'cash',
         ]);
 
@@ -160,7 +160,7 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->getJson("/api/v1/admin/reception/wallet-balance?user_id={$member->id}");
         $response->assertOk();
         $response->assertJsonPath('data.owner_name', 'Sara Al-Halabi');
-        $response->assertJsonPath('data.general_balance', '0.00');
+        $response->assertJsonPath('data.general_balance', '0');
 
         $company = Company::factory()->create(['legal_name' => 'Syria Tech']);
         $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
@@ -168,7 +168,7 @@ class WalletTopUpControllerTest extends TestCase
         $responseC = $this->getJson("/api/v1/admin/reception/wallet-balance?company_id={$company->id}");
         $responseC->assertOk();
         $responseC->assertJsonPath('data.owner_name', 'Syria Tech');
-        $responseC->assertJsonPath('data.general_balance', '0.00');
+        $responseC->assertJsonPath('data.general_balance', '0');
     }
 
     public function test_operations_can_list_users(): void
@@ -190,7 +190,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 100,
-            'amount' => '10.00',
+            'amount' => '10',
             'payment_method' => 'cash',
         ])->assertForbidden();
     }
@@ -212,7 +212,7 @@ class WalletTopUpControllerTest extends TestCase
             'user_id' => $member->id,
             // What 150,000.50 SYP would buy, so `amount` is the only thing wrong.
             'points' => 100,
-            'amount' => '150000.50',
+            'amount' => '150000.5',
             'currency' => 'SYP',
             'payment_method' => 'cash',
         ])->assertUnprocessable()->assertJsonValidationErrors(['amount' => 'must be a whole number']);
@@ -243,23 +243,23 @@ class WalletTopUpControllerTest extends TestCase
         $response = $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 100,
-            'amount' => '150000.00',
+            'amount' => '150000',
             'currency' => 'SYP',
             'payment_method' => 'cash',
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.payment_amount', '150000.00');
+        $response->assertJsonPath('data.payment_amount', '150000');
         $response->assertJsonPath('data.payment_currency', 'SYP');
-        $response->assertJsonPath('data.amount', '10.00');
+        $response->assertJsonPath('data.amount', '10');
         $response->assertJsonPath('data.currency', 'USD');
-        $response->assertJsonPath('data.new_balance', '10.00');
+        $response->assertJsonPath('data.new_balance', '10');
 
         $transaction = $wallet->fresh()->transactions()->latest('id')->first();
         // The ledger is point-denominated: $10.00 credited is 100 points.
         $this->assertSame(100, (int) $transaction->amount);
         $this->assertEquals('SYP', $transaction->payment_currency);
-        $this->assertEquals('150000.00', $transaction->payment_amount);
+        $this->assertEquals('150000', $transaction->payment_amount);
     }
 
     public function test_a_cash_top_up_credits_points_and_records_what_was_paid(): void
@@ -294,7 +294,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertDatabaseHas('wallet_transactions', [
             'amount' => 340,
             'payment_currency' => 'SYP',
-            'payment_amount' => '500000.00',
+            'payment_amount' => '500000',
             'performed_by_user_id' => $operator->id,
         ]);
     }
@@ -326,8 +326,8 @@ class WalletTopUpControllerTest extends TestCase
             ->assertJsonPath('data.payment_amount', '10.05')
             // ...but every credited-value figure reports the 100 points
             // stored, not the untruncated 10.05 the old code echoed back.
-            ->assertJsonPath('data.amount', '10.00')
-            ->assertJsonPath('data.new_balance', '10.00');
+            ->assertJsonPath('data.amount', '10')
+            ->assertJsonPath('data.new_balance', '10');
 
         $transaction = $wallet->fresh()->transactions()->latest('id')->first();
         $this->assertSame(100, (int) $transaction->amount);
@@ -353,7 +353,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 250,
-            'amount' => '25.00',
+            'amount' => '25',
             'payment_method' => 'cash',
         ])->assertCreated();
 
@@ -388,7 +388,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 250,
-            'amount' => '25.00',
+            'amount' => '25',
             'payment_method' => 'cash',
         ])->assertJsonValidationErrors(['points' => __('api.wallet.quote_stale')]);
 
@@ -411,7 +411,7 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 9,
-            'amount' => '0.90',
+            'amount' => '0.9',
             'payment_method' => 'cash',
         ])->assertJsonValidationErrors(['points' => __('api.wallet.min_points', ['min' => 10])]);
 
@@ -427,14 +427,14 @@ class WalletTopUpControllerTest extends TestCase
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 20,
-            'amount' => '2.00',
+            'amount' => '2',
             'payment_method' => 'cash',
         ])->assertJsonValidationErrors('points');
 
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 25,
-            'amount' => '2.50',
+            'amount' => '2.5',
             'payment_method' => 'cash',
         ])->assertCreated();
     }
@@ -452,7 +452,7 @@ class WalletTopUpControllerTest extends TestCase
             $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
                 'user_id' => $member->id,
                 'points' => $points,
-                'amount' => '25.00',
+                'amount' => '25',
                 'payment_method' => 'cash',
             ])->assertJsonValidationErrors(['points' => __('api.wallet.quote_stale')]);
         }
@@ -586,11 +586,11 @@ class WalletTopUpControllerTest extends TestCase
         $currencies = collect($response->json('data.top_up.currencies'))->keyBy('code');
         $this->assertEqualsCanonicalizing(['SYP', 'USD'], $currencies->keys()->all());
         $this->assertSame('0.0068027211', $currencies['SYP']['rate_to_base']);
-        $this->assertSame('10.00', $currencies['SYP']['cash_step']);
+        $this->assertSame('10', $currencies['SYP']['cash_step']);
         // The pound has no decimals (2026_10_04_100200_syrian_pound_has_no_decimals).
         $this->assertSame(0, $currencies['SYP']['decimal_places']);
         $this->assertSame('1', $currencies['USD']['rate_to_base']);
-        $this->assertSame('1.00', $currencies['USD']['cash_step']);
+        $this->assertSame('1', $currencies['USD']['cash_step']);
     }
 
     /**

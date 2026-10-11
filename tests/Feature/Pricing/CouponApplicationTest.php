@@ -66,7 +66,7 @@ class CouponApplicationTest extends TestCase
             'payment_state' => PaymentState::Unpaid,
             'price_points' => 100,
             'list_price_points' => 100,
-            'amount_owed' => '10.00',
+            'amount_owed' => '10',
         ], $attributes));
     }
 
@@ -98,7 +98,7 @@ class CouponApplicationTest extends TestCase
         $booking->refresh();
         $this->assertSame(80, $booking->price_points);
         $this->assertSame(100, $booking->list_price_points);
-        $this->assertSame('8.00', (string) $booking->amount_owed);
+        $this->assertSame('8', (string) $booking->amount_owed);
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(80, Payment::sole()->amount_points);
         $this->assertSame($coupon->id, app(CouponLedger::class)->couponFor($booking)->coupon_id);

@@ -117,7 +117,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
 
         $session->refresh();
-        $this->assertSame('0.00', (string) $session->amount_owed);
+        $this->assertSame('0', (string) $session->amount_owed);
         $this->assertSame(PaymentState::Paid, $session->payment_state);
         $this->assertSame(PaymentSource::Plan, $session->payment_source);
         $this->assertSame(2 * 3600, $session->plan_covered_seconds);
@@ -137,7 +137,7 @@ class WalkInPlanCoverageTest extends TestCase
 
         $session->refresh();
         // One hour at 100 points/hour, converted at the seeded point rate.
-        $this->assertSame('10.00', (string) $session->amount_owed);
+        $this->assertSame('10', (string) $session->amount_owed);
         $this->assertSame(2 * 3600, $session->plan_covered_seconds);
         // Still owes money, so it is NOT auto-settled.
         $this->assertSame(PaymentState::Unpaid, $session->payment_state);
@@ -158,7 +158,7 @@ class WalkInPlanCoverageTest extends TestCase
 
         $session->refresh();
         $this->assertSame(3600, $session->plan_covered_seconds);
-        $this->assertSame('0.00', (string) $session->amount_owed);
+        $this->assertSame('0', (string) $session->amount_owed);
         $this->assertSame('1.00', (string) ResourceConsumption::where('membership_id', $session->membership_id)->value('quantity'));
     }
 
@@ -203,7 +203,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 16:00'));
 
         $session->refresh();
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
         $this->assertSame(0, $session->plan_covered_seconds);
         $this->assertSame(PaymentState::Unpaid, $session->payment_state);
     }
@@ -223,7 +223,7 @@ class WalkInPlanCoverageTest extends TestCase
         $session->refresh();
         // One hour covered by the grant, two billed.
         $this->assertSame(3600, $session->plan_covered_seconds);
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
         $this->assertSame(PaymentState::Unpaid, $session->payment_state);
     }
 
@@ -254,7 +254,7 @@ class WalkInPlanCoverageTest extends TestCase
         // Only one hour of quota was left for the second session.
         $this->assertSame(2 * 3600, $first->refresh()->plan_covered_seconds);
         $this->assertSame(3600, $second->refresh()->plan_covered_seconds);
-        $this->assertSame('10.00', (string) $second->amount_owed);
+        $this->assertSame('10', (string) $second->amount_owed);
     }
 
     public function test_a_walk_in_with_no_membership_is_billed_exactly_as_before(): void
@@ -270,7 +270,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
 
         $session->refresh();
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
         $this->assertSame(0, $session->plan_covered_seconds);
         $this->assertNull($session->payment_source);
     }
@@ -290,7 +290,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
 
         $session->refresh();
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
         $this->assertSame(0, $session->plan_covered_seconds);
     }
 
@@ -303,7 +303,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
 
         $session->refresh();
-        $this->assertSame('20.00', (string) $session->amount_owed);
+        $this->assertSame('20', (string) $session->amount_owed);
         $this->assertSame(0, $session->plan_covered_seconds);
     }
 }
