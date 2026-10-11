@@ -2,6 +2,7 @@
 
 namespace App\Domain\Renewals\Services;
 
+use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Leasing\Enums\OfficeLeaseStatus;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
@@ -23,7 +24,7 @@ use Illuminate\Support\Facades\Log;
  */
 class RenewalRunner
 {
-    private const DEFAULT_ADVANCE_DAYS = 7;
+    public const DEFAULT_ADVANCE_DAYS = 7;
 
     public function __construct(
         private readonly MembershipRenewalService $memberships,
@@ -61,13 +62,18 @@ class RenewalRunner
             ->chunkById(100, function ($memberships) use (&$renewed, &$stopped) {
                 foreach ($memberships as $membership) {
                     try {
-                        $this->memberships->renew($membership, null);
+                        $this->memberships->renew($membership, null, automatic: true);
                         $renewed++;
                     } catch (RenewalRefused $e) {
                         $this->stop($membership, $e->reason);
                         $stopped++;
+                    } catch (InvoicingException) {
+                        // The invoice currency has no exchange rate today.
+                        $this->stop($membership, RenewalStopReason::NoExchangeRate);
+                        $stopped++;
                     } catch (RenewalException) {
-                        // Not renewable (not a provider assignment) or renewed meanwhile.
+                        // Not renewable (not a provider assignment, auto-renew
+                        // turned off meanwhile) or renewed meanwhile.
                     } catch (\Throwable $e) {
                         Log::error('Failed to renew a subscription', ['membership_id' => $membership->id, 'error' => $e->getMessage()]);
                     }
@@ -91,13 +97,13 @@ class RenewalRunner
             ->chunkById(100, function ($leases) use (&$extended, &$stopped) {
                 foreach ($leases as $lease) {
                     try {
-                        $this->leases->extend($lease, null);
+                        $this->leases->extend($lease, null, automatic: true);
                         $extended++;
                     } catch (RenewalRefused $e) {
                         $this->stop($lease, $e->reason);
                         $stopped++;
                     } catch (RenewalException) {
-                        // Ended or terminated meanwhile.
+                        // Ended, terminated, extended or auto-renew turned off meanwhile.
                     } catch (\Throwable $e) {
                         Log::error('Failed to extend a lease', ['office_lease_id' => $lease->id, 'error' => $e->getMessage()]);
                     }

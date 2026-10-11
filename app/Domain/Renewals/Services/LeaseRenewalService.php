@@ -17,6 +17,7 @@ use App\Domain\Leasing\Services\OfficeLeaseService;
 use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use App\Domain\Renewals\Exceptions\RenewalRefused;
+use App\Domain\Settings\Services\SettingService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -32,19 +33,34 @@ class LeaseRenewalService
         private readonly PayerStanding $standing,
         private readonly AvailabilityService $availability,
         private readonly OfficeLeaseService $leases,
+        private readonly SettingService $settings,
     ) {}
 
     /**
+     * Extends from the caller's read of the lease: when `ends_on` moved
+     * since (a double click, the run and staff at once) it is refused, so
+     * one read extends once. `$automatic` (the renewal run) re-checks under
+     * the lock that auto-renew is still on and the end still inside the
+     * advance window.
+     *
      * @throws RenewalRefused when a check fails (the caller stores the reason)
-     * @throws RenewalException when the lease is not active
+     * @throws RenewalException when the lease is not active, already extended or (automatic) no longer due
      */
-    public function extend(OfficeLease $lease, ?User $actor, bool $checkOverdue = true): OfficeLease
+    public function extend(OfficeLease $lease, ?User $actor, bool $checkOverdue = true, bool $automatic = false): OfficeLease
     {
-        $extended = DB::transaction(function () use ($lease, $checkOverdue) {
+        $extended = DB::transaction(function () use ($lease, $checkOverdue, $automatic) {
             $locked = OfficeLease::query()->whereKey($lease->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== OfficeLeaseStatus::Active) {
                 throw new RenewalException('api.renewal.lease_not_active', 409);
+            }
+
+            if ($locked->ends_on->toDateString() !== $lease->ends_on->toDateString()) {
+                throw new RenewalException('api.renewal.already_renewed', 409);
+            }
+
+            if ($automatic && (! $locked->auto_renew || ! $this->dueForAutomaticExtension($locked))) {
+                throw new RenewalException('api.renewal.not_renewable');
             }
 
             $space = Space::query()->whereKey($locked->space_id)->lockForUpdate()->firstOrFail();
@@ -97,5 +113,14 @@ class LeaseRenewalService
         $this->leases->openDoor($extended->fresh());
 
         return $extended->fresh();
+    }
+
+    /** The run's window: the lease ends today or within `renewals.advance_days`. */
+    private function dueForAutomaticExtension(OfficeLease $lease): bool
+    {
+        $endsOn = $lease->ends_on->toDateString();
+        $advanceDays = (int) $this->settings->get('renewals.advance_days', RenewalRunner::DEFAULT_ADVANCE_DAYS);
+
+        return $endsOn >= now()->toDateString() && $endsOn <= now()->addDays($advanceDays)->toDateString();
     }
 }

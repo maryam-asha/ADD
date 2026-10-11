@@ -728,6 +728,7 @@ return [
             'company_inactive' => 'The company is not active.',
             'office_unavailable' => 'The office is under maintenance or out of service.',
             'office_taken' => 'The office is leased or booked during the next period.',
+            'no_exchange_rate' => 'No exchange rate for the invoice currency.',
         ],
         'refused' => 'Cannot renew: :reason',
         'renewed' => 'Renewed.',
@@ -735,5 +736,6 @@ return [
         'not_renewable' => 'This subscription does not renew automatically.',
         'already_renewed' => 'This has already been renewed.',
         'lease_not_active' => 'Only an active lease can be renewed.',
+        'superseded' => 'The company already has a newer subscription.',
     ],
 ];

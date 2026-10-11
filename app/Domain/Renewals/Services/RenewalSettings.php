@@ -8,8 +8,12 @@ use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
-/** Turns auto-renewal on or off; turning it off clears a stop reason. */
+/**
+ * Turns auto-renewal on or off; turning it off clears a stop reason. For a
+ * subscription the choice also reaches its renewal made in advance.
+ */
 class RenewalSettings
 {
     public function __construct(private readonly MembershipRenewalService $memberships) {}
@@ -20,7 +24,20 @@ class RenewalSettings
             throw new RenewalException('api.renewal.not_renewable');
         }
 
-        $this->set($membership, $on, $actor);
+        DB::transaction(function () use ($membership, $on, $actor) {
+            $this->set($membership, $on, $actor);
+
+            // A renewal already made in advance would otherwise carry the
+            // old choice into the next cycle.
+            $pending = Membership::query()
+                ->where('renewed_from_id', $membership->id)
+                ->where('current_period_start', '>', now())
+                ->first();
+
+            if ($pending !== null) {
+                $this->set($pending, $on, $actor);
+            }
+        });
     }
 
     public function setForLease(OfficeLease $lease, bool $on, ?User $actor): void

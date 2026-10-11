@@ -127,8 +127,10 @@ class OfficeLeaseService
 
     /**
      * Issues the office lock grant when the lease grants access today, the
-     * office is active, has a lock, and no live grant exists yet. Never
-     * throws: a lock-service failure is logged and the daily run retries.
+     * office is active, has a lock, and no live grant reaching the lease's
+     * last day of access exists yet — a shorter one is revoked and
+     * replaced. Never throws: a lock-service failure is logged and the
+     * daily run retries.
      */
     public function openDoor(OfficeLease $lease): bool
     {
@@ -136,9 +138,22 @@ class OfficeLeaseService
 
         if (! $lease->grantsAccessOn(now()->toDateString())
             || $lease->space->status !== OperationalStatus::Active
-            || ! $this->passcodes->hasLock($lease->space)
-            || $lease->accessGrants()->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])->exists()) {
+            || ! $this->passcodes->hasLock($lease->space)) {
             return false;
+        }
+
+        $live = $lease->accessGrants()->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])->get();
+
+        if ($live->isNotEmpty()) {
+            // A grant ending before the lease's last day of access is stale
+            // (the lease was extended and its revoke failed, …): replace it,
+            // or the tenant is locked out at the old end.
+            $endsAt = $lease->accessEndsOn()->endOfDay()->timestamp;
+
+            if ($live->every(fn ($grant) => $grant->expires_at === null || $grant->expires_at->timestamp >= $endsAt)
+                || ! $this->closeDoor($lease)) {
+                return false;
+            }
         }
 
         try {

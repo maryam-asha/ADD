@@ -2,6 +2,8 @@
 
 namespace Tests\Feature\Renewals;
 
+use App\Domain\Foundation\Models\Building;
+use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
@@ -9,12 +11,16 @@ use App\Domain\Invoicing\Data\InvoiceTerms;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use App\Domain\Renewals\Exceptions\RenewalRefused;
 use App\Domain\Renewals\Services\MembershipRenewalService;
+use App\Notifications\GeneralNotification;
+use Illuminate\Support\Facades\Notification;
 
 class MembershipRenewalTest extends RenewalsTestCase
 {
@@ -182,5 +188,99 @@ class MembershipRenewalTest extends RenewalsTestCase
 
         $this->assertEqualsWithDelta(now()->timestamp, $renewal->current_period_start->timestamp, 2);
         $this->assertTrue($renewal->isLive());
+    }
+
+    public function test_an_automatic_renewal_rechecks_auto_renew_under_the_lock(): void
+    {
+        $current = $this->assignedMembership(Provider::factory()->create());
+        $this->assertTrue($current->auto_renew);
+        Membership::query()->whereKey($current->id)->update(['auto_renew' => false]);
+
+        try {
+            $this->service()->renew($current, null, automatic: true);
+            $this->fail('Expected not_renewable.');
+        } catch (RenewalException $e) {
+            $this->assertSame('api.renewal.not_renewable', $e->messageKey);
+        }
+
+        $this->assertSame(0, Membership::query()->where('renewed_from_id', $current->id)->count());
+    }
+
+    public function test_a_manual_renewal_keeps_the_subscriptions_auto_renew_choice(): void
+    {
+        $current = $this->assignedMembership(Provider::factory()->create(), ['auto_renew' => false]);
+        $this->assertFalse($current->auto_renew);
+
+        $renewal = $this->service()->renew($current, $this->reviewer(), checkOverdue: false);
+
+        $this->assertFalse($renewal->fresh()->auto_renew);
+    }
+
+    public function test_a_stale_stopped_subscription_is_not_renewed_over_a_newer_one(): void
+    {
+        $provider = Provider::factory()->create();
+        $old = $this->assignedMembership($provider);
+        $old->update(['renewal_stop_reason' => RenewalStopReason::OverdueInvoice]);
+        $this->travel(40)->days();
+        $company = Company::query()->findOrFail($old->owner_id);
+        $this->assignedMembership($provider, company: $company);
+
+        try {
+            $this->service()->renew($old->fresh(), $this->reviewer(), checkOverdue: false);
+            $this->fail('Expected superseded.');
+        } catch (RenewalException $e) {
+            $this->assertSame('api.renewal.superseded', $e->messageKey);
+            $this->assertSame(409, $e->status);
+        }
+
+        $this->assertSame(0, Membership::query()->where('renewed_from_id', $old->id)->count());
+    }
+
+    public function test_a_dedicated_desk_subscription_renews_holding_its_desks(): void
+    {
+        [$current, $desk] = $this->deskSubscription();
+
+        $renewal = $this->service()->renew($current, null);
+
+        $this->assertSame([$desk->id], $renewal->fresh()->seatDesks->pluck('id')->all());
+    }
+
+    public function test_a_dedicated_desk_taken_in_the_next_period_renews_without_desks_and_tells_staff(): void
+    {
+        Notification::fake();
+        [$current, $desk] = $this->deskSubscription();
+        $other = Membership::factory()->create([
+            'plan_id' => $current->plan_id,
+            'owner_type' => OwnerType::Company,
+            'owner_id' => Company::factory()->create()->id,
+            'branch_id' => $current->branch_id,
+            'current_period_start' => $current->current_period_end,
+            'current_period_end' => $current->current_period_end->copy()->addDays(30),
+        ]);
+        $other->seatDesks()->sync([$desk->id]);
+
+        $renewal = $this->service()->renew($current, null);
+
+        $this->assertSame([], $renewal->fresh()->seatDesks->pluck('id')->all());
+        Notification::assertSentTo(
+            $this->reviewer(),
+            GeneralNotification::class,
+            fn (GeneralNotification $n) => $n->toArray($this->reviewer())['template_key'] === 'membership.desk_needed',
+        );
+    }
+
+    /** @return array{0: Membership, 1: SeatDesk} */
+    private function deskSubscription(): array
+    {
+        $plan = Plan::factory()->dedicatedDesk()->create(['price_points' => 500, 'duration_days' => 30]);
+        $current = $this->assignedMembership(Provider::factory()->create(), ['plan_id' => $plan->id, 'seats' => 1]);
+        $coSpace = Space::factory()->create([
+            'building_id' => Building::factory()->create(['branch_id' => $current->branch_id])->id,
+            'space_type' => 'co_space',
+        ]);
+        $desk = SeatDesk::factory()->create(['space_id' => $coSpace->id]);
+        app(DedicatedDeskService::class)->assign($current->load('plan'), [$desk->id]);
+
+        return [$current->fresh(), $desk];
     }
 }

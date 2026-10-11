@@ -123,4 +123,65 @@ class LeaseRenewalTest extends RenewalsTestCase
             $this->assertSame('api.renewal.lease_not_active', $e->messageKey);
         }
     }
+
+    public function test_a_stale_read_extends_the_lease_once(): void
+    {
+        $lease = $this->lease($this->leasableOffice(withLock: false));
+
+        app(LeaseRenewalService::class)->extend($lease, $this->reviewer(), checkOverdue: false);
+
+        try {
+            app(LeaseRenewalService::class)->extend($lease, $this->reviewer(), checkOverdue: false);
+            $this->fail('Expected already_renewed.');
+        } catch (RenewalException $e) {
+            $this->assertSame('api.renewal.already_renewed', $e->messageKey);
+            $this->assertSame(409, $e->status);
+        }
+
+        $this->assertSame(1, $lease->fresh()->renewals_count);
+        $this->assertCount(8, $lease->periods()->get());
+    }
+
+    public function test_an_automatic_extension_rechecks_auto_renew_and_the_window_under_the_lock(): void
+    {
+        $lease = $this->lease($this->leasableOffice(withLock: false));
+        $lease->update(['auto_renew' => true]);
+        $this->travelTo($lease->ends_on->subDays(3));
+
+        OfficeLease::query()->whereKey($lease->id)->update(['auto_renew' => false]);
+        $this->assertNotRenewable(fn () => app(LeaseRenewalService::class)->extend($lease, null, automatic: true));
+
+        OfficeLease::query()->whereKey($lease->id)->update(['auto_renew' => true]);
+        $this->travelTo($lease->ends_on->subDays(8));
+        $this->assertNotRenewable(fn () => app(LeaseRenewalService::class)->extend($lease, null, automatic: true));
+
+        $this->assertSame(0, $lease->fresh()->renewals_count);
+    }
+
+    public function test_a_stale_door_grant_is_replaced_when_the_door_opens(): void
+    {
+        $this->fakeTtlock();
+        $lease = $this->lease($this->leasableOffice());
+        $oldGrant = $lease->accessGrants()->sole();
+        $lease->update(['ends_on' => $lease->ends_on->addMonthsNoOverflow(12)->toDateString()]);
+
+        $this->assertTrue(app(OfficeLeaseService::class)->openDoor($lease->fresh()));
+
+        $this->assertSame(AccessGrantStatus::Revoked, $oldGrant->fresh()->status);
+        $live = $lease->accessGrants()->where('status', AccessGrantStatus::Activated)->sole();
+        $this->assertSame($lease->fresh()->ends_on->endOfDay()->timestamp, $live->expires_at->timestamp);
+
+        $this->assertFalse(app(OfficeLeaseService::class)->openDoor($lease->fresh()));
+        $this->assertSame(1, $lease->accessGrants()->where('status', AccessGrantStatus::Activated)->count());
+    }
+
+    private function assertNotRenewable(callable $action): void
+    {
+        try {
+            $action();
+            $this->fail('Expected not_renewable.');
+        } catch (RenewalException $e) {
+            $this->assertSame('api.renewal.not_renewable', $e->messageKey);
+        }
+    }
 }

@@ -15,6 +15,7 @@ enum RenewalStopReason: string
     case CompanyInactive = 'company_inactive';
     case OfficeUnavailable = 'office_unavailable';
     case OfficeTaken = 'office_taken';
+    case NoExchangeRate = 'no_exchange_rate';
 
     public function label(): string
     {

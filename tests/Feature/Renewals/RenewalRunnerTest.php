@@ -2,8 +2,10 @@
 
 namespace Tests\Feature\Renewals;
 
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
+use App\Domain\Invoicing\Data\InvoiceTerms;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Leasing\Data\LeaseTerms;
@@ -17,6 +19,7 @@ use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Renewals\Services\RenewalRunner;
+use Illuminate\Support\Facades\Cache;
 
 class RenewalRunnerTest extends RenewalsTestCase
 {
@@ -128,6 +131,22 @@ class RenewalRunnerTest extends RenewalsTestCase
         $this->assertSame(1, $this->runRenewals()['leases_extended']);
         $this->assertSame(0, $this->runRenewals()['leases_extended']);
         $this->assertSame(1, $lease->fresh()->renewals_count);
+    }
+
+    public function test_a_missing_exchange_rate_stops_the_renewal_with_its_reason(): void
+    {
+        $this->syp();
+        $current = $this->assignedMembership(Provider::factory()->create(), terms: new InvoiceTerms(currency: 'SYP'));
+        $this->settleInvoices();
+        ExchangeRate::query()->where('currency_code', 'SYP')->delete();
+        Cache::forget('exchange_rate_current_SYP');
+        $this->travelTo($current->current_period_end->copy()->subDays(3));
+
+        $result = $this->runRenewals();
+
+        $this->assertSame([0, 1], [$result['memberships_renewed'], $result['memberships_stopped']]);
+        $this->assertSame(RenewalStopReason::NoExchangeRate, $current->fresh()->renewal_stop_reason);
+        $this->assertSame(0, Membership::query()->where('renewed_from_id', $current->id)->count());
     }
 
     public function test_the_command_is_scheduled_hourly(): void
