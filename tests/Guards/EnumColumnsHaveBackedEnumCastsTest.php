@@ -89,6 +89,7 @@ use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Enums\ProviderStatus;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
+use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
@@ -222,6 +223,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Membership::class => [
             'owner_type' => OwnerType::class,
             'status' => MembershipStatus::class,
+            'renewal_stop_reason' => RenewalStopReason::class,
         ],
         PlanBalance::class => [
             'category' => WalletTransactionCategory::class,
@@ -261,6 +263,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         OfficeLease::class => [
             'status' => OfficeLeaseStatus::class,
             'billed_to' => Payer::class,
+            'renewal_stop_reason' => RenewalStopReason::class,
         ],
         OfficeLeasePeriod::class => [
             'status' => LeasePeriodStatus::class,

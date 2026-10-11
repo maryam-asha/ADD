@@ -52,5 +52,9 @@ class SettingSeeder extends Seeder
         // Provider invoicing: days from issue to due when the provider has
         // no payment terms of its own (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
         $settings->setDefault('invoices.default_due_days', 15, SettingValueType::Int);
+
+        // Auto-renewal: how many days before a subscription or lease ends
+        // its renewal is made (docs/superpowers/specs/2026-10-11-auto-renewal-design.md).
+        $settings->setDefault('renewals.advance_days', 7, SettingValueType::Int);
     }
 }

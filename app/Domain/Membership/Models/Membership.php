@@ -8,11 +8,13 @@ use App\Domain\Membership\Concerns\ValidatesOwner;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Services\MembershipBranchResolver;
+use App\Domain\Renewals\Enums\RenewalStopReason;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * The actual purchase record (ERD v2.0 naming). Same manual-polymorphic
@@ -37,6 +39,10 @@ class Membership extends Model
         'status',
         'current_period_start',
         'current_period_end',
+        'auto_renew',
+        'renewed_from_id',
+        'renewal_stop_reason',
+        'balances_granted_at',
     ];
 
     protected function casts(): array
@@ -47,6 +53,9 @@ class Membership extends Model
             'seats' => 'integer',
             'current_period_start' => 'datetime',
             'current_period_end' => 'datetime',
+            'auto_renew' => 'boolean',
+            'renewal_stop_reason' => RenewalStopReason::class,
+            'balances_granted_at' => 'datetime',
         ];
     }
 
@@ -67,6 +76,18 @@ class Membership extends Model
                 $model->branch_id = app(MembershipBranchResolver::class)->branchFor($model->owner_type, (int) $model->owner_id);
             }
         });
+    }
+
+    /** The subscription this one renews. */
+    public function renewedFrom(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'renewed_from_id');
+    }
+
+    /** The subscription that renews this one, once created. */
+    public function renewal(): HasOne
+    {
+        return $this->hasOne(self::class, 'renewed_from_id');
     }
 
     public function plan(): BelongsTo
