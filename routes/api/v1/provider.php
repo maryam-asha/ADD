@@ -46,3 +46,4 @@ Route::get('invoices', [ProviderInvoiceController::class, 'index']);
 Route::get('invoices/{invoice}', [ProviderInvoiceController::class, 'show']);
 
 Route::get('reports/invoices', [ProviderReportController::class, 'invoices']);
+Route::get('reports/companies', [ProviderReportController::class, 'companies']);
