@@ -24,6 +24,7 @@ trait ValidatesLeaseTerms
             'monthly_amount' => ['required', 'decimal:0,2', 'gt:0'],
             'currency' => ['required', 'string', 'size:3', 'exists:currencies,code'],
             'billed_to' => ['nullable', Rule::enum(Payer::class)],
+            'auto_renew' => ['sometimes', 'boolean'],
         ];
     }
 

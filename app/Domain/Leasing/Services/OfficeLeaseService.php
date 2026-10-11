@@ -89,6 +89,7 @@ class OfficeLeaseService
                 'duration_months' => $terms->durationMonths,
                 'billing_cycle_months' => $terms->billingCycleMonths,
                 'ends_on' => $endsOn,
+                'auto_renew' => $terms->autoRenew,
                 'status' => OfficeLeaseStatus::Active,
                 'created_by' => $actor->id,
             ]);

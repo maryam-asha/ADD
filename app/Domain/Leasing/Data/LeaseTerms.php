@@ -16,6 +16,7 @@ final class LeaseTerms
         public readonly string $currency,
         public readonly string $contractRef,
         public readonly ?Payer $billedTo = null,
+        public readonly bool $autoRenew = false,
     ) {}
 
     /** @param  array<string, mixed>  $validated */
@@ -30,6 +31,7 @@ final class LeaseTerms
             currency: (string) $validated['currency'],
             contractRef: (string) $validated['contract_ref'],
             billedTo: isset($validated['billed_to']) ? Payer::from($validated['billed_to']) : null,
+            autoRenew: (bool) ($validated['auto_renew'] ?? false),
         );
     }
 }
