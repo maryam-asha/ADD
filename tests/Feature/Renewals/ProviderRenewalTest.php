@@ -44,6 +44,29 @@ class ProviderRenewalTest extends RenewalsTestCase
             ->assertJsonPath('data.membership.next_membership.current_period_start', $next->current_period_start->toIso8601String());
     }
 
+    public function test_turning_renewal_off_reaches_the_renewal_already_made(): void
+    {
+        $provider = Provider::factory()->create();
+        $membership = $this->assignedMembership($provider);
+        $next = app(MembershipRenewalService::class)->renew($membership, null);
+        $next->update(['renewal_stop_reason' => RenewalStopReason::NoSeats]);
+        $this->providerAccount($provider);
+
+        $this->patchJson("/api/v1/provider/companies/{$membership->owner_id}/membership/auto-renew", ['auto_renew' => false])->assertOk();
+
+        $this->assertFalse($membership->fresh()->auto_renew);
+        $this->assertFalse($next->fresh()->auto_renew);
+        $this->assertNull($next->fresh()->renewal_stop_reason);
+    }
+
+    public function test_another_providers_company_is_not_found_before_the_body_is_validated(): void
+    {
+        $theirs = $this->assignedMembership(Provider::factory()->create());
+        $this->providerAccount(Provider::factory()->create());
+
+        $this->patchJson("/api/v1/provider/companies/{$theirs->owner_id}/membership/auto-renew", [])->assertNotFound();
+    }
+
     public function test_another_providers_company_or_lease_is_not_found(): void
     {
         $theirs = $this->assignedMembership(Provider::factory()->create());

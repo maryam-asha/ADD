@@ -21,6 +21,7 @@ class ListStoppedRenewalsRequest extends FormRequest
             'provider_id' => ['nullable', 'integer'],
             'reason' => ['nullable', Rule::enum(RenewalStopReason::class)],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'page' => ['nullable', 'integer', 'min:1'],
         ];
     }
 }

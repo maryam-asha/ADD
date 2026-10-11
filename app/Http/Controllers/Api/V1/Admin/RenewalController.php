@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Renewals\Exceptions\RenewalException;
@@ -80,8 +81,20 @@ class RenewalController extends Controller
             ->when($request->filled('reason'), fn ($q) => $q->where('renewal_stop_reason', $request->input('reason')))
             ->get();
         $companies = Company::query()->with('provider')->whereIn('id', $memberships->pluck('owner_id'))->get()->keyBy('id');
+        // Live or upcoming subscriptions of these companies: an ended stopped
+        // one is moot once its company holds another.
+        $current = Membership::query()
+            ->where('owner_type', OwnerType::Company)
+            ->whereIn('owner_id', $memberships->pluck('owner_id'))
+            ->where('status', MembershipStatus::Active)
+            ->where('current_period_end', '>=', now())
+            ->get(['id', 'owner_id'])
+            ->groupBy('owner_id');
 
-        return $memberships->map(fn (Membership $m) => $this->row('membership', $m->id, $companies->get($m->owner_id), $m->renewal_stop_reason, $m->current_period_end->toIso8601String(), $m->current_period_end->isPast()));
+        return $memberships
+            ->reject(fn (Membership $m) => $m->current_period_end->isPast()
+                && $current->get($m->owner_id, collect())->contains(fn (Membership $other) => $other->id !== $m->id))
+            ->map(fn (Membership $m) => $this->row('membership', $m->id, $companies->get($m->owner_id), $m->renewal_stop_reason, $m->current_period_end->toIso8601String(), $m->current_period_end->isPast()));
     }
 
     /** @return Collection<int, array<string, mixed>> */

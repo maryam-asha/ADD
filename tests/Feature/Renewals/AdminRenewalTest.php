@@ -15,6 +15,7 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Renewals\Enums\RenewalStopReason;
+use App\Domain\Renewals\Services\MembershipRenewalService;
 use Laravel\Sanctum\Sanctum;
 
 class AdminRenewalTest extends RenewalsTestCase
@@ -103,6 +104,54 @@ class AdminRenewalTest extends RenewalsTestCase
             ->assertJsonPath('data.0.provider.id', $provider->id)
             ->assertJsonPath('data.0.has_ended', false);
         $this->getJson('/api/v1/admin/renewals/stopped?provider_id='.$provider->id)->assertJsonCount(1, 'data');
+    }
+
+    public function test_a_stopped_subscription_superseded_by_a_newer_one_cannot_be_renewed_and_leaves_the_list(): void
+    {
+        $provider = Provider::factory()->create();
+        $old = $this->assignedMembership($provider);
+        $old->update(['renewal_stop_reason' => RenewalStopReason::OverdueInvoice]);
+        $this->travel(40)->days();
+        $this->actingAsAdmin();
+
+        $this->getJson('/api/v1/admin/renewals/stopped?type=membership')
+            ->assertJsonCount(1, 'data')->assertJsonPath('data.0.has_ended', true);
+
+        $this->assignedMembership($provider, company: Company::query()->findOrFail($old->owner_id));
+
+        $this->postJson("/api/v1/admin/memberships/{$old->id}/renew")
+            ->assertStatus(409)->assertJsonPath('message', __('api.renewal.superseded'));
+        $this->assertSame(0, Membership::query()->where('renewed_from_id', $old->id)->count());
+        $this->getJson('/api/v1/admin/renewals/stopped?type=membership')->assertJsonCount(0, 'data')->assertJsonPath('meta.total', 0);
+    }
+
+    public function test_the_stopped_list_rejects_a_page_below_one(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->getJson('/api/v1/admin/renewals/stopped?page=0')->assertUnprocessable()->assertJsonValidationErrors('page');
+    }
+
+    public function test_a_provider_transfer_turns_off_the_companys_subscription_auto_renew_but_not_its_leases(): void
+    {
+        $old = Provider::factory()->create();
+        $current = $this->assignedMembership($old);
+        $next = app(MembershipRenewalService::class)->renew($current, null);
+        $current->update(['renewal_stop_reason' => RenewalStopReason::OverdueInvoice]);
+        $lease = app(OfficeLeaseService::class)->contract(
+            PrivateOfficeRequest::factory()->quoted()->create(['company_id' => $current->owner_id, 'provider_id' => $old->id, 'payer' => Payer::Provider]),
+            LeaseTerms::fromArray([...$this->leasePayload($this->leasableOffice(withLock: false), ['starts_on' => now()->toDateString()]), 'contract_ref' => 'C']),
+            $this->reviewer(),
+        );
+        $lease->update(['auto_renew' => true]);
+        $this->actingAsAdmin();
+
+        $this->patchJson("/api/v1/admin/companies/{$current->owner_id}/provider", ['provider_id' => Provider::factory()->create()->id])->assertOk();
+
+        $this->assertFalse($current->fresh()->auto_renew);
+        $this->assertNull($current->fresh()->renewal_stop_reason);
+        $this->assertFalse($next->fresh()->auto_renew);
+        $this->assertTrue($lease->fresh()->auto_renew);
     }
 
     public function test_it_all_needs_the_permission(): void
