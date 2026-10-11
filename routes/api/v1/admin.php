@@ -541,4 +541,5 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
 // like the provider routes, so `reports.view` can be given to any role.
 Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::get('reports/revenue', [ReportController::class, 'revenue'])->middleware('permission:reports.view');
+    Route::get('reports/providers', [ReportController::class, 'providers'])->middleware('permission:reports.view');
 });

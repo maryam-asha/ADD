@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Reports\Services\ProvidersReport;
 use App\Domain\Reports\Services\RevenueReport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Reports\RevenueReportRequest;
@@ -21,5 +22,10 @@ class ReportController extends Controller
             $request->input('to'),
             $request->filled('provider_id') ? $request->integer('provider_id') : null,
         )]);
+    }
+
+    public function providers(ProvidersReport $report): JsonResponse
+    {
+        return response()->json(['data' => $report->all()]);
     }
 }
