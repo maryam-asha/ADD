@@ -54,11 +54,11 @@ class ProvidersReportTest extends InvoicingTestCase
         $this->assertSame(1, $alpha['active_leases']);
         $this->assertSame($branch->id, $alpha['branch_share'][0]['branch_id']);
         $this->assertSame(10, $alpha['branch_share'][0]['capacity']);
-        $this->assertSame('0.50', $alpha['branch_share'][0]['share']);
+        $this->assertSame('0.5', $alpha['branch_share'][0]['share']);
         $usd = collect($alpha['outstanding'])->firstWhere('currency', 'USD');
-        $this->assertSame('100.00', $usd['remaining']);
-        $this->assertSame('100.00', $usd['overdue']);
-        $this->assertSame('70.00', collect($alpha['outstanding'])->firstWhere('currency', 'SYP')['remaining']);
+        $this->assertSame('100', $usd['remaining']);
+        $this->assertSame('100', $usd['overdue']);
+        $this->assertSame('70', collect($alpha['outstanding'])->firstWhere('currency', 'SYP')['remaining']);
 
         $beta = $rows->firstWhere('name', 'Beta');
         $this->assertSame(4, $beta['seats']);

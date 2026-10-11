@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Invoicing\Models\Invoice;
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -29,7 +30,7 @@ class OfficeLeaseResource extends JsonResource
             'provider' => $this->whenLoaded('provider', fn () => $this->provider === null ? null : ['id' => $this->provider->id, 'name' => $this->provider->name]),
             'billed_to' => $this->billed_to,
             'currency' => $this->currency,
-            'monthly_amount' => (string) $this->monthly_amount,
+            'monthly_amount' => PlainAmount::of($this->monthly_amount),
             'starts_on' => $this->starts_on->toDateString(),
             'ends_on' => $this->ends_on->toDateString(),
             'access_ends_on' => $this->accessEndsOn()->toDateString(),
@@ -44,16 +45,16 @@ class OfficeLeaseResource extends JsonResource
                 'sequence' => $period->sequence,
                 'starts_on' => $period->starts_on->toDateString(),
                 'ends_on' => $period->ends_on->toDateString(),
-                'amount' => (string) $period->amount,
+                'amount' => PlainAmount::of($period->amount),
                 'status' => $period->status,
                 'invoice' => $period->relationLoaded('invoice') && $period->invoice !== null && $this->showsInvoice($period->invoice, $request) ? [
                     'id' => $period->invoice->id,
                     'reference' => $period->invoice->reference,
                     'status' => $period->invoice->status,
                     'is_overdue' => $period->invoice->isOverdue(),
-                    'amount' => (string) $period->invoice->amount,
-                    'paid_amount' => (string) $period->invoice->paid_amount,
-                    'remaining' => $period->invoice->remaining(),
+                    'amount' => PlainAmount::of($period->invoice->amount),
+                    'paid_amount' => PlainAmount::of($period->invoice->paid_amount),
+                    'remaining' => PlainAmount::of($period->invoice->remaining()),
                     'due_at' => $period->invoice->due_at?->toDateString(),
                 ] : null,
             ])->values()),

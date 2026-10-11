@@ -52,7 +52,7 @@ class ProviderInvoiceTest extends InvoicingTestCase
 
         $this->getJson("/api/v1/provider/invoices/{$invoice->id}")
             ->assertOk()
-            ->assertJsonPath('data.payments.0.amount', '10.00')
+            ->assertJsonPath('data.payments.0.amount', '10')
             ->assertJsonMissingPath('data.issued_by')
             ->assertJsonMissingPath('data.computed_amount')
             ->assertJsonMissingPath('data.payments.0.recorded_by')

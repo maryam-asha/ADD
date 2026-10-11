@@ -3,6 +3,7 @@
 namespace App\Domain\Reports\Services;
 
 use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Support\PlainAmount;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -81,7 +82,7 @@ final class InvoiceAggregates
     {
         $out = [];
         foreach ($keys as $k) {
-            $out[$k] = number_format((float) $row->$k, 2, '.', '');
+            $out[$k] = PlainAmount::of($row->$k);
         }
 
         return $out;

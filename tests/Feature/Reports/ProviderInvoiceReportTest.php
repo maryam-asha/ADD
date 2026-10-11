@@ -52,15 +52,15 @@ class ProviderInvoiceReportTest extends InvoicingTestCase
         $data = $this->getJson('/api/v1/provider/reports/invoices')->assertOk()->json('data');
 
         $usd = collect($data['totals'])->firstWhere('currency', 'USD');
-        $this->assertSame('1000.00', $usd['billed']);
-        $this->assertSame('50.00', $usd['paid']);
-        $this->assertSame('950.00', $usd['remaining']);
-        $this->assertSame('850.00', $usd['overdue']);
-        $this->assertSame('450.00', $usd['by_payer']['provider']['remaining']);
+        $this->assertSame('1000', $usd['billed']);
+        $this->assertSame('50', $usd['paid']);
+        $this->assertSame('950', $usd['remaining']);
+        $this->assertSame('850', $usd['overdue']);
+        $this->assertSame('450', $usd['by_payer']['provider']['remaining']);
 
         $syp = collect($data['totals'])->firstWhere('currency', 'SYP');
-        $this->assertSame('500000.00', $syp['billed']);
-        $this->assertSame('0.00', $syp['remaining']);
+        $this->assertSame('500000', $syp['billed']);
+        $this->assertSame('0', $syp['remaining']);
         $this->assertCount(2, $data['totals']);
     }
 
@@ -68,9 +68,9 @@ class ProviderInvoiceReportTest extends InvoicingTestCase
     {
         $aging = collect($this->getJson('/api/v1/provider/reports/invoices')->json('data.aging'))->firstWhere('currency', 'USD');
 
-        $this->assertSame('150.00', $aging['0_30']);
-        $this->assertSame('300.00', $aging['31_60']);
-        $this->assertSame('400.00', $aging['60_plus']);
+        $this->assertSame('150', $aging['0_30']);
+        $this->assertSame('300', $aging['31_60']);
+        $this->assertSame('400', $aging['60_plus']);
     }
 
     public function test_by_company_lists_only_this_providers_companies(): void
@@ -79,9 +79,9 @@ class ProviderInvoiceReportTest extends InvoicingTestCase
 
         $this->assertCount(2, $byCompany);
         $c1 = $byCompany->firstWhere('company.id', $this->c1->id);
-        $this->assertSame('250.00', collect($c1['totals'])->firstWhere('currency', 'USD')['remaining']);
+        $this->assertSame('250', collect($c1['totals'])->firstWhere('currency', 'USD')['remaining']);
         $c2 = $byCompany->firstWhere('company.id', $this->c2->id);
-        $this->assertSame('700.00', collect($c2['totals'])->firstWhere('currency', 'USD')['remaining']);
+        $this->assertSame('700', collect($c2['totals'])->firstWhere('currency', 'USD')['remaining']);
     }
 
     public function test_the_period_filters_on_issue_date(): void
@@ -89,7 +89,7 @@ class ProviderInvoiceReportTest extends InvoicingTestCase
         $from = now()->subDays(95)->toDateString();
         $usd = collect($this->getJson("/api/v1/provider/reports/invoices?from={$from}")->json('data.totals'))->firstWhere('currency', 'USD');
 
-        $this->assertSame('600.00', $usd['billed']);
+        $this->assertSame('600', $usd['billed']);
     }
 
     public function test_the_period_is_validated(): void

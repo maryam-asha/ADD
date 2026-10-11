@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
+use App\Support\PlainAmount;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,7 +43,7 @@ class InvoicePaymentService
             $shortfall = bcsub($remaining, $amount, 2);
 
             if (bccomp($shortfall, '0', 2) < 0) {
-                throw new InvoicingException('api.invoice.overpayment', 422, ['remaining' => $remaining, 'currency' => $locked->currency]);
+                throw new InvoicingException('api.invoice.overpayment', 422, ['remaining' => PlainAmount::of($remaining), 'currency' => $locked->currency]);
             }
 
             // Converting from another currency truncates, which can leave less than

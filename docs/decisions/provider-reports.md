@@ -9,7 +9,7 @@ Spec: `docs/superpowers/specs/2026-10-11-provider-reports-design.md`. Code: `App
 | `GET provider/reports/companies` | the provider's accounts | one row per client company: `members_count`, live `membership` (plan, seats, period end, `auto_renew`, stop reason + label) or null, `active_leases_count`, `outstanding` per currency (`remaining`, `overdue`) |
 | `GET provider/reports/invoices?from&to` | the provider's accounts | `totals` per currency (`billed`, `paid`, `remaining`, `overdue`, plus `by_payer` provider / company), `aging`, `by_company` |
 | `GET admin/reports/revenue?from&to&provider_id` | `reports.view` | `totals`, `by_source` (`wallet_top_up`, `plan_assignment`, `membership_renewal`, `office_lease`), `aging`, `top_overdue` (10 payers, provider or company) |
-| `GET admin/reports/providers` | `reports.view` | every provider: `active_companies`, `seats`, `branch_share` (`seats`, pool `capacity`, `share` = seats / capacity as a 2-decimal string, null when the branch has no capacity), `active_leases`, `outstanding` |
+| `GET admin/reports/providers` | `reports.view` | every provider: `active_companies`, `seats`, `branch_share` (`seats`, pool `capacity`, `share` = seats / capacity as a string, at most 2 decimals, null when the branch has no capacity), `active_leases`, `outstanding` |
 
 ## Rules
 
@@ -29,3 +29,5 @@ Admin reports are gated by `reports.view` (registered manually in `PermissionSyn
 ## Deferred
 
 A usage report (seat occupancy, attendance hours) is a later phase.
+
+**Amount format.** Every money amount the providers module returns (reports, provider summary, invoices, invoice payments, office leases, a request's invoice, the overpayment message) goes out through `App\Support\PlainAmount`: a string, exact to the cent, with no trailing zeros (`"300"`, `"150.5"`, `"12.75"`, `"0"`). Asked for by the product owner on 2026-10-11 so the dashboard shows values as they are. Stored columns stay `decimal(…, 2)`.

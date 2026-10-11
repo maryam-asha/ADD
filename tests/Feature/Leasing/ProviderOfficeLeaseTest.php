@@ -41,9 +41,9 @@ class ProviderOfficeLeaseTest extends LeasingTestCase
 
         $this->getJson("/api/v1/provider/office-leases/{$lease->id}")
             ->assertOk()
-            ->assertJsonPath('data.monthly_amount', '500.00')
+            ->assertJsonPath('data.monthly_amount', '500')
             ->assertJsonCount(4, 'data.periods')
-            ->assertJsonPath('data.periods.0.invoice.amount', '1500.00')
+            ->assertJsonPath('data.periods.0.invoice.amount', '1500')
             ->assertJsonMissingPath('data.termination_reason')
             ->assertJsonMissingPath('data.access')
             ->assertJsonMissingPath('data.private_office_request_id');

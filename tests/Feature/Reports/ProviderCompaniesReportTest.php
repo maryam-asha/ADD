@@ -49,14 +49,14 @@ class ProviderCompaniesReportTest extends InvoicingTestCase
         $this->assertNotNull($alpha['membership']['renewal_stop_reason_label']);
         $this->assertSame(1, $alpha['active_leases_count']);
         $usd = collect($alpha['outstanding'])->firstWhere('currency', 'USD');
-        $this->assertSame('100.00', $usd['remaining']);
-        $this->assertSame('100.00', $usd['overdue']);
-        $this->assertSame('40.00', collect($alpha['outstanding'])->firstWhere('currency', 'SYP')['remaining']);
+        $this->assertSame('100', $usd['remaining']);
+        $this->assertSame('100', $usd['overdue']);
+        $this->assertSame('40', collect($alpha['outstanding'])->firstWhere('currency', 'SYP')['remaining']);
 
         $beta = $data[1];
         $this->assertNull($beta['membership']);
         $this->assertSame(0, $beta['active_leases_count']);
-        $this->assertSame('25.00', $beta['outstanding'][0]['remaining']);
-        $this->assertSame('0.00', $beta['outstanding'][0]['overdue']);
+        $this->assertSame('25', $beta['outstanding'][0]['remaining']);
+        $this->assertSame('0', $beta['outstanding'][0]['overdue']);
     }
 }

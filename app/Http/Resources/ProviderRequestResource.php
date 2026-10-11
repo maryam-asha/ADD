@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -34,7 +35,7 @@ class ProviderRequestResource extends JsonResource
                 'id' => $this->invoice->id,
                 'reference' => $this->invoice->reference,
                 'status' => $this->invoice->status,
-                'amount' => (string) $this->invoice->amount,
+                'amount' => PlainAmount::of($this->invoice->amount),
                 'currency' => $this->invoice->currency,
             ] : null,
             'created_at' => $this->created_at?->toIso8601String(),

@@ -30,9 +30,9 @@ class ContractLeaseEndpointsTest extends LeasingTestCase
             ->assertJsonPath('data.legal_name', 'Acme LLC')
             ->assertJsonPath('data.branch_id', $office->building->branch_id)
             ->assertJsonPath('data.office_leases.0.space.id', $office->id)
-            ->assertJsonPath('data.office_leases.0.monthly_amount', '500.00')
+            ->assertJsonPath('data.office_leases.0.monthly_amount', '500')
             ->assertJsonCount(4, 'data.office_leases.0.periods')
-            ->assertJsonPath('data.office_leases.0.periods.0.invoice.amount', '1500.00')
+            ->assertJsonPath('data.office_leases.0.periods.0.invoice.amount', '1500')
             ->assertJsonPath('data.office_leases.0.periods.1.invoice', null);
     }
 
@@ -104,7 +104,7 @@ class ContractLeaseEndpointsTest extends LeasingTestCase
 
         $this->postJson($url, ['contract_ref' => 'C', ...$this->leasePayload($office, ['duration_months' => 10, 'billing_cycle_months' => 3])])
             ->assertUnprocessable()->assertJsonValidationErrors('billing_cycle_months');
-        $this->postJson($url, ['contract_ref' => 'C', ...$this->leasePayload($office, ['currency' => 'SYP', 'monthly_amount' => '100.50'])])
+        $this->postJson($url, ['contract_ref' => 'C', ...$this->leasePayload($office, ['currency' => 'SYP', 'monthly_amount' => '100.5'])])
             ->assertUnprocessable()->assertJsonValidationErrors('monthly_amount');
         $this->postJson($url, ['contract_ref' => 'C', ...$this->leasePayload($office, ['monthly_amount' => '0'])])
             ->assertUnprocessable()->assertJsonValidationErrors('monthly_amount');

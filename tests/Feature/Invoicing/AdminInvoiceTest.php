@@ -37,12 +37,12 @@ class AdminInvoiceTest extends InvoicingTestCase
 
         $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [
             'amount' => '25', 'currency' => 'USD', 'method' => 'cash', 'receipt_number' => 'R-77', 'paid_at' => now()->toDateString(),
-        ])->assertCreated()->assertJsonPath('data.amount', '25.00');
+        ])->assertCreated()->assertJsonPath('data.amount', '25');
 
         $this->getJson("/api/v1/admin/invoices/{$invoice->id}")
             ->assertOk()
             ->assertJsonPath('data.status', 'partially_paid')
-            ->assertJsonPath('data.remaining', '75.00')
+            ->assertJsonPath('data.remaining', '75')
             ->assertJsonPath('data.payments.0.receipt_number', 'R-77')
             ->assertJsonPath('data.payments.0.recorded_by.id', $staff->id);
     }
@@ -54,7 +54,7 @@ class AdminInvoiceTest extends InvoicingTestCase
 
         $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [
             'amount' => '11', 'currency' => 'USD', 'method' => 'cash', 'paid_at' => now()->toDateString(),
-        ])->assertStatus(422)->assertJsonPath('message', __('api.invoice.overpayment', ['remaining' => '10.00', 'currency' => 'USD']));
+        ])->assertStatus(422)->assertJsonPath('message', __('api.invoice.overpayment', ['remaining' => '10', 'currency' => 'USD']));
     }
 
     public function test_void_and_cancel_need_a_reason(): void
@@ -115,7 +115,7 @@ class AdminInvoiceTest extends InvoicingTestCase
 
         $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [...$base, 'amount' => '100.5', 'currency' => 'SYP'])
             ->assertStatus(422)->assertJsonValidationErrors('amount');
-        $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [...$base, 'amount' => '100.50', 'currency' => 'USD'])
+        $this->postJson("/api/v1/admin/invoices/{$invoice->id}/payments", [...$base, 'amount' => '100.5', 'currency' => 'USD'])
             ->assertCreated();
     }
 

@@ -65,21 +65,21 @@ class RevenueReportTest extends InvoicingTestCase
         $data = $this->getJson('/api/v1/admin/reports/revenue')->assertOk()->json('data');
         $src = fn (string $cur, string $s) => collect($data['by_source'])->first(fn ($r) => $r['currency'] === $cur && $r['source'] === $s);
 
-        $this->assertSame('100.00', $src('USD', 'wallet_top_up')['billed']);
-        $this->assertSame('200.00', $src('USD', 'plan_assignment')['billed']);
-        $this->assertSame('1500.00', $src('USD', 'office_lease')['billed']);
-        $this->assertSame('300.00', $src('USD', 'membership_renewal')['billed']);
-        $this->assertSame('40000.00', $src('SYP', 'wallet_top_up')['billed']);
+        $this->assertSame('100', $src('USD', 'wallet_top_up')['billed']);
+        $this->assertSame('200', $src('USD', 'plan_assignment')['billed']);
+        $this->assertSame('1500', $src('USD', 'office_lease')['billed']);
+        $this->assertSame('300', $src('USD', 'membership_renewal')['billed']);
+        $this->assertSame('40000', $src('SYP', 'wallet_top_up')['billed']);
 
         $usd = collect($data['totals'])->firstWhere('currency', 'USD');
-        $this->assertSame('2100.00', $usd['billed']);
-        $this->assertSame('500.00', $usd['overdue']);
-        $this->assertSame('40000.00', collect($data['totals'])->firstWhere('currency', 'SYP')['billed']);
+        $this->assertSame('2100', $usd['billed']);
+        $this->assertSame('500', $usd['overdue']);
+        $this->assertSame('40000', collect($data['totals'])->firstWhere('currency', 'SYP')['billed']);
 
         $aging = collect($data['aging'])->firstWhere('currency', 'USD');
-        $this->assertSame('300.00', $aging['0_30']);
-        $this->assertSame('200.00', $aging['31_60']);
-        $this->assertSame('0.00', $aging['60_plus']);
+        $this->assertSame('300', $aging['0_30']);
+        $this->assertSame('200', $aging['31_60']);
+        $this->assertSame('0', $aging['60_plus']);
     }
 
     public function test_top_overdue_orders_by_amount_and_names_the_payer(): void
@@ -92,9 +92,9 @@ class RevenueReportTest extends InvoicingTestCase
         $this->assertSame('provider', $top[0]['payer']['type']);
         $this->assertSame($this->p2->id, $top[0]['payer']['id']);
         $this->assertSame('P Two', $top[0]['payer']['name']);
-        $this->assertSame('300.00', $top[0]['overdue']);
+        $this->assertSame('300', $top[0]['overdue']);
         $this->assertSame('P One', $top[1]['payer']['name']);
-        $this->assertSame('200.00', $top[1]['overdue']);
+        $this->assertSame('200', $top[1]['overdue']);
         $this->assertCount(2, $top);
     }
 
@@ -112,7 +112,7 @@ class RevenueReportTest extends InvoicingTestCase
         $usd = $top->where('currency', 'USD')->values();
         $this->assertCount(1, $usd);
         $this->assertSame($this->p1->id, $usd[0]['payer']['id']);
-        $this->assertSame('3000.00', $usd[0]['overdue']);
+        $this->assertSame('3000', $usd[0]['overdue']);
     }
 
     public function test_it_filters_by_provider_and_period(): void
@@ -122,11 +122,11 @@ class RevenueReportTest extends InvoicingTestCase
         $this->actingAsAdmin();
 
         $byProvider = $this->getJson("/api/v1/admin/reports/revenue?provider_id={$this->p2->id}")->json('data.totals');
-        $this->assertSame('300.00', collect($byProvider)->firstWhere('currency', 'USD')['billed']);
+        $this->assertSame('300', collect($byProvider)->firstWhere('currency', 'USD')['billed']);
 
         $from = now()->subDays(30)->toDateString();
         $recent = $this->getJson("/api/v1/admin/reports/revenue?from={$from}&provider_id={$this->p1->id}")->json('data.totals');
-        $this->assertSame('1800.00', collect($recent)->firstWhere('currency', 'USD')['billed']);
+        $this->assertSame('1800', collect($recent)->firstWhere('currency', 'USD')['billed']);
     }
 
     public function test_operations_without_the_permission_is_refused(): void

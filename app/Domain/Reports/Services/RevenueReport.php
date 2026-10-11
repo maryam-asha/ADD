@@ -7,6 +7,7 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
+use App\Support\PlainAmount;
 use Illuminate\Database\Eloquent\Builder;
 
 /** What ADD billed, collected and is still owed - per currency, by source - and who owes the most overdue. */
@@ -53,9 +54,9 @@ final class RevenueReport
             ->map(fn ($r) => [
                 'currency' => $r->currency,
                 'source' => $r->source,
-                'billed' => number_format((float) $r->billed, 2, '.', ''),
-                'paid' => number_format((float) $r->paid, 2, '.', ''),
-                'remaining' => number_format((float) $r->remaining, 2, '.', ''),
+                'billed' => PlainAmount::of($r->billed),
+                'paid' => PlainAmount::of($r->paid),
+                'remaining' => PlainAmount::of($r->remaining),
             ])->values()->all();
     }
 
@@ -88,7 +89,7 @@ final class RevenueReport
                 'name' => $r->billed_to === Payer::Provider->value ? $providers[$r->payer_id] ?? null : $companies[$r->payer_id] ?? null,
             ],
             'currency' => $r->currency,
-            'overdue' => number_format((float) $r->overdue, 2, '.', ''),
+            'overdue' => PlainAmount::of($r->overdue),
         ])->values()->all();
     }
 }

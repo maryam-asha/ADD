@@ -12,6 +12,7 @@ use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Providers\Models\Provider;
+use App\Support\PlainAmount;
 
 /**
  * Every provider at a glance: its companies, the seats it holds in each
@@ -51,7 +52,7 @@ final class ProvidersReport
                     'branch_name' => $branch?->translate('name'),
                     'seats' => $seats,
                     'capacity' => $cap,
-                    'share' => $cap > 0 ? bcdiv((string) $seats, (string) $cap, 2) : null,
+                    'share' => $cap > 0 ? PlainAmount::of(bcdiv((string) $seats, (string) $cap, 2)) : null,
                 ];
             })->values()->all();
 

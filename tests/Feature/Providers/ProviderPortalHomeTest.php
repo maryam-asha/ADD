@@ -71,8 +71,8 @@ class ProviderPortalHomeTest extends ProviderTestCase
             ->assertJsonPath('data.invoices.open', 3)
             ->assertJsonPath('data.invoices.overdue', 1)
             ->assertJsonPath('data.invoices.outstanding', [
-                ['currency' => 'SYP', 'owed_by_provider' => '500000.00', 'owed_by_companies' => '0.00', 'overdue' => '0.00'],
-                ['currency' => 'USD', 'owed_by_provider' => '60.00', 'owed_by_companies' => '50.00', 'overdue' => '50.00'],
+                ['currency' => 'SYP', 'owed_by_provider' => '500000', 'owed_by_companies' => '0', 'overdue' => '0'],
+                ['currency' => 'USD', 'owed_by_provider' => '60', 'owed_by_companies' => '50', 'overdue' => '50'],
             ]);
     }
 

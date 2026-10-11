@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -11,8 +12,8 @@ class InvoicePaymentResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'amount' => (string) $this->amount,
-            'received_amount' => (string) $this->received_amount,
+            'amount' => PlainAmount::of($this->amount),
+            'received_amount' => PlainAmount::of($this->received_amount),
             'received_currency' => $this->received_currency,
             'method' => $this->method,
             'receipt_number' => $this->receipt_number,

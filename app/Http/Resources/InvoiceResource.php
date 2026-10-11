@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -25,9 +26,9 @@ class InvoiceResource extends JsonResource
             'description' => $this->description,
             'points' => $this->points,
             'currency' => $this->currency,
-            'amount' => (string) $this->amount,
-            'paid_amount' => (string) $this->paid_amount,
-            'remaining' => $this->remaining(),
+            'amount' => PlainAmount::of($this->amount),
+            'paid_amount' => PlainAmount::of($this->paid_amount),
+            'remaining' => PlainAmount::of($this->remaining()),
             'issued_at' => $this->issued_at?->toDateString(),
             'due_at' => $this->due_at?->toDateString(),
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
@@ -40,7 +41,7 @@ class InvoiceResource extends JsonResource
     protected function staffFields(): array
     {
         return [
-            'computed_amount' => (string) $this->computed_amount,
+            'computed_amount' => PlainAmount::of($this->computed_amount),
             'exchange_rate_to_base' => (string) $this->exchange_rate_to_base,
             'issued_by' => $this->whenLoaded('issuer', fn () => $this->issuer === null ? null : ['id' => $this->issuer->id, 'name' => $this->issuer->name]),
             'cancelled_by' => $this->cancelled_by,

@@ -13,6 +13,7 @@ use App\Domain\Providers\Enums\ProviderRequestStatus;
 use App\Domain\Providers\Models\ProviderRequest;
 use App\Http\Controllers\Api\V1\Provider\Concerns\ActsForProvider;
 use App\Http\Controllers\Controller;
+use App\Support\PlainAmount;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -66,9 +67,9 @@ class ProviderSummaryController extends Controller
             ->get()
             ->map(fn ($row) => [
                 'currency' => $row->currency,
-                'owed_by_provider' => number_format((float) $row->owed_by_provider, 2, '.', ''),
-                'owed_by_companies' => number_format((float) $row->owed_by_companies, 2, '.', ''),
-                'overdue' => number_format((float) $row->overdue, 2, '.', ''),
+                'owed_by_provider' => PlainAmount::of($row->owed_by_provider),
+                'owed_by_companies' => PlainAmount::of($row->owed_by_companies),
+                'overdue' => PlainAmount::of($row->overdue),
             ])
             ->values();
 

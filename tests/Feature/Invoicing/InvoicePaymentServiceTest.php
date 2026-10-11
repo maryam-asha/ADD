@@ -80,7 +80,7 @@ class InvoicePaymentServiceTest extends InvoicingTestCase
             $this->fail('An overpayment was accepted.');
         } catch (InvoicingException $e) {
             $this->assertSame('api.invoice.overpayment', $e->messageKey);
-            $this->assertSame('30.00', $e->params['remaining']);
+            $this->assertSame('30', $e->params['remaining']);
         }
     }
 

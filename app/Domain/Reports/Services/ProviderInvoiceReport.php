@@ -30,7 +30,7 @@ final class ProviderInvoiceReport
             $row['by_payer'] = [];
             foreach (Payer::cases() as $payer) {
                 $row['by_payer'][$payer->value] = $byPayer[$row['currency']][$payer->value]
-                    ?? ['currency' => $row['currency'], 'billed' => '0.00', 'paid' => '0.00', 'remaining' => '0.00', 'overdue' => '0.00'];
+                    ?? ['currency' => $row['currency'], 'billed' => '0', 'paid' => '0', 'remaining' => '0', 'overdue' => '0'];
             }
 
             return $row;
