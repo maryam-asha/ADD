@@ -120,3 +120,11 @@ Schedule::command('payments:cancel-expired-prepayments')->everyMinute()->without
  * only while it has no live grant.
  */
 Schedule::command('leases:run-daily')->hourly()->withoutOverlapping();
+
+/*
+ * Auto-renewal (docs/superpowers/specs/2026-10-11-auto-renewal-design.md):
+ * renew subscriptions and extend leases within renewals.advance_days of
+ * their end, retrying stopped ones every hour until they end, and grant
+ * renewals their plan balances once they start.
+ */
+Schedule::command('renewals:run')->hourly()->withoutOverlapping();
