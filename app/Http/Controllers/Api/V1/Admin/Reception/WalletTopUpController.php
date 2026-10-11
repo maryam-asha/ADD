@@ -24,6 +24,7 @@ use App\Http\Requests\Admin\Reception\StoreWalletTopUpRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * S2-BE-06: WalletService::creditGeneral() already exists and is tested —
@@ -126,9 +127,17 @@ class WalletTopUpController extends Controller
         // has already verified, through this same converter, that the amount
         // buys exactly the `points` the dashboard quoted and the operator read
         // out — and that they reach the minimum, so a payment too small to
-        // buy a single point never gets here. One conversion: the points, the
-        // exchange rate and the point rate recorded below all come from it.
+        // buy a single point never gets here. The points, the exchange rate
+        // and the point rate recorded below all come from this conversion.
         $converted = $converter->toPoints($paymentAmount, $paymentCurrency);
+
+        // The request converted once to check; this converts again to credit.
+        // A rate written in between makes the two disagree — refuse it as a
+        // stale quote rather than credit a figure the operator never read out.
+        if ($converted->points !== (int) $request->validated('points')) {
+            throw ValidationException::withMessages(['points' => __('api.wallet.quote_stale')]);
+        }
+
         $pointsCredited = $converted->points;
         $exchangeRate = $converted->rateToBase;
         $pointRate = $converted->pointRateUsd;

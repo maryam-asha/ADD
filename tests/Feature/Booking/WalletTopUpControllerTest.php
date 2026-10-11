@@ -2,10 +2,12 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Finance\DataTransferObjects\ConvertedMoney;
 use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -362,6 +364,35 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertSame(PaymentMethod::Cash, $transaction->payment_method);
         $this->assertSame('USD', $transaction->payment_currency);
         $this->assertSame('0.1000', (string) $transaction->point_rate_usd);
+    }
+
+    /**
+     * The request checks the quoted points through the converter, then
+     * store() converts again to credit. A rate written between the two
+     * makes the second answer differ: the top-up is refused as a stale
+     * quote rather than crediting a figure the operator never read out.
+     */
+    public function test_a_rate_change_between_the_check_and_the_credit_is_refused(): void
+    {
+        $this->actingAsOperations();
+        $member = $this->memberWithWallet();
+
+        $this->mock(ReceivedMoneyConverter::class, fn ($mock) => $mock
+            ->shouldReceive('toPoints')
+            ->twice()
+            ->andReturn(
+                new ConvertedMoney(points: 250, baseAmount: '25.00', rateToBase: null, pointRateUsd: '0.10'),
+                new ConvertedMoney(points: 251, baseAmount: '25.10', rateToBase: null, pointRateUsd: '0.10'),
+            ));
+
+        $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            'points' => 250,
+            'amount' => '25.00',
+            'payment_method' => 'cash',
+        ])->assertJsonValidationErrors(['points' => __('api.wallet.quote_stale')]);
+
+        $this->assertDatabaseCount('wallet_transactions', 0);
     }
 
     private function memberWithWallet(): User
