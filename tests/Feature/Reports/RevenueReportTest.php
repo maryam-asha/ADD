@@ -98,6 +98,23 @@ class RevenueReportTest extends InvoicingTestCase
         $this->assertCount(2, $top);
     }
 
+    public function test_top_overdue_ranks_within_each_currency(): void
+    {
+        foreach (range(1, 10) as $i) {
+            $this->invoice(Provider::factory()->create(), '50000.00', ['currency' => 'SYP', 'billed_to' => Payer::Provider, 'due_at' => now()->subDays(3)->toDateString()]);
+        }
+        $this->invoice($this->p1, '3000.00', ['billed_to' => Payer::Provider, 'due_at' => now()->subDays(3)->toDateString()]);
+        $this->actingAsAdmin();
+
+        $top = collect($this->getJson('/api/v1/admin/reports/revenue')->json('data.top_overdue'));
+
+        $this->assertCount(10, $top->where('currency', 'SYP'));
+        $usd = $top->where('currency', 'USD')->values();
+        $this->assertCount(1, $usd);
+        $this->assertSame($this->p1->id, $usd[0]['payer']['id']);
+        $this->assertSame('3000.00', $usd[0]['overdue']);
+    }
+
     public function test_it_filters_by_provider_and_period(): void
     {
         $this->seedInvoices();

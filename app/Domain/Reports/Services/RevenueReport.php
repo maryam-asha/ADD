@@ -62,16 +62,21 @@ final class RevenueReport
     /** @return list<array<string, mixed>> */
     private function topOverdue(Builder $invoices): array
     {
-        $rows = $invoices
+        $overdue = $invoices
             ->whereIn('status', [InvoiceStatus::Unpaid, InvoiceStatus::PartiallyPaid])
-            ->whereRaw('DATE(due_at) < ?', [now()->toDateString()])
-            ->selectRaw('billed_to, currency')
-            ->selectRaw('CASE WHEN billed_to = ? THEN provider_id ELSE company_id END AS payer_id', [Payer::Provider->value])
-            ->selectRaw('SUM(amount - paid_amount) AS overdue')
-            ->groupBy('billed_to', 'payer_id', 'currency')
-            ->orderByRaw('SUM(amount - paid_amount) DESC')
-            ->limit(self::TOP_OVERDUE)
-            ->toBase()->get();
+            ->whereRaw('DATE(due_at) < ?', [now()->toDateString()]);
+
+        // Ranked within each currency: amounts in different currencies are never compared.
+        $rows = (clone $overdue)->distinct()->orderBy('currency')->pluck('currency')
+            ->flatMap(fn (string $currency) => (clone $overdue)
+                ->where('currency', $currency)
+                ->selectRaw('billed_to, currency')
+                ->selectRaw('CASE WHEN billed_to = ? THEN provider_id ELSE company_id END AS payer_id', [Payer::Provider->value])
+                ->selectRaw('SUM(amount - paid_amount) AS overdue')
+                ->groupBy('billed_to', 'payer_id', 'currency')
+                ->orderByRaw('SUM(amount - paid_amount) DESC')
+                ->limit(self::TOP_OVERDUE)
+                ->toBase()->get());
 
         $providers = Provider::query()->whereIn('id', $rows->where('billed_to', Payer::Provider->value)->pluck('payer_id'))->pluck('name', 'id');
         $companies = Company::query()->whereIn('id', $rows->where('billed_to', Payer::Company->value)->pluck('payer_id'))->pluck('legal_name', 'id');
