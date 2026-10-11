@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\RenewalController;
+use App\Http\Controllers\Api\V1\Admin\ReportController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -61,6 +62,10 @@ class PermissionSyncService
         ],
         SettingController::class => [
             'settings' => ['view', 'update'],
+        ],
+        // Invoice reports (docs/decisions/provider-reports.md).
+        ReportController::class => [
+            'reports' => ['view'],
         ],
         // Card payments. `reverse` is the only one actually enforced as a
         // permission today (routes/api/v1/admin.php) — reversing moves real

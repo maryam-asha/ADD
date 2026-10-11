@@ -65,6 +65,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\RenewalController;
+use App\Http\Controllers\Api\V1\Admin\ReportController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
@@ -534,4 +535,10 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::post('payments/{payment}/reverse', [AdminPaymentController::class, 'reverse'])
         ->middleware('permission:payments.reverse')
         ->name('payments.reverse');
+});
+
+// Invoice reports (docs/decisions/provider-reports.md): permission-gated
+// like the provider routes, so `reports.view` can be given to any role.
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::get('reports/revenue', [ReportController::class, 'revenue'])->middleware('permission:reports.view');
 });
