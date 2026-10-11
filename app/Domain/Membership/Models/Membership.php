@@ -110,14 +110,17 @@ class Membership extends Model
     }
 
     /**
-     * Active and not yet ended. Nothing writes an `expired` status: a
-     * subscription past `current_period_end` is over by its date alone.
+     * Started, active and not yet ended. Nothing writes an `expired` status:
+     * a subscription past `current_period_end` is over by its date alone, and
+     * a renewal made in advance is not live until its period starts.
      *
      * @param  Builder<self>  $query
      */
     public function scopeLive(Builder $query): void
     {
-        $query->where('status', MembershipStatus::Active)->where('current_period_end', '>=', now());
+        $query->where('status', MembershipStatus::Active)
+            ->where('current_period_start', '<=', now())
+            ->where('current_period_end', '>=', now());
     }
 
     /**
@@ -135,6 +138,8 @@ class Membership extends Model
     /** The same rule as scopeLive(), for a loaded row. */
     public function isLive(): bool
     {
-        return $this->status === MembershipStatus::Active && ! $this->current_period_end->isPast();
+        return $this->status === MembershipStatus::Active
+            && ! $this->current_period_start->isFuture()
+            && ! $this->current_period_end->isPast();
     }
 }

@@ -14,6 +14,7 @@ use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -64,8 +65,13 @@ class MembershipActivationService
      * `$auditProperties` are added to the audit entry — how a sale paid
      * elsewhere (PaymentService) names the payment that paid for it.
      *
+     * `$startsAt` starts the period later (a renewal made in advance);
+     * `$attributes` are extra columns for the new row (`auto_renew`,
+     * `renewed_from_id`).
+     *
      * @param  list<int>  $deskIds
      * @param  array<string, mixed>  $auditProperties
+     * @param  array<string, mixed>  $attributes
      */
     public function activate(
         Plan $plan,
@@ -78,15 +84,17 @@ class MembershipActivationService
         bool $overrideCapacity = false,
         array $deskIds = [],
         array $auditProperties = [],
+        ?CarbonInterface $startsAt = null,
+        array $attributes = [],
     ): Membership {
         if ($ownerType === OwnerType::User && $seats !== 1) {
             throw new \InvalidArgumentException('A member\'s own subscription holds exactly one seat.');
         }
 
-        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds, $auditProperties) {
+        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds, $auditProperties, $startsAt, $attributes) {
             $branchId ??= $this->branches->branchFor($ownerType, $ownerId);
-            $periodStart = now();
-            $periodEnd = now()->addDays($plan->duration_days);
+            $periodStart = $startsAt !== null ? $startsAt->copy() : now();
+            $periodEnd = $periodStart->copy()->addDays($plan->duration_days);
 
             // Before the wallet is touched, and on the branch row every other
             // seat decision locks, so two sales cannot both take the last seat.
@@ -120,6 +128,7 @@ class MembershipActivationService
                 'status' => MembershipStatus::Active,
                 'current_period_start' => $periodStart,
                 'current_period_end' => $periodEnd,
+                ...$attributes,
             ]);
 
             if ($deskIds !== []) {
@@ -130,7 +139,13 @@ class MembershipActivationService
                 DB::afterCommit(fn () => $this->desks->notifyStaffDeskNeeded($membership->setRelation('plan', $plan)));
             }
 
-            $this->grantPlanBalances($plan, $membership, $wallet);
+            // A renewal made in advance holds its allowance until it starts
+            // (grantDueBalances, from the renewal run), or the company would
+            // spend next period's allowance in this one.
+            if (! $periodStart->isFuture()) {
+                $this->grantPlanBalances($plan, $membership, $wallet);
+                $membership->forceFill(['balances_granted_at' => now()])->save();
+            }
 
             $this->logSensitiveAction($auditAction ?? 'membership_purchased', $membership, array_merge([
                 'plan_id' => $plan->id,
@@ -144,6 +159,26 @@ class MembershipActivationService
             ], $auditProperties));
 
             return $membership;
+        });
+    }
+
+    /**
+     * Grants a started membership's plan balances once (renewals made in
+     * advance). False when it has not started or was already granted.
+     */
+    public function grantDueBalances(Membership $membership): bool
+    {
+        return DB::transaction(function () use ($membership) {
+            $locked = Membership::query()->with('plan.balances')->whereKey($membership->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->balances_granted_at !== null || $locked->current_period_start->isFuture()) {
+                return false;
+            }
+
+            $this->grantPlanBalances($locked->plan, $locked, $this->wallets->walletFor($locked->owner_type, (int) $locked->owner_id));
+            $locked->forceFill(['balances_granted_at' => now()])->save();
+
+            return true;
         });
     }
 
