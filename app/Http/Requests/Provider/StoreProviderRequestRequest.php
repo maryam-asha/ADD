@@ -61,6 +61,7 @@ class StoreProviderRequestRequest extends FormRequest
                 'plan_id' => ['required', 'integer'],
                 'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
                 'seats' => ['required', 'integer', 'min:1', 'max:1000'],
+                'auto_renew' => ['sometimes', 'boolean'],
             ],
             ProviderRequestType::WalletTopUp => $company + $payer + [
                 'points' => ['required', 'integer', 'min:1'],

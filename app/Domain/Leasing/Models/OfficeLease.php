@@ -11,6 +11,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Leasing\Enums\OfficeLeaseStatus;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
+use App\Domain\Renewals\Enums\RenewalStopReason;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -45,6 +46,9 @@ class OfficeLease extends Model
         'terminated_by',
         'termination_reason',
         'created_by',
+        'auto_renew',
+        'renewal_stop_reason',
+        'renewals_count',
     ];
 
     protected function casts(): array
@@ -58,6 +62,9 @@ class OfficeLease extends Model
             'terminated_on' => 'immutable_date',
             'duration_months' => 'integer',
             'billing_cycle_months' => 'integer',
+            'auto_renew' => 'boolean',
+            'renewal_stop_reason' => RenewalStopReason::class,
+            'renewals_count' => 'integer',
         ];
     }
 

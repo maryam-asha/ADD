@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\Provider\ProviderOfficeLeaseController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
 use App\Http\Controllers\Api\V1\Provider\ProviderProfileController;
+use App\Http\Controllers\Api\V1\Provider\ProviderRenewalController;
 use App\Http\Controllers\Api\V1\Provider\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderSummaryController;
 use Illuminate\Support\Facades\Route;
@@ -30,6 +31,8 @@ Route::post('office-requests', [ProviderOfficeRequestController::class, 'store']
 Route::get('office-leases', [ProviderOfficeLeaseController::class, 'index']);
 Route::get('office-leases/{officeLease}', [ProviderOfficeLeaseController::class, 'show']);
 Route::get('companies/{company}/office-leases', [ProviderOfficeLeaseController::class, 'forCompany']);
+Route::patch('companies/{company}/membership/auto-renew', [ProviderRenewalController::class, 'membershipAutoRenew']);
+Route::patch('office-leases/{officeLease}/auto-renew', [ProviderRenewalController::class, 'leaseAutoRenew']);
 
 Route::get('plans', [ProviderPlanController::class, 'index']);
 

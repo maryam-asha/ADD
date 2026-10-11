@@ -8,7 +8,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A client company as its provider sees it. `members` and `invitations`
  * only on the detail call; `membership` is the live company subscription
- * (set by the controller as `current_membership`), or null.
+ * (set by the controller as `current_membership`), or null; its `next_membership` is the renewal
+ * made in advance, or null.
  */
 class ProviderCompanyResource extends JsonResource
 {
@@ -28,6 +29,13 @@ class ProviderCompanyResource extends JsonResource
                 'plan_name' => $membership->plan?->translate('name'),
                 'seats' => $membership->seats,
                 'current_period_end' => $membership->current_period_end?->toIso8601String(),
+                'auto_renew' => $membership->auto_renew,
+                'renewal_stop_reason' => $membership->renewal_stop_reason?->value,
+                'renewal_stop_reason_label' => $membership->renewal_stop_reason?->label(),
+                'next_membership' => $this->next_membership === null ? null : [
+                    'current_period_start' => $this->next_membership->current_period_start->toIso8601String(),
+                    'current_period_end' => $this->next_membership->current_period_end->toIso8601String(),
+                ],
             ],
             'members' => $this->whenLoaded('members', fn () => $this->members->map(fn ($member) => [
                 'id' => $member->id,

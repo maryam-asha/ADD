@@ -50,6 +50,7 @@ class PlanAssignmentHandler implements ProviderRequestHandler
                 seats: (int) $payload['seats'],
                 overrideCapacity: (bool) ($overrides['override_capacity'] ?? false),
                 auditProperties: ['provider_request_id' => $request->id, 'payer' => $payload['payer']],
+                attributes: ['auto_renew' => (bool) ($payload['auto_renew'] ?? false)],
             );
         } catch (SeatPoolExhaustedException) {
             throw new ProviderRequestException('api.membership.seat_pool_full');

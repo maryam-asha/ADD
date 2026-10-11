@@ -6,6 +6,7 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Http\Controllers\Api\V1\Provider\Concerns\ActsForProvider;
 use App\Http\Controllers\Controller;
@@ -60,6 +61,9 @@ class ProviderCompanyController extends Controller
 
     private function attachMembership(Company $company): void
     {
-        $company->setAttribute('current_membership', $this->memberships->activeForOwner(OwnerType::Company, $company->id));
+        $current = $this->memberships->activeForOwner(OwnerType::Company, $company->id);
+
+        $company->setAttribute('current_membership', $current);
+        $company->setAttribute('next_membership', $current === null ? null : Membership::query()->where('renewed_from_id', $current->id)->first());
     }
 }

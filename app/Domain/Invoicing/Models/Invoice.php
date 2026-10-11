@@ -7,6 +7,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Leasing\Models\OfficeLeasePeriod;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -33,6 +34,7 @@ class Invoice extends Model
         'billed_to',
         'provider_request_id',
         'office_lease_period_id',
+        'membership_id',
         'description',
         'points',
         'currency',
@@ -85,6 +87,12 @@ class Invoice extends Model
     public function providerRequest(): BelongsTo
     {
         return $this->belongsTo(ProviderRequest::class);
+    }
+
+    /** The renewal subscription this invoice bills (a renewal's own source). */
+    public function membership(): BelongsTo
+    {
+        return $this->belongsTo(Membership::class);
     }
 
     public function leasePeriod(): BelongsTo

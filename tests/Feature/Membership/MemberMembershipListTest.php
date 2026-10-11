@@ -156,6 +156,25 @@ class MemberMembershipListTest extends TestCase
             ->assertJsonPath('data', []);
     }
 
+    public function test_a_renewal_made_ahead_is_upcoming_and_filterable(): void
+    {
+        $live = $this->membership(OwnerType::Company, $this->company->id, '2026-10-01 09:00', 30, 'Team');
+        $next = $this->membership(OwnerType::Company, $this->company->id, '2026-10-31 09:00', 30, 'Team');
+
+        $this->getJson('/api/v1/member/memberships')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $next->id)
+            ->assertJsonPath('data.0.status', 'upcoming')
+            ->assertJsonPath('data.1.id', $live->id)
+            ->assertJsonPath('data.1.status', 'active');
+
+        $this->getJson('/api/v1/member/memberships?status=upcoming')
+            ->assertOk()->assertJsonPath('meta.total', 1)->assertJsonPath('data.0.id', $next->id);
+
+        $this->getJson('/api/v1/member/memberships?status=expired')
+            ->assertOk()->assertJsonPath('meta.total', 0);
+    }
+
     public function test_bad_filters_are_refused(): void
     {
         $this->getJson('/api/v1/member/memberships?status=cancelled&via=team')

@@ -5,6 +5,7 @@ namespace App\Domain\Invoicing\Services;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Data\InvoiceDraft;
 use App\Domain\Invoicing\Data\InvoiceQuote;
@@ -14,6 +15,7 @@ use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Leasing\Enums\LeasePeriodStatus;
 use App\Domain\Leasing\Models\OfficeLeasePeriod;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Enums\ProviderRequestType;
@@ -26,7 +28,7 @@ use App\Domain\Settings\Services\SettingService;
  * (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md):
  * points priced in the reviewer's currency at today's rate, due after the
  * provider's terms or the default. The draft is source-agnostic; each
- * source gets a thin wrapper (issueForProviderRequest, issueForLeasePeriod).
+ * source gets a thin wrapper (issueForProviderRequest, issueForLeasePeriod, issueForMembershipRenewal).
  */
 class InvoiceIssuer
 {
@@ -170,6 +172,38 @@ class InvoiceIssuer
         $period->update(['status' => LeasePeriodStatus::Invoiced]);
 
         return $invoice;
+    }
+
+    /**
+     * Bills a renewal subscription: its plan's price today × its seats, in
+     * $currency (the previous invoice's; null = base), to $billedTo, for the
+     * company's current provider. Null for a free plan. The caller owns
+     * the transaction (MembershipRenewalService::renew()).
+     */
+    public function issueForMembershipRenewal(Membership $renewal, Payer $billedTo, ?string $currency, ?User $issuer): ?Invoice
+    {
+        $renewal->loadMissing('plan');
+        $points = (int) $renewal->plan->price_points * $renewal->seats;
+
+        if ($points <= 0) {
+            return null;
+        }
+
+        $company = Company::query()->findOrFail($renewal->owner_id);
+
+        return $this->issue(new InvoiceDraft(
+            companyId: $company->id,
+            providerId: $company->provider_id,
+            billedTo: $billedTo,
+            points: $points,
+            description: sprintf(
+                'Plan renewal: %s × %d seats, %d days',
+                $renewal->plan->translate('name', 'en'),
+                $renewal->seats,
+                (int) $renewal->plan->duration_days,
+            ),
+            source: ['membership_id' => $renewal->id],
+        ), new InvoiceTerms(currency: $currency), $issuer);
     }
 
     /** @return array{0: int, 1: string} */
