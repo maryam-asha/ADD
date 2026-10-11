@@ -13,17 +13,29 @@ use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionEndRequestStatus;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SessionEndRequest;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Forms\Models\Form;
+use App\Domain\Forms\Models\FormAnswer;
+use App\Domain\Forms\Models\FormField;
 use App\Domain\Foundation\Enums\AllocationModel;
+use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
@@ -31,6 +43,8 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Foundation\Models\SpaceAmenity;
+use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Identity\Enums\CompanyStatus;
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Identity\Enums\ConsentType;
@@ -44,6 +58,14 @@ use App\Domain\Identity\Models\ErrorLog;
 use App\Domain\Identity\Models\OtpVerification;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\UserPersonalProfile;
+use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
+use App\Domain\Invoicing\Enums\InvoiceStatus;
+use App\Domain\Invoicing\Models\Invoice;
+use App\Domain\Invoicing\Models\InvoicePayment;
+use App\Domain\Leasing\Enums\LeasePeriodStatus;
+use App\Domain\Leasing\Enums\OfficeLeaseStatus;
+use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Leasing\Models\OfficeLeasePeriod;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -52,9 +74,27 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Pricing\Enums\CouponDiscountType;
+use App\Domain\Pricing\Enums\CouponRevisionAction;
+use App\Domain\Pricing\Enums\CouponSource;
+use App\Domain\Pricing\Enums\DiscountKind;
+use App\Domain\Pricing\Enums\PricingPurpose;
+use App\Domain\Pricing\Models\AppliedDiscount;
+use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Pricing\Models\CouponRevision;
+use App\Domain\Pricing\Models\CouponTarget;
+use App\Domain\Providers\Enums\Payer;
+use App\Domain\Providers\Enums\ProviderRequestStatus;
+use App\Domain\Providers\Enums\ProviderRequestType;
+use App\Domain\Providers\Enums\ProviderStatus;
+use App\Domain\Providers\Models\Provider;
+use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
+use App\Support\Enums\EventPaymentState;
+use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Forms\FieldType;
 use Tests\TestCase;
 
 /**
@@ -72,6 +112,10 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        EventAttendee::class => [
+            'status' => EventRegistrationStatus::class,
+            'payment_state' => EventPaymentState::class,
+        ],
         AccessGrant::class => [
             'grantee_type' => OwnerType::class,
             'source_type' => AccessSourceType::class,
@@ -92,12 +136,17 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
             'payment_method' => PaymentMethod::class,
+            'checked_in_via' => SessionStartSource::class,
         ],
         WalkinSession::class => [
+            'started_via' => SessionStartSource::class,
             'payment_state' => PaymentState::class,
             'payment_source' => PaymentSource::class,
             'termination_source' => TerminationSource::class,
             'payment_method' => PaymentMethod::class,
+        ],
+        SessionEndRequest::class => [
+            'status' => SessionEndRequestStatus::class,
         ],
         Space::class => [
             'space_type' => SpaceType::class,
@@ -107,6 +156,13 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Resource::class => [
             'category' => ResourceCategory::class,
             'status' => OperationalStatus::class,
+        ],
+        SpaceTypeAmenity::class => [
+            'space_type' => SpaceType::class,
+            'amenity' => AmenityType::class,
+        ],
+        SpaceAmenity::class => [
+            'amenity' => AmenityType::class,
         ],
         BusinessHour::class => [
             'day_of_week' => DayOfWeek::class,
@@ -118,8 +174,31 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
             'source' => ExchangeRateSuggestionSource::class,
             'status' => ExchangeRateSuggestionStatus::class,
         ],
+        Coupon::class => [
+            'source' => CouponSource::class,
+            'discount_type' => CouponDiscountType::class,
+        ],
+        CouponRevision::class => [
+            'action' => CouponRevisionAction::class,
+            'discount_type' => CouponDiscountType::class,
+        ],
+        CouponTarget::class => [
+            'purpose' => PricingPurpose::class,
+            'space_type' => SpaceType::class,
+        ],
+        AppliedDiscount::class => [
+            'purpose' => PricingPurpose::class,
+            'discount_type' => CouponDiscountType::class,
+            'kind' => DiscountKind::class,
+        ],
+        Payment::class => [
+            'status' => PaymentStatus::class,
+            'purpose' => PaymentPurpose::class,
+            'collected_via' => PaymentMethod::class,
+        ],
         PrivateOfficeRequest::class => [
             'status' => PrivateOfficeRequestStatus::class,
+            'payer' => Payer::class,
         ],
         ErrorLog::class => [
             'platform' => ErrorLogPlatform::class,
@@ -155,6 +234,36 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Setting::class => [
             'scope_type' => SettingScope::class,
             'type' => SettingValueType::class,
+        ],
+        Form::class => [
+            'purpose' => FormPurpose::class,
+        ],
+        FormField::class => [
+            'type' => FieldType::class,
+        ],
+        FormAnswer::class => [
+            'field_type' => FieldType::class,
+        ],
+        Provider::class => [
+            'status' => ProviderStatus::class,
+        ],
+        ProviderRequest::class => [
+            'type' => ProviderRequestType::class,
+            'status' => ProviderRequestStatus::class,
+        ],
+        Invoice::class => [
+            'status' => InvoiceStatus::class,
+            'billed_to' => Payer::class,
+        ],
+        InvoicePayment::class => [
+            'method' => InvoicePaymentMethod::class,
+        ],
+        OfficeLease::class => [
+            'status' => OfficeLeaseStatus::class,
+            'billed_to' => Payer::class,
+        ],
+        OfficeLeasePeriod::class => [
+            'status' => LeasePeriodStatus::class,
         ],
     ];
 

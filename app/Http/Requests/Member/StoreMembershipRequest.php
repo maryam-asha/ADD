@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Member;
 
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Membership\Models\Plan;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 /**
  * Whether the actor may buy on behalf of *this* company at all
@@ -28,6 +30,16 @@ class StoreMembershipRequest extends FormRequest
         return [
             'plan_id' => ['required', 'integer', 'exists:plans,id'],
             'company_id' => ['nullable', 'integer', 'exists:companies,id'],
+            // Omitted: points, as before payment methods existed. Points or a
+            // card only — never cash: there is no subscription without
+            // payment (docs/decisions/unified-payments.md).
+            'payment_method' => ['nullable', 'string', Rule::in(array_values(array_intersect(
+                ['wallet', 'paymera'],
+                array_keys(app(PaymentMethodRegistry::class)->enabled()),
+            )))],
+            // A coupon is the member's own: not on a purchase for a company
+            // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md, D5).
+            'coupon_code' => ['nullable', 'string', 'max:40', 'prohibits:company_id'],
         ];
     }
 
@@ -57,6 +69,16 @@ class StoreMembershipRequest extends FormRequest
                 $validator->errors()->add(
                     'plan_id',
                     'This plan is no longer available.'
+                );
+            }
+
+            // A private plan is assigned by operations from the dashboard, never
+            // bought. Nobody can browse to one, so this is a defensive guard
+            // against a hand-crafted plan_id rather than a reachable flow.
+            if (! $plan->is_public) {
+                $validator->errors()->add(
+                    'plan_id',
+                    'This plan is not available for purchase.'
                 );
             }
         });

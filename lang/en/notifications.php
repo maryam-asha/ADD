@@ -83,6 +83,10 @@ return [
     ],
 
     'membership' => [
+        'desk_needed' => [
+            'title' => 'Dedicated desk to assign',
+            'body' => 'A member subscribed to :plan in the app and needs a desk assigned.',
+        ],
         'subscribed' => [
             'title' => 'Plan Activated',
             'body' => 'Your subscription to :plan_name is now active.',
@@ -149,6 +153,50 @@ return [
         'status_updated' => [
             'title' => 'Service Ticket Updated',
             'body' => 'Your ticket #:ticket_id status is now :status.',
+        ],
+    ],
+
+    'coworking' => [
+        'session_ended' => [
+            'title' => 'Session Ended',
+            'body' => 'Your session at :space has ended. Tap to see the report.',
+        ],
+    ],
+
+    'payment' => [
+        'received' => [
+            'title' => 'Payment Received',
+            'body' => 'Your payment for :purpose was received (:points points).',
+        ],
+        'expired' => [
+            'title' => 'Reserved Package Released',
+            'body' => 'The package you chose to pay for at reception was not paid in time and has been released.',
+        ],
+        'purposes' => [
+            'wallet_top_up' => 'a wallet top-up',
+            'plan_purchase' => 'a package',
+            'booking' => 'a booking',
+            'event_registration' => 'an event registration',
+            'coworking_session' => 'a coworking session',
+            'booking_extension' => 'a booking extension',
+        ],
+    ],
+
+    'event' => [
+        'payment_due' => [
+            'title' => 'Payment Due',
+            'body' => 'Your seat at :event is confirmed. Pay :points points before the event to be let in.',
+        ],
+    ],
+
+    'provider' => [
+        'request_approved' => [
+            'title' => 'Request approved',
+            'body' => 'Your request has been approved.',
+        ],
+        'request_rejected' => [
+            'title' => 'Request rejected',
+            'body' => 'Your request has been rejected.',
         ],
     ],
 

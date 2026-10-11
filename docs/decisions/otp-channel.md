@@ -49,3 +49,17 @@ asserts the `provider` enum stays `['whatsapp']` and that no file under
 `app/Services/Otp` names a carrier SMS channel. Scoped to that directory
 only — `mtn`/`syriatel` are legitimate `payment_methods.code` values from
 Phase 4 onward and must not be banned repo-wide.
+
+## Gateway (2026-09-24)
+
+The WhatsApp gateway is **Hala Sender** (`https://clientarea.hala-sender.com`),
+not the Meta Cloud API. It's wired as the `hala_sender` driver
+(`app/Services/Otp/Drivers/HalaSenderOtpProvider.php`), enabled with
+`OTP_DRIVER=hala_sender`, `HALA_SENDER_API_KEY` and `HALA_SENDER_DEVICE_ID`
+(the linked WhatsApp device). The WhatsApp body is `{whatsAppDeviceId, message,
+receivers[]}` (per the vendor's Swagger), not the SMS `{message, phoneNumbers}`.
+It needs the account's *WhatsApp* API key — an SMS key answers "No Provided
+Sender" — and a device that exists on that key, or it answers "device is not
+exist". The unused Meta `services.whatsapp` config was removed. Note
+that Hala Sender returns 404, not 401, when the API key is missing or
+invalid.

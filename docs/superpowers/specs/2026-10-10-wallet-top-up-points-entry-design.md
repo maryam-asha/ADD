@@ -79,6 +79,14 @@ such case would surface as a spurious 422.
 
 ## 4. API changes (ADDCore)
 
+> *Amended when merged with `feat/add-point-system` (2026-10-10):* that
+> branch had already made `ReceivedMoneyConverter::toPoints()` the one place
+> money becomes points (docs/decisions/unified-payments.md), so the request
+> verifies `points` with it and the `toBaseExact()`/`currencyToPoints()`
+> pair below was not kept. `amount` takes that branch's rules — a
+> plain-decimal regex plus `AmountFitsCurrency` (no more decimals than the
+> currency's `decimal_places`; SYP has 0) — in place of `decimal:0,2`.
+
 ### `GET admin/reception/wallet-balance` — additive
 
 Adds a `top_up` block: everything the dialog needs to convert locally.

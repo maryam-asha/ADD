@@ -2,519 +2,249 @@
 
 namespace Database\Seeders;
 
-use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Space;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanModule;
+use App\Domain\Membership\Models\ResourceType;
+use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Pricing\Models\CouponTarget;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
+/**
+ * The real plan catalog (price sheet of 2026-10-08), replacing the demo
+ * plans this seeder used to create — those live on as a test fixture,
+ * tests/Support/LegacyPlanCatalogSeeder.php.
+ *
+ * Prices are the sheet's USD × 10 (`point.rate_usd` = 0.10). Each plan is
+ * matched by its English name, so a re-run updates it in place; any plan not
+ * in this list is deleted, with its memberships and coupon targets — a
+ * development reset, refused in production when a plan to delete was ever
+ * subscribed to.
+ *
+ * How time is covered: a co-working session is absorbed only by a plan with
+ * an access window and a `space-hours` grant (PlanHourCoverageService). So
+ * every plan has both: the hour packages their 25 / 50 hours round the clock,
+ * the evening package 17:00–00:00, and the unlimited ones every hour of their
+ * period — a quota they cannot run out of.
+ *
+ * The "current discount" column is not stored: it is each plan's saving
+ * against a reference (PlanSavingCalculator) — the months against the same
+ * desk's monthly plan, the hour packages and the day against the Hot Desk's
+ * hourly rate (the day as 8 hours), the week against seven days.
+ */
 class PlanSeeder extends Seeder
 {
+    private const HOT_DESK = 'flexi_desk';
+
+    private const FULL_DAY = ['00:00', '00:00'];
+
+    private const EVENING = ['17:00', '00:00'];
+
     public function run(): void
     {
-        $plans = [
-            [
-                'id' => 1,
-                'plan_module_id' => 1,
-                'name' => [
-                    'en' => 'The Smart Starter',
-                    'ar' => 'ذا سمارت ستارتر',
-                ],
-                'subtitle' => [
-                    'en' => 'Perfect for individuals getting started with flexible hours.',
-                    'ar' => 'مثالية للأفراد الراغبين ببداية مرنة وبساعات محددة.',
-                ],
-                'is_subscription' => true,
-                'price_points' => 500,
-                'duration_days' => 30,
-                'included_hours' => 8.00,
-                'overage_rate_points' => 30,
-                'is_active' => true,
-                'order' => 1,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 200,
-                        'description' => ['en' => 'Café Balance', 'ar' => 'رصيد الكافيه'],
-                        'order' => 1,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::PrintingInternet,
-                        'amount_points' => 150,
-                        'description' => ['en' => 'Printing & Internet Balance', 'ar' => 'رصيد الطباعة والإنترنت'],
-                        'order' => 2,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '8 Days per month', 'ar' => '8 أيام شهرياً'],
-                        'value' => ['en' => '8 Days', 'ar' => '8 أيام'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Hot Desk', 'ar' => 'وصول إلى مكتب مشترك'],
-                        'value' => null,
-                        'icon' => 'monitor',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
-                        'name' => ['en' => 'First access during reception hours', 'ar' => 'أول دخول خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                ],
+        $hotDeskSpace = Space::query()->where('space_type', SpaceType::CoSpace)->orderBy('id')->first();
+
+        // The Hot Desk's hourly rate is the sheet's 1.5 USD — what the hour
+        // packages and the day pass are compared against.
+        $hotDeskSpace?->forceFill(['hourly_rate_points' => 15])->save();
+
+        $kept = [];
+
+        foreach ($this->catalog() as $key => $data) {
+            $kept[$key] = $this->upsert($data, $kept, $hotDeskSpace);
+        }
+
+        $this->deleteAllBut(collect($kept)->map->id->values()->all());
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private function catalog(): array
+    {
+        $hot = fn (string $en, string $ar) => ['en' => "Hot Desk — {$en}", 'ar' => "مكتب مرن — {$ar}"];
+        $dedicated = fn (string $en, string $ar) => ['en' => "Dedicated Desk — {$en}", 'ar' => "مكتب مخصص — {$ar}"];
+
+        return [
+            'hours_25' => [
+                'module' => self::HOT_DESK, 'name' => ['en' => '25 Hours a Month', 'ar' => 'باقة ساعات شهرية 25 ساعة'],
+                'price' => 300, 'days' => 30, 'window' => self::FULL_DAY, 'hours' => 25, 'compare' => ['space', 25],
             ],
-            [
-                'id' => 2,
-                'plan_module_id' => 1,
-                'name' => [
-                    'en' => 'The Free Bird',
-                    'ar' => 'ذا فري بيرد',
-                ],
-                'subtitle' => [
-                    'en' => 'Designed for growing professionals needing more flexibility.',
-                    'ar' => 'مصممة للمحترفين مع مرونة أكبر في الحضور.',
-                ],
-                'is_subscription' => true,
-                'price_points' => 750,
-                'duration_days' => 30,
-                'included_hours' => 12.00,
-                'overage_rate_points' => 25,
-                'is_active' => true,
-                'order' => 2,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 300,
-                        'description' => ['en' => 'Café Balance', 'ar' => 'رصيد الكافيه'],
-                        'order' => 1,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::PrintingInternet,
-                        'amount_points' => 200,
-                        'description' => ['en' => 'Printing & Internet Balance', 'ar' => 'رصيد الطباعة والإنترنت'],
-                        'order' => 2,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '12 Days per month', 'ar' => '12 يوماً شهرياً'],
-                        'value' => ['en' => '12 Days', 'ar' => '12 يوماً'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Hot Desk', 'ar' => 'وصول إلى مكتب مشترك'],
-                        'value' => null,
-                        'icon' => 'monitor',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
-                        'name' => ['en' => 'First access during reception hours', 'ar' => 'أول دخول خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                ],
+            'hours_50' => [
+                'module' => self::HOT_DESK, 'name' => ['en' => '50 Hours a Month', 'ar' => 'باقة ساعات شهرية 50 ساعة'],
+                'price' => 500, 'days' => 30, 'window' => self::FULL_DAY, 'hours' => 50, 'compare' => ['space', 50],
             ],
-            [
-                'id' => 3,
-                'plan_module_id' => 1,
-                'name' => [
-                    'en' => 'The Happy Committer',
-                    'ar' => 'ذا هابي كوميتر',
-                ],
-                'subtitle' => [
-                    'en' => 'Full month access for everyday productive work.',
-                    'ar' => 'وصول كامل طوال الشهر لإنتاجية يومية مستمرة.',
-                ],
-                'is_subscription' => true,
-                'price_points' => 1100,
-                'duration_days' => 30,
-                'included_hours' => 25.00,
-                'overage_rate_points' => 20,
-                'is_active' => true,
-                'order' => 3,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 400,
-                        'description' => ['en' => 'Café Balance', 'ar' => 'رصيد الكافيه'],
-                        'order' => 1,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::PrintingInternet,
-                        'amount_points' => 250,
-                        'description' => ['en' => 'Printing & Internet Balance', 'ar' => 'رصيد الطباعة والإنترنت'],
-                        'order' => 2,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '1 month unlimited', 'ar' => 'شهر كامل غير محدود'],
-                        'value' => ['en' => '1 Month', 'ar' => 'شهر واحد'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Hot Desk', 'ar' => 'وصول إلى مكتب مشترك'],
-                        'value' => null,
-                        'icon' => 'monitor',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات ومساحات الفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
-                        'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                ],
+            'hot_daily' => [
+                'module' => self::HOT_DESK, 'name' => $hot('Daily', 'يومي'),
+                'price' => 60, 'days' => 1, 'window' => self::FULL_DAY, 'compare' => ['space', 8],
             ],
-            [
-                'id' => 4,
-                'plan_module_id' => 2,
-                'name' => [
-                    'en' => '1 Day Pass',
-                    'ar' => 'بطاقة يوم واحد',
-                ],
-                'subtitle' => [
-                    'en' => 'A dedicated desk for a full single day.',
-                    'ar' => 'مكتب مخصص ليوم كامل بجميع الخدمات.',
-                ],
-                'is_subscription' => false,
-                'price_points' => 220,
-                'duration_days' => 1,
-                'included_hours' => 8.00,
-                'overage_rate_points' => 0,
-                'is_active' => true,
-                'order' => 4,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 50,
-                        'description' => ['en' => 'Day Café Credit', 'ar' => 'رصيد كافيه يومي'],
-                        'order' => 1,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '1 Day pass', 'ar' => 'بطاقة يوم واحد'],
-                        'value' => ['en' => '1 Day', 'ar' => 'يوم واحد'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Dedicated Desk', 'ar' => 'وصول لمكتب مخصص'],
-                        'value' => null,
-                        'icon' => 'briefcase',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => 'First access during reception hours', 'ar' => 'أول دخول خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                ],
+            'hot_weekly' => [
+                'module' => self::HOT_DESK, 'name' => $hot('Weekly', 'أسبوعي'),
+                'price' => 350, 'days' => 7, 'window' => self::FULL_DAY, 'compare' => ['hot_daily', 7],
             ],
-            [
-                'id' => 5,
-                'plan_module_id' => 2,
-                'name' => [
-                    'en' => 'The Dedicated',
-                    'ar' => 'ذا ديديكيتد',
-                ],
-                'subtitle' => [
-                    'en' => 'Your personal permanent desk with private storage.',
-                    'ar' => 'مكتبك الخاص والدائم مع خزانة وقفل شخصي.',
-                ],
-                'is_subscription' => true,
-                'price_points' => 1990,
-                'duration_days' => 30,
-                'included_hours' => 10.00,
-                'overage_rate_points' => 20,
-                'is_active' => true,
-                'order' => 5,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 400,
-                        'description' => ['en' => 'Café Balance', 'ar' => 'رصيد الكافيه'],
-                        'order' => 1,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::PrintingInternet,
-                        'amount_points' => 250,
-                        'description' => ['en' => 'Printing & Internet Balance', 'ar' => 'رصيد الطباعة والإنترنت'],
-                        'order' => 2,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '1 Month access', 'ar' => 'وصول لمدة شهر'],
-                        'value' => ['en' => '1 Month', 'ar' => 'شهر واحد'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Dedicated Desk', 'ar' => 'وصول لمكتب مخصص'],
-                        'value' => null,
-                        'icon' => 'briefcase',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to Locker', 'ar' => 'خزانة شخصية'],
-                        'value' => null,
-                        'icon' => 'lock',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
-                        'name' => ['en' => '30% on Meeting Rooms and Event Spaces', 'ar' => 'خصم 30% على غرف الاجتماعات والفعاليات'],
-                        'value' => ['en' => '30%', 'ar' => '30%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                    [
-                        'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 7,
-                    ],
-                ],
+            'hot_monthly' => [
+                'module' => self::HOT_DESK, 'name' => $hot('Monthly', 'شهري'),
+                'price' => 1250, 'days' => 30, 'window' => self::FULL_DAY,
             ],
-            [
-                'id' => 6,
-                'plan_module_id' => 2,
-                'name' => [
-                    'en' => 'The Dedicated +',
-                    'ar' => 'ذا ديديكيتد بلس',
-                ],
-                'subtitle' => [
-                    'en' => 'Premium dedicated desk with printing quotas and meeting room hours.',
-                    'ar' => 'مكتب مخصص مميز مع حصص طباعة وساعات غرف اجتماعات مجانية.',
-                ],
-                'is_subscription' => true,
-                'price_points' => 2500,
-                'duration_days' => 30,
-                'included_hours' => 8.00,
-                'overage_rate_points' => 15,
-                'is_active' => true,
-                'order' => 6,
-                'balances' => [
-                    [
-                        'category' => WalletTransactionCategory::Cafe,
-                        'amount_points' => 500,
-                        'description' => ['en' => 'Café Balance', 'ar' => 'رصيد الكافيه'],
-                        'order' => 1,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::PrintingInternet,
-                        'amount_points' => 350,
-                        'description' => ['en' => 'Printing & Internet Balance', 'ar' => 'رصيد الطباعة والإنترنت'],
-                        'order' => 2,
-                    ],
-                    [
-                        'category' => WalletTransactionCategory::SpaceSpecific,
-                        'amount_points' => 80,
-                        'description' => ['en' => 'Meeting Room Hours', 'ar' => 'ساعات غرف الاجتماعات'],
-                        'order' => 3,
-                    ],
-                ],
-                'features' => [
-                    [
-                        'name' => ['en' => '1 Month access', 'ar' => 'وصول لمدة شهر'],
-                        'value' => ['en' => '1 Month', 'ar' => 'شهر واحد'],
-                        'icon' => 'calendar',
-                        'is_included' => true,
-                        'order' => 1,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to a Dedicated Desk', 'ar' => 'وصول لمكتب مخصص'],
-                        'value' => null,
-                        'icon' => 'briefcase',
-                        'is_included' => true,
-                        'order' => 2,
-                    ],
-                    [
-                        'name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'],
-                        'value' => null,
-                        'icon' => 'wifi',
-                        'is_included' => true,
-                        'order' => 3,
-                    ],
-                    [
-                        'name' => ['en' => 'Unlimited Coffee', 'ar' => 'قهوة غير محدودة'],
-                        'value' => null,
-                        'icon' => 'coffee',
-                        'is_included' => true,
-                        'order' => 4,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to Locker', 'ar' => 'خزانة شخصية'],
-                        'value' => null,
-                        'icon' => 'lock',
-                        'is_included' => true,
-                        'order' => 5,
-                    ],
-                    [
-                        'name' => ['en' => 'Printing: 100 B&W, 50 Colored', 'ar' => 'طباعة: 100 أبيض وأسود، 50 ملون'],
-                        'value' => ['en' => '100 B&W, 50 Colored', 'ar' => '100 أبيض وأسود، 50 ملون'],
-                        'icon' => 'printer',
-                        'is_included' => true,
-                        'order' => 6,
-                    ],
-                    [
-                        'name' => ['en' => 'Access to Meeting Rooms: 8 Hours, 50% on additional hours', 'ar' => 'غرف الاجتماعات: 8 ساعات، 50% على الساعات الإضافية'],
-                        'value' => ['en' => '8 Hours', 'ar' => '8 ساعات'],
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 7,
-                    ],
-                    [
-                        'name' => ['en' => '50% on Event Spaces', 'ar' => 'خصم 50% على مساحات الفعاليات'],
-                        'value' => ['en' => '50%', 'ar' => '50%'],
-                        'icon' => 'percent',
-                        'is_included' => true,
-                        'order' => 8,
-                    ],
-                    [
-                        'name' => ['en' => 'First access to ADD during reception hours', 'ar' => 'أول دخول إلى ADD خلال ساعات الاستقبال'],
-                        'value' => null,
-                        'icon' => 'clock',
-                        'is_included' => true,
-                        'order' => 9,
-                    ],
-                ],
+            'hot_evening' => [
+                'module' => self::HOT_DESK, 'name' => $hot('Evening Monthly (5 PM – 12 AM)', 'شهري مسائي من 5 إلى 12 ليلاً'),
+                'price' => 500, 'days' => 30, 'window' => self::EVENING,
+            ],
+            'hot_3_months' => [
+                'module' => self::HOT_DESK, 'name' => $hot('3 Months', '3 أشهر'),
+                'price' => 3000, 'days' => 90, 'window' => self::FULL_DAY, 'compare' => ['hot_monthly', 3],
+            ],
+            'hot_6_months' => [
+                'module' => self::HOT_DESK, 'name' => $hot('6 Months', '6 أشهر'),
+                'price' => 5500, 'days' => 180, 'window' => self::FULL_DAY, 'compare' => ['hot_monthly', 6],
+            ],
+            'hot_12_months' => [
+                'module' => self::HOT_DESK, 'name' => $hot('12 Months', '12 شهراً'),
+                'price' => 9000, 'days' => 360, 'window' => self::FULL_DAY, 'compare' => ['hot_monthly', 12],
+            ],
+            'dedicated_monthly' => [
+                'module' => PlanModule::DEDICATED_DESK, 'name' => $dedicated('Monthly', 'شهري'),
+                'price' => 1750, 'days' => 30, 'window' => self::FULL_DAY,
+            ],
+            'dedicated_3_months' => [
+                'module' => PlanModule::DEDICATED_DESK, 'name' => $dedicated('3 Months', '3 أشهر'),
+                'price' => 4500, 'days' => 90, 'window' => self::FULL_DAY, 'compare' => ['dedicated_monthly', 3],
+            ],
+            'dedicated_6_months' => [
+                'module' => PlanModule::DEDICATED_DESK, 'name' => $dedicated('6 Months', '6 أشهر'),
+                'price' => 8500, 'days' => 180, 'window' => self::FULL_DAY, 'compare' => ['dedicated_monthly', 6],
+            ],
+            'dedicated_12_months' => [
+                'module' => PlanModule::DEDICATED_DESK, 'name' => $dedicated('12 Months', '12 شهراً'),
+                'price' => 15000, 'days' => 360, 'window' => self::FULL_DAY, 'compare' => ['dedicated_monthly', 12],
             ],
         ];
+    }
 
-        foreach ($plans as $planData) {
-            $balances = $planData['balances'] ?? [];
-            $features = $planData['features'] ?? [];
-            unset($planData['balances'], $planData['features']);
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, Plan>  $seeded  the plans written so far, by key — a reference is always seeded before the plan naming it
+     */
+    private function upsert(array $data, array $seeded, ?Space $hotDeskSpace): Plan
+    {
+        [$compareTo, $units] = $data['compare'] ?? [null, null];
+        [$windowStart, $windowEnd] = $data['window'];
 
-            $plan = Plan::updateOrCreate(
-                ['id' => $planData['id']],
-                $planData
-            );
+        $plan = Plan::query()->where('name->en', $data['name']['en'])->first() ?? new Plan;
+        $plan->fill([
+            'plan_module_id' => PlanModule::query()->where('slug', $data['module'])->value('id'),
+            'name' => $data['name'],
+            'subtitle' => null,
+            'is_subscription' => true,
+            'price_points' => $data['price'],
+            'duration_days' => $data['days'],
+            'access_window_start' => $windowStart,
+            'access_window_end' => $windowEnd,
+            'reference_plan_id' => $compareTo !== null && $compareTo !== 'space' ? $seeded[$compareTo]->id : null,
+            'reference_space_id' => $compareTo === 'space' ? $hotDeskSpace?->id : null,
+            'reference_units' => $compareTo === 'space' && $hotDeskSpace === null ? null : $units,
+            'is_active' => true,
+            'is_public' => true,
+            'order' => count($seeded) + 1,
+        ])->save();
 
-            $plan->balances()->delete();
-            if (! empty($balances)) {
-                $plan->balances()->createMany($balances);
-            }
+        $hours = $data['hours'] ?? $this->hoursIn($data['days'], $windowStart, $windowEnd);
 
-            $plan->features()->delete();
-            if (! empty($features)) {
-                $plan->features()->createMany($features);
-            }
+        $plan->balances()->delete();
+        $plan->discounts()->delete();
+
+        $plan->resourceGrants()->delete();
+        $hourType = ResourceType::query()->where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->first();
+
+        if ($hourType !== null) {
+            $plan->resourceGrants()->create([
+                'resource_type_id' => $hourType->id,
+                'quantity' => $hours,
+                'description' => ['en' => "{$hours} desk hours", 'ar' => "{$hours} ساعة مكتب"],
+                'order' => 1,
+            ]);
         }
+
+        $plan->features()->delete();
+        $plan->features()->createMany($this->features($data, $hours));
+
+        return $plan;
+    }
+
+    /**
+     * Every hour the window opens over the period: a quota the plan cannot
+     * run out of.
+     */
+    private function hoursIn(int $days, string $start, string $end): int
+    {
+        $minutes = fn (string $time) => ((int) substr($time, 0, 2)) * 60 + (int) substr($time, 3, 2);
+        $open = $minutes($end) - $minutes($start);
+
+        return $days * intdiv($open > 0 ? $open : $open + 24 * 60, 60);
+    }
+
+    /**
+     * The basics only — the desk, how long or how many hours, the window, the
+     * internet. No café or printing balances and no room discounts until they
+     * are priced.
+     *
+     * @param  array<string, mixed>  $data
+     * @return list<array<string, mixed>>
+     */
+    private function features(array $data, int $hours): array
+    {
+        $dedicated = $data['module'] === PlanModule::DEDICATED_DESK;
+        $features = [[
+            'name' => $dedicated
+                ? ['en' => 'Your own Dedicated Desk', 'ar' => 'مكتب مخصص لك']
+                : ['en' => 'Access to a Hot Desk', 'ar' => 'وصول إلى مكتب مرن'],
+            'value' => null,
+            'icon' => $dedicated ? 'briefcase' : 'monitor',
+        ]];
+
+        $features[] = isset($data['hours'])
+            ? ['name' => ['en' => "{$hours} hours a month", 'ar' => "{$hours} ساعة شهرياً"], 'value' => ['en' => "{$hours} Hours", 'ar' => "{$hours} ساعة"], 'icon' => 'clock']
+            : ['name' => ['en' => "{$data['days']} days unlimited", 'ar' => "{$data['days']} يوماً بلا حدود"], 'value' => ['en' => "{$data['days']} Days", 'ar' => "{$data['days']} يوماً"], 'icon' => 'calendar'];
+
+        if ($data['window'] === self::EVENING) {
+            $features[] = ['name' => ['en' => 'Evenings from 5 PM to midnight', 'ar' => 'مساءً من 5 حتى 12 ليلاً'], 'value' => ['en' => '5 PM – 12 AM', 'ar' => '5 – 12 ليلاً'], 'icon' => 'clock'];
+        }
+
+        $features[] = ['name' => ['en' => 'Internet Access', 'ar' => 'إنترنت عالي السرعة'], 'value' => null, 'icon' => 'wifi'];
+
+        return array_map(
+            fn (array $feature, int $i) => $feature + ['is_included' => true, 'order' => $i + 1],
+            $features,
+            array_keys($features),
+        );
+    }
+
+    /**
+     * @param  list<int>  $keep
+     */
+    private function deleteAllBut(array $keep): void
+    {
+        $stale = Plan::query()->whereNotIn('id', $keep)->pluck('id');
+
+        if ($stale->isEmpty()) {
+            return;
+        }
+
+        if (app()->isProduction() && Membership::query()->whereIn('plan_id', $stale)->exists()) {
+            throw new RuntimeException('PlanSeeder will not delete plans members subscribed to in production: '.$stale->implode(', '));
+        }
+
+        DB::transaction(function () use ($stale) {
+            // Coupon targets restrict a plan's delete; memberships hold a
+            // plain FK. Everything under a membership cascades or is nulled.
+            CouponTarget::query()->whereIn('plan_id', $stale)->delete();
+            Plan::query()->whereIn('reference_plan_id', $stale)->update(['reference_plan_id' => null]);
+            Membership::query()->whereIn('plan_id', $stale)->delete();
+            Plan::query()->whereIn('id', $stale)->delete();
+        });
     }
 }

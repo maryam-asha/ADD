@@ -66,7 +66,7 @@ class KioskController extends Controller
     private function activePlans(): array
     {
         return Plan::query()
-            ->where('is_active', true)
+            ->publiclyListable()
             ->orderBy('order')
             ->get()
             ->map(fn (Plan $plan) => [
@@ -74,7 +74,6 @@ class KioskController extends Controller
                 'name' => $plan->translate('name'),
                 'price_points' => (int) $plan->price_points,
                 'duration_days' => $plan->duration_days,
-                'included_hours' => (string) $plan->included_hours,
             ])
             ->all();
     }

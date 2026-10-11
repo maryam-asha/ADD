@@ -159,11 +159,11 @@ class SessionClosureServiceTest extends TestCase
             'amount_owed' => '10.00',
         ]);
 
-        $this->closures->settlePayment($session, PaymentMethod::Sham, $operator);
+        $this->closures->settlePayment($session, PaymentMethod::Cash, $operator);
 
         $session->refresh();
         $this->assertSame(PaymentState::Paid, $session->payment_state);
-        $this->assertSame(PaymentMethod::Sham, $session->payment_method);
+        $this->assertSame(PaymentMethod::Cash, $session->payment_method);
         $this->assertTrue($session->paid_by === $operator->id);
         $this->assertNotNull($session->paid_at);
     }

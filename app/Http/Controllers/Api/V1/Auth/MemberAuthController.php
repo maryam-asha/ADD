@@ -8,6 +8,7 @@ use App\Domain\Identity\Models\PendingRegistration;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Providers\Services\CompanyInvitationAcceptor;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
@@ -17,6 +18,7 @@ use App\Http\Requests\Auth\RegisterVerifyRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\Exceptions\InvalidRefreshTokenException;
 use App\Services\Auth\TokenPairService;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
 use App\Services\Otp\OtpService;
@@ -50,25 +52,28 @@ class MemberAuthController extends Controller
         $phone = $request->validated('phone');
 
         try {
-            // One transaction so the parked profile and the live code are never
-            // out of step. A throttled request rolls the upsert back rather than
-            // leaving a profile the member has no code to unlock — and rather
-            // than letting an older code unlock a newer profile.
-            DB::transaction(function () use ($phone, $request) {
+            // The profile is parked in the same transaction as the code, so the
+            // two are never out of step, and a throttled request writes neither
+            // — no profile left without a code, and no older code unlocking a
+            // newer profile. The send itself happens after that transaction
+            // commits (see OtpService::request()).
+            $this->otp->request($phone, OtpPurpose::Registration, function () use ($phone, $request) {
                 PendingRegistration::updateOrCreate(['phone' => $phone], [
                     'name' => $request->validated('name'),
                     'email' => $request->validated('email'),
                     'password' => $request->validated('password'),
                     'expires_at' => now()->addMinutes(config('otp.expires_after_minutes')),
                 ]);
-
-                $this->otp->request($phone, OtpPurpose::Registration);
             });
         } catch (OtpThrottledException $e) {
             return response()->json([
                 'message' => __('api.auth.otp_request_throttled'),
                 'retry_after' => $e->retryAfterSeconds,
             ], 429);
+        } catch (OtpDeliveryFailedException) {
+            // The parked profile stays, so register/resend can retry the send
+            // without the member retyping everything; it expires on its own.
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 
         return response()->json(['message' => __('api.auth.otp_sent')]);
@@ -76,29 +81,38 @@ class MemberAuthController extends Controller
 
     /**
      * Resend the registration OTP for a phone that already has a pending
-     * registration parked by step one. The response is deliberately identical
-     * whether or not a usable pending entry exists — the same reason forgot()
-     * gives for not confirming account existence.
+     * registration parked by step one.
      *
-     * Unlike forgot(), a throttled resend is surfaced as 429: the caller
-     * already knows they are in the middle of sign-up, so a "wait N seconds"
-     * response costs nothing in information and lets the UI give useful feedback.
+     * "Sent" is only ever answered when a code actually went out. This used to
+     * answer 200 whether or not there was anything to resend, to avoid
+     * confirming which numbers have accounts — but register() already says
+     * so (phone_already_registered) and so does password/forgot
+     * (phone_not_found), so the silence hid nothing and only left members
+     * waiting for a code that was never sent.
      */
     public function resendRegistration(ForgotPasswordRequest $request): JsonResponse
     {
         $phone = $request->validated('phone');
 
+        if (User::where('phone', $phone)->exists()) {
+            return response()->json(['message' => __('api.auth.phone_already_registered')], 422);
+        }
+
         $pending = PendingRegistration::where('phone', $phone)->first();
 
-        if ($pending && $pending->isUsable()) {
-            try {
-                $this->otp->request($phone, OtpPurpose::Registration);
-            } catch (OtpThrottledException $e) {
-                return response()->json([
-                    'message' => __('api.auth.otp_request_throttled'),
-                    'retry_after' => $e->retryAfterSeconds,
-                ], 429);
-            }
+        if (! $pending || ! $pending->isUsable()) {
+            return response()->json(['message' => __('api.auth.registration_code_invalid')], 422);
+        }
+
+        try {
+            $this->otp->request($phone, OtpPurpose::Registration);
+        } catch (OtpThrottledException $e) {
+            return response()->json([
+                'message' => __('api.auth.otp_request_throttled'),
+                'retry_after' => $e->retryAfterSeconds,
+            ], 429);
+        } catch (OtpDeliveryFailedException) {
+            return response()->json(['message' => __('api.auth.otp_send_failed')], 503);
         }
 
         return response()->json(['message' => __('api.auth.otp_sent')]);
@@ -178,6 +192,10 @@ class MemberAuthController extends Controller
                 'owner_type' => OwnerType::User,
                 'owner_id' => $user->id,
             ]);
+
+            // A provider's client company may already be waiting for this
+            // phone (docs/decisions/service-providers.md).
+            app(CompanyInvitationAcceptor::class)->acceptFor($user);
 
             // The sign-up is no longer pending. Dropped in the same transaction
             // that creates the account, so the two states can never both exist.

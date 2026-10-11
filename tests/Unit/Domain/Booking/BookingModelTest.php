@@ -41,7 +41,7 @@ class BookingModelTest extends TestCase
         $booking = Booking::factory()->create([
             'payment_state' => PaymentState::Paid,
             'payment_source' => PaymentSource::Cash,
-            'payment_method' => PaymentMethod::Sham,
+            'payment_method' => PaymentMethod::Cash,
             'paid_by' => $operator->id,
             'paid_at' => now(),
             'amount_owed' => '12.50',
@@ -50,7 +50,7 @@ class BookingModelTest extends TestCase
 
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(PaymentSource::Cash, $booking->payment_source);
-        $this->assertSame(PaymentMethod::Sham, $booking->payment_method);
+        $this->assertSame(PaymentMethod::Cash, $booking->payment_method);
         $this->assertSame('12.50', (string) $booking->amount_owed);
     }
 }

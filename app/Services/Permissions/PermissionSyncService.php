@@ -3,7 +3,15 @@
 namespace App\Services\Permissions;
 
 use App\Http\Controllers\Api\V1\Admin\AdminResourceController;
+use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
+use App\Http\Controllers\Api\V1\Admin\InvoiceController;
+use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
+use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
+use App\Http\Controllers\Api\V1\Admin\PaymentController;
+use App\Http\Controllers\Api\V1\Admin\ProviderController;
+use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
+use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -52,6 +60,44 @@ class PermissionSyncService
         ],
         SettingController::class => [
             'settings' => ['view', 'update'],
+        ],
+        // Card payments. `reverse` is the only one actually enforced as a
+        // permission today (routes/api/v1/admin.php) — reversing moves real
+        // money at the bank, so it gets a granular grant rather than riding
+        // on role:admin|operations like the listing does. `view` is
+        // registered alongside it so a custom role can be given read-only
+        // access to the ledger once the pilot widens.
+        PaymentController::class => [
+            'payments' => ['view', 'reverse'],
+        ],
+        // Provider invoicing - each action its own grant, so recording money
+        // can be given to accounts staff without the right to void or cancel.
+        InvoiceController::class => [
+            'invoices' => ['view', 'cancel'],
+        ],
+        InvoicePaymentController::class => [
+            'invoices' => ['record_payment', 'void_payment'],
+        ],
+        // Service providers (docs/decisions/service-providers.md). Every
+        // route is permission-gated, so the decision on a provider request
+        // can be given to operations, or any custom role, from the roles
+        // screen.
+        ProviderController::class => [
+            'providers' => ['view', 'create', 'update', 'status'],
+        ],
+        ProviderUserController::class => [
+            'providers' => ['update'],
+        ],
+        CompanyProviderController::class => [
+            'providers' => ['transfer_company'],
+        ],
+        ProviderRequestController::class => [
+            'provider-requests' => ['view', 'approve', 'reject'],
+        ],
+        // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+        // Ending a lease early is its own grant.
+        OfficeLeaseController::class => [
+            'office-leases' => ['view', 'create', 'terminate'],
         ],
     ];
 

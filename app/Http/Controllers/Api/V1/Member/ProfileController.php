@@ -5,25 +5,30 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Domain\Identity\Models\UserPersonalProfile;
 use App\Domain\Identity\Models\UserProfessionalProfile;
 use App\Domain\Identity\Services\ProfileCompletionService;
+use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateProfileRequest;
 use App\Http\Resources\MemberProfileResource;
+use App\Support\Presenters\PriceLabelPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings): MemberProfileResource
+    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings, WalletService $wallets, PriceLabelPresenter $prices): JsonResponse
     {
         $user = $request->user();
 
-        return (new MemberProfileResource($user))->additional([
-            'completion' => [
-                'score' => $completion->score($user),
-                'threshold' => $settings->get('profile.completion_threshold', 80),
-                'missing_fields' => $completion->missingFields($user),
+        return response()->json([
+            'data' => [
+                'user' => new MemberProfileResource($user),
+                'points_label' => $prices->pointsLabel($wallets->personalGeneralBalance($user)),
+                'completion' => [
+                    'score' => $completion->score($user),
+                    'threshold' => $settings->get('profile.completion_threshold', 80),
+                ],
             ],
         ]);
     }

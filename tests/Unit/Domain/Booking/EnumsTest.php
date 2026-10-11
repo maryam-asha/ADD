@@ -14,7 +14,8 @@ class EnumsTest extends TestCase
 {
     public function test_booking_status_cases(): void
     {
-        $this->assertSame(['confirmed', 'cancelled', 'pending', 'rejected'], array_column(BookingStatus::cases(), 'value'));
+        // Lifecycle order (docs/decisions/booking-outcomes-and-extension.md).
+        $this->assertSame(['awaiting_payment', 'pending', 'confirmed', 'completed', 'no_show', 'rejected', 'cancelled'], array_column(BookingStatus::cases(), 'value'));
     }
 
     public function test_payment_state_cases(): void
@@ -24,7 +25,11 @@ class EnumsTest extends TestCase
 
     public function test_payment_source_cases(): void
     {
-        $this->assertSame(['wallet', 'cash'], array_column(PaymentSource::cases(), 'value'));
+        // `plan` marks a walk-in absorbed in full by the member's plan access
+        // window, where nothing was collected at all
+        // (docs/decisions/plan-access-windows.md). `gateway` is a card (or
+        // any other gateway) payment made from the app.
+        $this->assertSame(['wallet', 'cash', 'plan', 'gateway'], array_column(PaymentSource::cases(), 'value'));
     }
 
     public function test_termination_source_cases(): void
@@ -32,9 +37,18 @@ class EnumsTest extends TestCase
         $this->assertSame(['reception', 'auto'], array_column(TerminationSource::cases(), 'value'));
     }
 
+    /**
+     * Cash at the desk and a card through Paymera — the only two. sham,
+     * mtn and syriatel were planned but never used, and were removed.
+     * `paymera` is not taken by hand, which is why a wallet transaction
+     * carrying it has no `performed_by_user_id`.
+     */
     public function test_payment_method_cases(): void
     {
-        $this->assertSame(['cash', 'sham', 'mtn', 'syriatel'], array_column(PaymentMethod::cases(), 'value'));
+        $this->assertSame(
+            ['cash', 'paymera'],
+            array_column(PaymentMethod::cases(), 'value')
+        );
     }
 
     public function test_wallet_transaction_source_gained_a_refund_case(): void

@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Domain\Foundation\Enums\AllocationModel;
+use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
@@ -14,6 +15,8 @@ use App\Domain\Foundation\Models\Floor;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Foundation\Models\SpaceAmenity;
+use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Foundation\Models\Zone;
 use Illuminate\Database\Seeder;
 
@@ -90,11 +93,13 @@ class SpaceSeeder extends Seeder
                 'space_type' => SpaceType::CoSpace,
             ],
             [
+                'name' => ['en' => 'Hot Desk', 'ar' => 'مكتب مرن'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::Open,
                 'is_lockable' => false,
-                'capacity' => 1,
-                'hourly_rate_points' => 30,
+                // Recounted from its desks below (SeatDesk).
+                'capacity' => 0,
+                'hourly_rate_points' => 15, // 1.5 USD (price sheet, 2026-10-08)
                 'cancellation_window_minutes' => 60,
                 'slot_granularity_minutes' => 60,
                 'buffer_minutes' => 0,
@@ -110,10 +115,10 @@ class SpaceSeeder extends Seeder
         ]);
 
         for ($i = 1; $i <= 10; $i++) {
-            SeatDesk::query()->firstOrCreate([
-                'space_id' => $hotDesk->id,
-                'label' => sprintf('Desk %02d', $i),
-            ]);
+            SeatDesk::query()->firstOrCreate(
+                ['space_id' => $hotDesk->id, 'code' => sprintf('D-%02d', $i)],
+                ['label' => sprintf('Desk %02d', $i)],
+            );
         }
 
         // --- Space 2: Meeting Room A ---
@@ -124,6 +129,7 @@ class SpaceSeeder extends Seeder
                 'capacity' => 6,
             ],
             [
+                'name' => ['en' => 'Meeting Room A', 'ar' => 'غرفة الاجتماعات أ'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
@@ -150,6 +156,7 @@ class SpaceSeeder extends Seeder
                 'capacity' => 2,
             ],
             [
+                'name' => ['en' => 'Private Office 3', 'ar' => 'مكتب خاص ٣'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingHourly,
                 'is_lockable' => true,
@@ -174,6 +181,7 @@ class SpaceSeeder extends Seeder
                 'space_type' => SpaceType::EventHall,
             ],
             [
+                'name' => ['en' => 'Event Hall', 'ar' => 'قاعة الفعاليات'],
                 'zone_id' => $zone->id,
                 'allocation_model' => AllocationModel::BookingDaily,
                 'is_lockable' => true,
@@ -192,6 +200,54 @@ class SpaceSeeder extends Seeder
             ['name' => 'Laser Projector', 'category' => ResourceCategory::Projector, 'quantity' => 1],
             ['name' => 'Audio System & Microphones', 'category' => ResourceCategory::Mic, 'quantity' => 2],
         ]);
+
+        // 7. Type -> amenity config matrix (admin-editable default starting
+        // point — see AmenityType/SpaceTypeAmenity), then turn on every
+        // amenity applicable to each demo space's own type. Keyed by the
+        // enum's string value, not the enum case itself — PHP array keys
+        // can't be enum instances.
+        $amenityMatrix = [
+            SpaceType::CoSpace->value => [
+                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::ErgonomicChairs,
+                AmenityType::Printing, AmenityType::Locker, AmenityType::CafeAccess,
+            ],
+            SpaceType::Room->value => [
+                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac, AmenityType::CafeAccess,
+            ],
+            SpaceType::Business->value => [
+                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac,
+                AmenityType::Locker, AmenityType::CafeAccess,
+            ],
+            SpaceType::EventHall->value => [
+                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac,
+                AmenityType::CafeAccess, AmenityType::Stage,
+            ],
+        ];
+
+        foreach ($amenityMatrix as $typeValue => $amenities) {
+            foreach ($amenities as $amenity) {
+                SpaceTypeAmenity::query()->firstOrCreate([
+                    'space_type' => SpaceType::from($typeValue),
+                    'amenity' => $amenity,
+                ]);
+            }
+        }
+
+        $spacesByType = [
+            SpaceType::CoSpace->value => $hotDesk,
+            SpaceType::Room->value => $meetingRoom,
+            SpaceType::Business->value => $privateOffice,
+            SpaceType::EventHall->value => $eventHall,
+        ];
+
+        foreach ($spacesByType as $typeValue => $space) {
+            foreach ($amenityMatrix[$typeValue] as $amenity) {
+                SpaceAmenity::query()->firstOrCreate([
+                    'space_id' => $space->id,
+                    'amenity' => $amenity,
+                ]);
+            }
+        }
     }
 
     /**

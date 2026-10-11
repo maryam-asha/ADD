@@ -16,10 +16,11 @@ class MemberProfileResource extends JsonResource
     {
         $account = (new UserResource($this->resource))->toArray($request);
 
-        // A member doesn't need their own Spatie roles echoed back — unlike
+        // A member doesn't need their own Spatie roles or permissions echoed back — unlike
         // UserResource's other consumer (the shared /auth/me, used by the ops
         // dashboard for user management), this endpoint is member-only.
         unset($account['roles']);
+        unset($account['permissions']);
 
         return array_merge(
             $account,

@@ -225,6 +225,17 @@ class WalletService
     }
 
     /**
+     * generalBalance() of `$user`'s personal wallet — 0 when they have none
+     * yet, rather than creating one just to read it.
+     */
+    public function personalGeneralBalance(User $user): int
+    {
+        $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $user->id)->first();
+
+        return $wallet === null ? 0 : $this->generalBalance($wallet);
+    }
+
+    /**
      * Unlocked read of the general (never-expiring) point balance — for
      * display and receipts. Debits use lockedGeneralBalance() instead.
      */
@@ -239,6 +250,62 @@ class WalletService
             ->get();
 
         return $this->sumAmounts($transactions);
+    }
+
+    /**
+     * Unlocked read of what `$user` may spend from `$wallet` in `$category`
+     * alone — the category side of debit()'s choice, before it falls back
+     * to general. For display and for reporting a shortfall; debits lock
+     * instead.
+     */
+    public function categoryBalance(Wallet $wallet, User $user, WalletTransactionCategory $category): int
+    {
+        return $this->eligibleBalance($wallet, $user, $category);
+    }
+
+    /**
+     * Unlocked read of what `$user` may spend from `$wallet` in each
+     * category, General first — the wallet screen's balances. Every
+     * category is listed, empty or not, so a client can rely on the keys.
+     *
+     * @return array<string, int> category value => points
+     */
+    public function balances(Wallet $wallet, User $user): array
+    {
+        $balances = [];
+
+        foreach (WalletTransactionCategory::cases() as $category) {
+            $balances[$category->value] = $this->eligibleBalance($wallet, $user, $category);
+        }
+
+        return $balances;
+    }
+
+    /**
+     * The balance of `$transaction`'s own pool (its category, as `$user`
+     * may spend it) the moment the row was written — the "balance after"
+     * of a receipt; subtract the row's amount for "before". Rows are
+     * append-only, so the pool then is every eligible row up to this one,
+     * less credits that had already expired by that moment.
+     */
+    public function balanceAfter(WalletTransaction $transaction, User $user): int
+    {
+        $transactions = WalletTransaction::query()
+            ->where('wallet_id', $transaction->wallet_id)
+            ->where('category', $transaction->category)
+            ->where('id', '<=', $transaction->id)
+            ->where(function ($query) use ($transaction) {
+                $query->whereNull('expires_at')->orWhere('expires_at', '>', $transaction->created_at);
+            })
+            ->with('allowedUsers')
+            ->get();
+
+        $eligible = $transactions->filter(
+            fn (WalletTransaction $row) => $row->allowedUsers->isEmpty()
+                || $row->allowedUsers->contains('id', $user->id)
+        );
+
+        return $this->sumAmounts($eligible);
     }
 
     /**
@@ -403,7 +470,9 @@ class WalletService
         $categoryBalance = $this->eligibleBalance($wallet, $user, $category);
         $generalBalance = $this->eligibleBalance($wallet, $user, WalletTransactionCategory::General);
 
-        $usableBalance = $categoryBalance > 0 ? $categoryBalance : $generalBalance;
+        // What debit() can actually spend: it tries the category first and
+        // falls back to general for the whole amount when that falls short.
+        $usableBalance = max($categoryBalance, $generalBalance);
 
         if ($usableBalance <= 0) {
             return null;

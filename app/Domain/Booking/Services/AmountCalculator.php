@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\ValueObjects\RateSegment;
 use App\Domain\Foundation\Models\Space;
 use Carbon\CarbonInterface;
 
@@ -26,21 +27,36 @@ class AmountCalculator
     {
         $rate = $space->hourly_rate_points;
 
-        if ($rate === null || $rate <= 0) {
+        if ($rate === null) {
             return 0;
         }
 
-        $seconds = (int) $start->diffInSeconds($end);
+        return $this->forSegments([new RateSegment((int) $start->diffInSeconds($end), (int) $rate)]);
+    }
 
-        if ($seconds <= 0) {
-            return 0;
+    /**
+     * Several stretches at their own rates — a range part of which falls in
+     * an offer, at an exact rate such as 13.5 — summed exactly and rounded
+     * up once over the whole, so a partial point is never charged twice. A
+     * stretch with no time or no rate costs nothing.
+     *
+     * @param  list<RateSegment>  $segments
+     */
+    public function forSegments(array $segments): int
+    {
+        $points = '0';
+
+        foreach ($segments as $segment) {
+            if ($segment->seconds <= 0 || bccomp($segment->rate, '0', 2) <= 0) {
+                continue;
+            }
+
+            $points = bcadd($points, bcmul((string) $segment->seconds, $segment->rate, 2), 2);
         }
 
-        $points = bcmul((string) $seconds, (string) $rate);
-
+        // Seconds × rate is point-seconds: divided by 3600 once, rounded up once.
         $whole = bcdiv($points, (string) self::SECONDS_PER_HOUR, 0);
-        $remainder = bcmod($points, (string) self::SECONDS_PER_HOUR);
 
-        return (int) (bccomp($remainder, '0') > 0 ? bcadd($whole, '1') : $whole);
+        return (int) (bccomp($points, bcmul($whole, (string) self::SECONDS_PER_HOUR, 2), 2) > 0 ? bcadd($whole, '1') : $whole);
     }
 }

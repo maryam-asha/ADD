@@ -12,7 +12,23 @@ namespace App\Domain\Finance\Enums;
 enum PaymentMethod: string
 {
     case Cash = 'cash';
-    case Sham = 'sham';
-    case Mtn = 'mtn';
-    case Syriatel = 'syriatel';
+
+    /**
+     * Card via Paymera eGate — the one method here that is NOT taken by a
+     * human at the till. It is recorded on the resulting wallet transaction
+     * the same way the others are, so a point credit always says how the
+     * money arrived; `performed_by_user_id` stays null, because nobody did.
+     */
+    case Paymera = 'paymera';
+
+    /**
+     * What reception may record as the way money reached the desk: cash.
+     * A card is paid by the member through Paymera, never entered by hand.
+     *
+     * @return list<self>
+     */
+    public static function atReception(): array
+    {
+        return [self::Cash];
+    }
 }

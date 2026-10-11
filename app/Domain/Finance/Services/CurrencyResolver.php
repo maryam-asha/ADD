@@ -27,6 +27,6 @@ class CurrencyResolver
             return $header;
         }
 
-        return $user?->preferred_currency ?? Currency::query()->where('is_base', true)->value('code');
+        return $user?->preferred_currency ?? Currency::baseCode();
     }
 }

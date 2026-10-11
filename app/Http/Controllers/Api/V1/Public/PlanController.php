@@ -20,6 +20,6 @@ class PlanController extends PublicResourceController
 
     protected function scopeQuery(Builder $query): Builder
     {
-        return $query->where('is_active', true)->orderBy('order');
+        return $query->publiclyListable()->orderBy('order');
     }
 }

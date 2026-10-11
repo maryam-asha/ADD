@@ -4,12 +4,17 @@ namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\SpaceCoworkingWindow;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\WalkInCapacityService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -52,7 +57,7 @@ class WalkInCapacityServiceTest extends TestCase
         $space = $this->openSpace(2);
         $member = User::factory()->create();
 
-        $session = $this->capacity->start($space, $member);
+        $session = $this->capacity->start($space, $member)->session;
 
         $this->assertInstanceOf(WalkinSession::class, $session);
         $this->assertTrue($session->checked_in_at->equalTo(now()));
@@ -65,7 +70,7 @@ class WalkInCapacityServiceTest extends TestCase
         $space = $this->openSpace(null);
 
         $this->capacity->start($space, User::factory()->create());
-        $second = $this->capacity->start($space, User::factory()->create());
+        $second = $this->capacity->start($space, User::factory()->create())->session;
 
         $this->assertInstanceOf(WalkinSession::class, $second);
     }
@@ -113,9 +118,98 @@ class WalkInCapacityServiceTest extends TestCase
             'checked_out_at' => now()->subMinutes(10),
         ]);
 
-        $session = $this->capacity->start($space, User::factory()->create());
+        $session = $this->capacity->start($space, User::factory()->create())->session;
 
         $this->assertInstanceOf(WalkinSession::class, $session);
+    }
+
+    // ------------------------------------------------------------------
+    // The co-working seat pool (docs/decisions/coworking-seat-pool.md)
+    // ------------------------------------------------------------------
+
+    private function coSpace(int $capacity): Space
+    {
+        $space = Space::factory()->create(['capacity' => $capacity]);
+        BusinessHour::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'day_of_week' => DayOfWeek::Monday,
+            'open_time' => '08:00',
+            'close_time' => '20:00',
+        ]);
+
+        return $space;
+    }
+
+    private function assertNoCapacity(Space $space, User $member): void
+    {
+        try {
+            $this->capacity->start($space, $member);
+            $this->fail('Expected no capacity.');
+        } catch (ReceptionActionException $e) {
+            $this->assertSame('api.reception.no_capacity', $e->messageKey);
+        }
+    }
+
+    /** Every seat is held, but this one is theirs: they sit in it. */
+    public function test_a_subscriber_gets_in_when_the_pool_is_full_of_held_seats(): void
+    {
+        $space = $this->coSpace(1);
+        $member = User::factory()->create();
+        Membership::factory()->create(['owner_id' => $member->id, 'branch_id' => $space->building->branch_id]);
+
+        $session = $this->capacity->start($space, $member)->session;
+
+        $this->assertTrue($session->seat_covered);
+    }
+
+    public function test_a_walk_in_without_a_held_seat_is_refused_when_the_pool_is_full(): void
+    {
+        $space = $this->coSpace(1);
+        Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+
+        $this->assertNoCapacity($space, User::factory()->create());
+    }
+
+    /** A company's two seats cover two of its people; the third needs a free one. */
+    public function test_a_company_beyond_its_seats_needs_a_free_pool_seat(): void
+    {
+        $space = $this->coSpace(2);
+        $company = Company::factory()->create(['branch_id' => $space->building->branch_id]);
+        Membership::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id, 'seats' => 2]);
+        $people = User::factory()->count(3)->create()->each(fn (User $user) => $company->members()->attach($user->id));
+
+        $this->assertTrue($this->capacity->start($space, $people[0])->session->seat_covered);
+        $this->assertTrue($this->capacity->start($space, $people[1])->session->seat_covered);
+        $this->assertNoCapacity($space, $people[2]);
+    }
+
+    /** Outside their plan's hours the seat is not held, so they need a free one. */
+    public function test_a_subscriber_outside_their_plan_hours_needs_a_free_seat(): void
+    {
+        $space = $this->coSpace(1);
+        $member = User::factory()->create();
+        Membership::factory()->create([
+            'owner_id' => $member->id,
+            'branch_id' => $space->building->branch_id,
+            'plan_id' => Plan::factory()->evening()->create()->id,
+        ]);
+        WalkinSession::factory()->create(['space_id' => $space->id]);
+
+        $this->assertNoCapacity($space, $member);
+    }
+
+    /** A room lent to co-working takes walk-ins into the pool's seats. */
+    public function test_a_walk_in_to_a_room_lent_to_co_working_draws_on_the_pool(): void
+    {
+        $space = $this->coSpace(1);
+        Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+        $room = Space::factory()->room()->create(['building_id' => $space->building_id, 'capacity' => 8]);
+        SpaceCoworkingWindow::factory()->create([
+            'space_id' => $room->id, 'starts_at' => now()->subHour(), 'ends_at' => now()->addHours(3), 'seats' => 1,
+        ]);
+
+        $this->assertFalse($this->capacity->start($room, User::factory()->create())->session->seat_covered);
+        $this->assertNoCapacity($room, User::factory()->create());
     }
 
     public function test_starting_a_walk_in_outside_business_hours_fails(): void

@@ -27,27 +27,40 @@ class WalkInSessionController extends Controller
         $member = User::findOrFail($request->validated('user_id'));
 
         try {
-            $session = $capacity->start($space, $member);
+            $result = $capacity->start($space, $member);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
+        $session = $result->session;
+
         $this->logSensitiveAction('walkin_session_started', $session);
 
-        return response()->json([
+        $payload = [
             'data' => [
                 'id' => $session->id,
                 'space_id' => $session->space_id,
                 'user_id' => $session->user_id,
                 'checked_in_at' => $session->checked_in_at->toIso8601String(),
+                // Machine-readable, because `message` alone is ambiguous here:
+                // everywhere else in this API it accompanies a 4xx.
+                'plan_applies' => $result->planApplies,
             ],
-        ], 201);
+        ];
+
+        // A caveat on a success, not an error — the session did start. Same
+        // message-beside-data shape as BookingController::storeBatch().
+        if ($result->noticeKey !== null) {
+            $payload['message'] = __($result->noticeKey);
+        }
+
+        return response()->json($payload, 201);
     }
 
     public function checkOut(CheckOutSessionRequest $request, WalkinSession $walkinSession, SessionClosureService $closures): JsonResponse
     {
         try {
-            $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at')));
+            $closures->closeOut($walkinSession, Carbon::parse($request->validated('checked_out_at'), 'UTC'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

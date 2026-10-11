@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\ReactivateAccountRequest;
 use App\Http\Requests\Auth\ReactivateAccountVerifyRequest;
 use App\Http\Resources\UserResource;
 use App\Services\Auth\TokenPairService;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
 use App\Services\Otp\OtpService;
@@ -54,6 +55,10 @@ class AccountReactivationController extends Controller
                 $this->otp->request($phone, OtpPurpose::AccountReactivation);
             } catch (OtpThrottledException) {
                 // Intentionally indistinguishable from the success path.
+            } catch (OtpDeliveryFailedException) {
+                // Also swallowed: a 503 only members could trigger would
+                // reveal which numbers have an account. The member simply
+                // asks again — no cooldown was started.
             }
         }
 

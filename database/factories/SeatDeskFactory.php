@@ -21,7 +21,8 @@ class SeatDeskFactory extends Factory
         return [
             'space_id' => Space::factory(),
             'qr_point_id' => null,
-            'label' => 'D-'.fake()->unique()->numberBetween(1, 999),
+            'code' => 'D-'.fake()->unique()->numberBetween(1, 99999),
+            'label' => 'Desk '.fake()->numberBetween(1, 999),
         ];
     }
 }

@@ -3,15 +3,19 @@
 namespace App\Domain\Services\Models;
 
 use App\Concerns\HasTranslations;
+use App\Domain\Forms\Concerns\InteractsWithForms;
+use App\Domain\Forms\Contracts\HasForms;
+use App\Domain\Forms\Enums\FormPurpose;
 use App\Domain\Services\Enums\RequestMethod;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 
-class ServiceType extends Model
+class ServiceType extends Model implements HasForms
 {
-    use HasTranslations;
+    use HasTranslations, InteractsWithForms;
 
     protected $fillable = [
         'service_axis_id',
@@ -33,16 +37,16 @@ class ServiceType extends Model
     protected function casts(): array
     {
         return [
-            'name'                    => 'array',
-            'description'             => 'array',
-            'is_active'               => 'boolean',
-            'is_coming_soon'          => 'boolean',
-            'requires_location'       => 'boolean',
-            'requires_review'         => 'boolean',
-            'request_method'          => RequestMethod::class,
-            'request_config'          => 'array',
+            'name' => 'array',
+            'description' => 'array',
+            'is_active' => 'boolean',
+            'is_coming_soon' => 'boolean',
+            'requires_location' => 'boolean',
+            'requires_review' => 'boolean',
+            'request_method' => RequestMethod::class,
+            'request_config' => 'array',
             'allowed_plan_module_ids' => 'array',
-            'order'                   => 'integer',
+            'order' => 'integer',
         ];
     }
 
@@ -53,9 +57,10 @@ class ServiceType extends Model
         return $this->belongsTo(ServiceAxis::class, 'service_axis_id');
     }
 
-    public function fields(): HasMany
+    /** The questions a member answers when filing a request of this type. */
+    public function requestForm(): MorphOne
     {
-        return $this->hasMany(ServiceTypeField::class)->orderBy('order');
+        return $this->form(FormPurpose::Request);
     }
 
     public function requests(): HasMany

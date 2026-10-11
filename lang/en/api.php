@@ -5,6 +5,8 @@ return [
     'auth' => [
         'otp_request_throttled' => 'Too many requests. Please wait before requesting a new code.',
         'otp_sent' => 'Verification code sent.',
+        'otp_send_failed' => 'We could not send the verification code right now. Please try again.',
+        'otp_message' => 'Your ADD verification code is :code. It expires in :minutes minutes. Do not share it with anyone.',
         'registration_code_invalid' => 'Invalid or expired code. Please start signing up again.',
         'account_already_exists' => 'An account already exists for this number or email. Please log in instead.',
         'phone_already_registered' => 'This number already has an account. Please log in instead.',
@@ -37,6 +39,31 @@ return [
         'insufficient_balance_for_plan' => 'Insufficient general balance to purchase this plan.',
         'min_points' => 'A top-up must be at least :min points.',
         'quote_stale' => 'Rates changed since this top-up was prepared. Review the new figures and submit again.',
+        'top_up_below_minimum' => 'The minimum top-up is :amount :currency (:points points).',
+
+        // The member's wallet history (WalletTransactionPresenter): what
+        // each row was, and the pool it moved.
+        'kinds' => [
+            'booking' => 'Booking',
+            'booking_extension' => 'Booking extension',
+            'coworking_session' => 'Coworking session',
+            'event_registration' => 'Event registration',
+            'plan_purchase' => 'Package purchase',
+            'top_up' => 'Wallet top-up',
+            'payment_received' => 'Payment received',
+            'refund' => 'Refund',
+            'reversal' => 'Card payment reversed',
+            'subscription_grant' => 'Package points',
+            'gift' => 'Gift points',
+            'company_allocation' => 'Company allocation',
+            'spend' => 'Payment',
+        ],
+        'categories' => [
+            'general' => 'General balance',
+            'cafe' => 'Café balance',
+            'printing_internet' => 'Printing & internet balance',
+            'space_specific' => 'Space balance',
+        ],
     ],
 
     'system' => [
@@ -47,10 +74,28 @@ return [
     ],
 
     'validation' => [
+        'amount_must_be_whole' => 'An amount in :currency must be a whole number, with no decimals.',
+        'amount_too_precise' => 'An amount in :currency can have at most :decimals decimal places.',
+        'reserved_field_key' => '":key" is taken from the member account and cannot be a form field.',
+        'vocabulary_not_an_object' => 'Validation settings must be an object.',
+        'constraint_not_allowed_for_type' => '":key" is not a setting a :type field accepts.',
+        'constraint_must_be_boolean' => '":key" must be true or false.',
+        'constraint_must_be_whole' => '":key" must be a whole number.',
+        'constraint_below_minimum' => '":key" must be at least :min.',
+        'constraint_must_be_numeric' => '":key" must be a number.',
+        'constraint_must_be_a_date' => '":key" must be a date in YYYY-MM-DD form.',
+        'constraint_not_a_real_date' => '":date" is not a real calendar date.',
+        'constraint_unknown_pattern' => '":key" must be one of: :patterns.',
+        'constraint_must_be_text' => '":key" must be text.',
+        'constraint_range_inverted' => '":min" must not be greater than ":max".',
+        'amenity_not_available_for_space_type' => '":amenity" is not an available amenity for this space type.',
+        'registration_closes_after_start' => 'Registration must close no later than the event starts (:start).',
+        'registration_closes_before_it_opens' => 'Registration must close after it opens.',
         'failed' => 'The given data is invalid.',
     ],
 
     'member' => [
+        'company_admin_requested' => 'Your request has been sent for approval.',
         'currency_preference_updated' => 'Currency preference updated.',
         'language_preference_updated' => 'Language preference updated.',
         'profile_updated' => 'Profile updated.',
@@ -68,15 +113,36 @@ return [
     ],
 
     'admin' => [
+        'provider_status_updated' => 'Provider status updated.',
+        'company_provider_updated' => "The company's provider was changed.",
+        'provider_updated' => 'Provider updated.',
+        'provider_user_linked' => 'The account now works for this provider.',
+        'provider_user_unlinked' => 'The account no longer works for this provider.',
+        'provider_user_not_provider_role' => 'Only an account with the provider role can work for a provider.',
+        'provider_user_taken' => 'This account already works for a provider.',
+        'provider_request_approved' => 'Request approved.',
+        'provider_request_rejected' => 'Request rejected.',
         'branch_updated' => 'Branch updated.',
         'building_updated' => 'Building updated.',
         'floor_updated' => 'Floor updated.',
         'zone_updated' => 'Zone updated.',
         'space_updated' => 'Space updated.',
+        'co_space_has_desks' => 'This co-working space has desks; move or delete them before changing its type.',
+        'plan_reference_units_without_reference' => 'Reference units need a reference plan or space.',
+        'plan_reference_self' => 'A plan cannot be its own reference.',
+        'plan_reference_one_kind' => 'A plan is measured against one reference: a plan or a space, not both.',
+        'co_space_desks_held' => 'Some of this space\'s desks belong to live Dedicated Desk subscriptions.',
+        'co_space_exists' => 'This branch already has a co-working space; add desks to it instead.',
+        'coupon_updated' => 'Coupon updated.',
+        'coupon_target_invalid' => 'A coupon target names at most one item, and one its purpose can be bought with: a plan for a plan purchase, a space or space type for time in a space, an event for a registration.',
         'space_status_updated' => 'Space status updated.',
+        'space_amenities_updated' => 'Space amenities updated.',
+        'space_type_amenities_updated' => 'Amenities updated.',
         'resource_updated' => 'Resource updated.',
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
+        'seat_desk_code_taken' => 'Another desk in this branch already has this code.',
+        'seat_desk_held' => 'This desk belongs to a live Dedicated Desk subscription.',
         'device_updated' => 'Device updated.',
         'device_qr_value_regenerated' => 'The device QR value has been regenerated.',
         'device_not_a_lock' => 'Only lock devices have a QR value.',
@@ -86,6 +152,13 @@ return [
         'contact_link_updated' => 'Contact link updated.',
         'plan_updated' => 'Plan updated.',
         'plan_module_updated' => 'Plan module updated.',
+        'membership_activated' => 'Membership activated.',
+        'membership_already_active' => 'This member or company already has an active membership.',
+        'membership_plan_not_subscription' => 'This plan is a one-time package, not a subscription, and cannot be activated as a membership.',
+        'membership_plan_inactive' => 'This plan is no longer available.',
+        'membership_seats_user_owner' => 'A member\'s own subscription holds exactly one seat; seats are for company subscriptions.',
+        'plan_sale_company_inactive' => 'Cannot sell a plan to an inactive company.',
+        'resource_type_updated' => 'Resource type updated.',
         'event_category_updated' => 'Event category updated.',
         'event_updated' => 'Event updated.',
         'community_member_updated' => 'Community member updated.',
@@ -107,6 +180,7 @@ return [
         'exchange_rate_suggestion_not_pending' => 'Only a pending suggestion can be dismissed.',
         'role_updated' => 'Role updated.',
         'inquiry_updated' => 'Inquiry updated.',
+        'kiosk_updated' => 'Kiosk updated.',
     ],
 
     'public' => [
@@ -118,6 +192,7 @@ return [
         'protected_delete' => 'This role cannot be deleted.',
         'role_in_use' => 'This role is currently assigned to one or more users. Reassign them before deleting it.',
         'member_out_of_scope' => "Member accounts don't participate in the admin permission system; the member role can't be assigned any admin-panel permissions.",
+        'provider_out_of_scope' => "Provider accounts don't participate in the admin permission system; the provider role can't be assigned any admin-panel permissions.",
     ],
 
     'access' => [
@@ -137,6 +212,10 @@ return [
         'exchange_rates_block_reassignment' => 'Cannot reassign the base currency while exchange rate history exists.',
     ],
 
+    'resource_type' => [
+        'in_use' => 'This resource type is granted by one or more plans. Deactivate it instead of deleting it.',
+    ],
+
     'reception' => [
         'checked_in' => 'Checked in.',
         'checked_out' => 'Checked out.',
@@ -148,30 +227,139 @@ return [
         'already_paid' => 'This booking or session has already been paid.',
         'outside_business_hours' => 'This action is not available outside business hours.',
         'no_capacity' => 'This space has no available capacity right now.',
+        'outside_plan_window' => "This session is outside your plan's hours and will be charged at the standard rate.",
+        'plan_hours_exhausted' => 'Your plan hours are used up, so the remaining time is charged at the standard rate.',
         'not_checked_in' => 'This session has not been checked in yet.',
         'checkout_before_checkin' => 'The checkout time cannot be before the check-in time.',
         'checkout_past_closing' => "The checkout time cannot be after the branch's closing time.",
         'not_yet_checked_out' => 'This booking or session must be checked out before payment can be settled.',
         'cancellation_window_passed' => 'This booking is past its cancellation window.',
+        'no_active_membership' => 'This member or company has no active membership.',
+        'resource_grant_not_found' => 'The active plan does not grant a quota for this resource type.',
+        'resource_quota_insufficient' => 'The requested quantity exceeds what remains of this resource quota.',
+        'member_already_in_session' => 'This member already has an active coworking session.',
+    ],
+
+    // Weekday names, for labels built from the weekly schedule
+    // ("Saturday, Monday – Thursday").
+    'weekdays' => [
+        'saturday' => 'Saturday',
+        'sunday' => 'Sunday',
+        'monday' => 'Monday',
+        'tuesday' => 'Tuesday',
+        'wednesday' => 'Wednesday',
+        'thursday' => 'Thursday',
+        'friday' => 'Friday',
     ],
 
     'booking' => [
         'invalid_start_time' => "The start time does not match this space's slot granularity.",
         'duration_too_short' => 'The booking duration is shorter than the minimum allowed.',
+        'too_soon' => 'This time is too soon to book. Please choose a later start.',
+        'too_far_ahead' => 'This date is too far ahead to book yet.',
+        'space_not_bookable' => 'This space is not available for booking right now.',
+        'duration_not_offered' => 'This duration is not available for this space.',
         'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
         'slot_unavailable' => 'This space is not available for the requested time.',
+        'room_in_coworking_mode' => 'This room is part of the co-working space at that time, so it cannot be booked as a room.',
+        'office_leased' => 'This office is leased to a company on that date, so it cannot be booked.',
         'buffer_conflict' => 'This booking is too close to another booking on this space.',
         'wallet_choice_required' => 'More than one wallet can cover this booking. Please choose one.',
+        'booking_mismatch' => 'These details do not match the booking being paid. Start the booking again.',
         'not_pending' => 'This booking is not awaiting approval.',
         'rejection_reason_required' => 'A rejection reason is required.',
         'approved' => 'Booking approved.',
         'rejected' => 'Booking rejected.',
         'invalid_extension_duration' => 'The extension duration does not meet the minimum duration or granularity requirements.',
         'extension_conflict' => 'This booking cannot be extended past :latest_end_at.',
+        'extension_past_closing' => 'This booking cannot be extended past the branch closing at :latest_end_at.',
+        'extension_not_allowed' => 'Bookings on this space cannot be extended.',
+        'extension_outside_booking_time' => 'A booking can only be extended while it is running.',
+        'extension_seat_room_closes' => 'The room you are seated in returns from co-working at :latest_end_at, and no other co-working seat is free after it.',
+        'extension_reasons' => [
+            'space_disallows' => 'Bookings on this space cannot be extended.',
+            'not_checked_in' => 'You can extend only while you are checked in.',
+            'outside_booking_time' => 'You can extend only while your booking is running.',
+            'next_slot_booked' => 'The next time slot is already booked, so your booking cannot be extended.',
+            'branch_closing' => 'The branch closes when your booking ends, so it cannot be extended.',
+            'seat_room_closes' => 'The room you are seated in stops serving co-working when your booking ends, and no other seat is free.',
+        ],
         'extended' => 'Booking extended.',
+        'extended_seat_moved' => 'Booking extended. The room you were seated in returns from co-working, so please move to :place.',
         'wallet_not_owned' => 'You are not authorized to spend from that wallet.',
         'check_in_requires_approval' => 'This booking must be approved before it can be checked in.',
         'check_in_rejected' => 'This booking was rejected and cannot be checked in.',
+        'check_in_no_show' => 'This booking ended without a check-in and can no longer be checked in.',
+        'check_in_ended' => 'This booking has already ended and can no longer be checked in.',
+        'check_in_awaiting_payment' => 'This booking is waiting for its payment. Take the payment first, then check it in.',
+        'check_in_too_early' => 'Check-in opens 15 minutes before the booking starts.',
+        'not_cancellable' => 'This booking has already been closed and cannot be cancelled.',
+        'lapsed_unreviewed' => 'Your request was not reviewed before it started, so it was closed automatically.',
+
+        // Availability calendar. `slot_in_past` and `space_at_capacity`
+        // are the two slot states the write path has no error for — a past
+        // slot is simply never offered, and a co_space at its ceiling is a
+        // capacity refusal rather than an overlap one.
+        'slot_in_past' => 'This time has already passed.',
+        'space_at_capacity' => 'This space is fully booked for the requested time.',
+        'branch_closed_on_date' => ':branch is closed on this date.',
+        'choose_another_day' => 'Choose another day.',
+        'branch_hours_title' => ':branch Hours',
+        'timezone_note' => 'All times shown in your local time (:offset)',
+
+        // Member booking lifecycle: list, detail, cancellation, preview.
+        'cancelled' => 'Booking cancelled.',
+        'not_your_booking' => 'This booking does not belong to you.',
+        'start_in_the_past' => 'A booking cannot start in the past.',
+        'batch_partially_unavailable' => 'Some of the selected dates are not available. Nothing was booked.',
+        'batch_created' => ':count bookings created.',
+        'cancellation_note' => 'You can cancel this booking up to :duration before the start time.',
+        // The list card's day and time lines.
+        'date_today' => 'Today, :date',
+        'date_tomorrow' => 'Tomorrow, :date',
+        'time_range' => ':start - :end (:duration)',
+        // The detail's cancel screen.
+        'cancel_until' => 'You can cancel this booking until :at.',
+        'refund_to_own_wallet' => 'Your wallet',
+        'refund_to_company_wallet' => 'Your company\'s wallet',
+        'points_amount' => ':points pts',
+        'vat_label' => 'VAT (:percent%)',
+        'hours_times_rate' => ':duration × :rate / hour',
+        'discount_label' => 'Discount (:percent%)',
+        'sale_label' => 'Offer',
+        'coupon_label' => 'Coupon (:code)',
+        'note_label' => 'Add a Note (Optional)',
+        'note_placeholder' => 'e.g. Meeting purpose, special requests…',
+        'statuses' => [
+            'awaiting_payment' => 'Awaiting Payment',
+            'confirmed' => 'Confirmed',
+            'pending' => 'Under Review',
+            'rejected' => 'Rejected',
+            'cancelled' => 'Cancelled',
+            'completed' => 'Completed',
+            'no_show' => 'Not Attended',
+        ],
+        // Shown under the status only where the money differs between two
+        // bookings with the same status.
+        'status_notes' => [
+            'refunded' => 'Your points were returned to your wallet.',
+            'payment_due' => 'You can pay from the app or at reception.',
+            'payment_not_completed' => 'Cancelled because the payment was not completed in time.',
+            'no_show_charged' => 'The points are not refunded because the booking was not cancelled before its deadline.',
+            'no_show_free' => 'Nothing is owed for this booking.',
+        ],
+        'steps' => [
+            'submitted' => 'Submitted',
+        ],
+        'payment_methods' => [
+            'wallet' => 'Use Wallet Balance',
+            'cash' => 'Pay Cash at Arrival',
+        ],
+        'tabs' => [
+            'upcoming' => 'Upcoming',
+            'past' => 'Past',
+            'all' => 'All',
+        ],
     ],
 
     'kiosk' => [
@@ -179,6 +367,49 @@ return [
         'space_id_required' => 'A space is required to confirm an unmatched arrival request.',
         'arrival_request_confirmed' => 'Arrival confirmed.',
         'arrival_request_rejected' => 'Arrival request rejected.',
+        'not_a_coworking_space' => 'A kiosk can only serve a coworking space.',
+        'invalid_pairing_code' => 'This pairing code is invalid or has expired.',
+        'secret_revoked' => 'The kiosk has been unpaired. Pair it again to use it.',
+    ],
+
+    // One group for both co-working features: rooms lent to co-working
+    // (docs/decisions/coworking-seat-pool.md) and self-service sessions
+    // (docs/decisions/coworking-self-service-sessions.md). A second
+    // 'coworking' key would silently replace this one.
+    'coworking' => [
+        'window_updated' => 'The co-working stretch was updated.',
+        'window_deleted' => 'The room is no longer lent to co-working for that stretch.',
+        'room_has_bookings' => 'This room has bookings in that stretch, so it cannot be lent to co-working then.',
+        'would_overbook' => 'Co-working seats are already counted on in that stretch; taking them back would overbook the co-working space.',
+        'not_a_room' => 'Only a room can be lent to co-working.',
+        'window_overlaps' => 'This room is already lent to co-working for part of that stretch.',
+        'window_in_past' => 'That stretch has already ended. Check the times, including AM/PM.',
+
+        'invalid_code' => 'This code is not valid. Scan the code currently shown on the kiosk.',
+        'ticket_expired' => 'This confirmation has expired. Scan the kiosk code again.',
+        'unavailable' => 'Coworking sessions are not available at this kiosk right now.',
+        'confirmation_required' => 'Your plan will not cover this session (:reason). It will be billed at :rate points per hour.',
+        'booking_awaiting_payment' => 'Your booking is waiting for its payment. Pay it in the app or at reception, then scan again.',
+        'booking_pending_approval' => 'Your booking is awaiting approval. Please see reception.',
+        'no_open_session' => 'You have no active session.',
+        'end_request_not_pending' => 'This end request is no longer pending.',
+        'end_request_cancelled' => 'End request withdrawn.',
+        'session_ended' => 'Session ended.',
+        'session_ended_paid' => 'Session ended and paid.',
+        'session_ended_unpaid' => 'Session ended. Payment is still due.',
+        'reasons' => [
+            'no_plan' => 'you have no active plan',
+            'plan_expired' => 'your plan has expired',
+            'plan_without_hours' => 'your plan does not include coworking hours',
+            'hours_exhausted' => "your plan's hours are used up",
+            'outside_window' => "it is outside your plan's hours",
+        ],
+        'report' => [
+            'time_so_far' => 'Time so far',
+            'time_from_plan' => 'Time covered by your plan',
+            'time_charged' => 'Charged time',
+            'unit_hour' => 'hour',
+        ],
     ],
 
     'notification' => [
@@ -194,6 +425,53 @@ return [
         'cash_register_already_closed' => 'This cash register session is already closed.',
     ],
 
+    // The shared form-field editor (AdminFormFieldController), for every
+    // form owner — events, service types, and whatever owns a form next.
+    'forms' => [
+        'field_updated' => 'Field updated.',
+        'field_deleted' => 'Field deleted.',
+    ],
+
+    'payment' => [
+        'no_balance' => 'No balance in your wallet',
+        'amount_short' => 'The amount received is short by :shortage :currency.',
+        'currency_unavailable' => 'This currency has no exchange rate yet.',
+        'registration_not_payable' => 'Only an approved registration for an event that is still on can be paid.',
+        // Shown to the member. Never mentions the gateway's own fault
+        // conditions (a rejected key, an unregistered server IP) — those are
+        // ours, and a member must not read them as their card being declined.
+        'gateway_unavailable' => 'Card payment is temporarily unavailable. Please try again shortly.',
+        'could_not_start' => 'We could not start the payment. Please try again.',
+        'plan_unavailable' => 'This package is not available for purchase.',
+        'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
+        'method_not_supported' => 'This payment method cannot be used for this.',
+        'already_paid' => 'This has already been paid.',
+        'booking_not_payable' => 'A cancelled, rejected or not-attended booking cannot be paid.',
+        'nothing_due' => 'There is nothing to pay.',
+        'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
+        'no_wallet' => 'There is no wallet to record this payment against.',
+        'not_refundable' => 'Only a settled payment made with points can be refunded.',
+        'payable_not_found' => 'We could not find what you are paying for.',
+        'not_settleable' => 'This payment can no longer be settled.',
+
+        // Admin-facing.
+        'not_reversible' => 'Only an accepted payment can be reversed.',
+        'reversal_failed' => 'The gateway rejected the reversal. Please check the payment at the bank before retrying.',
+        'reversed' => 'The payment has been reversed.',
+
+        // Names of the payment methods (config/payments.php), keyed by method.
+        'methods' => [
+            'wallet' => 'Wallet points',
+            'cash' => 'Cash at reception',
+            'paymera' => 'Paymera - Bank card',
+        ],
+
+        // Ledger descriptions — these land in the member's wallet history.
+        'credit_description' => 'Card payment :reference',
+        'reversal_description' => 'Reversal of card payment :reference',
+        'received_description' => 'Payment received',
+    ],
+
     'space' => [
         'browse_title' => 'Browse Spaces',
         'browse_subtitle' => 'Find and book the right workspace for your day.',
@@ -204,12 +482,19 @@ return [
             'maintenance' => 'Under Maintenance',
             'retired' => 'Retired',
         ],
-        'starting_from' => 'Starting from',
+        'types' => [
+            'event_hall' => 'Event Hall',
+            'room' => 'Meeting Room',
+            'space' => 'Space',
+        ],
+        'price_points' => ':points pts',
         'per_hour' => 'hour',
+        'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
         'per_day' => 'day',
         'up_to_people' => 'Up to :count people',
         'single_seat' => '1 seat',
-        'min_duration_note' => ':granularity-min start slots • Min. :min_duration',
         'book_this_space' => 'Book This Space',
         'person' => ':count person',
         'people' => ':count people',
@@ -223,9 +508,51 @@ return [
             'business' => 'Quiet, dedicated private office designed for maximum focus, confidentiality, comfort, and security.',
             'event_hall' => 'Spacious and versatile hall equipped with modern AV technology, ideal for conferences, large workshops, and gatherings.',
         ],
+        'amenities' => [
+            'wifi' => 'Wi-Fi',
+            'power_outlet' => 'Power Outlets',
+            'printing' => 'Printing Access',
+            'ergonomic_chairs' => 'Ergonomic Chairs',
+            'locker' => 'Locker',
+            'cafe_access' => 'Cafe Access',
+            'ac' => 'Air Conditioning',
+            'stage' => 'Stage',
+        ],
+    ],
+
+    'membership' => [
+        'desks_assigned' => 'Desks assigned.',
+        'desks_need_dedicated_plan' => 'Only a Dedicated Desk subscription is tied to desks.',
+        'desks_exceed_seats' => 'A subscription gets no more desks than the seats it holds.',
+        'desks_outside_branch' => 'Every desk must be in a co-working space of the subscription\'s branch.',
+        'desk_taken' => 'A desk is already held by another subscription during some of these hours and dates.',
+        'seat_pool_full' => 'Every co-working seat in this branch is already taken for part of this plan\'s period, so it cannot be subscribed to now.',
     ],
 
     'package' => [
+        'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
+        'saving_percent' => 'Save :percent%',
+        'saving_amount' => 'Save :amount',
+        'per_unit' => ':amount per :unit',
+        // The saving spelled out (saving_description): what you get, for
+        // what, against what, and what one unit comes to.
+        'saving_description' => "Get :quantity for :price (regular price :regular) — save :saving (:points). That's :per_unit:per.",
+        'saving_description_plain' => "Get it for :price (regular price :regular) — save :saving (:points). That's :per_unit per :unit.",
+        'saving_description_day' => 'Get a full day for :price (regular price :regular for :quantity) — save :saving (:points).',
+        'saving_quantity' => [
+            'hour' => '{1} 1 hour|[2,*] :count hours',
+            'day' => '{1} 1 day|[2,*] :count days',
+            'week' => '{1} 1 week|[2,*] :count weeks',
+            'month' => '{1} 1 month|[2,*] :count months',
+        ],
+        'saving_per' => [
+            'hour' => '/hour',
+            'day' => '/day',
+            'week' => '/week',
+            'month' => '/mo',
+        ],
         'title' => 'Packages & Subscription',
         'subtitle' => 'Choose the right plan for your business.',
         'tabs' => [
@@ -242,6 +569,11 @@ return [
         'benefits_title' => 'Plan Benefits',
         'expires_on' => 'Expires :date',
         'per_month' => 'mo',
+        'points_unit' => 'pts',
+        'billing_cycle' => 'Current cycle: :start – :end',
+        'usage_title' => 'Your Usage This Cycle',
+        'balance_rollover_notice' => 'Any granted balance ends with the billing cycle and does not roll over.',
+        'remaining_label' => ':amount remaining',
         'benefits' => [
             'cafe_access' => 'Café Access',
             'printing_credits' => 'Printing Credits',
@@ -252,12 +584,19 @@ return [
         'balances' => [
             'cafe' => 'Café Balance',
             'printing' => 'Printing Balance',
+            'meeting' => 'Meeting Room Hours',
+        ],
+        'units' => [
+            'hours' => 'hours',
         ],
         'tags' => [
             'cafe' => 'Café',
             'printing' => 'Printing',
             'meeting' => 'Meeting',
             'discounts' => 'Discounts',
+        ],
+        'discounts' => [
+            'default' => 'Save :percentage% on your bookings.',
         ],
         'subtitles' => [
             'starter' => 'Perfect for individuals and small teams.',
@@ -271,17 +610,27 @@ return [
         'request_not_found' => 'Service request not found.',
         'not_form_based' => 'This service does not accept form submissions.',
         'request_already_terminal' => 'This request is already closed and cannot be updated.',
+        'request_submitted' => ':service request submitted successfully.',
         'type_updated' => 'Service type updated.',
         'type_deleted' => 'Service type deleted.',
-        'field_updated' => 'Field updated.',
-        'field_deleted' => 'Field deleted.',
         'request_updated' => 'Request status updated.',
     ],
 
     'event' => [
+        'check_in_unpaid' => 'This registration has not been paid for yet.',
+        'check_in_not_approved' => 'Only an approved registration can be checked in.',
+        'already_checked_in' => 'This attendee has already been checked in.',
+        'checked_in' => 'Checked in.',
+        'form_is_internal' => 'This event already asks its own :count question(s). Remove them before sending registration to an external form.',
+        'form_is_external' => 'This event sends registration to an external form, so it has no questions of its own. Clear the link first.',
+        'registers_externally' => 'Registration for this event is handled on an external form.',
+        'pending_rejected' => 'Closed out :count pending registration(s).',
+        'pending_expired' => 'Closed automatically: not reviewed before the event.',
+        'prepayment_expired' => 'Your seat was released because the payment was not completed in time.',
         'cancelled' => 'This event is cancelled and registration is closed.',
         'not_available' => 'This event is currently not available for registration.',
         'closed' => 'Registration for this event has closed.',
+        'not_yet_open' => 'Registration for this event opens on :date.',
         'already_registered' => 'You are already registered for this event.',
         'full' => 'Sorry, this event is full. All seats are completely booked.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
@@ -289,6 +638,88 @@ return [
         'registration_success_points' => 'Successfully registered for the event. :points points deducted from your wallet.',
         'price_free' => 'Free',
         'price_points' => ':points pts',
+        'sale_ends' => 'Offer ends :date',
+        'sale_discount_percent' => ':percent% off',
+        'sale_discount_amount' => 'Save :amount',
+        'registration_pending' => 'Your registration has been submitted and is awaiting approval.',
+        'not_pending' => 'This registration is not awaiting approval.',
+        'rejection_reason_required' => 'A rejection reason is required.',
+        'registration_approved' => 'Registration approved.',
+        'registration_rejected' => 'Registration rejected.',
+        'approve_insufficient_points' => 'Cannot approve: the member has :current points but :required are required.',
+        'approval_would_exceed_capacity' => 'Cannot approve: the event is already full.',
+        'wallet_missing' => 'This member has no wallet.',
+        'approve_requires_member' => 'A paid registration can only be approved for a registered member.',
+        'identity_name' => 'Full name',
+        'identity_phone' => 'Phone number',
+        'identity_email' => 'Email',
+    ],
+
+    'coupon' => [
+        'valid' => 'This code is valid and can be used.',
+        'not_found' => 'This code is not valid.',
+        'not_started' => 'This code is not active yet.',
+        'expired' => 'This code has expired.',
+        'usage_limit_reached' => 'This code has reached its usage limit.',
+        'per_user_limit_reached' => 'You have already used this code as many times as it allows.',
+        'not_eligible' => 'This code is not available to your account.',
+        'new_members_only' => 'This code is for new members, on their first purchase.',
+        'not_applicable' => 'This code cannot be used on this purchase.',
+        'min_amount_not_met' => 'This code needs a purchase of at least :points points.',
+        'not_combinable' => 'This code cannot be combined with the current offer.',
+        'already_applied' => 'A code has already been applied to this.',
+        'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
+        'offer_is_better' => 'The current offer already gives you a lower price, so the code was not applied.',
+        'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
+        // "My coupons" asked about an item: how a code sits beside the offer there now.
+        'with_offer' => [
+            'stacks' => 'Adds on top of the current offer.',
+            'better_of_two' => 'Does not combine with the current offer; you get the better of the two.',
+            'code_is_better' => 'Better than the current offer.',
+            'offer_is_better' => 'The current offer is better than this code.',
+        ],
+    ],
+
+    // Service providers (docs/decisions/service-providers.md).
+    'provider' => [
+        'inactive' => 'This provider account is not active.',
+        'member_removed' => 'The employee was removed from the company.',
+        'company_unavailable' => 'This company is not one of yours, or it is not active.',
+        'plan_unavailable' => 'This plan cannot be assigned.',
+        'duplicate_request' => 'This has already been requested or done.',
+        'not_a_company_member' => 'This person is not an employee of the company.',
+        'already_company_admin' => 'This employee is already the company admin.',
+        'request_cancelled' => 'The request was cancelled.',
+        'request_not_pending' => 'This request has already been decided.',
+    ],
+
+    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+    'invoice' => [
+        'no_exchange_rate' => 'There is no exchange rate for :currency yet.',
+        'not_payable' => 'This invoice is paid or cancelled; it takes no payment.',
+        'overpayment' => 'That is more than what is left on this invoice (:remaining :currency).',
+        'has_payments' => 'This invoice has payments; void them before cancelling it.',
+        'already_cancelled' => 'This invoice is already cancelled.',
+        'payment_already_voided' => 'This payment is already voided.',
+        'amount_too_small' => 'The amount is too small to record.',
+        'cancelled' => 'Invoice cancelled.',
+        'payment_voided' => 'Payment voided.',
+        'too_many_decimals' => 'This currency takes at most :places decimal places.',
+    ],
+    'lease' => [
+        'request_not_quoted' => 'This request must be quoted before a lease can be made from it.',
+        'request_has_no_company' => 'This request is for a new company; create the company with its lease instead.',
+        'request_is_for_existing_company' => 'This request is for an existing company; create the lease from the request instead.',
+        'company_inactive' => 'The company is not active.',
+        'not_an_office' => 'Only a private office can be leased.',
+        'office_unavailable' => 'This office is under maintenance or out of service.',
+        'office_taken' => 'This office is already leased for part of these dates.',
+        'office_booked' => 'This office has bookings during these dates.',
+        'payer_required' => 'Choose who pays: the provider or the company.',
+        'invalid_cycle' => 'The billing period must be 1, 3 or 6 months, or the whole term, and divide the term exactly.',
+        'not_active' => 'Only an active lease can be terminated.',
+        'termination_out_of_range' => 'The termination date must fall between the lease start and end dates.',
+        'terminated' => 'The lease was terminated.',
     ],
 
 ];

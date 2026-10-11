@@ -10,6 +10,7 @@ use App\Domain\Membership\Models\Wallet;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\BuildsOfficeLeases;
 use Tests\Support\InteractsWithOtp;
 use Tests\TestCase;
 
@@ -20,7 +21,7 @@ use Tests\TestCase;
  */
 class WalletProvisioningTest extends TestCase
 {
-    use InteractsWithOtp, RefreshDatabase;
+    use BuildsOfficeLeases, InteractsWithOtp, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -33,6 +34,7 @@ class WalletProvisioningTest extends TestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();
@@ -42,7 +44,7 @@ class WalletProvisioningTest extends TestCase
             'private_office_request_id' => $poRequest->id,
             'legal_name' => 'ACME LLC',
             'contract_ref' => 'C-1001',
-            'branch_id' => $branch->id,
+            ...$this->leasePayload($this->leasableOffice($branch)),
         ]);
 
         $response->assertCreated();

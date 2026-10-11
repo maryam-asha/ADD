@@ -2,13 +2,21 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreAnnouncementRequest extends FormRequest
 {
+    use InterpretsLocalTimes;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->interpretLocalTimes(['starts_at', 'ends_at']);
     }
 
     /**

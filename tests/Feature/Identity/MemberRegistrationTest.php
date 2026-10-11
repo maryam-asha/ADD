@@ -8,6 +8,8 @@ use App\Domain\Identity\Models\PendingRegistration;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Providers\Models\CompanyInvitation;
+use App\Domain\Providers\Models\ProviderRequest;
 use App\Services\Otp\OtpService;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Testing\TestResponse;
@@ -179,6 +181,24 @@ class MemberRegistrationTest extends IdentityTestCase
 
         $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $user->id)->sole();
         $this->assertSame(0, $wallet->transactions()->count());
+    }
+
+    public function test_registration_joins_the_companies_that_invited_the_phone(): void
+    {
+        $request = ProviderRequest::factory()->create();
+        $company = $request->company;
+        CompanyInvitation::create([
+            'company_id' => $company->id,
+            'provider_request_id' => $request->id,
+            'phone' => self::PHONE,
+            'door_access_enabled' => true,
+        ]);
+
+        $this->register()->assertOk();
+
+        $user = User::where('phone', self::PHONE)->sole();
+        $this->assertTrue((bool) $company->members()->where('users.id', $user->id)->sole()->pivot->door_access_enabled);
+        $this->assertSame(0, CompanyInvitation::query()->open()->count());
     }
 
     public function test_the_issued_pair_is_immediately_usable(): void

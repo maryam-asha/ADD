@@ -58,6 +58,32 @@ class Currency extends Model
         ];
     }
 
+    /**
+     * The base currency's code.
+     *
+     * One fact for the whole request, and it changes almost never — but it
+     * was being read from the database by every caller that needed it, which
+     * on an events page meant once per card. Memoised in-process on top of
+     * the cache, because CACHE_STORE is `database` in production and a cache
+     * hit is itself a query there.
+     */
+    public static function baseCode(): string
+    {
+        return static::$baseCodeMemo ??= Cache::rememberForever(
+            'base_currency_code',
+            fn () => static::where('is_base', true)->value('code') ?? 'USD'
+        );
+    }
+
+    /** Cleared by the booted() hooks below when the base currency moves. */
+    protected static ?string $baseCodeMemo = null;
+
+    public static function forgetBaseCode(): void
+    {
+        static::$baseCodeMemo = null;
+        Cache::forget('base_currency_code');
+    }
+
     public static function defaultCode(): string
     {
         return Cache::rememberForever('default_currency_code', function () {
@@ -69,6 +95,10 @@ class Currency extends Model
 
     protected static function booted(): void
     {
+        // A moved base currency must not leave a stale memo behind.
+        static::saved(fn () => static::forgetBaseCode());
+        static::deleted(fn () => static::forgetBaseCode());
+
         static::saving(function (Currency $currency) {
             // Keep is_default and is_base synchronized
             if ($currency->is_default) {

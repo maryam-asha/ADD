@@ -100,36 +100,4 @@ class PointConversionServiceTest extends TestCase
         $this->assertNotNull($syp);
         $this->assertEqualsWithDelta(499800, (float) $syp, 100);
     }
-
-    /**
-     * The same vectors the dashboard's top-up-math.spec.ts asserts, so the
-     * two implementations are proven to agree (spec 2026-10-10 §6).
-     * Each new rate row is newer than the last (higher id, same
-     * effective_from), and saving one clears ExchangeRate::current()'s cache.
-     */
-    public function test_currency_to_points_floors_the_exact_value_once(): void
-    {
-        $vectors = [
-            // [amount, currency, rate_to_base (null = base currency), expected points]
-            ['500000', 'SYP', '0.0000680272', 340],
-            ['501200', 'SYP', '0.0000680272', 340], // the old path credited 341
-            ['150000.00', 'SYP', '0.0000666667', 100],
-            ['5000', 'SYP', '0.0068027211', 340],   // new pound
-            ['0.30', 'USD', null, 3],               // float division gives 2
-            ['10.05', 'USD', null, 100],
-        ];
-
-        foreach ($vectors as [$amount, $currency, $rate, $expected]) {
-            if ($rate !== null) {
-                ExchangeRate::factory()->create(['currency_code' => $currency, 'rate_to_base' => $rate]);
-            }
-
-            $this->assertSame($expected, $this->points->currencyToPoints($amount, $currency), "{$amount} {$currency}");
-        }
-    }
-
-    public function test_currency_to_points_is_null_without_an_exchange_rate(): void
-    {
-        $this->assertNull($this->points->currencyToPoints('5000', 'SYP'));
-    }
 }

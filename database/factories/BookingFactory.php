@@ -48,13 +48,14 @@ class BookingFactory extends Factory
 
     public function pending(): static
     {
-        return $this->state(fn () => ['status' => BookingStatus::Pending]);
+        return $this->state(fn () => ['status' => BookingStatus::Pending, 'required_approval' => true]);
     }
 
     public function rejected(): static
     {
         return $this->state(fn () => [
             'status' => BookingStatus::Rejected,
+            'required_approval' => true,
             'rejection_reason' => 'Not a good fit for this request.',
         ]);
     }

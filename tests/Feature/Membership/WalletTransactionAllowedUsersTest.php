@@ -247,7 +247,9 @@ class WalletTransactionAllowedUsersTest extends TestCase
         $bOptions = $this->wallets->spendOptions($employeeB, WalletTransactionCategory::Cafe);
         $this->assertCount(1, $bOptions);
         $this->assertSame(250, $bOptions[0]['category_balance']);
-        $this->assertSame(250, $bOptions[0]['usable_balance']);
+        // What debit() can spend: the company's general balance, which
+        // exceeds B's cafe allocation, is its fallback.
+        $this->assertSame($bOptions[0]['general_balance'], $bOptions[0]['usable_balance']);
 
         $aOptions = $this->wallets->spendOptions($employeeA, WalletTransactionCategory::Cafe);
         $this->assertSame(0, $aOptions[0]['category_balance']);

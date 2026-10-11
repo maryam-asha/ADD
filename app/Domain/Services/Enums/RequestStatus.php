@@ -4,11 +4,11 @@ namespace App\Domain\Services\Enums;
 
 enum RequestStatus: string
 {
-    case Pending    = 'pending';
+    case Pending = 'pending';
     case InProgress = 'in_progress';
-    case Resolved   = 'resolved';
-    case Rejected   = 'rejected';
-    case Cancelled  = 'cancelled';
+    case Resolved = 'resolved';
+    case Rejected = 'rejected';
+    case Cancelled = 'cancelled';
 
     /** Statuses that operations staff can transition to */
     public static function operationsAllowed(): array

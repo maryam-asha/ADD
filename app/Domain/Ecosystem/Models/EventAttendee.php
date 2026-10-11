@@ -2,23 +2,45 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Concerns\HasReference;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Forms\Concerns\HasFormSubmissions;
 use App\Domain\Identity\Models\User;
+use App\Support\Enums\EventPaymentState;
+use App\Support\Enums\EventRegistrationStatus;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class EventAttendee extends Model
 {
-    use HasFactory;
+    use HasFactory, HasFormSubmissions, HasReference;
 
     protected $fillable = [
+        'reference',
         'event_id',
         'user_id',
         'name',
         'phone',
         'email',
+        'status',
+        'rejection_reason',
+        'approved_by',
+        'approved_at',
+        'pending_expires_at',
         'attended',
+        'price_points',
+        'list_price_points',
+        'payment_state',
+        'payment_method',
+        'payment_wallet_owner_type',
+        'payment_wallet_owner_id',
+        'paid_at',
+        'checked_in_at',
+        'checked_in_by',
+        'payment_due_at',
     ];
 
     protected function casts(): array
@@ -26,7 +48,65 @@ class EventAttendee extends Model
         return [
             'user_id' => 'integer',
             'attended' => 'boolean',
+            'approved_at' => 'datetime',
+            'pending_expires_at' => 'datetime',
+            'price_points' => 'integer',
+            'list_price_points' => 'integer',
+            'payment_state' => EventPaymentState::class,
+            'payment_wallet_owner_id' => 'integer',
+            'paid_at' => 'datetime',
+            'checked_in_at' => 'datetime',
+            'checked_in_by' => 'integer',
+            'payment_due_at' => 'datetime',
         ];
+    }
+
+    /**
+     * "EVT-2026-00041" (HasReference).
+     */
+    protected function referencePrefix(): string
+    {
+        return 'EVT';
+    }
+
+    protected static function booted(): void
+    {
+        static::creating(function (EventAttendee $attendee) {
+            if (empty($attendee->attributes['status'])) {
+                $requiresApproval = $attendee->relationLoaded('event')
+                    ? (bool) $attendee->event?->requires_approval
+                    : (bool) Event::query()->where('id', $attendee->event_id)->value('requires_approval');
+
+                $attendee->status = $requiresApproval
+                    ? EventRegistrationStatus::Pending
+                    : EventRegistrationStatus::Approved;
+            }
+        });
+    }
+
+    protected function status(): Attribute
+    {
+        return Attribute::make(
+            get: function ($value) {
+                if ($value instanceof EventRegistrationStatus) {
+                    return $value;
+                }
+
+                $enum = EventRegistrationStatus::tryFrom((string) $value);
+                if ($enum !== null) {
+                    return $enum;
+                }
+
+                $requiresApproval = $this->relationLoaded('event')
+                    ? (bool) $this->event?->requires_approval
+                    : (bool) Event::query()->where('id', $this->event_id)->value('requires_approval');
+
+                return $requiresApproval
+                    ? EventRegistrationStatus::Pending
+                    : EventRegistrationStatus::Approved;
+            },
+            set: fn ($value) => $value instanceof EventRegistrationStatus ? $value->value : $value,
+        );
     }
 
     public function event(): BelongsTo
@@ -37,5 +117,28 @@ class EventAttendee extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /** The staff account that approved or rejected this registration. */
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /** Held for its prepayment past the deadline: no new payment may open. */
+    public function awaitingPaymentExpired(): bool
+    {
+        return $this->status === EventRegistrationStatus::AwaitingPayment
+            && $this->payment_due_at !== null
+            && ! $this->payment_due_at->isFuture();
+    }
+
+    /**
+     * Registrations that occupy a seat. A rejected one does not, so the
+     * seat is free again with no separate release step.
+     */
+    public function scopeSeatHolding(Builder $query): Builder
+    {
+        return $query->whereIn('status', EventRegistrationStatus::seatHoldingValues());
     }
 }

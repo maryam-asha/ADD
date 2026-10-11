@@ -100,7 +100,9 @@ class UnlockService
 
         $grant->loadMissing('booking');
 
-        return $grant->booking?->status === BookingStatus::Confirmed;
+        // A checkout completes the booking, but the room stays the member's
+        // until end_at — the grant's own period still bounds it.
+        return in_array($grant->booking?->status, [BookingStatus::Confirmed, BookingStatus::Completed], true);
     }
 
     private function logEvent(Device $lock, ?AccessGrant $grant, AccessEventType $type, User $actor): void

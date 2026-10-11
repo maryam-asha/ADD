@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
+use App\Http\Requests\Admin\Concerns\ValidatesLeaseTerms;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -12,10 +13,13 @@ use Illuminate\Foundation\Http\FormRequest;
  * signed (PRD §5.1) — the one path into `companies`. The request must
  * currently be `quoted`: the pipeline is request -> quote -> signed
  * contract (§5.3), and skipping straight from `requested` would presume a
- * quote that was never issued.
+ * quote that was never issued. The company's first lease comes in the same
+ * body (ValidatesLeaseTerms); its branch is the office's branch.
  */
 class StoreCompanyRequest extends FormRequest
 {
+    use ValidatesLeaseTerms;
+
     public function authorize(): bool
     {
         return true;
@@ -29,14 +33,15 @@ class StoreCompanyRequest extends FormRequest
         return [
             'private_office_request_id' => ['required', 'integer', 'exists:private_office_requests,id'],
             'legal_name' => ['required', 'string', 'max:255'],
-            'contract_ref' => ['required', 'string', 'max:255'],
-            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            ...$this->leaseRules(),
         ];
     }
 
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            $this->validateLeaseTerms($validator);
+
             $requestId = $this->input('private_office_request_id');
 
             if (! $requestId) {

@@ -11,7 +11,10 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use Carbon\Carbon;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Tests\TestCase;
 
 class CloseOverdueReceptionSessionsCommandTest extends TestCase
@@ -139,5 +142,48 @@ class CloseOverdueReceptionSessionsCommandTest extends TestCase
         $session->refresh();
         $this->assertSame(TerminationSource::Reception, $session->termination_source);
         $this->assertSame('20.00', (string) $session->amount_owed);
+    }
+
+    /**
+     * The same race, end to end through the command: the first session is
+     * closed at the desk after the command read it but before autoClose()
+     * locked it. That one is reported and skipped; the run goes on to close
+     * the next one instead of aborting.
+     */
+    public function test_a_session_closed_concurrently_is_skipped_and_the_run_goes_on(): void
+    {
+        Exceptions::fake();
+        $space = $this->openSpace();
+        $closedAtTheDesk = WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00'),
+        ]);
+        $next = WalkinSession::factory()->create([
+            'space_id' => $space->id,
+            'checked_in_at' => Carbon::parse('2026-08-17 09:00:00'),
+        ]);
+        Carbon::setTestNow(Carbon::parse('2026-08-17 20:30:00', 'Asia/Damascus'));
+
+        // The command looks for the first session's pending end request after
+        // reading the page and before autoClose() locks the row: land a desk
+        // checkout of that session exactly there.
+        $landed = false;
+        DB::listen(function (QueryExecuted $query) use (&$landed, $closedAtTheDesk) {
+            if ($landed || ! str_contains($query->sql, 'session_end_requests')) {
+                return;
+            }
+
+            $landed = true;
+            app(SessionClosureService::class)->closeOut(WalkinSession::find($closedAtTheDesk->id), Carbon::parse('2026-08-17 11:00:00'));
+        });
+
+        $this->artisan('reception:close-overdue-sessions')
+            ->expectsOutputToContain("walkin #{$closedAtTheDesk->id}")
+            ->assertExitCode(0);
+
+        $this->assertTrue($landed);
+        $this->assertSame(TerminationSource::Reception, $closedAtTheDesk->fresh()->termination_source);
+        $this->assertSame(TerminationSource::Auto, $next->fresh()->termination_source);
+        Exceptions::assertReported(fn (ReceptionActionException $e) => $e->messageKey === 'api.reception.already_checked_out');
     }
 }

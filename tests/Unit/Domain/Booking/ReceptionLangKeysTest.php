@@ -26,6 +26,7 @@ class ReceptionLangKeysTest extends TestCase
             'checkout_past_closing',
             'not_yet_checked_out',
             'cancellation_window_passed',
+            'member_already_in_session',
         ];
     }
 

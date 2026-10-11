@@ -23,6 +23,24 @@ class SettingSeeder extends Seeder
         $settings->setDefault('booking.min_duration_minutes', 60, SettingValueType::Int);
         $settings->setDefault('booking.overrun_grace_minutes', 10, SettingValueType::Int);
         $settings->setDefault('booking.buffer_minutes', 0, SettingValueType::Int);
+        // A closed session's time is billed in whole blocks of this many
+        // minutes, rounded up (SessionClosureService::priceFor()).
+        $settings->setDefault('coworking.billing_increment_minutes', 15, SettingValueType::Int);
+        // Shown on the confirmation screen's price breakdown. Zero is a
+        // decision, not a hardcoded literal — the arithmetic path handles a
+        // non-zero rate even though it currently always evaluates to zero.
+        $settings->setDefault('booking.vat_percent', 0, SettingValueType::Int);
+        // A past-dated booking could be created and paid for, and could
+        // then never be cancelled, since its cancellation window had
+        // already gone. Off by default; the flag exists so reception can be
+        // given a back-dating override later without a code change.
+        $settings->setDefault('booking.allow_past_bookings', false, SettingValueType::Bool);
+        // The booking window; a booking's length has no ceiling. The notice
+        // starts at an hour: a member books at least 60 minutes before the
+        // start (0 turns it off). How many days ahead is unlimited (0) until
+        // an admin sets a value.
+        $settings->setDefault('booking.min_notice_minutes', 60, SettingValueType::Int);
+        $settings->setDefault('booking.max_days_ahead', 0, SettingValueType::Int);
         $settings->setDefault('profile.completion_threshold', 80, SettingValueType::Int);
         $settings->setDefault('guest.host_approval_timeout_seconds', 120, SettingValueType::Int);
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);
@@ -33,5 +51,8 @@ class SettingSeeder extends Seeder
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
         $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
         $settings->setDefault(TopUpMinimum::SETTING_KEY, TopUpMinimum::DEFAULT_POINTS, SettingValueType::Int);
+        // Provider invoicing: days from issue to due when the provider has
+        // no payment terms of its own (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+        $settings->setDefault('invoices.default_due_days', 15, SettingValueType::Int);
     }
 }

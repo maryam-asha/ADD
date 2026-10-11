@@ -9,6 +9,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Identity\Models\User;
 use Laravel\Sanctum\Sanctum;
+use Tests\Concerns\BuildsOfficeLeases;
 
 /**
  * PRD §5.1/§5.3: companies are created exclusively by operations, after a
@@ -16,10 +17,13 @@ use Laravel\Sanctum\Sanctum;
  */
 class CompanyLifecycleTest extends IdentityTestCase
 {
+    use BuildsOfficeLeases;
+
     public function test_operations_creates_a_company_from_a_quoted_request_and_closes_the_pipeline(): void
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();
@@ -29,7 +33,7 @@ class CompanyLifecycleTest extends IdentityTestCase
             'private_office_request_id' => $poRequest->id,
             'legal_name' => 'ACME LLC',
             'contract_ref' => 'C-1001',
-            'branch_id' => $branch->id,
+            ...$this->leasePayload($this->leasableOffice($branch)),
         ]);
 
         $response->assertCreated();
@@ -46,6 +50,7 @@ class CompanyLifecycleTest extends IdentityTestCase
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
         $poRequest = PrivateOfficeRequest::factory()->create(); // still 'requested', no quote issued
@@ -55,7 +60,7 @@ class CompanyLifecycleTest extends IdentityTestCase
             'private_office_request_id' => $poRequest->id,
             'legal_name' => 'ACME LLC',
             'contract_ref' => 'C-1002',
-            'branch_id' => $branch->id,
+            ...$this->leasePayload($this->leasableOffice($branch)),
         ]);
 
         $response->assertUnprocessable();
@@ -86,29 +91,30 @@ class CompanyLifecycleTest extends IdentityTestCase
             ->assertJsonPath('data.status', 'inactive');
     }
 
-    public function test_operations_creates_a_company_without_branch_id_and_uses_default_branch(): void
+    public function test_the_company_takes_the_branch_of_its_office(): void
     {
         $operator = User::factory()->create();
         $operator->assignRole('operations');
+        $this->grantLeaseCreation();
         Sanctum::actingAs($operator, ['*']);
 
-        $defaultBranch = Branch::factory()->default()->create();
+        $office = $this->leasableOffice($branch = Branch::factory()->create());
         $poRequest = PrivateOfficeRequest::factory()->quoted()->create();
 
-        // branch_id is completely omitted from the payload
         $response = $this->postJson('/api/v1/admin/companies', [
             'private_office_request_id' => $poRequest->id,
             'legal_name' => 'Auto Branch LLC',
             'contract_ref' => 'C-AUTO-1',
+            ...$this->leasePayload($office),
         ]);
 
         $response->assertCreated();
         $response->assertJsonPath('data.legal_name', 'Auto Branch LLC');
-        $response->assertJsonPath('data.branch_id', $defaultBranch->id);
+        $response->assertJsonPath('data.branch_id', $branch->id);
 
         $this->assertDatabaseHas('companies', [
             'legal_name' => 'Auto Branch LLC',
-            'branch_id' => $defaultBranch->id,
+            'branch_id' => $branch->id,
         ]);
     }
 }

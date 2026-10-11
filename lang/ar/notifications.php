@@ -83,6 +83,10 @@ return [
     ],
 
     'membership' => [
+        'desk_needed' => [
+            'title' => 'مكتب مخصص بانتظار الربط',
+            'body' => 'اشترك عضو في :plan من التطبيق ويحتاج إلى ربط مقعد.',
+        ],
         'subscribed' => [
             'title' => 'تم تفعيل الباقة',
             'body' => 'أصبح اشتراكك في باقة :plan_name مفعّلاً الآن.',
@@ -149,6 +153,50 @@ return [
         'status_updated' => [
             'title' => 'تحديث على طلب الخدمة',
             'body' => 'أصبحت حالة التذكرة رقم #:ticket_id: :status.',
+        ],
+    ],
+
+    'coworking' => [
+        'session_ended' => [
+            'title' => 'انتهت الجلسة',
+            'body' => 'انتهت جلستك في :space. اضغط لعرض التقرير.',
+        ],
+    ],
+
+    'payment' => [
+        'received' => [
+            'title' => 'تم استلام الدفعة',
+            'body' => 'تم استلام دفعتك مقابل :purpose (:points نقطة).',
+        ],
+        'expired' => [
+            'title' => 'تم إلغاء حجز الباقة',
+            'body' => 'لم يتم دفع الباقة التي اخترت دفعها في الاستقبال خلال المهلة، وتم إلغاء حجزها.',
+        ],
+        'purposes' => [
+            'wallet_top_up' => 'شحن المحفظة',
+            'plan_purchase' => 'باقة',
+            'booking' => 'حجز',
+            'event_registration' => 'تسجيل في فعالية',
+            'coworking_session' => 'جلسة عمل مشترك',
+            'booking_extension' => 'تمديد حجز',
+        ],
+    ],
+
+    'event' => [
+        'payment_due' => [
+            'title' => 'دفعة مستحقة',
+            'body' => 'تم تأكيد مقعدك في :event. ادفع :points نقطة قبل الفعالية لتتمكن من الدخول.',
+        ],
+    ],
+
+    'provider' => [
+        'request_approved' => [
+            'title' => 'قُبل الطلب',
+            'body' => 'وُوفق على طلبك.',
+        ],
+        'request_rejected' => [
+            'title' => 'رُفض الطلب',
+            'body' => 'رُفض طلبك.',
         ],
     ],
 

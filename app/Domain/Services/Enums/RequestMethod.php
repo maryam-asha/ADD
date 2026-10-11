@@ -4,7 +4,7 @@ namespace App\Domain\Services\Enums;
 
 enum RequestMethod: string
 {
-    /** Dynamic form built from service_type_fields */
+    /** Dynamic form: the service type's request form (App\Domain\Forms) */
     case Form = 'form';
 
     /** Open a URL in browser or webview — config: {url, open} */

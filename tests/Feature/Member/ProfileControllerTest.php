@@ -27,21 +27,22 @@ class ProfileControllerTest extends TestCase
         $response = $this->getJson('/api/v1/member/profile');
 
         $response->assertOk();
-        $response->assertJsonPath('data.id', $member->id);
-        $response->assertJsonPath('data.name', $member->name);
-        $response->assertJsonPath('data.phone', $member->phone);
-        $response->assertJsonPath('data.email', $member->email);
-        $response->assertJsonPath('data.preferred_language', $member->preferred_language);
-        $response->assertJsonPath('data.preferred_currency', $member->preferred_currency);
-        $response->assertJsonPath('data.status', $member->status);
-        $response->assertJsonPath('data.personal.bio', null);
-        $response->assertJsonPath('data.personal.city', null);
-        $response->assertJsonPath('data.personal.avatar_url', null);
-        $response->assertJsonPath('data.professional.job_title', null);
-        $response->assertJsonPath('data.professional.company_name', null);
-        $response->assertJsonPath('data.professional.industry', null);
-        $response->assertJsonPath('data.links.linkedin_url', null);
-        $response->assertJsonMissingPath('data.roles');
+        $response->assertJsonPath('data.user.id', $member->id);
+        $response->assertJsonPath('data.user.name', $member->name);
+        $response->assertJsonPath('data.user.phone', $member->phone);
+        $response->assertJsonPath('data.user.email', $member->email);
+        $response->assertJsonPath('data.user.preferred_language', $member->preferred_language);
+        $response->assertJsonPath('data.user.preferred_currency', $member->preferred_currency);
+        $response->assertJsonPath('data.user.status', $member->status);
+        $response->assertJsonPath('data.user.personal.bio', null);
+        $response->assertJsonPath('data.user.personal.city', null);
+        $response->assertJsonPath('data.user.personal.avatar_url', null);
+        $response->assertJsonPath('data.user.professional.job_title', null);
+        $response->assertJsonPath('data.user.professional.company_name', null);
+        $response->assertJsonPath('data.user.professional.industry', null);
+        $response->assertJsonPath('data.user.links.linkedin_url', null);
+        $response->assertJsonMissingPath('data.user.roles');
+        $response->assertJsonMissingPath('data.user.permissions');
     }
 
     public function test_patch_with_all_seven_fields_creates_both_rows_in_one_call(): void
@@ -184,10 +185,10 @@ class ProfileControllerTest extends TestCase
         $response = $this->getJson('/api/v1/member/profile');
 
         $response->assertOk();
-        $response->assertJsonPath('data.personal.gender', null);
-        $response->assertJsonPath('data.links.instagram_url', null);
-        $response->assertJsonPath('data.links.behance_url', null);
-        $response->assertJsonPath('data.links.website_url', null);
+        $response->assertJsonPath('data.user.personal.gender', null);
+        $response->assertJsonPath('data.user.links.instagram_url', null);
+        $response->assertJsonPath('data.user.links.behance_url', null);
+        $response->assertJsonPath('data.user.links.website_url', null);
     }
 
     public function test_patch_can_set_gender_and_the_new_social_links(): void
@@ -218,7 +219,7 @@ class ProfileControllerTest extends TestCase
         ]);
 
         $getResponse = $this->getJson('/api/v1/member/profile');
-        $getResponse->assertJsonPath('data.personal.gender', 'female');
+        $getResponse->assertJsonPath('data.user.personal.gender', 'female');
     }
 
     public function test_patch_rejects_an_invalid_gender_value(): void

@@ -18,10 +18,10 @@ class UpdateServiceRequestStatusRequest extends FormRequest
         $allowed = collect(RequestStatus::operationsAllowed())->map->value->all();
 
         return [
-            'status'              => ['required', 'string', Rule::in($allowed)],
-            'resolution_note'     => ['nullable', 'array'],
-            'resolution_note.en'  => ['nullable', 'string', 'max:1000'],
-            'resolution_note.ar'  => ['nullable', 'string', 'max:1000'],
+            'status' => ['required', 'string', Rule::in($allowed)],
+            'resolution_note' => ['nullable', 'array'],
+            'resolution_note.en' => ['nullable', 'string', 'max:1000'],
+            'resolution_note.ar' => ['nullable', 'string', 'max:1000'],
         ];
     }
 }

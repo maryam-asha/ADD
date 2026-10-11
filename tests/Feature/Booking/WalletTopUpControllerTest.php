@@ -73,7 +73,7 @@ class WalletTopUpControllerTest extends TestCase
             'company_id' => $company->id,
             'points' => 500,
             'amount' => '50.00',
-            'payment_method' => 'syriatel',
+            'payment_method' => 'cash',
         ]);
 
         $response->assertCreated();
@@ -191,6 +191,29 @@ class WalletTopUpControllerTest extends TestCase
             'amount' => '10.00',
             'payment_method' => 'cash',
         ])->assertForbidden();
+    }
+
+    /** The pound has no piasters in use: an SYP amount is whole ("5000.00" is). */
+    public function test_a_syrian_amount_with_piasters_is_refused(): void
+    {
+        $this->actingAsOperations();
+        $member = User::factory()->create();
+        Wallet::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        ExchangeRate::create([
+            'currency_code' => 'SYP',
+            'rate_to_base' => '0.0000666667',
+            'source' => ExchangeRateSource::Manual,
+            'effective_from' => now()->subMinute(),
+        ]);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/admin/reception/wallet-top-ups', [
+            'user_id' => $member->id,
+            // What 150,000.50 SYP would buy, so `amount` is the only thing wrong.
+            'points' => 100,
+            'amount' => '150000.50',
+            'currency' => 'SYP',
+            'payment_method' => 'cash',
+        ])->assertUnprocessable()->assertJsonValidationErrors(['amount' => 'must be a whole number']);
     }
 
     public function test_operations_can_top_up_in_foreign_currency_with_conversion(): void
@@ -493,8 +516,8 @@ class WalletTopUpControllerTest extends TestCase
             'payment_method' => 'cash',
         ])->assertJsonValidationErrors('amount');
 
-        // decimal:0,2 is also what keeps exponent notation away from bcmath,
-        // which would throw a ValueError (a 500) on a string like this.
+        // The plain-decimal regex is what keeps exponent notation away from
+        // bcmath, which would throw a ValueError (a 500) on a string like this.
         $this->postJson('/api/v1/admin/reception/wallet-top-ups', [
             'user_id' => $member->id,
             'points' => 10000,
@@ -533,7 +556,8 @@ class WalletTopUpControllerTest extends TestCase
         $this->assertEqualsCanonicalizing(['SYP', 'USD'], $currencies->keys()->all());
         $this->assertSame('0.0068027211', $currencies['SYP']['rate_to_base']);
         $this->assertSame('10.00', $currencies['SYP']['cash_step']);
-        $this->assertSame(2, $currencies['SYP']['decimal_places']);
+        // The pound has no decimals (2026_10_04_100200_syrian_pound_has_no_decimals).
+        $this->assertSame(0, $currencies['SYP']['decimal_places']);
         $this->assertSame('1', $currencies['USD']['rate_to_base']);
         $this->assertSame('1.00', $currencies['USD']['cash_step']);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Models\Currency;
 use App\Domain\Settings\Services\SettingService;
 use InvalidArgumentException;
 
@@ -59,6 +60,18 @@ class PointConversionService
     }
 
     /**
+     * The USD a point count is worth at the rate's full precision. The rate
+     * may carry up to four decimal places (UpdateSettingRequest), so a
+     * point can be worth a fraction of a cent that pointsToUsd() — cents,
+     * for display — would cut off. A price that has to buy `$points` back
+     * (ReceivedMoneyConverter::pointsToAmount) is computed from this.
+     */
+    public function pointsToUsdExact(int $points): string
+    {
+        return bcmul((string) $points, $this->rate(), 10);
+    }
+
+    /**
      * Credit direction — floors. bcdiv at scale 0 truncates toward zero,
      * which is floor for the non-negative input this accepts.
      */
@@ -85,18 +98,6 @@ class PointConversionService
     }
 
     /**
-     * Points a cash payment buys — credit direction. Floors once, on the
-     * exact base-currency value (Invariant 2); nothing is rounded before the
-     * floor. Null when the currency has no current exchange rate.
-     */
-    public function currencyToPoints(string $amount, string $currencyCode): ?int
-    {
-        $usd = $this->currency->toBaseExact($amount, $currencyCode);
-
-        return $usd === null ? null : $this->usdToPoints($usd);
-    }
-
-    /**
      * Null when the target currency has no exchange rate, matching
      * CurrencyConversionService's existing contract so callers keep
      * their null handling.
@@ -112,7 +113,16 @@ class PointConversionService
 
         $converted = $this->currency->convert((float) $usd, $baseCurrency, $currencyCode);
 
-        return $converted !== null ? number_format($converted, 2, '.', '') : null;
+        if ($converted === null) {
+            return null;
+        }
+
+        // At the currency's own decimals — a whole pound for SYP — rounded up,
+        // the direction every amount asked for is rounded in.
+        $decimals = (int) (Currency::query()->whereKey($currencyCode)->value('decimal_places') ?? 2);
+        $factor = 10 ** $decimals;
+
+        return number_format(ceil(round($converted * $factor, 6)) / $factor, $decimals, '.', '');
     }
 
     private function rejectNegative(string $usd): void

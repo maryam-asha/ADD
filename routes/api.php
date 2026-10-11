@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Paymera\PaymeraCallbackController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -11,6 +12,7 @@ Route::prefix('v1')->group(function () {
     require base_path('routes/api/v1/auth.php');
     require base_path('routes/api/v1/public.php');
     require base_path('routes/api/v1/mobile.php');
+    require base_path('routes/api/v1/kiosk.php');
 
     // 'active' is no longer listed here — EnsureUserIsActive is registered
     // globally in bootstrap/app.php, not per route group.
@@ -30,4 +32,38 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'role:member'])
         ->prefix('member')
         ->group(base_path('routes/api/v1/member.php'));
+
+    // Service providers (docs/decisions/service-providers.md): dashboard
+    // accounts, so the same 'abilities:dashboard' boundary as the admin
+    // group, but their own role and their own file — a provider never
+    // reaches an admin route, and provider.active cuts off every account of
+    // a deactivated provider.
+    Route::middleware(['auth:sanctum', 'abilities:dashboard', 'role:provider', 'provider.active'])
+        ->prefix('provider')
+        ->group(base_path('routes/api/v1/provider.php'));
+
+    /*
+     * Paymera's two return paths. Unauthenticated by necessity: the gateway
+     * presents no credentials, and the member comes back from an external
+     * page with no session in the WebView. What stands in for auth is the
+     * 64-character random token in the URL — these routes are keyed on
+     * `callback_token`, never on a payment id, so they cannot be walked.
+     *
+     * Neither endpoint is trusted to report an outcome; both just prompt a
+     * get-payment-status call. Rate limited because they are public, and
+     * the trigger accepts GET and POST since the spec does not fix the verb.
+     *
+     * CSRF is not a concern here: this is the "api" route file, which
+     * Laravel does not put behind VerifyCsrfToken — the statefulApi()
+     * middleware only applies CSRF to requests carrying a session cookie
+     * from a SANCTUM_STATEFUL_DOMAINS origin, which Paymera's server-side
+     * call and the WebView return are not.
+     */
+    Route::prefix('paymera')->middleware('throttle:60,1')->group(function () {
+        Route::get('callback/{token}', [PaymeraCallbackController::class, 'callback'])
+            ->name('paymera.callback');
+
+        Route::match(['get', 'post'], 'trigger/{token}', [PaymeraCallbackController::class, 'trigger'])
+            ->name('paymera.trigger');
+    });
 });

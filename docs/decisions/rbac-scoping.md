@@ -1,5 +1,7 @@
 # RBAC scoping (D.8): flat spatie roles, no scope_type/scope_id system
 
+> **Revised 2026-10-08:** `ProviderPolicy` is a second exception beside `CompanyPolicy`; see [service-providers.md](service-providers.md).
+
 **Status:** resolved 2026-08-08. **Owner:** Maryam Asha.
 
 ## What each source said

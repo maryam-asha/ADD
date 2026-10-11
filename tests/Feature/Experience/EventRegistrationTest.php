@@ -2,7 +2,6 @@
 
 namespace Tests\Feature\Experience;
 
-use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;

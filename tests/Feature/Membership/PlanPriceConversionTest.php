@@ -45,11 +45,11 @@ class PlanPriceConversionTest extends TestCase
         $response->assertOk();
         // price_display is formatted as a decimal string (number_format) —
         // not a raw JSON number, which would silently drop the fractional
-        // part for whole-number amounts. 10 / 0.0000680272 ≈ 147000.02, not
+        // part for whole-number amounts. 10 / 0.0000680272 ≈ 147000.02 — shown up to a whole pound, 147001 — not
         // a clean 147000.00, because the stored rate is 1/14700 rounded to
         // 10 decimal places, not the exact repeating fraction — expected of
         // a real rate.
-        $response->assertJsonPath('data.price_display', '147000.02');
+        $response->assertJsonPath('data.price_display', '147001');
         $response->assertJsonPath('data.currency', 'SYP');
     }
 
@@ -94,9 +94,9 @@ class PlanPriceConversionTest extends TestCase
         $response = $this->getJson("/api/v1/admin/plans/{$plan->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('data.price_display', '147000.02');
+        $response->assertJsonPath('data.price_display', '147001');
         $response->assertJsonPath('data.currency', 'SYP');
-        $response->assertJsonPath('data.converted_amount', '147000.02');
+        $response->assertJsonPath('data.converted_amount', '147001');
         $response->assertJsonPath('data.converted_currency', 'SYP');
         $this->assertSame(
             $response->json('data.price_display'),
@@ -161,7 +161,7 @@ class PlanPriceConversionTest extends TestCase
         $response = $this->withHeader('currency', 'SYP')->getJson("/api/v1/admin/plans/{$plan->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('data.price_display', '147000.02');
+        $response->assertJsonPath('data.price_display', '147001');
         $response->assertJsonPath('data.currency', 'SYP');
     }
 

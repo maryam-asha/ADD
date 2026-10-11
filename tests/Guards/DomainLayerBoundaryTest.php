@@ -34,8 +34,8 @@ class DomainLayerBoundaryTest extends TestCase
 
     /** @var array<string, list<string>> domain => domains it may not import from */
     private const FORBIDDEN = [
-        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership', 'Finance'],
-        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership', 'Finance'],
+        'Ecosystem' => ['Experience', 'Booking', 'Access', 'Membership', 'Finance', 'Pricing'],
+        'Experience' => ['Ecosystem', 'Booking', 'Access', 'Membership', 'Finance', 'Pricing'],
     ];
 
     /** @var array<string, list<string>> file => domains it is cleared to import from, with why above */
@@ -67,5 +67,31 @@ class DomainLayerBoundaryTest extends TestCase
         }
 
         $this->assertSame([], $violations, "Decision #17/#18 — Experience/Ecosystem must not depend on Core or each other:\n".implode("\n", $violations));
+    }
+
+    /**
+     * Forms is a shared kernel: every domain may attach a form, so Forms
+     * itself may depend on none of them — otherwise Experience importing
+     * Forms would drag Core in behind it and defeat the test above. Owners
+     * and subjects are reached through morphs and the HasForms contract,
+     * never by class. Identity is the one exception, for the submitting
+     * User. Written as an allowlist, so a domain created later is banned
+     * without anyone extending this (docs/decisions/unified-forms.md).
+     */
+    public function test_forms_depends_on_no_domain_but_identity(): void
+    {
+        $violations = [];
+
+        foreach ($this->phpFilesIn(app_path('Domain/Forms')) as $path => $contents) {
+            preg_match_all('/use\s+App\\\\Domain\\\\(\w+)\\\\/', $contents, $matches);
+
+            foreach (array_unique($matches[1]) as $domain) {
+                if (! in_array($domain, ['Forms', 'Identity'], true)) {
+                    $violations[] = "{$path} imports from Domain\\{$domain}";
+                }
+            }
+        }
+
+        $this->assertSame([], $violations, "Domain\\Forms may import only Domain\\Identity:\n".implode("\n", $violations));
     }
 }

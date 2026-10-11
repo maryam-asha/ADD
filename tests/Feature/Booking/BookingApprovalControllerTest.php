@@ -129,6 +129,8 @@ class BookingApprovalControllerTest extends TestCase
 
         app(BookingCancellationService::class)->cancel($firstBooking);
         $this->assertSame(BookingStatus::Cancelled, $firstBooking->fresh()->status);
+        // The space's setting at booking time outlives the cancellation.
+        $this->assertTrue($firstBooking->fresh()->required_approval);
 
         $secondBooking = $creations->create($space, User::factory()->create(), $start, $end);
         $this->assertSame(BookingStatus::Pending, $secondBooking->status);

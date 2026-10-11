@@ -3,15 +3,11 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\PaymentSource;
-use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionSource;
-use App\Domain\Membership\Services\WalletService;
+use App\Domain\Membership\Services\PlanDiscountService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -22,8 +18,8 @@ use Illuminate\Support\Facades\DB;
 class BookingApprovalService
 {
     public function __construct(
-        private readonly WalletService $wallets,
-        private readonly AmountCalculator $amounts,
+        private readonly BookingRefunder $refunder,
+        private readonly PlanDiscountService $discounts,
     ) {}
 
     public function approve(Booking $booking, User $operator): void
@@ -57,14 +53,47 @@ class BookingApprovalService
                 'approved_at' => now(),
             ])->save();
 
-            if ($locked->payment_source === PaymentSource::Wallet && $locked->payment_state === PaymentState::Paid) {
-                $points = $this->amounts->forRange($locked->space, $locked->start_at, $locked->end_at);
+            $this->refunder->refund($locked, 'Booking rejection refund');
 
-                $wallet = $this->wallets->walletFor(OwnerType::User, $locked->user_id);
-                $this->wallets->creditGeneral($wallet, $points, WalletTransactionSource::Refund, 'Booking rejection refund');
-            }
+            // The usage this booking consumed is returned once it no
+            // longer holds a charge (docs/decisions/plan-discounts-design.md).
+            $this->discounts->voidFor($locked);
 
             $this->notify($locked->user_id, 'booking.rejected');
+        });
+    }
+
+    /**
+     * A request still undecided when it starts can no longer be used — check-in
+     * needs it confirmed — so it is closed exactly like a rejection, refund
+     * included, with no operator and no reason: Booking::lapsedUnreviewed()
+     * tells the two apart, and the member sees a translated explanation
+     * rather than a stored string in the server's language.
+     *
+     * Returns false when the booking was decided in the meantime; the
+     * scheduled command treats that as nothing to do, not an error.
+     */
+    public function lapse(Booking $booking): bool
+    {
+        return DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== BookingStatus::Pending) {
+                return false;
+            }
+
+            $locked->forceFill([
+                'status' => BookingStatus::Rejected,
+                'rejection_reason' => null,
+                'approved_by' => null,
+                'approved_at' => now(),
+            ])->save();
+
+            $this->refunder->refund($locked, 'Booking lapsed unreviewed refund');
+            $this->discounts->voidFor($locked);
+            $this->notify($locked->user_id, 'booking.lapsed');
+
+            return true;
         });
     }
 

@@ -4,10 +4,15 @@ namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Finance\Enums\PaymentMethod;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Currency;
-use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Payments\PaymentNotifier;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -27,11 +32,13 @@ use Illuminate\Support\Facades\DB;
  * fields exactly as they are.
  *
  * The ledger is point-denominated. The dashboard quotes the points and
- * StoreWalletTopUpRequest verifies them against the cash — floored once on
- * the exact value — so store() credits exactly the figure the operator read
- * out. Every currency figure this controller reports is derived back out of
- * the stored point count, never carried over from the payment, so a receipt
- * can never claim a value the wallet does not hold (Invariant 3).
+ * StoreWalletTopUpRequest verifies them against the cash through
+ * ReceivedMoneyConverter — the one place money becomes points, floored once
+ * on the exact value — so store(), converting through that same converter,
+ * credits exactly the figure the operator read out. Every currency figure
+ * this controller reports is derived back out of the stored point count,
+ * never carried over from the payment, so a receipt can never claim a value
+ * the wallet does not hold (Invariant 3).
  */
 class WalletTopUpController extends Controller
 {
@@ -101,6 +108,8 @@ class WalletTopUpController extends Controller
         WalletService $wallets,
         PointConversionService $points,
         CurrencyConversionService $conversion,
+        ReceivedMoneyConverter $converter,
+        PaymentNotifier $notifier,
     ): JsonResponse {
         [$ownerType, $ownerId] = $request->validated('company_id')
             ? [OwnerType::Company, (int) $request->validated('company_id')]
@@ -111,15 +120,18 @@ class WalletTopUpController extends Controller
         $baseCurrency = $conversion->baseCurrencyCode();
         $paymentCurrency = $request->validated('currency') ?? $baseCurrency;
         $paymentAmount = (string) $request->validated('amount');
-        $exchangeRate = $paymentCurrency === $baseCurrency
-            ? null
-            : (string) ExchangeRate::current($paymentCurrency)->rate_to_base;
 
-        // StoreWalletTopUpRequest has proved this is exactly what the amount
-        // buys at today's rates, floored once (Invariant 2), and it is the
-        // figure the operator read out to the member.
-        $pointsCredited = (int) $request->validated('points');
-        $pointRate = $points->rate();
+        // Credit direction: floor. The member is never credited more value
+        // than the cash actually covers (Invariant 2). StoreWalletTopUpRequest
+        // has already verified, through this same converter, that the amount
+        // buys exactly the `points` the dashboard quoted and the operator read
+        // out — and that they reach the minimum, so a payment too small to
+        // buy a single point never gets here. One conversion: the points, the
+        // exchange rate and the point rate recorded below all come from it.
+        $converted = $converter->toPoints($paymentAmount, $paymentCurrency);
+        $pointsCredited = $converted->points;
+        $exchangeRate = $converted->rateToBase;
+        $pointRate = $converted->pointRateUsd;
 
         $previousBalancePoints = $wallets->generalBalance($wallet);
 
@@ -128,7 +140,7 @@ class WalletTopUpController extends Controller
         // rate. Previously these were two writes with no transaction.
         $transaction = DB::transaction(function () use (
             $wallets, $wallet, $pointsCredited, $request,
-            $paymentCurrency, $paymentAmount, $exchangeRate, $pointRate
+            $paymentCurrency, $paymentAmount, $exchangeRate, $pointRate, $notifier
         ) {
             $transaction = $wallets->creditGeneral(
                 $wallet,
@@ -145,6 +157,35 @@ class WalletTopUpController extends Controller
                 'exchange_rate_to_base' => $exchangeRate,
                 'point_rate_usd' => $pointRate,
             ])->save();
+
+            // The same payment row every other way of paying leaves, so the
+            // payments list shows money taken at the desk too. The payer is
+            // the member topped up; for a company, whoever took the money.
+            $payment = new Payment;
+            $payment->forceFill([
+                'method' => CashMethod::KEY,
+                'purpose' => PaymentPurpose::WalletTopUp,
+                'status' => PaymentStatus::Accepted,
+                'user_id' => $wallet->owner_type === OwnerType::User ? (int) $wallet->owner_id : $request->user()->id,
+                'wallet_id' => $wallet->id,
+                'wallet_transaction_id' => $transaction->id,
+                'amount_points' => $pointsCredited,
+                'points_to_credit' => $pointsCredited,
+                'collected_via' => PaymentMethod::from($request->validated('payment_method')),
+                'received_amount' => $paymentAmount,
+                'received_currency' => $paymentCurrency,
+                'received_by' => $request->user()->id,
+                'received_at' => now(),
+                'settled_at' => now(),
+            ])->save();
+
+            // The member hears their wallet was topped up, as they do for a
+            // card top-up. Not for a company: the payer recorded there is
+            // whoever took the money, not anyone waiting on it. Sent after
+            // commit (PaymentNotifier), so a rolled-back top-up says nothing.
+            if ($wallet->owner_type === OwnerType::User) {
+                $notifier->received($payment);
+            }
 
             return $transaction;
         });
@@ -205,7 +246,10 @@ class WalletTopUpController extends Controller
 
     /**
      * Spec 2026-10-10 §4. A non-base currency with no current rate is left
-     * out: it cannot be quoted, and store() refuses it anyway.
+     * out: it cannot be quoted, and store() refuses it anyway. Each rate is
+     * CurrencyConversionService::rateToBase()'s string — the one
+     * ReceivedMoneyConverter verifies and credits with — so the dashboard
+     * quotes from exactly the figure the server checks against.
      *
      * @return array{point_rate_usd: string, min_points: int, currencies: list<array{code: string, rate_to_base: string, cash_step: string, decimal_places: int}>}
      */
@@ -220,7 +264,7 @@ class WalletTopUpController extends Controller
         foreach (Currency::query()->where('is_active', true)->orderBy('order')->get() as $currency) {
             $rate = $currency->code === $baseCurrency
                 ? '1'
-                : ExchangeRate::current($currency->code)?->rate_to_base;
+                : $conversion->rateToBase($currency->code);
 
             if ($rate === null) {
                 continue;
@@ -228,7 +272,7 @@ class WalletTopUpController extends Controller
 
             $currencies[] = [
                 'code' => $currency->code,
-                'rate_to_base' => (string) $rate,
+                'rate_to_base' => $rate,
                 'cash_step' => (string) $currency->cash_step,
                 'decimal_places' => $currency->decimal_places,
             ];

@@ -11,6 +11,9 @@ class PlanModule extends Model
 {
     use HasFactory, HasTranslations;
 
+    /** The module whose plans tie a subscription to specific desks. */
+    public const DEDICATED_DESK = 'dedicated_desk';
+
     protected $fillable = [
         'name',
         'slug',

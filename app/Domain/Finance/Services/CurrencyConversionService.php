@@ -18,7 +18,21 @@ class CurrencyConversionService
 {
     public function baseCurrencyCode(): string
     {
-        return Currency::query()->where('is_base', true)->value('code') ?? 'USD';
+        return Currency::baseCode();
+    }
+
+    /**
+     * The current rate turning one unit of `$currencyCode` into the base
+     * currency, as the exact decimal string the column holds — for callers
+     * that must stay in bcmath rather than go through convert()'s floats.
+     * Null when the currency has no active rate; the base currency itself
+     * never has one (nothing to convert).
+     */
+    public function rateToBase(string $currencyCode): ?string
+    {
+        $rate = ExchangeRate::current($currencyCode);
+
+        return $rate !== null ? (string) $rate->rate_to_base : null;
     }
 
     public function convert(float $amount, string $fromCurrency, string $toCurrency): ?float
@@ -59,27 +73,5 @@ class CurrencyConversionService
         $amountInBase = $amount * (float) $fromRate->rate_to_base;
 
         return round($amountInBase / (float) $toRate->rate_to_base, 2);
-    }
-
-    /**
-     * The exact base-currency value of an amount, as a bcmath string — no
-     * rounding at all. For the top-up credit path, where the result is
-     * floored into points: rounding to cents first, as convert() does, can
-     * lift it across a point boundary and credit more than was paid.
-     * Null when the currency has no current rate, matching convert().
-     */
-    public function toBaseExact(string $amount, string $fromCurrency): ?string
-    {
-        if ($fromCurrency === $this->baseCurrencyCode()) {
-            return $amount;
-        }
-
-        $rate = ExchangeRate::current($fromCurrency);
-
-        if ($rate === null) {
-            return null;
-        }
-
-        return bcmul($amount, (string) $rate->rate_to_base, 20);
     }
 }

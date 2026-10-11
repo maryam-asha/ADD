@@ -1,9 +1,15 @@
 <?php
 
+use App\Domain\Experience\Models\Event;
+use App\Domain\Forms\Enums\FormPurpose;
+use App\Domain\Services\Models\ServiceType;
+use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
+use App\Http\Controllers\Api\V1\Admin\BookingCalendarController;
+use App\Http\Controllers\Api\V1\Admin\BookingController;
 use App\Http\Controllers\Api\V1\Admin\BranchController;
 use App\Http\Controllers\Api\V1\Admin\BuildingController;
 use App\Http\Controllers\Api\V1\Admin\BusinessHourController;
@@ -11,10 +17,15 @@ use App\Http\Controllers\Api\V1\Admin\BusinessHourExceptionController;
 use App\Http\Controllers\Api\V1\Admin\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Admin\CompanyController;
 use App\Http\Controllers\Api\V1\Admin\CompanyMemberController;
+use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
 use App\Http\Controllers\Api\V1\Admin\ContactLinkController;
+use App\Http\Controllers\Api\V1\Admin\CouponController;
+use App\Http\Controllers\Api\V1\Admin\CoworkingPoolController;
+use App\Http\Controllers\Api\V1\Admin\CoworkingWindowController;
 use App\Http\Controllers\Api\V1\Admin\CurrencyController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
+use App\Http\Controllers\Api\V1\Admin\DiscountReportController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\EventCategoryController;
 use App\Http\Controllers\Api\V1\Admin\EventController;
@@ -22,28 +33,49 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
+use App\Http\Controllers\Api\V1\Admin\InvoiceController;
+use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
+use App\Http\Controllers\Api\V1\Admin\KioskController;
+use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
+use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
+use App\Http\Controllers\Api\V1\Admin\MembershipController;
+use App\Http\Controllers\Api\V1\Admin\OfferReportController;
+use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
+use App\Http\Controllers\Api\V1\Admin\PaymentController as AdminPaymentController;
+use App\Http\Controllers\Api\V1\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Api\V1\Admin\PlanController;
 use App\Http\Controllers\Api\V1\Admin\PlanModuleController;
 use App\Http\Controllers\Api\V1\Admin\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
+use App\Http\Controllers\Api\V1\Admin\ProviderController;
+use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
+use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\PlanPurchaseController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSummaryController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
+use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\SiteInquiryController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
+use App\Http\Controllers\Api\V1\Admin\SpaceTypeAmenityController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
+use App\Http\Routing\FormFieldRoutes;
 use Illuminate\Support\Facades\Route;
 
 // Every route in this file already sits behind auth:sanctum + role:admin|operations
@@ -90,8 +122,17 @@ Route::apiResource('floors', FloorController::class)->except('destroy');
 Route::apiResource('zones', ZoneController::class)->except('destroy');
 Route::apiResource('spaces', SpaceController::class)->except('destroy');
 Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
+Route::patch('spaces/{space}/amenities', [SpaceController::class, 'updateAmenities']);
 Route::apiResource('resources', ResourceController::class)->except('destroy');
 Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
+
+// The type -> amenity config matrix (which AmenityType values are even
+// selectable for a given SpaceType) — a fixed 4-row config, not a
+// paginated CRUD resource, so it isn't a Route::apiResource line. Same
+// role:admin|operations tier as the rest of this file — no
+// permission:-based middleware here, the pilot only covers Branches.
+Route::get('space-type-amenities', [SpaceTypeAmenityController::class, 'index']);
+Route::put('space-type-amenities/{spaceType}', [SpaceTypeAmenityController::class, 'update']);
 
 // Multi-word resource name — same reason as community-members above.
 Route::apiResource('seats-desks', SeatDeskController::class)
@@ -124,6 +165,30 @@ Route::apiResource('plans', PlanController::class);
 Route::apiResource('plan-modules', PlanModuleController::class)
     ->parameters(['plan-modules' => 'planModule']);
 
+// Discount coupons (docs/decisions/pricing-offers-and-coupons.md): anyone on
+// the dashboard can look one up, and who used it; creating, changing and
+// deleting one sits in the role:admin group below — a code is money off.
+Route::get('coupons', [CouponController::class, 'index']);
+Route::get('coupons/{coupon}', [CouponController::class, 'show']);
+Route::get('coupons/{coupon}/redemptions', [CouponController::class, 'redemptions']);
+Route::get('coupons/{coupon}/revisions', [CouponController::class, 'revisions']);
+
+// What was given off, and saved, over a period — every operation with its
+// status; totals over the ones that count
+// (docs/superpowers/specs/2026-10-05-automatic-offers-savings-discount-ledger-design.md).
+Route::get('reports/discounts', [DiscountReportController::class, 'index']);
+
+// Which offers (or, `type=coupon`, coupons) ran in a period, on the terms
+// they had then, and what each gave — from every version an admin saved
+// (CouponHistory), so a changed or deleted offer still shows where it ran.
+Route::get('reports/offers', [OfferReportController::class, 'index']);
+
+// Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
+// segment is `resource-types`, not `resources` — that name is already taken
+// by the physical Resource model's admin route above.
+Route::apiResource('resource-types', ResourceTypeController::class)
+    ->parameters(['resource-types' => 'resourceType']);
+
 // Contact Links — public org content (social/app-store/website/phone
 // links), admin-managed. Same permission tier as Founders/Partners (no
 // narrower role:admin group) — see
@@ -140,6 +205,20 @@ Route::apiResource('event-categories', EventCategoryController::class)
 Route::get('events/rooms', [EventController::class, 'rooms']);
 Route::get('events/statuses', [EventController::class, 'statuses']);
 Route::apiResource('events', EventController::class);
+
+// Per-event registration form definition, and the attendee roster with its
+// approve/reject decisions. All nested under an already-bound event, so
+// they never collide with the apiResource above. The field editor is the
+// shared one every form owner gets (App\Http\Routing\FormFieldRoutes).
+FormFieldRoutes::register('events/{event}/registration-fields', Event::class, FormPurpose::Registration);
+
+Route::get('events/{event}/attendees', [AdminEventAttendeeController::class, 'index']);
+Route::get('events/{event}/attendees/pending', [AdminEventAttendeeController::class, 'pending']);
+Route::post('events/{event}/attendees/reject-pending', [AdminEventAttendeeController::class, 'rejectPending']);
+Route::post('events/{event}/attendees/{attendee}/approve', [AdminEventAttendeeController::class, 'approve']);
+Route::post('events/{event}/attendees/{attendee}/reject', [AdminEventAttendeeController::class, 'reject']);
+// The door: approved, and for a paid event paid (docs/decisions/unified-payments.md).
+Route::post('events/{event}/attendees/{attendee}/check-in', [AdminEventAttendeeController::class, 'checkIn']);
 
 Route::get('exchange-rates', [ExchangeRateController::class, 'index']);
 Route::post('exchange-rates', [ExchangeRateController::class, 'store']);
@@ -176,7 +255,9 @@ Route::apiResource('private-office-requests', PrivateOfficeRequestController::cl
 // deactivate, they don't hard-delete, same reasoning as UserController), and
 // "update" is specifically the status transition, not a free-form PATCH.
 Route::get('companies', [CompanyController::class, 'index']);
-Route::post('companies', [CompanyController::class, 'store']);
+// Creating a company contracts its first lease, so it needs that permission
+// on top of the group's role gate (docs/decisions/office-leases.md).
+Route::post('companies', [CompanyController::class, 'store'])->middleware('permission:office-leases.create');
 Route::get('companies/{company}', [CompanyController::class, 'show']);
 Route::patch('companies/{company}/status', [CompanyController::class, 'updateStatus']);
 
@@ -186,17 +267,97 @@ Route::patch('companies/{company}/members/{user}', [CompanyMemberController::cla
 Route::patch('companies/{company}/members/{user}/admin', [CompanyMemberController::class, 'updateAdmin']);
 Route::delete('companies/{company}/members/{user}', [CompanyMemberController::class, 'destroy']);
 
+// Service providers (docs/decisions/service-providers.md). Permission-gated
+// like Branches (docs/decisions/rbac-permission-pilot.md): the coarse
+// role:admin|operations check is stripped and each route names its
+// permission, so deciding provider requests can be given to any role.
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::get('providers', [ProviderController::class, 'index'])->middleware('permission:providers.view');
+    Route::post('providers', [ProviderController::class, 'store'])->middleware('permission:providers.create');
+    Route::get('providers/{provider}', [ProviderController::class, 'show'])->middleware('permission:providers.view');
+    Route::patch('providers/{provider}', [ProviderController::class, 'update'])->middleware('permission:providers.update');
+    Route::post('providers/{provider}/users/{user}', [ProviderUserController::class, 'store'])->middleware('permission:providers.update');
+    Route::delete('providers/{provider}/users/{user}', [ProviderUserController::class, 'destroy'])->middleware('permission:providers.update');
+    Route::patch('providers/{provider}/status', [ProviderController::class, 'updateStatus'])->middleware('permission:providers.status');
+    Route::patch('companies/{company}/provider', [CompanyProviderController::class, 'update'])->middleware('permission:providers.transfer_company');
+    Route::get('provider-requests', [ProviderRequestController::class, 'index'])->middleware('permission:provider-requests.view');
+    Route::get('provider-requests/{providerRequest}', [ProviderRequestController::class, 'show'])->middleware('permission:provider-requests.view');
+    Route::post('provider-requests/{providerRequest}/approve', [ProviderRequestController::class, 'approve'])->middleware('permission:provider-requests.approve');
+    Route::post('provider-requests/{providerRequest}/reject', [ProviderRequestController::class, 'reject'])->middleware('permission:provider-requests.reject');
+
+    // Provider invoicing (docs/superpowers/specs/2026-10-10-provider-invoicing-design.md).
+    Route::get('invoices', [InvoiceController::class, 'index'])->middleware('permission:invoices.view');
+    Route::get('invoices/{invoice}', [InvoiceController::class, 'show'])->middleware('permission:invoices.view');
+    Route::post('invoices/{invoice}/payments', [InvoicePaymentController::class, 'store'])->middleware('permission:invoices.record_payment');
+    Route::post('invoice-payments/{invoicePayment}/void', [InvoicePaymentController::class, 'void'])->middleware('permission:invoices.void_payment');
+    Route::post('invoices/{invoice}/cancel', [InvoiceController::class, 'cancel'])->middleware('permission:invoices.cancel');
+
+    // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
+    Route::post('private-office-requests/{privateOfficeRequest}/lease', [OfficeLeaseController::class, 'store'])->middleware('permission:office-leases.create');
+    Route::get('office-leases', [OfficeLeaseController::class, 'index'])->middleware('permission:office-leases.view');
+    Route::get('office-leases/{officeLease}', [OfficeLeaseController::class, 'show'])->middleware('permission:office-leases.view');
+    Route::post('office-leases/{officeLease}/terminate', [OfficeLeaseController::class, 'terminate'])->middleware('permission:office-leases.terminate');
+});
+
 // Mobile client crash/error reports (ingested unauthenticated from
 // routes/api/v1/mobile.php) — viewable by both roles, but deleting one is
 // admin-only, same narrower-than-the-group pattern as below.
 Route::get('error-logs', [ErrorLogController::class, 'index']);
 Route::get('error-logs/{errorLog}', [ErrorLogController::class, 'show']);
 
+// docs/decisions/booking-availability-and-calendar.md — the operations
+// calendar (spaces as rows, days as cells, occupancy per cell) and the
+// general bookings index. Read-only: every write verb lives on the
+// reception routes below. Occupancy is computed from the same
+// BusinessHoursService periods the member calendar uses, so the two can
+// never disagree about what "open" means.
+// One member's whole file for the dashboard's member profile: a summary,
+// then sessions, wallet history, memberships, service requests and event
+// registrations. Bookings and payments use bookings?user_id= and
+// payments?user_id=. Read-only, for operations as well as admins.
+Route::prefix('members/{user}')->whereNumber('user')->group(function () {
+    Route::get('summary', [MemberProfileController::class, 'summary']);
+    Route::get('sessions', [MemberProfileController::class, 'sessions']);
+    Route::get('wallet-transactions', [MemberProfileController::class, 'walletTransactions']);
+    Route::get('memberships', [MemberProfileController::class, 'memberships']);
+    Route::get('service-requests', [MemberProfileController::class, 'serviceRequests']);
+    Route::get('event-registrations', [MemberProfileController::class, 'eventRegistrations']);
+});
+
+Route::get('bookings', [BookingController::class, 'index']);
+Route::get('bookings/{booking}', [BookingController::class, 'show']);
+Route::get('calendar', [BookingCalendarController::class, 'index']);
+Route::get('calendar/occupancy', [BookingCalendarController::class, 'occupancy']);
+
+// The cells of one space on one date, so the desk's booking form offers
+// the windows BookingCreationService will actually accept instead of a
+// free-form clock that learns the rules one 422 at a time. Same
+// AvailabilityBrowseService the member routes call -- the read side and the
+// write side cannot disagree because there is one of each. No duration and
+// no quote: the desk picks a run of cells, like the member app.
+Route::get('spaces/{space}/availability/slots', [BookingCalendarController::class, 'slots']);
+
+// The branch's co-working seat pool (docs/decisions/coworking-seat-pool.md):
+// its seats taken and free over time, and the rooms lent to co-working when
+// the co-working space is overloaded.
+Route::get('branches/{branch}/coworking-pool', [CoworkingPoolController::class, 'show']);
+Route::get('spaces/{space}/coworking-windows', [CoworkingWindowController::class, 'index']);
+Route::post('spaces/{space}/coworking-windows', [CoworkingWindowController::class, 'store']);
+Route::patch('coworking-windows/{coworkingWindow}', [CoworkingWindowController::class, 'update']);
+Route::delete('coworking-windows/{coworkingWindow}', [CoworkingWindowController::class, 'destroy']);
+
 // Reception Operations (docs/superpowers/specs/2026-08-16-reception-operations-design.md)
 // — check-in, check-out, cancellation and payment settlement for bookings.
 // No narrower role gate than the file's own admin|operations group: both do
 // all of it.
 Route::get('reception/bookings/pending-approval', [BookingReceptionController::class, 'pendingApproval']);
+// Reception booking a member in at the desk, and the calendar's "book it
+// for them" action. Reuses BookingCreationService, so every availability
+// rule the member endpoint enforces applies here too.
+Route::post('reception/bookings', [BookingReceptionController::class, 'store']);
+// What that booking would cost — points and money, from the space's hourly
+// rate and the hours chosen — before the desk picks how it is paid.
+Route::post('reception/bookings/quote', [BookingReceptionController::class, 'quote']);
 Route::post('reception/bookings/{booking}/check-in', [BookingReceptionController::class, 'checkIn']);
 Route::post('reception/bookings/{booking}/check-out', [BookingReceptionController::class, 'checkOut']);
 Route::post('reception/bookings/{booking}/cancel', [BookingReceptionController::class, 'cancel']);
@@ -204,6 +365,7 @@ Route::post('reception/bookings/{booking}/settle-payment', [BookingReceptionCont
 Route::post('reception/bookings/{booking}/approve', [BookingReceptionController::class, 'approve']);
 Route::post('reception/bookings/{booking}/reject', [BookingReceptionController::class, 'reject']);
 Route::post('reception/bookings/{booking}/extend', [BookingReceptionController::class, 'extend']);
+Route::get('reception/bookings/{booking}/extension-options', [BookingReceptionController::class, 'extensionOptions']);
 // Access-grant read surface for reception (final-review C3b) — resolves the
 // grant a given booking needs activated, since there was previously no way
 // to discover a grant's id from its booking.
@@ -213,7 +375,22 @@ Route::post('reception/walk-ins', [WalkInSessionController::class, 'store']);
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut']);
 Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionController::class, 'settlePayment']);
 
+// Settle anything a member owes with the money handed over (overpayment
+// stays as points), and list everything they owe (docs/decisions/unified-payments.md).
+Route::post('reception/payments/settle', [ReceptionPaymentController::class, 'settle']);
+Route::get('reception/outstanding', [ReceptionPaymentController::class, 'outstanding']);
+
+// The desk's day at a glance: counts and what needs it next
+// (the reception desk screen).
+Route::get('reception/summary', [ReceptionSummaryController::class, 'show']);
 Route::get('reception/sessions/active', [ReceptionSessionsController::class, 'active']);
+Route::get('reception/sessions/{type}/{id}/report', [ReceptionSessionsController::class, 'report'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
+
+// A member's "end session" press, confirmed here
+// (docs/decisions/coworking-self-service-sessions.md).
+Route::post('reception/session-end-requests/{sessionEndRequest}/confirm', [SessionEndRequestController::class, 'confirm']);
 
 Route::get('reception/arrival-requests', [ReceptionArrivalRequestController::class, 'index']);
 Route::post('reception/arrival-requests/{arrivalRequest}/confirm', [ReceptionArrivalRequestController::class, 'confirm']);
@@ -221,7 +398,19 @@ Route::post('reception/arrival-requests/{arrivalRequest}/reject', [ReceptionArri
 
 Route::get('reception/wallet-balance', [WalletTopUpController::class, 'balance']);
 Route::post('reception/wallet-top-ups', [WalletTopUpController::class, 'store']);
+
+// A plan sold for cash at the desk, the way a wallet is topped up: the
+// plan's price exactly, in the currency chosen, becomes points in the
+// owner's wallet and is spent on the plan at once (docs/decisions/unified-payments.md).
+Route::post('reception/plan-purchases/preview', [PlanPurchaseController::class, 'preview']);
+Route::post('reception/plan-purchases', [PlanPurchaseController::class, 'store']);
 Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationController::class, 'activate']);
+
+// Manual-entry recording of natural-unit resource consumption (Printing,
+// Internet, ...) against a member/company's active membership's
+// PlanResourceGrant (docs/decisions/resource-quota-design.md). Same
+// user_id/company_id owner-resolution pattern as wallet-top-ups above.
+Route::post('reception/resource-consumptions', [ResourceConsumptionController::class, 'store']);
 
 // Cash Register Sessions per staff member per shift (S6-BE-03 / PRD 5.9)
 Route::get('reception/cash-register-sessions', [CashRegisterSessionController::class, 'index']);
@@ -243,6 +432,13 @@ Route::get('users/{user}', [UserController::class, 'show']);
 
 // Narrower than the group above: creating, mutating accounts, and managing roles is admin-only
 Route::middleware('role:admin')->group(function () {
+    // Activating a plan for someone with no wallet debit is a money-adjacent
+    // grant, so it sits with the other admin-only actions rather than in the
+    // shared admin|operations block above.
+    Route::get('memberships', [MembershipController::class, 'index']);
+    Route::post('memberships', [MembershipController::class, 'store']);
+    Route::put('memberships/{membership}/desks', [MembershipController::class, 'assignDesks']);
+
     Route::post('users', [UserController::class, 'store']);
     Route::match(['put', 'patch'], 'users/{user}', [UserController::class, 'update']);
     Route::patch('users/{user}/status', [UserController::class, 'updateStatus']);
@@ -274,23 +470,60 @@ Route::middleware('role:admin')->group(function () {
 
     Route::patch('settings/{key}', [SettingController::class, 'update']);
 
+    Route::post('coupons', [CouponController::class, 'store']);
+    Route::match(['put', 'patch'], 'coupons/{coupon}', [CouponController::class, 'update']);
+    Route::delete('coupons/{coupon}', [CouponController::class, 'destroy']);
+
     // Notification broadcast — admin-only, sends push + in-app notifications
     // to targeted users (all, by role, or specific user IDs).
     Route::post('notifications/broadcast', [AdminNotificationController::class, 'broadcast']);
 
-    // ADD Service Types — CRUD for service catalog + form fields
+    // ADD Service Types — CRUD for the service catalog; the request-form
+    // field editor is the shared one every form owner gets.
     Route::get('service-types', [AdminServiceTypeController::class, 'index']);
     Route::post('service-types', [AdminServiceTypeController::class, 'store']);
     Route::get('service-types/{serviceType}', [AdminServiceTypeController::class, 'show']);
     Route::patch('service-types/{serviceType}', [AdminServiceTypeController::class, 'update']);
     Route::delete('service-types/{serviceType}', [AdminServiceTypeController::class, 'destroy']);
-    Route::get('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'indexFields']);
-    Route::post('service-types/{serviceType}/fields', [AdminServiceTypeController::class, 'storeField']);
-    Route::patch('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'updateField']);
-    Route::delete('service-types/{serviceType}/fields/{field}', [AdminServiceTypeController::class, 'destroyField']);
+    FormFieldRoutes::register('service-types/{serviceType}/fields', ServiceType::class, FormPurpose::Request);
 
     // ADD Service Requests — staff view all, filter by branch/status/type
     Route::get('service-requests', [AdminServiceRequestController::class, 'index']);
     Route::get('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'show']);
     Route::patch('service-requests/{serviceRequest}', [AdminServiceRequestController::class, 'update']);
+
+    // Kiosk devices that start self-service coworking sessions
+    // (docs/decisions/coworking-self-service-sessions.md). Admin-only: a
+    // kiosk's pairing is a credential.
+    Route::apiResource('kiosks', KioskController::class);
+    Route::post('kiosks/{kiosk}/pairing-code', [KioskPairingController::class, 'issue']);
+    Route::delete('kiosks/{kiosk}/secret', [KioskPairingController::class, 'revoke']);
+});
+
+/*
+ * Card payments (docs/paymera.md). Read access rides on the group's
+ * role:admin|operations check like every other resource here; only the
+ * reversal — which moves real money at the bank — is gated on a granular
+ * permission, following the Branches pilot
+ * (docs/decisions/rbac-permission-pilot.md). It therefore opts out of the
+ * group's role check for that one route and enforces permission instead.
+ *
+ * Note for deploys: permissions:sync (or PermissionSeeder) must run before
+ * anyone, admin included, can reverse a payment — an empty permissions
+ * table grants nothing.
+ *
+ * There is no store/update/destroy: a payment is created by a member
+ * paying and settled by the gateway, never edited by hand.
+ */
+Route::get('payments', [AdminPaymentController::class, 'index'])->name('payments.index');
+// Totals over the same filters as the list; before payments/{payment}, which would take it for an id.
+Route::get('payments/summary', [AdminPaymentController::class, 'summary'])->name('payments.summary');
+// Every payment method in config, enabled or not, with how it has been used. Read-only.
+Route::get('payment-methods', [AdminPaymentMethodController::class, 'index'])->name('payment-methods.index');
+Route::get('payments/{payment}', [AdminPaymentController::class, 'show'])->name('payments.show');
+
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::post('payments/{payment}/reverse', [AdminPaymentController::class, 'reverse'])
+        ->middleware('permission:payments.reverse')
+        ->name('payments.reverse');
 });

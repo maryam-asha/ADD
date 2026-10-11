@@ -4,6 +4,9 @@ namespace App\Domain\Identity\Models;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Enums\CompanyStatus;
+use App\Domain\Leasing\Models\OfficeLease;
+use App\Domain\Providers\Models\CompanyInvitation;
+use App\Domain\Providers\Models\Provider;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -25,6 +28,7 @@ class Company extends Model
         'branch_id',
         'status',
         'created_from_request_id',
+        'provider_id',
     ];
 
     protected function casts(): array
@@ -55,5 +59,21 @@ class Company extends Model
             ->using(CompanyUser::class)
             ->withPivot('id', 'door_access_enabled', 'is_admin')
             ->withTimestamps();
+    }
+
+    /** The provider managing this company; null when ADD deals with it directly. */
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(Provider::class);
+    }
+
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(CompanyInvitation::class);
+    }
+
+    public function officeLeases(): HasMany
+    {
+        return $this->hasMany(OfficeLease::class);
     }
 }

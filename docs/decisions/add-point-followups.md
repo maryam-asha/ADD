@@ -64,10 +64,14 @@ separate schema change with USD assertions across five test files.
 
 ## 4. The FX leg still uses float — ✅ resolved for the credit path 2026-10-10
 
-Resolved for the credit path on 2026-10-10: top-up credits now go through
-`CurrencyConversionService::toBaseExact()` +
-`PointConversionService::currencyToPoints()` (bcmath, floored once), see
+Resolved for the credit path on 2026-10-10: top-up credits — and the
+request's check of the dashboard's quoted `points` — now go through
+`ReceivedMoneyConverter::toPoints()` (bcmath, floored once on the exact
+value; docs/decisions/unified-payments.md), see
 [2026-10-10-wallet-top-up-points-entry-design.md](../superpowers/specs/2026-10-10-wallet-top-up-points-entry-design.md).
+That spec's own `toBaseExact()`/`currencyToPoints()` pair was folded into
+the converter when the two branches merged, so money becomes points in
+one place.
 The two float call sites this section recorded (a validator-side check and
 a controller-side `paymentInBaseCurrency()`) are gone, so there is no
 longer a second computation that could desync "will this be rejected" from

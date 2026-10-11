@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Domain\Finance\Services\CurrencyConversionService;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Pricing\Services\PlanSavingCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Symfony\Component\HttpKernel\Exception\HttpException;
@@ -29,9 +30,17 @@ class PlanResource extends JsonResource
             'subtitle' => $this->subtitle,
             'is_subscription' => $this->is_subscription,
             'duration_days' => $this->duration_days,
-            'included_hours' => $this->included_hours,
+            'access_window_start' => $this->access_window_start,
+            'access_window_end' => $this->access_window_end,
             'is_active' => $this->is_active,
+            'is_public' => $this->is_public,
             'order' => $this->order,
+            'reference_plan_id' => $this->reference_plan_id,
+            'reference_space_id' => $this->reference_space_id,
+            'reference_units' => $this->reference_units,
+            // What it saves against its reference — dashboard only; members
+            // read it as labels (PackageBrowseService).
+            'saving' => $this->when($request->is('api/v1/admin/*'), fn () => app(PlanSavingCalculator::class)->for($this->resource)?->toArray()),
             'balances' => $this->whenLoaded('balances', fn () => $this->balances->map(fn ($b) => [
                 'id' => $b->id,
                 'category' => $b->category->value,
@@ -47,6 +56,30 @@ class PlanResource extends JsonResource
                 'icon' => $f->icon,
                 'is_included' => $f->is_included,
                 'order' => $f->order,
+            ])),
+            'discounts' => $this->whenLoaded('discounts', fn () => $this->discounts->map(fn ($d) => [
+                'id' => $d->id,
+                'percentage' => (int) $d->percentage,
+                'space_id' => $d->space_id,
+                'space_type' => $d->space_type?->value,
+                'usage_limit' => $d->usage_limit,
+                'description' => $d->description,
+                'is_active' => $d->is_active,
+                'order' => $d->order,
+            ])),
+            'resource_grants' => $this->whenLoaded('resourceGrants', fn () => $this->resourceGrants->map(fn ($g) => [
+                'id' => $g->id,
+                'resource_type_id' => $g->resource_type_id,
+                'resource_type' => $g->relationLoaded('resourceType') && $g->resourceType ? [
+                    'id' => $g->resourceType->id,
+                    'slug' => $g->resourceType->slug,
+                    'name' => $g->resourceType->name,
+                    'unit_label' => $g->resourceType->unit_label,
+                    'icon' => $g->resourceType->icon,
+                ] : null,
+                'quantity' => (float) $g->quantity,
+                'description' => $g->description,
+                'order' => $g->order,
             ])),
             'created_at' => $this->created_at,
         ];
@@ -79,9 +112,6 @@ class PlanResource extends JsonResource
         $data['price_usd'] = $points->pointsToUsd((int) $this->price_points);
         $data['price_display'] = $convertedDisplay ?? $data['price_usd'];
         $data['currency'] = $targetCurrency;
-        $data['overage_rate_points'] = $this->overage_rate_points !== null
-            ? (int) $this->overage_rate_points
-            : null;
 
         // Deprecated: superseded by price_display/currency above, which
         // this pair simply mirrors — kept for one release only because the

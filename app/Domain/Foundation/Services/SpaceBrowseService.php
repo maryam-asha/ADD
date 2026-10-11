@@ -3,6 +3,7 @@
 namespace App\Domain\Foundation\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -10,7 +11,10 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Settings\Services\SettingService;
+use App\Support\Presenters\BranchHoursPresenter;
+use App\Support\Presenters\PriceLabelPresenter;
 use Carbon\Carbon;
 use Carbon\CarbonInterface;
 
@@ -20,12 +24,21 @@ class SpaceBrowseService
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
         private readonly PointConversionService $points,
+        private readonly BranchHoursPresenter $hours,
+        private readonly PriceLabelPresenter $prices,
+        private readonly OfferResolver $offers,
     ) {}
 
     /**
+     * Note: there is no `date` filter here. One was documented for a long
+     * time and never read. "Spaces with any availability on this date" is a
+     * real feature but a different one — it means an availability
+     * computation per card per page — and it belongs after the calendar
+     * exists and can be measured. Dates live in
+     * Member\SpaceAvailabilityController.
+     *
      * @param array{
      *     space_type?: ?string,
-     *     date?: ?string,
      *     min_capacity?: ?int,
      *     branch_id?: ?int,
      *     amenity?: ?string,
@@ -58,15 +71,22 @@ class SpaceBrowseService
             ];
         }
 
-        // 2. Working Hours Banner for Branch (Today)
+        // 2. Working Hours Banner for Branch: today's hours, plus the branch's
+        // week and closures. They are the same for every space, so they are
+        // stated here, once, rather than in each space's details.
         $today = Carbon::now($timezone)->startOfDay();
         $periods = $this->businessHours->periodsFor($today, $branch);
-        $banner = $this->buildWorkingHoursBanner($periods, $today, $timezone);
+        $banner = [
+            ...$this->buildWorkingHoursBanner($periods, $today, $timezone),
+            ...$this->branchWeek($branch, $periods, $timezone),
+        ];
 
-        // 3. Query Active Spaces for Branch
+        // 3. Query Active Spaces for Branch — a private office held by a
+        // lease today is not on offer (docs/superpowers/specs/2026-10-10-office-leases-design.md).
         $spacesQuery = Space::query()
             ->active()
-            ->with(['resources', 'building', 'zone.floor'])
+            ->whereDoesntHave('officeLeases', fn ($q) => $q->holdingOn(now()->toDateString()))
+            ->with(['resources', 'amenities', 'building', 'zone.floor'])
             ->whereHas('building', fn ($q) => $q->where('branch_id', $branch->id));
 
         $requestedType = strtolower((string) ($filters['space_type'] ?? 'all'));
@@ -96,7 +116,7 @@ class SpaceBrowseService
         $paginator = $spacesQuery->orderBy('hourly_rate_points', 'asc')->paginate($perPage);
 
         // 5. Transform Space Cards
-        $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space));
+        $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space, $user));
 
         return [
             'working_hours_banner' => $banner,
@@ -176,6 +196,41 @@ class SpaceBrowseService
     }
 
     /**
+     * The branch's hours beyond today, for the list's banner — everything the
+     * member app needs about the branch before any booking screen opens:
+     *
+     * - `periods`: today's, the periods behind `hours`.
+     * - `schedule` / `open_weekdays` / `days_label`: the ordinary week, its
+     *   days grouped by the hours they share (a branch keeps different hours
+     *   on different days).
+     * - the timezone, and its label derived per request (Damascus has DST).
+     *
+     * The upcoming closures are not here: the booking calendar is set up
+     * from the space details, which carry them as plain dates.
+     *
+     * Written by the same BranchHoursPresenter as the calendars' hours card.
+     *
+     * @param  array<int, array{open_time: string, close_time: string}>  $periods  today's
+     * @return array<string, mixed>
+     */
+    private function branchWeek(Branch $branch, array $periods, string $timezone): array
+    {
+        $locale = app()->getLocale();
+        $timezoneLabel = $this->hours->timezoneLabel($timezone);
+
+        return [
+            'title' => __('api.booking.branch_hours_title', [
+                'branch' => $branch->translate('name', $locale) ?? 'Aleppo Digital District',
+            ], $locale),
+            'periods' => $periods,
+            ...$this->hours->week($this->businessHours->weeklySchedule($branch), $timezone, $locale),
+            'timezone' => $timezone,
+            'timezone_label' => $timezoneLabel,
+            'timezone_note' => __('api.booking.timezone_note', ['offset' => $timezoneLabel], $locale),
+        ];
+    }
+
+    /**
      * @return array<int, array{key: string, label: string, icon: string}>
      */
     public function categories(): array
@@ -192,7 +247,7 @@ class SpaceBrowseService
     /**
      * @return array<string, mixed>
      */
-    private function formatSpaceCard(Space $space): array
+    private function formatSpaceCard(Space $space, ?User $user): array
     {
         $badge = match ($space->space_type) {
             SpaceType::CoSpace => 'OPEN SPACE',
@@ -201,23 +256,12 @@ class SpaceBrowseService
             SpaceType::EventHall => 'EVENT HALL',
         };
 
-        $title = match ($space->space_type) {
-            SpaceType::CoSpace => 'Hot Desk',
-            SpaceType::Room => 'Meeting Room A',
-            SpaceType::Business => 'Private Office '.($space->id),
-            SpaceType::EventHall => 'Event Hall',
-        };
+        $title = $space->displayTitle();
 
         $subtitle = match ($space->space_type) {
             SpaceType::CoSpace => 'Open Workspace',
             default => __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
         };
-
-        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
-        $rate = (float) $this->points->pointsToUsd($ratePoints);
-        $currency = 'USD';
-        $symbol = '$';
-        $isStartingFrom = $space->space_type === SpaceType::CoSpace;
 
         $amenities = $this->buildAmenities($space);
 
@@ -233,14 +277,10 @@ class SpaceBrowseService
             'capacity_label' => $space->space_type === SpaceType::CoSpace
                 ? __('api.space.single_seat')
                 : __('api.space.up_to_people', ['count' => $space->capacity ?? 1]),
-            'pricing' => [
-                'starting_from' => $isStartingFrom,
-                'hourly_rate_points' => $ratePoints,
-                'hourly_rate' => $rate,
-                'currency' => $currency,
-                'currency_symbol' => $symbol,
-                'formatted' => sprintf('%s%s / %s', $symbol, rtrim(rtrim(number_format($rate, 2), '0'), '.'), __('api.space.per_hour')),
-            ],
+            'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+            // The best offer live now for this member: the rate struck
+            // through, the offer rate, when it ends.
+            'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -257,6 +297,14 @@ class SpaceBrowseService
             $amenities[] = ['key' => 'seat', 'label' => __('api.space.single_seat'), 'icon' => 'user'];
         }
 
+        // Two genuinely different sources merge here: the fixed facility
+        // amenities toggled on for this space (SpaceAmenity) and its active
+        // equipment (Resource — projectors, mics, ...). See AmenityType's
+        // own doc comment for why these no longer live on the same model.
+        foreach ($space->amenities as $amenity) {
+            $amenities[] = $this->resolveAmenityType($amenity->amenity);
+        }
+
         // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
         // bare `Resource` to PHP's builtin `resource` stream pseudo-type, which
         // silently breaks static analysis of this Eloquent model. The FQCN is
@@ -267,17 +315,69 @@ class SpaceBrowseService
                 continue;
             }
 
-            $icon = match ($res->category) {
-                ResourceCategory::Screen => 'screen',
-                ResourceCategory::Projector => 'projector',
-                ResourceCategory::Whiteboard => 'whiteboard',
-                ResourceCategory::Mic => 'volume-2',
-                default => 'check-circle',
-            };
+            $amenities[] = $this->resolveResourceAmenity($res);
+        }
 
-            $label = $res->name;
-            $key = $res->category->value;
+        // Add lockable if not already present
+        if ($space->is_lockable && ! collect($amenities)->contains('key', 'lockable')) {
+            $amenities[] = ['key' => 'lockable', 'label' => 'Lockable', 'icon' => 'lock'];
+        }
 
+        return array_values($amenities);
+    }
+
+    /**
+     * Icon mapping carried over unchanged from when these 8 values were
+     * (briefly) ResourceCategory cases — same icons, now resolved off
+     * AmenityType/SpaceAmenity instead. Labels are translated per-locale,
+     * unlike a Resource's free-text admin-authored name.
+     *
+     * @return array{key: string, label: string, icon: string}
+     */
+    private function resolveAmenityType(AmenityType $amenity): array
+    {
+        $icon = match ($amenity) {
+            AmenityType::Wifi => 'wifi',
+            AmenityType::PowerOutlet => 'zap',
+            AmenityType::Printing => 'printer',
+            AmenityType::ErgonomicChairs => 'check-circle',
+            AmenityType::Locker => 'lock',
+            AmenityType::CafeAccess => 'coffee',
+            AmenityType::Ac => 'snowflake',
+            AmenityType::Stage => 'stage',
+        };
+
+        return [
+            'key' => $amenity->value,
+            'label' => __('api.space.amenities.'.$amenity->value),
+            'icon' => $icon,
+        ];
+    }
+
+    /**
+     * Category-first amenity resolution shared by the card view
+     * (`buildAmenities()`) and the detail checklist
+     * (`buildAmenitiesChecklist()`). A properly categorized resource is
+     * trusted directly; the substring-matching guesses only run for the
+     * catch-all `Other` category, as a backward-compat path for legacy rows
+     * that haven't been recategorized.
+     *
+     * @return array{key: string, label: string, icon: string}
+     */
+    private function resolveResourceAmenity(Resource $res): array
+    {
+        $icon = match ($res->category) {
+            ResourceCategory::Screen => 'screen',
+            ResourceCategory::Projector => 'projector',
+            ResourceCategory::Whiteboard => 'whiteboard',
+            ResourceCategory::Mic => 'volume-2',
+            default => 'check-circle',
+        };
+
+        $label = $res->name;
+        $key = $res->category->value;
+
+        if ($res->category === ResourceCategory::Other) {
             $lower = strtolower($res->name);
             if (str_contains($lower, 'wi-fi') || str_contains($lower, 'wifi')) {
                 $icon = 'wifi';
@@ -320,20 +420,9 @@ class SpaceBrowseService
                 $key = 'projector';
                 $label = 'Projector';
             }
-
-            $amenities[] = [
-                'key' => $key,
-                'label' => $label,
-                'icon' => $icon,
-            ];
         }
 
-        // Add lockable if not already present
-        if ($space->is_lockable && ! collect($amenities)->contains('key', 'lockable')) {
-            $amenities[] = ['key' => 'lockable', 'label' => 'Lockable', 'icon' => 'lock'];
-        }
-
-        return array_values($amenities);
+        return ['key' => $key, 'label' => $label, 'icon' => $icon];
     }
 
     /**
@@ -345,7 +434,7 @@ class SpaceBrowseService
             abort(404);
         }
 
-        $space->loadMissing(['resources', 'building.branch', 'zone.floor']);
+        $space->loadMissing(['resources', 'amenities', 'building.branch', 'zone.floor']);
 
         $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
         $branch = $space->building->branch;
@@ -359,12 +448,7 @@ class SpaceBrowseService
             SpaceType::EventHall => 'EVENT HALL',
         };
 
-        $title = match ($space->space_type) {
-            SpaceType::CoSpace => 'Hot Desk',
-            SpaceType::Room => 'Meeting Room A',
-            SpaceType::Business => 'Private Office '.($space->id),
-            SpaceType::EventHall => 'Event Hall',
-        };
+        $title = $space->displayTitle();
 
         $subtitle = match ($space->space_type) {
             SpaceType::CoSpace => 'Open Workspace',
@@ -373,12 +457,6 @@ class SpaceBrowseService
 
         $descriptionKey = 'api.space.descriptions.'.$space->space_type->value;
         $description = __($descriptionKey);
-
-        $ratePoints = (int) ($space->hourly_rate_points ?? 0);
-        $rate = (float) $this->points->pointsToUsd($ratePoints);
-        $currency = 'USD';
-        $symbol = '$';
-        $isStartingFrom = $space->space_type === SpaceType::CoSpace;
 
         $quickFeatures = $this->buildQuickFeatures($space);
 
@@ -401,14 +479,8 @@ class SpaceBrowseService
             'details' => [
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
-                'price' => [
-                    'starting_from' => $isStartingFrom,
-                    'hourly_rate_points' => $ratePoints,
-                    'hourly_rate' => $rate,
-                    'currency' => $currency,
-                    'currency_symbol' => $symbol,
-                    'formatted' => sprintf('%s%s / %s', $symbol, rtrim(rtrim(number_format($rate, 2), '0'), '.'), __('api.space.per_hour')),
-                ],
+                'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
+                'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1
@@ -465,50 +537,45 @@ class SpaceBrowseService
     }
 
     /**
+     * Data-driven regardless of space type: every entry comes from the
+     * space's own active `amenities`/`resources` rows (plus the
+     * `is_lockable` flag), not a per-`space_type` fabricated list.
+     *
      * @return array<int, array{key: string, name: string, icon: string}>
      */
     private function buildAmenitiesChecklist(Space $space): array
     {
         $checklist = [];
 
-        // Base checklist standard for hot desks/spaces
-        if ($space->space_type === SpaceType::CoSpace) {
-            $checklist = [
-                ['key' => 'wifi', 'name' => 'High-Speed Wi-Fi', 'icon' => 'wifi'],
-                ['key' => 'power', 'name' => 'Power Outlets', 'icon' => 'zap'],
-                ['key' => 'ergonomic_chairs', 'name' => 'Ergonomic Chairs', 'icon' => 'check-circle'],
-                ['key' => 'printing', 'name' => 'Printing Access', 'icon' => 'printer'],
-                ['key' => 'locker', 'name' => 'Locker (Add-on)', 'icon' => 'lock'],
-                ['key' => 'cafe', 'name' => 'Cafe Access', 'icon' => 'coffee'],
+        foreach ($space->amenities as $amenity) {
+            $resolved = $this->resolveAmenityType($amenity->amenity);
+            $checklist[] = [
+                'key' => $resolved['key'],
+                'name' => $resolved['label'],
+                'icon' => $resolved['icon'],
             ];
-        } else {
-            // For rooms, offices, halls: start with resources
-            foreach ($space->resources as $res) {
-                if ($res->status !== OperationalStatus::Active) {
-                    continue;
-                }
-                $icon = match ($res->category) {
-                    ResourceCategory::Screen => 'tv',
-                    ResourceCategory::Projector => 'video',
-                    ResourceCategory::Whiteboard => 'edit-3',
-                    ResourceCategory::Mic => 'volume-2',
-                    default => 'check-circle',
-                };
-                $checklist[] = [
-                    'key' => $res->category->value.'_'.$res->id,
-                    'name' => $res->name,
-                    'icon' => $icon,
-                ];
+        }
+
+        // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
+        // bare `Resource` to PHP's builtin `resource` stream pseudo-type, which
+        // silently breaks static analysis of this Eloquent model. The FQCN is
+        // left alone by that fixer.
+        /** @var \App\Domain\Foundation\Models\Resource $res */
+        foreach ($space->resources as $res) {
+            if ($res->status !== OperationalStatus::Active) {
+                continue;
             }
 
-            if ($space->is_lockable) {
-                $checklist[] = ['key' => 'smart_lock', 'name' => 'Keyless Smart Lock', 'icon' => 'lock'];
-            }
+            $amenity = $this->resolveResourceAmenity($res);
+            $checklist[] = [
+                'key' => $amenity['key'],
+                'name' => $amenity['label'],
+                'icon' => $amenity['icon'],
+            ];
+        }
 
-            // Standard facilities
-            $checklist[] = ['key' => 'wifi', 'name' => 'High-Speed Wi-Fi', 'icon' => 'wifi'];
-            $checklist[] = ['key' => 'ac', 'name' => 'Climate Control A/C', 'icon' => 'snowflake'];
-            $checklist[] = ['key' => 'cafe', 'name' => 'Cafe Access', 'icon' => 'coffee'];
+        if ($space->is_lockable) {
+            $checklist[] = ['key' => 'smart_lock', 'name' => 'Keyless Smart Lock', 'icon' => 'lock'];
         }
 
         return array_values($checklist);

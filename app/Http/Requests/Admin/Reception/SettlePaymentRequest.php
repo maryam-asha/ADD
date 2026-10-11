@@ -19,7 +19,7 @@ class SettlePaymentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            'payment_method' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],
         ];
     }
 }

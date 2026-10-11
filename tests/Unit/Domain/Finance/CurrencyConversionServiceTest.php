@@ -80,28 +80,4 @@ class CurrencyConversionServiceTest extends TestCase
 
         $this->assertNull($result);
     }
-
-    /**
-     * convert() rounds to cents; toBaseExact() must not. 501,200 SYP is
-     * $34.09523264 exactly — convert() reports 34.10, which floors to one
-     * point more than was paid for.
-     */
-    public function test_to_base_exact_keeps_every_digit(): void
-    {
-        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0000680272', 'effective_from' => now()->subDay()]);
-
-        $usd = (new CurrencyConversionService)->toBaseExact('501200', 'SYP');
-
-        $this->assertSame(0, bccomp('34.09523264', $usd, 20));
-    }
-
-    public function test_to_base_exact_passes_the_base_currency_through_untouched(): void
-    {
-        $this->assertSame('12.50', (new CurrencyConversionService)->toBaseExact('12.50', 'USD'));
-    }
-
-    public function test_to_base_exact_is_null_without_an_exchange_rate(): void
-    {
-        $this->assertNull((new CurrencyConversionService)->toBaseExact('5000', 'SYP'));
-    }
 }

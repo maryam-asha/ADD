@@ -20,7 +20,7 @@ class ServiceAxis extends Model
     protected function casts(): array
     {
         return [
-            'name'  => 'array',
+            'name' => 'array',
             'order' => 'integer',
         ];
     }

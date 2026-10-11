@@ -2,11 +2,18 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Support\TranslatableField;
+use App\Domain\Membership\Models\Plan;
+use App\Support\Plans\PlanRules;
+use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Rule;
 
+/**
+ * `access_window_start`/`access_window_end` are validated as a pair, but
+ * deliberately WITHOUT StoreBusinessHourRequest's "end must be after start"
+ * rule: a plan window is allowed to wrap past midnight (20:00-00:00 is the
+ * evening package this was built for), so an end at or before the start is
+ * meaningful here rather than an error.
+ */
 class StorePlanRequest extends FormRequest
 {
     public function authorize(): bool
@@ -19,39 +26,41 @@ class StorePlanRequest extends FormRequest
      */
     public function rules(): array
     {
-        return array_merge(
-            TranslatableField::rules('name'),
-            TranslatableField::rules('subtitle', false),
-            [
-                'plan_module_id' => ['nullable', 'integer', 'exists:plan_modules,id'],
-                'is_subscription' => ['required', 'boolean'],
-                'price_points' => ['required', 'integer', 'min:0'],
-                'duration_days' => ['required', 'integer', 'min:1'],
-                'included_hours' => ['required', 'numeric', 'min:0'],
-                'overage_rate_points' => ['nullable', 'integer', 'min:0'],
-                'is_active' => ['nullable', 'boolean'],
-                'order' => ['nullable', 'integer', 'min:0'],
+        return PlanRules::rules();
+    }
 
-                'balances' => ['nullable', 'array'],
-                'balances.*.category' => ['required', Rule::enum(WalletTransactionCategory::class)],
-                'balances.*.amount_points' => ['required', 'integer', 'min:0'],
-                'balances.*.restricted_space_id' => ['nullable', 'integer', 'exists:spaces,id'],
-                'balances.*.description' => ['nullable', 'array'],
-                'balances.*.description.ar' => ['nullable', 'string'],
-                'balances.*.description.en' => ['nullable', 'string'],
-                'balances.*.order' => ['nullable', 'integer', 'min:0'],
+    /**
+     * One reference or neither, as stored once saved; units with no
+     * reference measure against nothing; and a plan is never its own
+     * reference.
+     */
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($validator->errors()->hasAny(['reference_plan_id', 'reference_space_id', 'reference_units'])) {
+                return;
+            }
 
-                'features' => ['nullable', 'array'],
-                'features.*.name' => ['required', 'array'],
-                'features.*.name.ar' => ['nullable', 'string'],
-                'features.*.name.en' => ['nullable', 'string'],
-                'features.*.value' => ['nullable', 'array'],
-                'features.*.value.ar' => ['nullable', 'string'],
-                'features.*.value.en' => ['nullable', 'string'],
-                'features.*.icon' => ['nullable', 'string', 'max:100'],
-                'features.*.is_included' => ['nullable', 'boolean'],
-                'features.*.order' => ['nullable', 'integer', 'min:0'],
-            ]
-        );
+            $plan = $this->route('plan');
+            $plan = $plan instanceof Plan ? $plan : ($plan !== null ? Plan::find($plan) : null);
+            $sentOrStored = fn (string $field) => $this->exists($field) ? $this->input($field) : $plan?->getAttribute($field);
+
+            // One reference or neither — a reference sent beside a stored one
+            // of the other kind would leave both.
+            if ($sentOrStored('reference_plan_id') !== null && $sentOrStored('reference_space_id') !== null) {
+                $validator->errors()->add(
+                    $this->filled('reference_plan_id') ? 'reference_plan_id' : 'reference_space_id',
+                    __('api.admin.plan_reference_one_kind'),
+                );
+            }
+
+            if ($this->input('reference_units') !== null && $sentOrStored('reference_plan_id') === null && $sentOrStored('reference_space_id') === null) {
+                $validator->errors()->add('reference_units', __('api.admin.plan_reference_units_without_reference'));
+            }
+
+            if ($plan !== null && (int) $this->input('reference_plan_id') === $plan->id) {
+                $validator->errors()->add('reference_plan_id', __('api.admin.plan_reference_self'));
+            }
+        });
     }
 }

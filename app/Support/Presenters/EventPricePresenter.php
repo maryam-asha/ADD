@@ -3,7 +3,6 @@
 namespace App\Support\Presenters;
 
 use App\Domain\Experience\Models\Event;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Services\CurrencyResolver;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Identity\Models\User;
@@ -24,6 +23,7 @@ class EventPricePresenter
     public function __construct(
         private readonly PointConversionService $points,
         private readonly CurrencyResolver $currencies,
+        private readonly PriceLabelPresenter $labels,
     ) {}
 
     /**
@@ -49,23 +49,29 @@ class EventPricePresenter
     }
 
     /**
-     * The member-facing view: the two labels a client prints, and nothing
-     * else. A member never needs the raw point count — registration
-     * charges the wallet server-side and validates the balance there, so
-     * shipping the number would only invite a client to re-derive a price
-     * the server already decided.
+     * The member-facing view: the formatted price and points as numbers
+     * along with their display-ready labels in a single pricing object.
      *
-     * Admin surfaces keep the full block (they edit the stored value).
-     *
-     * @return array{price_label: string, price_display_label: string}
+     * @return array{
+     *     points: int,
+     *     points_label: string,
+     *     price: int|float,
+     *     price_label: string,
+     *     currency: string
+     * }
      */
     public function presentForDisplay(Event $event, ?User $user, string $locale): array
     {
         $price = $this->presentFor($event, $user, $locale);
+        $amount = $price['price_display'];
+        $numericPrice = (float) $amount == (int) (float) $amount ? (int) (float) $amount : (float) $amount;
 
         return [
-            'price_label' => $price['price_label'],
-            'price_display_label' => $price['price_display_label'],
+            'points' => $price['price_points'],
+            'points_label' => $price['price_label'],
+            'price' => $numericPrice,
+            'price_label' => $price['price_display_label'],
+            'currency' => $price['currency'],
         ];
     }
 
@@ -96,26 +102,8 @@ class EventPricePresenter
             'price_display' => $priceDisplay,
             'price_display_label' => $isFree
                 ? __('api.event.price_free', [], $locale)
-                : $this->withSymbol($priceDisplay, $targetCurrency),
+                : $this->labels->currencyLabel($priceDisplay, $targetCurrency, $locale),
             'currency' => $targetCurrency,
         ];
-    }
-
-    /**
-     * Thousands-separated, with the currency's own symbol placed after the
-     * number — the convention both `ل.س` and `$` read correctly in here,
-     * and the one the dashboard already uses.
-     *
-     * Falls back to the currency code when a row carries no symbol, so an
-     * admin adding a currency without one degrades to "1,000 EUR" rather
-     * than a bare number.
-     */
-    private function withSymbol(string $amount, string $currencyCode): string
-    {
-        $currency = Currency::find($currencyCode);
-        $decimals = $currency?->decimal_places ?? 2;
-        $symbol = $currency?->symbol ?: $currencyCode;
-
-        return number_format((float) $amount, $decimals).' '.$symbol;
     }
 }

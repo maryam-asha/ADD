@@ -4,7 +4,10 @@ namespace App\Services\Otp;
 
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Models\OtpVerification;
+use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
+use Closure;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 
@@ -22,9 +25,22 @@ class OtpService
      * Each flow has its own endpoint now, so every caller knows exactly what it
      * is minting and there is no case left where guessing would be right.
      *
-     * @throws OtpThrottledException if a code was requested too recently.
+     * `$alongside` runs in the same short transaction that stores the code,
+     * for a caller whose own row must be written with it (register() parks the
+     * profile this way) — never wrap request() in a transaction instead. The
+     * send is an HTTP call to the gateway that can take several seconds, and
+     * holding a transaction open across it is what let MySQL drop the
+     * connection mid-request ("server has gone away") in production.
+     *
+     * @param  (Closure(): void)|null  $alongside
+     *
+     * @throws OtpThrottledException if a code was requested too recently —
+     *                               checked before anything is written.
+     * @throws OtpDeliveryFailedException if the gateway did not accept the send.
+     *                                    The code row is dropped and the cooldown
+     *                                    is not started, so the member can retry.
      */
-    public function request(string $phone, OtpPurpose $purpose): OtpVerification
+    public function request(string $phone, OtpPurpose $purpose, ?Closure $alongside = null): OtpVerification
     {
         $key = $this->throttleKey($phone, $purpose);
 
@@ -34,16 +50,26 @@ class OtpService
 
         $code = $this->generateCode();
 
-        $otp = OtpVerification::create([
-            'phone' => $phone,
-            'provider' => self::CHANNEL,
-            'purpose' => $purpose,
-            'code_hash' => Hash::make($code),
-            'attempts' => 0,
-            'expires_at' => now()->addMinutes(config('otp.expires_after_minutes')),
-        ]);
+        $otp = DB::transaction(function () use ($phone, $purpose, $code, $alongside) {
+            if ($alongside) {
+                $alongside();
+            }
 
-        $this->provider->send($phone, $code, self::CHANNEL);
+            return OtpVerification::create([
+                'phone' => $phone,
+                'provider' => self::CHANNEL,
+                'purpose' => $purpose,
+                'code_hash' => Hash::make($code),
+                'attempts' => 0,
+                'expires_at' => now()->addMinutes(config('otp.expires_after_minutes')),
+            ]);
+        });
+
+        if (! $this->provider->send($phone, $code, self::CHANNEL)) {
+            $otp->delete();
+
+            throw new OtpDeliveryFailedException;
+        }
 
         RateLimiter::hit($key, config('otp.resend_cooldown_seconds'));
 
