@@ -15,6 +15,7 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use Carbon\CarbonInterface;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -66,8 +67,8 @@ class MembershipActivationService
      * elsewhere (PaymentService) names the payment that paid for it.
      *
      * `$startsAt` starts the period later (a renewal made in advance);
-     * `$attributes` are extra columns for the new row (`auto_renew`,
-     * `renewed_from_id`).
+     * `$attributes` only add the `auto_renew` and `renewed_from_id`
+     * columns to the new row; any other key is ignored.
      *
      * @param  list<int>  $deskIds
      * @param  array<string, mixed>  $auditProperties
@@ -128,7 +129,7 @@ class MembershipActivationService
                 'status' => MembershipStatus::Active,
                 'current_period_start' => $periodStart,
                 'current_period_end' => $periodEnd,
-                ...$attributes,
+                ...Arr::only($attributes, ['auto_renew', 'renewed_from_id']),
             ]);
 
             if ($deskIds !== []) {

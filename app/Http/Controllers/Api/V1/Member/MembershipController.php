@@ -13,6 +13,7 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\StartPayment;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
@@ -78,7 +79,8 @@ class MembershipController extends Controller
      * Every subscription the member holds or held — their own and those of
      * the companies they belong to — active or expired, newest first.
      * `via` says whose it is (`personal` | `company`, with the company named);
-     * `status` is `active` until `current_period_end`, then `expired`;
+     * `status` is `upcoming` before `current_period_start` (a renewal made
+     * ahead), `active` until `current_period_end`, then `expired`;
      * `is_current` marks the one memberships/current shows (the member's own
      * active plan first, else a company's), on no row once all have ended.
      * Filters: `status`, `via`, `per_page`.
@@ -97,6 +99,7 @@ class MembershipController extends Controller
             ))
             ->when($request->validated('status') === 'active', fn (Builder $q) => $q->live())
             ->when($request->validated('status') === 'expired', fn (Builder $q) => $q->ended())
+            ->when($request->validated('status') === 'upcoming', fn (Builder $q) => $q->where('status', MembershipStatus::Active)->where('current_period_start', '>', now()))
             ->orderByDesc('current_period_start')
             ->orderByDesc('id')
             ->paginate((int) ($request->validated('per_page') ?? 20));
@@ -109,7 +112,7 @@ class MembershipController extends Controller
                 'company' => $membership->owner_type === OwnerType::Company
                     ? ['id' => $membership->owner_id, 'name' => $companies->get($membership->owner_id)?->legal_name]
                     : null,
-                'status' => $membership->isLive() ? 'active' : 'expired',
+                'status' => $membership->current_period_start->isFuture() ? 'upcoming' : ($membership->isLive() ? 'active' : 'expired'),
                 'is_current' => $membership->id === $currentId,
                 'seats' => $membership->seats,
                 'desks' => $membership->seatDesks->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values(),

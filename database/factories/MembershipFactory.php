@@ -26,6 +26,7 @@ class MembershipFactory extends Factory
             'owner_id' => User::factory(),
             'current_period_start' => now(),
             'current_period_end' => now()->addDays(30),
+            'balances_granted_at' => now(),
         ];
     }
 }
