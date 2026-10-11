@@ -49,7 +49,7 @@ class AutoRenewAtCreationTest extends RenewalsTestCase
 
         $this->postJson("/api/v1/admin/private-office-requests/{$request->id}/lease", [
             'contract_ref' => 'C', ...$this->leasePayload($this->leasableOffice()), 'auto_renew' => true,
-        ])->assertCreated();
+        ])->assertCreated()->assertJsonPath('data.auto_renew', true);
 
         $this->assertTrue(OfficeLease::query()->sole()->auto_renew);
     }

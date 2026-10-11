@@ -64,6 +64,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
+use App\Http\Controllers\Api\V1\Admin\RenewalController;
 use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
@@ -297,6 +298,13 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::get('office-leases', [OfficeLeaseController::class, 'index'])->middleware('permission:office-leases.view');
     Route::get('office-leases/{officeLease}', [OfficeLeaseController::class, 'show'])->middleware('permission:office-leases.view');
     Route::post('office-leases/{officeLease}/terminate', [OfficeLeaseController::class, 'terminate'])->middleware('permission:office-leases.terminate');
+
+    // Auto-renewal (docs/superpowers/specs/2026-10-11-auto-renewal-design.md).
+    Route::get('renewals/stopped', [RenewalController::class, 'stopped'])->middleware('permission:renewals.manage');
+    Route::post('memberships/{membership}/renew', [RenewalController::class, 'renewMembership'])->middleware('permission:renewals.manage');
+    Route::post('office-leases/{officeLease}/renew', [RenewalController::class, 'renewLease'])->middleware('permission:renewals.manage');
+    Route::patch('memberships/{membership}/auto-renew', [RenewalController::class, 'membershipAutoRenew'])->middleware('permission:renewals.manage');
+    Route::patch('office-leases/{officeLease}/auto-renew', [RenewalController::class, 'leaseAutoRenew'])->middleware('permission:renewals.manage');
 });
 
 // Mobile client crash/error reports (ingested unauthenticated from

@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\Admin\PaymentController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
+use App\Http\Controllers\Api\V1\Admin\RenewalController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
@@ -77,6 +78,10 @@ class PermissionSyncService
         ],
         InvoicePaymentController::class => [
             'invoices' => ['record_payment', 'void_payment'],
+        ],
+        // Auto-renewal (docs/superpowers/specs/2026-10-11-auto-renewal-design.md).
+        RenewalController::class => [
+            'renewals' => ['manage'],
         ],
         // Service providers (docs/decisions/service-providers.md). Every
         // route is permission-gated, so the decision on a provider request

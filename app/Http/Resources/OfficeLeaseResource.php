@@ -36,6 +36,10 @@ class OfficeLeaseResource extends JsonResource
             'duration_months' => $this->duration_months,
             'billing_cycle_months' => $this->billing_cycle_months,
             'terminated_on' => $this->terminated_on?->toDateString(),
+            'auto_renew' => $this->auto_renew,
+            'renewal_stop_reason' => $this->renewal_stop_reason?->value,
+            'renewal_stop_reason_label' => $this->renewal_stop_reason?->label(),
+            'renewals_count' => $this->renewals_count,
             'periods' => $this->whenLoaded('periods', fn () => $this->periods->map(fn ($period) => [
                 'sequence' => $period->sequence,
                 'starts_on' => $period->starts_on->toDateString(),
