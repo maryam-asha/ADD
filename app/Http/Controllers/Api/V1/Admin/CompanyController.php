@@ -13,6 +13,7 @@ use App\Http\Requests\Admin\ListCompaniesRequest;
 use App\Http\Requests\Admin\StoreCompanyRequest;
 use App\Http\Requests\Admin\UpdateCompanyStatusRequest;
 use App\Http\Resources\CompanyResource;
+use App\Support\LikeTerm;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,9 +38,12 @@ class CompanyController extends Controller
             ->when($request->boolean('direct'), fn (Builder $q) => $q->whereNull('provider_id'))
             ->when($request->filled('status'), fn (Builder $q) => $q->where('status', $request->string('status')))
             ->when($request->filled('branch_id'), fn (Builder $q) => $q->where('branch_id', $request->integer('branch_id')))
-            ->when($request->filled('search'), fn (Builder $q) => $q->whereRaw("legal_name LIKE ? ESCAPE '!'", ['%'.$this->escapeLike($request->string('search')).'%']))
-            ->latest()
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->filled('search'), fn (Builder $q) => $q->whereRaw("legal_name LIKE ? ESCAPE '!'", [LikeTerm::contains($request->string('search'))]))
+            ->latest();
+
+        $companies = $request->boolean('all')
+            ? $companies->get()
+            : $companies->paginate($request->integer('per_page', 15));
 
         return CompanyResource::collection($companies);
     }
@@ -102,11 +106,5 @@ class CompanyController extends Controller
         ]);
 
         return response()->json(['message' => __('api.admin.company_status_updated')]);
-    }
-
-    /** `!` rather than a backslash: the one escape character MySQL and SQLite both read the same way. */
-    private function escapeLike(string $term): string
-    {
-        return str_replace(['!', '%', '_'], ['!!', '!%', '!_'], $term);
     }
 }

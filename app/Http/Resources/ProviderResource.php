@@ -16,6 +16,7 @@ class ProviderResource extends JsonResource
             'payment_terms_days' => $this->payment_terms_days,
             'status' => $this->status,
             'companies_count' => $this->whenCounted('companies'),
+            'users_count' => $this->whenCounted('users'),
             'users' => $this->whenLoaded('users', fn () => $this->users->map(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,

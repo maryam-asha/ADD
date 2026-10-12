@@ -16,6 +16,7 @@ class StoreProviderRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'contract_ref' => ['required', 'string', 'max:255'],
+            'payment_terms_days' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:365'],
         ];
     }
 }

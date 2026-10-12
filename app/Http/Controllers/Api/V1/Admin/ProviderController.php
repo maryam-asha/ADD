@@ -28,7 +28,7 @@ class ProviderController extends Controller
 
     public function index(): AnonymousResourceCollection
     {
-        return ProviderResource::collection(Provider::query()->withCount('companies')->orderBy('name')->get());
+        return ProviderResource::collection(Provider::query()->withCount(['companies', 'users'])->orderBy('name')->get());
     }
 
     public function store(StoreProviderRequest $request): ProviderResource

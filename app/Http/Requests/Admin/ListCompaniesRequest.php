@@ -26,6 +26,8 @@ class ListCompaniesRequest extends FormRequest
             'branch_id' => ['nullable', 'integer'],
             'search' => ['nullable', 'string', 'max:255'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+            // Pickers (dropdowns) need every company, not a page of them.
+            'all' => ['nullable', 'boolean', 'prohibits:per_page'],
         ];
     }
 }
