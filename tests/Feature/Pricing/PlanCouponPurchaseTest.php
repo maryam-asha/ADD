@@ -46,7 +46,6 @@ class PlanCouponPurchaseTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
 
@@ -169,7 +168,7 @@ class PlanCouponPurchaseTest extends TestCase
         $payment = Payment::sole();
         $this->assertSame(60, $payment->amount_points);
         $this->assertSame(60, $payment->points_to_credit);
-        $this->assertSame(600, $payment->amount_minor);
+        $this->assertSame(6, $payment->charged_amount);
         $this->assertSame(1, app(CouponLedger::class)->liveUsage($coupon));
 
         $payment->forceFill(['status' => PaymentStatus::Failed])->save();

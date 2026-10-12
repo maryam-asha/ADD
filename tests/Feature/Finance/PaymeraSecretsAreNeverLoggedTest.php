@@ -46,7 +46,6 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
             'paymera.terminal_id' => '99990001',
             'paymera.timeout' => 5,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'logging.channels.paymera' => [
                 'driver' => 'single',
                 'path' => $this->logPath,
@@ -90,7 +89,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
         ]);
 
         app(PaymeraClient::class)->createPayment(
-            amountMinor: 1000,
+            chargedAmount: 1000,
             callbackUrl: 'https://app.test/cb',
             triggerUrl: 'https://app.test/tr',
         );
@@ -109,7 +108,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
 
         try {
             app(PaymeraClient::class)->createPayment(
-                amountMinor: 1000,
+                chargedAmount: 1000,
                 callbackUrl: 'https://app.test/cb',
                 triggerUrl: 'https://app.test/tr',
             );
@@ -137,7 +136,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
 
         try {
             app(PaymeraClient::class)->createPayment(
-                amountMinor: 1000,
+                chargedAmount: 1000,
                 callbackUrl: 'https://app.test/cb',
                 triggerUrl: 'https://app.test/tr',
             );
@@ -160,7 +159,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
         ]);
 
         app(PaymeraClient::class)->createPayment(
-            amountMinor: 1000,
+            chargedAmount: 1000,
             callbackUrl: 'https://app.test/cb',
             triggerUrl: 'https://app.test/tr',
             extra: ['apiKey' => self::API_KEY],
@@ -185,7 +184,7 @@ class PaymeraSecretsAreNeverLoggedTest extends TestCase
         ]);
 
         app(PaymeraClient::class)->createPayment(
-            amountMinor: 1000,
+            chargedAmount: 1000,
             callbackUrl: 'https://app.test/cb',
             triggerUrl: 'https://app.test/tr',
         );

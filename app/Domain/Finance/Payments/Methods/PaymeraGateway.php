@@ -106,13 +106,12 @@ class PaymeraGateway implements PaymentGateway
      */
     private function prepare(Payment $payment, ?string $lang): void
     {
-        [$points, $chargeMinor] = $this->amounts->forPoints((int) $payment->amount_points);
+        [$points, $chargedAmount] = $this->amounts->forPoints((int) $payment->amount_points);
 
         $payment->forceFill([
             'callback_token' => Payment::newCallbackToken(),
-            'amount_minor' => $chargeMinor,
+            'charged_amount' => $chargedAmount,
             'currency' => (string) config('paymera.currency'),
-            'currency_exponent' => (int) config('paymera.currency_exponent'),
             'points_to_credit' => $points,
             'terminal_id' => (string) config('paymera.terminal_id'),
             'lang' => $lang ?? (string) config('paymera.default_lang'),
@@ -122,7 +121,7 @@ class PaymeraGateway implements PaymentGateway
     public function createPayment(Payment $payment, User $payer): CreatedPayment
     {
         return $this->client->createPayment(
-            amountMinor: $payment->amount_minor,
+            chargedAmount: $payment->charged_amount,
             callbackUrl: route($this->callbackRouteName(), ['token' => $payment->callback_token]),
             triggerUrl: route(self::TRIGGER_ROUTE, ['token' => $payment->callback_token]),
             lang: $payment->lang,

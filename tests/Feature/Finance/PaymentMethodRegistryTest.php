@@ -57,7 +57,6 @@ class PaymentMethodRegistryTest extends TestCase
             // Crediting reads the charged currency from here; USD is the
             // base currency, so no exchange rate is needed.
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.terminal_id' => self::TERMINAL,
         ]);
 
@@ -82,7 +81,7 @@ class PaymentMethodRegistryTest extends TestCase
             'method' => $method,
             'user_id' => $member->id,
             'wallet_id' => $wallet->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 1000,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
             'status' => PaymentStatus::Pending,
@@ -436,7 +435,7 @@ final class FakeGateway implements PaymentGateway
         return new PaymentStatusResult(
             status: PaymentStatus::Accepted,
             rawStatus: 'A',
-            amountMinor: (int) $payment->amount_minor,
+            chargedAmount: (int) $payment->charged_amount,
             terminalId: (string) $payment->terminal_id,
             rrn: 'fake-rrn',
             creationTimestamp: null,

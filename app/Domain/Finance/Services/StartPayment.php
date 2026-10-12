@@ -58,7 +58,7 @@ class StartPayment
      * A plan made free by its coupon has nothing to charge by card: the
      * caller settles it through PaymentService instead.
      *
-     * @param  int|null  $amountMinor  required for a top-up, ignored for a plan purchase
+     * @param  int|null  $chargedAmount  required for a top-up, ignored for a plan purchase
      * @param  string  $method  the gateway's key in config/payments.php — the payment is opened through it and recorded under it
      * @return array{payment: Payment, url: string}
      */
@@ -66,7 +66,7 @@ class StartPayment
         User $user,
         PaymentPurpose $purpose,
         ?Plan $plan = null,
-        ?int $amountMinor = null,
+        ?int $chargedAmount = null,
         ?string $lang = null,
         ?Coupon $coupon = null,
         string $method = PaymeraGateway::KEY,
@@ -88,19 +88,19 @@ class StartPayment
         // allocation/top-up paths, which carry their own authorization.
         $wallet = $this->wallets->walletFor(OwnerType::User, $user->id);
 
-        $payment = DB::transaction(function () use ($user, $purpose, $plan, $amountMinor, $lang, $coupon, $wallet, $method) {
+        $payment = DB::transaction(function () use ($user, $purpose, $plan, $chargedAmount, $lang, $coupon, $wallet, $method) {
             // The coupon's row first (CouponLedger), then the price it gives.
             $coupon = $this->couponLedger->lockForPricing($coupon);
             $quote = $purpose === PaymentPurpose::PlanPurchase ? $this->quotes->forPlan($plan, $user, $coupon, now()) : null;
 
             // Points are the unit of account, so both purposes resolve to the
             // same pair: how many points are granted, and what that costs in
-            // the gateway's minor units. A plan's price is PriceQuoteService's
+            // the gateway's currency. A plan's price is PriceQuoteService's
             // — its sale and coupon included — and the charge is derived from
             // those points, as for anything else.
-            [$points, $chargeMinor] = $quote !== null
+            [$points, $chargedAmount] = $quote !== null
                 ? $this->amounts->forPoints($quote->finalPoints)
-                : $this->amounts->forTopUp($amountMinor);
+                : $this->amounts->forTopUp($chargedAmount);
 
             $payment = Payment::create([
                 'callback_token' => Payment::newCallbackToken(),
@@ -110,9 +110,8 @@ class StartPayment
                 'user_id' => $user->id,
                 'wallet_id' => $wallet->id,
                 'plan_id' => $plan?->id,
-                'amount_minor' => $chargeMinor,
+                'charged_amount' => $chargedAmount,
                 'currency' => (string) config('paymera.currency'),
-                'currency_exponent' => (int) config('paymera.currency_exponent'),
                 'points_to_credit' => $points,
                 'amount_points' => $points,
                 'list_price_points' => $plan !== null ? (int) $plan->price_points : null,

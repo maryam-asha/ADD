@@ -51,7 +51,7 @@ class AdminPaymentsPagesTest extends TestCase
         if ($method !== 'paymera') {
             $factory = $factory->withoutGateway($method, $points);
         } else {
-            $attributes += ['points_to_credit' => $points, 'amount_minor' => $points * 10];
+            $attributes += ['points_to_credit' => $points, 'charged_amount' => intdiv($points, 10)];
         }
 
         return $factory->create(array_merge([
@@ -102,7 +102,7 @@ class AdminPaymentsPagesTest extends TestCase
         $this->payment('wallet', 40, PaymentStatus::Accepted, '2026-08-17 09:00');
         $this->payment('cash', 60, PaymentStatus::Accepted, '2026-08-17 10:00', ['received_amount' => 6000, 'received_currency' => 'SYP']);
         $this->payment('cash', 25, PaymentStatus::Pending, '2026-08-17 11:00');
-        $this->payment('paymera', 100, PaymentStatus::Accepted, '2026-08-17 11:30', ['currency' => 'USD', 'currency_exponent' => 2]);
+        $this->payment('paymera', 100, PaymentStatus::Accepted, '2026-08-17 11:30', ['currency' => 'USD']);
         // Another day: outside the range.
         $this->payment('wallet', 999, PaymentStatus::Accepted, '2026-08-10 09:00');
 

@@ -13,7 +13,7 @@ use Illuminate\Validation\Rule;
 /**
  * A member topping up their own wallet from the app — by a prepaid method
  * only; cash for points is reception's. `amount` is what they want to add,
- * in the gateway currency's major units.
+ * in the gateway currency, sent to the gateway as it is.
  */
 class StoreTopUpRequest extends FormRequest
 {
@@ -33,13 +33,13 @@ class StoreTopUpRequest extends FormRequest
             // is reception's), nor can points buy points. StartPayment opens
             // the payment through the method named here.
             'payment_method' => ['required', 'string', Rule::in(self::methods())],
-            // A plain decimal: `numeric` alone lets `1e3` through, which
-            // bcmath refuses (amountMinor()).
+            // A whole number, as Paymera takes it: `numeric` alone lets `1e3`
+            // through. Trailing zeros are not precision ("5000.00").
             'amount' => [
                 'required',
                 'numeric',
-                'regex:/^\d+(\.\d{1,6})?$/',
-                'min:0.01',
+                'regex:/^\d+(\.0+)?$/',
+                'min:1',
                 new AmountFitsCurrency((string) config('paymera.currency')),
             ],
         ];
@@ -57,7 +57,7 @@ class StoreTopUpRequest extends FormRequest
             // caught: it is ours, rendered as a 503 (bootstrap/app.php).
             $minimum = app(PaymentAmountCalculator::class)->minimumTopUp();
 
-            if ((int) $this->amountMinor() < $minimum['amount_minor']) {
+            if ((int) $this->chargedAmount() < (int) $minimum['amount']) {
                 $validator->errors()->add('amount', __('api.wallet.top_up_below_minimum', [
                     'amount' => number_format((int) $minimum['amount']),
                     'currency' => $minimum['currency'],
@@ -83,10 +83,9 @@ class StoreTopUpRequest extends FormRequest
     }
 
     /**
-     * The amount in the gateway's integer minor units, with bcmath — never
-     * (int) round($x * 100), which turns 10.10 into 1009.
+     * The amount as the gateway is charged it.
      */
-    public function amountMinor(): ?int
+    public function chargedAmount(): ?int
     {
         $amount = $this->input('amount');
 
@@ -94,6 +93,6 @@ class StoreTopUpRequest extends FormRequest
             return null;
         }
 
-        return (int) bcmul((string) $amount, bcpow('10', (string) config('paymera.currency_exponent'), 0), 0);
+        return (int) bcadd((string) $amount, '0', 0);
     }
 }

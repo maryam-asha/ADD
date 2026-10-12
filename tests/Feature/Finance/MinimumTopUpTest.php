@@ -35,7 +35,6 @@ class MinimumTopUpTest extends TestCase
             'paymera.api_key' => 'test-key',
             'paymera.terminal_id' => '14740460',
             'paymera.currency' => 'SYP',
-            'paymera.currency_exponent' => 2,
             'payments.min_top_up_points' => 10,
         ]);
 

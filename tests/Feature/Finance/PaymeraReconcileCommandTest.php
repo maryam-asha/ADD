@@ -35,7 +35,6 @@ class PaymeraReconcileCommandTest extends TestCase
             // a live exchange rate, and its absence would fail the credit for
             // an unrelated reason.
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.pending_expiry_minutes' => 60,
         ]);
     }
@@ -49,7 +48,7 @@ class PaymeraReconcileCommandTest extends TestCase
         return Payment::factory()->create(array_merge([
             'user_id' => $member->id,
             'wallet_id' => $wallet->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 1000,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
             'status' => PaymentStatus::Pending,

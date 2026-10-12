@@ -63,7 +63,9 @@ class PaymentsTableTest extends TestCase
 
         // Put the table back the way production has it, write a row the way
         // production wrote it, and run the migration over it. The later
-        // `reference` column goes first, so the table is really as it was.
+        // changes go first, so the table is really as it was.
+        $simplify = require database_path('migrations/2026_10_12_110000_simplify_payments_charged_amount.php');
+        $simplify->down();
         $references = require database_path('migrations/2026_10_08_100300_add_reference_to_payments_table.php');
         $references->down();
         $this->migration()->down();
@@ -88,6 +90,7 @@ class PaymentsTableTest extends TestCase
 
         $this->migration()->up();
         $references->up();
+        $simplify->up();
 
         $payment = Payment::query()->findOrFail($id);
 
@@ -108,7 +111,7 @@ class PaymentsTableTest extends TestCase
         $this->assertSame('wallet', $fresh->method);
         $this->assertNull($fresh->terminal_id);
         $this->assertNull($fresh->callback_token);
-        $this->assertNull($fresh->amount_minor);
+        $this->assertNull($fresh->charged_amount);
         $this->assertNull($fresh->currency);
         $this->assertSame(40, $fresh->amount_points);
     }
@@ -258,7 +261,6 @@ class PaymentsTableTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
         Http::fake([

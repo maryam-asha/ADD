@@ -49,7 +49,6 @@ class PlanOfferPriceTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
 
@@ -193,7 +192,7 @@ class PlanOfferPriceTest extends TestCase
                     'status' => 'A',
                     'creationTimestamp' => '2026-10-05 10:00:00.000',
                     'rrn' => '000009876543',
-                    'amount' => Payment::sole()->amount_minor,
+                    'amount' => Payment::sole()->charged_amount,
                     'terminalId' => (string) config('paymera.terminal_id'),
                 ],
             ]),

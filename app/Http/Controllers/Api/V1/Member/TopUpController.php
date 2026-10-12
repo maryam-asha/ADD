@@ -30,7 +30,7 @@ class TopUpController extends Controller
             ['payment' => $payment, 'url' => $url] = $card->handle(
                 user: $member,
                 purpose: PaymentPurpose::WalletTopUp,
-                amountMinor: $request->amountMinor(),
+                chargedAmount: $request->chargedAmount(),
                 lang: app()->getLocale(),
                 method: $request->validated('payment_method'),
             );

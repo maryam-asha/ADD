@@ -53,7 +53,6 @@ class BookingExtensionOwedTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
 
@@ -70,7 +69,7 @@ class BookingExtensionOwedTest extends TestCase
     }
 
     /**
-     * Every card payment here charges 1000 minor units (100 points); each
+     * Every card payment here charges 10 (100 points); each
      * create gets its own gateway id.
      */
     private function fakeGateway(): void
@@ -90,7 +89,7 @@ class BookingExtensionOwedTest extends TestCase
                     'status' => 'A',
                     'creationTimestamp' => '2026-08-17 08:00:00.000',
                     'rrn' => '000009876543',
-                    'amount' => 1000,
+                    'amount' => 10,
                     'terminalId' => '99990001',
                 ],
             ]),
@@ -195,7 +194,7 @@ class BookingExtensionOwedTest extends TestCase
 
         $second = Payment::query()->latest('id')->firstOrFail();
         $this->assertSame(100, $second->amount_points);
-        $this->assertSame(1000, $second->amount_minor);
+        $this->assertSame(10, $second->charged_amount);
 
         app(SyncPaymentStatus::class)->handle($second);
 

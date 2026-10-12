@@ -75,7 +75,6 @@ class PaymentServiceTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => self::TERMINAL,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
             'logging.channels.paymera' => [
                 'driver' => 'single',
@@ -123,7 +122,7 @@ class PaymentServiceTest extends TestCase
         ]);
     }
 
-    private function fakeGateway(int $amountMinor = 1000): void
+    private function fakeGateway(int $chargedAmount = 10): void
     {
         Http::fake([
             '*/api/get-payment-status/*' => Http::response([
@@ -133,7 +132,7 @@ class PaymentServiceTest extends TestCase
                     'status' => 'A',
                     'creationTimestamp' => '2026-01-26 12:06:52.547',
                     'rrn' => '000009876543',
-                    'amount' => $amountMinor,
+                    'amount' => $chargedAmount,
                     'terminalId' => self::TERMINAL,
                 ],
             ]),
@@ -151,7 +150,7 @@ class PaymentServiceTest extends TestCase
             'payment_id' => 'pay-123',
             'user_id' => $member->id,
             'wallet_id' => $this->walletOf($member)->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'terminal_id' => self::TERMINAL,
         ], $attributes));
     }
@@ -217,7 +216,7 @@ class PaymentServiceTest extends TestCase
         $member = $this->member();
         $payment = $this->cardPayment($member, [
             'status' => PaymentStatus::Accepted,
-            'amount_minor' => 147_000_000,
+            'charged_amount' => 1_470_000,
             'currency' => 'SYP',
             'points_to_credit' => 1000,
         ]);

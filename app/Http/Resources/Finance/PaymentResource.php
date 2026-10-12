@@ -35,13 +35,11 @@ class PaymentResource extends JsonResource
             'purpose' => $this->purpose->value,
             'method' => $this->method,
 
-            // What the card was charged, as charged: the gateway's integer
-            // minor units plus the exponent needed to render it. The client
-            // formats it; nothing here pre-rounds it into a float. All three
-            // are null for a payment that did not go through a gateway.
-            'amount_minor' => $this->amount_minor,
+            // What the card was charged, as charged: the whole amount sent to
+            // the gateway, in its currency. Both are null for a payment that
+            // did not go through a gateway.
+            'charged_amount' => $this->charged_amount,
             'currency' => $this->currency,
-            'currency_exponent' => $this->currency_exponent,
 
             'points_to_credit' => $this->points_to_credit,
 

@@ -45,7 +45,6 @@ class EventPaymentTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => self::TERMINAL,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
     }
@@ -188,7 +187,7 @@ class EventPaymentTest extends TestCase
                     'status' => 'A',
                     'creationTimestamp' => '2026-08-17 08:00:00.000',
                     'rrn' => '000009876543',
-                    'amount' => 1000,
+                    'amount' => 10,
                     'terminalId' => self::TERMINAL,
                 ],
             ]),

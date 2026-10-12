@@ -47,7 +47,6 @@ class PaymeraPaymentTest extends TestCase
             'paymera.api_key' => self::API_KEY,
             'paymera.terminal_id' => self::TERMINAL,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
             'paymera.pending_expiry_minutes' => 60,
         ]);
@@ -94,7 +93,7 @@ class PaymeraPaymentTest extends TestCase
                     'status' => 'A',
                     'creationTimestamp' => '2026-01-26 12:06:52.547',
                     'rrn' => '000009876543',
-                    'amount' => 1000,
+                    'amount' => 10,
                     'terminalId' => self::TERMINAL,
                 ], $statusData),
             ]),
@@ -125,7 +124,7 @@ class PaymeraPaymentTest extends TestCase
 
         $payment = Payment::first();
         $this->assertSame('pay-123', $payment->payment_id);
-        $this->assertSame(1000, $payment->amount_minor);
+        $this->assertSame(10, $payment->charged_amount);
         $this->assertSame(100, $payment->points_to_credit);
 
         // The amount reaching Paymera is a bare integer — no decimals, no
@@ -135,7 +134,7 @@ class PaymeraPaymentTest extends TestCase
                 return false;
             }
 
-            return $request['amount'] === 1000
+            return $request['amount'] === 10
                 && $request['terminalId'] === self::TERMINAL
                 && is_int($request['amount']);
         });
@@ -156,9 +155,9 @@ class PaymeraPaymentTest extends TestCase
 
         $payment = Payment::first();
 
-        // 250 points x 0.10 USD = 25.00 USD = 2500 minor units.
+        // 250 points x 0.10 USD = 25.00 USD charged as 25.
         $this->assertSame(250, $payment->points_to_credit);
-        $this->assertSame(2500, $payment->amount_minor);
+        $this->assertSame(25, $payment->charged_amount);
     }
 
     // ---------------------------------------------------------------
@@ -257,7 +256,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -287,7 +286,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -312,7 +311,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'terminal_id' => self::TERMINAL,
         ]);
 
@@ -337,7 +336,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'terminal_id' => self::TERMINAL,
         ]);
 
@@ -404,7 +403,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -429,7 +428,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -566,7 +565,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->forPlan($plan)->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'terminal_id' => self::TERMINAL,
         ]);
 
@@ -599,7 +598,7 @@ class PaymeraPaymentTest extends TestCase
         $payment = Payment::factory()->forPlan($plan)->create([
             'user_id' => $member->id,
             'wallet_id' => Wallet::where('owner_id', $member->id)->first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'terminal_id' => self::TERMINAL,
         ]);
 

@@ -39,7 +39,6 @@ class CoworkingSessionPayTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => self::TERMINAL,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
     }
@@ -50,7 +49,7 @@ class CoworkingSessionPayTest extends TestCase
         parent::tearDown();
     }
 
-    private function fakeGateway(string $status = 'A', int $amountMinor = 1000): void
+    private function fakeGateway(string $status = 'A', int $chargedAmount = 1000): void
     {
         Http::fake([
             '*/api/create-payment' => Http::response([
@@ -65,7 +64,7 @@ class CoworkingSessionPayTest extends TestCase
                     'status' => $status,
                     'creationTimestamp' => '2026-08-17 08:00:00.000',
                     'rrn' => '000009876543',
-                    'amount' => $amountMinor,
+                    'amount' => $chargedAmount,
                     'terminalId' => self::TERMINAL,
                 ],
             ]),
@@ -166,7 +165,7 @@ class CoworkingSessionPayTest extends TestCase
     {
         $member = $this->member();
         Sanctum::actingAs($member, ['*']);
-        $this->fakeGateway(amountMinor: 1500);
+        $this->fakeGateway(chargedAmount: 1500);
         $closed = WalkinSession::factory()->create([
             'user_id' => $member->id,
             'checked_out_at' => now()->subHour(),

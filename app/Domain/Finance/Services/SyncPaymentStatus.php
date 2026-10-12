@@ -120,7 +120,7 @@ class SyncPaymentStatus
 
         // Accepted by the gateway. Before a single point is credited, the
         // payment has to be the one we actually created.
-        if ($mismatch = $this->verify($payment, $result->amountMinor, $result->terminalId)) {
+        if ($mismatch = $this->verify($payment, $result->chargedAmount, $result->terminalId)) {
             return $this->quarantine($payment, $mismatch);
         }
 
@@ -134,13 +134,13 @@ class SyncPaymentStatus
      * inconsistently, and a loose `==` between 99990001 and "99990001"
      * would quietly pass anything numeric-looking.
      */
-    private function verify(Payment $payment, int $amountMinor, string $terminalId): ?string
+    private function verify(Payment $payment, int $chargedAmount, string $terminalId): ?string
     {
-        if ($amountMinor !== $payment->amount_minor) {
+        if ($chargedAmount !== $payment->charged_amount) {
             return sprintf(
                 'amount mismatch: gateway reported %d, expected %d',
-                $amountMinor,
-                $payment->amount_minor
+                $chargedAmount,
+                $payment->charged_amount
             );
         }
 

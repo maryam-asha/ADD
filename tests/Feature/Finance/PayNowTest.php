@@ -47,7 +47,6 @@ class PayNowTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => self::TERMINAL,
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
     }
@@ -58,7 +57,7 @@ class PayNowTest extends TestCase
         parent::tearDown();
     }
 
-    private function fakeGateway(string $status = 'A', int $amountMinor = 1000): void
+    private function fakeGateway(string $status = 'A', int $chargedAmount = 10): void
     {
         Http::fake([
             '*/api/create-payment' => Http::response([
@@ -73,7 +72,7 @@ class PayNowTest extends TestCase
                     'status' => $status,
                     'creationTimestamp' => '2026-08-17 08:00:00.000',
                     'rrn' => '000009876543',
-                    'amount' => $amountMinor,
+                    'amount' => $chargedAmount,
                     'terminalId' => self::TERMINAL,
                 ],
             ]),
@@ -176,7 +175,7 @@ class PayNowTest extends TestCase
 
         $payment = Payment::sole();
         $this->assertSame(100, $payment->points_to_credit);
-        $this->assertSame(1000, $payment->amount_minor);
+        $this->assertSame(10, $payment->charged_amount);
         $this->assertSame($this->walletOf($member)->id, $payment->wallet_id);
         $this->assertSame(PaymentState::Unpaid, $booking->refresh()->payment_state);
 

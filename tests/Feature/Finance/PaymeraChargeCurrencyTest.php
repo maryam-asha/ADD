@@ -47,7 +47,6 @@ class PaymeraChargeCurrencyTest extends TestCase
             'paymera.terminal_id' => self::TERMINAL,
             // The production shape: charge in SYP against a USD base.
             'paymera.currency' => 'SYP',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'ar',
         ]);
     }
@@ -73,7 +72,7 @@ class PaymeraChargeCurrencyTest extends TestCase
         return $member;
     }
 
-    private function fakeGateway(int $amountMinor): void
+    private function fakeGateway(int $chargedAmount): void
     {
         Http::fake([
             '*/api/create-payment' => Http::response([
@@ -89,7 +88,7 @@ class PaymeraChargeCurrencyTest extends TestCase
                 'ErrorCode' => 0,
                 'Data' => [
                     'status' => 'A',
-                    'amount' => $amountMinor,
+                    'amount' => $chargedAmount,
                     'terminalId' => self::TERMINAL,
                     'rrn' => '000053127772',
                 ],
@@ -107,16 +106,15 @@ class PaymeraChargeCurrencyTest extends TestCase
         $member = $this->member();
         $wallet = Wallet::where('owner_id', $member->id)->first();
 
-        // 147,000,000 minor units = 1,470,000.00 SYP ≈ 100 USD = 1000 points.
-        $amountMinor = 147_000_000;
-        $this->fakeGateway($amountMinor);
+        // 1,470,000 SYP ≈ 100 USD = 1000 points.
+        $chargedAmount = 1_470_000;
+        $this->fakeGateway($chargedAmount);
 
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => $wallet->id,
-            'amount_minor' => $amountMinor,
+            'charged_amount' => $chargedAmount,
             'currency' => 'SYP',
-            'currency_exponent' => 2,
             'points_to_credit' => 1000,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -153,14 +151,13 @@ class PaymeraChargeCurrencyTest extends TestCase
         $member = $this->member();
         $wallet = Wallet::where('owner_id', $member->id)->first();
 
-        $this->fakeGateway(1000);
+        $this->fakeGateway(10);
 
         $payment = Payment::factory()->create([
             'user_id' => $member->id,
             'wallet_id' => $wallet->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'currency' => 'USD',
-            'currency_exponent' => 2,
             'points_to_credit' => 100,
             'terminal_id' => self::TERMINAL,
         ]);
@@ -241,9 +238,9 @@ class PaymeraChargeCurrencyTest extends TestCase
 
     /**
      * With a rate present, the charge is derived from the plan's point
-     * price and sent to Paymera as a bare integer in SYP minor units.
+     * price and sent to Paymera as a bare integer of whole SYP.
      */
-    public function test_a_plan_is_charged_in_syrian_minor_units(): void
+    public function test_a_plan_is_charged_in_whole_syrian_pounds(): void
     {
         $this->syrianRate();
         $this->member();
@@ -257,14 +254,13 @@ class PaymeraChargeCurrencyTest extends TestCase
         // 1000 points = 100.00 USD. The stored rate 0.0000680272 is 1/14700
         // truncated to ten places, so the exact conversion is
         // 100 / 0.0000680272 = 1,470,000.2352 SYP — not a round 1,470,000.
-        // pointsToMinor() ceils — and the pound has no piasters in use, so to
-        // a whole pound: 1,470,001 SYP, 147,000,100 minor units. The member
+        // pointsToCharged() ceils to a whole pound: 1,470,001 SYP. The member
         // pays under one pound more rather than receiving a fraction of a
         // point's worth for free. That rounding direction is the deliberate
         // house-favouring rule, so it is pinned here exactly.
-        $expectedMinor = 147_000_100;
+        $expectedAmount = 1_470_001;
 
-        $this->fakeGateway($expectedMinor);
+        $this->fakeGateway($expectedAmount);
 
         $this->postJson('/api/v1/member/memberships', [
             'plan_id' => $plan->id,
@@ -274,12 +270,12 @@ class PaymeraChargeCurrencyTest extends TestCase
         $payment = Payment::first();
         $this->assertSame('SYP', $payment->currency);
         $this->assertSame(1000, $payment->points_to_credit);
-        $this->assertSame($expectedMinor, $payment->amount_minor);
+        $this->assertSame($expectedAmount, $payment->charged_amount);
 
         // Never rounds DOWN — that would hand out value for free.
-        $this->assertGreaterThanOrEqual(147_000_000, $payment->amount_minor);
+        $this->assertGreaterThanOrEqual(1_470_000, $payment->charged_amount);
 
-        Http::assertSent(function ($request) use ($expectedMinor) {
+        Http::assertSent(function ($request) use ($expectedAmount) {
             if (! str_contains($request->url(), 'create-payment')) {
                 return false;
             }
@@ -287,7 +283,7 @@ class PaymeraChargeCurrencyTest extends TestCase
             // A bare integer with no decimal point or separators, as the
             // gateway requires.
             return is_int($request['amount'])
-                && $request['amount'] === $expectedMinor
+                && $request['amount'] === $expectedAmount
                 && $request['terminalId'] === self::TERMINAL;
         });
     }

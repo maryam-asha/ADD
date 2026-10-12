@@ -37,7 +37,6 @@ class EventPaymentBlockTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
     }

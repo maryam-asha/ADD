@@ -48,7 +48,6 @@ class MoneyAmountSpellingTest extends TestCase
             'paymera.api_key' => 'test-api-key',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
             'paymera.default_lang' => 'en',
         ]);
 
@@ -139,7 +138,7 @@ class MoneyAmountSpellingTest extends TestCase
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/wallet/top-ups', ['payment_method' => 'paymera', 'amount' => ' 5'])
             ->assertCreated();
-        $this->assertSame(500, Payment::sole()->amount_minor);
+        $this->assertSame(5, Payment::sole()->charged_amount);
     }
 
     /**

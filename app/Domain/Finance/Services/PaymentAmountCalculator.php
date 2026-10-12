@@ -3,14 +3,13 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Exceptions\PaymentPricingException;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
 use InvalidArgumentException;
 
 /**
  * Converts between the three units a card payment has to reconcile:
- * ADD Points (the ledger), USD (the base currency), and the gateway's
- * integer minor units in the charged currency.
+ * ADD Points (the ledger), USD (the base currency), and the whole amount
+ * the gateway is charged in its currency.
  *
  * All money arithmetic is bcmath on decimal strings — PRD decision #15
  * forbids float for monetary values, and this is exactly the place a
@@ -39,7 +38,7 @@ class PaymentAmountCalculator
      * afford what they just bought. A plan's points are
      * PriceQuoteService's, its sale included.
      *
-     * @return array{0: int, 1: int} [points, amountMinor]
+     * @return array{0: int, 1: int} [points, chargedAmount]
      */
     public function forPoints(int $points): array
     {
@@ -47,7 +46,7 @@ class PaymentAmountCalculator
             throw new InvalidArgumentException('There is nothing to charge for zero points.');
         }
 
-        return [$points, $this->pointsToMinor($points)];
+        return [$points, $this->pointsToCharged($points)];
     }
 
     /**
@@ -59,21 +58,21 @@ class PaymentAmountCalculator
      * checks the same thing so the member sees a validation error, and this
      * is the backstop for any other caller.
      *
-     * @return array{0: int, 1: int} [points, amountMinor]
+     * @return array{0: int, 1: int} [points, chargedAmount]
      */
-    public function forTopUp(?int $amountMinor): array
+    public function forTopUp(?int $chargedAmount): array
     {
-        if ($amountMinor === null || $amountMinor <= 0) {
+        if ($chargedAmount === null || $chargedAmount <= 0) {
             throw new InvalidArgumentException('A top-up requires a positive amount.');
         }
 
-        $points = $this->points->usdToPoints($this->minorToUsd($amountMinor));
+        $points = $this->points->usdToPoints($this->chargedAmountToUsd($chargedAmount));
 
         if ($points < 1) {
             throw new InvalidArgumentException('Amount is worth less than one point.');
         }
 
-        return [$points, $amountMinor];
+        return [$points, $chargedAmount];
     }
 
     /**
@@ -82,86 +81,51 @@ class PaymentAmountCalculator
      * 13,840.01), since that is what the member is asked to type. Paying it
      * is accepted as the minimum.
      *
-     * @return array{points: int, amount_minor: int, amount: string, currency: string}
+     * @return array{points: int, amount: string, currency: string}
      */
     public function minimumTopUp(): array
     {
         $points = max(1, (int) config('payments.min_top_up_points'));
-        $factor = bcpow('10', (string) $this->exponent(), 0);
 
-        // Half up to a whole unit: add half a unit, then truncate.
-        // From the exact amount, not pointsToMinor()'s rounded-up one: the
-        // minimum is the nearest whole unit, which may be just below it.
-        $whole = bcdiv(bcadd((string) $this->exactMinor($points), bcdiv($factor, '2', 0), 0), $factor, 0);
+        // Half up to a whole unit, from the exact amount rather than
+        // pointsToCharged()'s rounded-up one: the minimum is the nearest whole
+        // unit, which may be just below it.
+        $whole = bcdiv(bcadd($this->exactCharged($points), '0.5', 4), '1', 0);
 
         return [
             'points' => $points,
-            'amount_minor' => (int) bcmul($whole, $factor, 0),
             'amount' => $whole,
             'currency' => $this->currencyCode(),
         ];
     }
 
     /**
-     * Gateway minor units for a point count, rounding UP to the minor unit.
+     * What the gateway is charged for a point count: a whole number of the
+     * charged currency, as Paymera takes it, rounded UP.
      *
      * Rounding up is deliberate and is the house-favouring direction here:
-     * the member receives exactly the points quoted, and any sub-minor-unit
-     * remainder is paid rather than absorbed. Rounding down would hand out
-     * a fraction of a unit of value per purchase.
+     * the member receives exactly the points quoted, and any fraction of a
+     * unit is paid rather than absorbed.
      */
-    public function pointsToMinor(int $points): int
+    public function pointsToCharged(int $points): int
     {
-        $minor = $this->exactMinor($points);
-
-        // The gateway counts in minor units its currency may not use: a card
-        // charge in Syrian pounds is a whole pound (currencies.decimal_places
-        // = 0), so it is rounded up to a whole number of the units it uses.
-        $decimals = (int) (Currency::query()->whereKey($this->currencyCode())->value('decimal_places') ?? $this->exponent());
-        $step = 10 ** max(0, $this->exponent() - $decimals);
-
-        return (int) (ceil($minor / $step) * $step);
+        return (int) $this->ceilString($this->exactCharged($points));
     }
 
     /**
-     * Gateway minor units for a point count, rounded up to the minor unit
-     * only — before pointsToMinor() takes it to a unit the currency uses.
+     * A point count's exact value in the charged currency.
      */
-    private function exactMinor(int $points): int
+    private function exactCharged(int $points): string
     {
-        $usd = $this->points->pointsToUsd($points);
-        $charged = $this->usdToCharged($usd);
-
-        $factor = bcpow('10', (string) $this->exponent(), 0);
-        $exact = bcmul($charged, $factor, 4);
-
-        return (int) $this->ceilString($exact);
+        return $this->usdToCharged($this->points->pointsToUsd($points));
     }
 
     /**
-     * The USD value of a gateway minor-unit amount.
+     * The USD value of an amount in the charged currency.
      */
-    public function minorToUsd(int $amountMinor): string
+    public function chargedAmountToUsd(int $chargedAmount): string
     {
-        $factor = bcpow('10', (string) $this->exponent(), 0);
-        $charged = bcdiv((string) $amountMinor, $factor, 4);
-
-        return $this->chargedToUsd($charged);
-    }
-
-    /**
-     * A gateway minor-unit amount as a decimal string in the currency it
-     * was actually charged in — 250000 minor SYP units becomes "2500.00".
-     *
-     * This, not minorToUsd(), is what belongs in a ledger row's
-     * `payment_amount` when `payment_currency` names the charged currency.
-     * Writing the USD value next to a "SYP" label makes the pair a lie.
-     */
-    public function minorToCharged(int $amountMinor): string
-    {
-        $factor = bcpow('10', (string) $this->exponent(), 0);
-
-        return bcdiv((string) $amountMinor, $factor, 2);
+        return $this->chargedToUsd((string) $chargedAmount);
     }
 
     /**
@@ -194,11 +158,6 @@ class PaymentAmountCalculator
     public function currencyCode(): string
     {
         return (string) config('paymera.currency');
-    }
-
-    private function exponent(): int
-    {
-        return (int) config('paymera.currency_exponent');
     }
 
     private function usdToCharged(string $usd): string

@@ -21,7 +21,7 @@ final readonly class PaymentStatusResult
     public function __construct(
         public PaymentStatus $status,
         public string $rawStatus,
-        public int $amountMinor,
+        public int $chargedAmount,
         public string $terminalId,
         public ?string $rrn,
         public ?string $creationTimestamp,
@@ -54,7 +54,7 @@ final readonly class PaymentStatusResult
         return new self(
             status: PaymentStatus::fromGatewayStatus($status),
             rawStatus: $status,
-            amountMinor: (int) $data['amount'],
+            chargedAmount: (int) $data['amount'],
             terminalId: isset($data['terminalId']) ? (string) $data['terminalId'] : '',
             rrn: isset($data['rrn']) ? (string) $data['rrn'] : null,
             creationTimestamp: isset($data['creationTimestamp']) ? (string) $data['creationTimestamp'] : null,

@@ -44,7 +44,7 @@ class PaymeraClient
      * @param  array<string, mixed>  $extra  savedCards / appUser / notes
      */
     public function createPayment(
-        int $amountMinor,
+        int $chargedAmount,
         string $callbackUrl,
         string $triggerUrl,
         ?string $lang = null,
@@ -53,10 +53,9 @@ class PaymeraClient
         $payload = array_merge([
             'lang' => $lang ?? (string) config('paymera.default_lang'),
             'terminalId' => (string) config('paymera.terminal_id'),
-            // Paymera requires a whole number with no separators. Casting to
-            // int here is the last line of defence; callers already hold an
-            // integer minor-unit amount.
-            'amount' => $amountMinor,
+            // Paymera requires a whole number with no separators, and charges
+            // it as it is.
+            'amount' => $chargedAmount,
             'callbackURL' => $callbackUrl,
             'triggerURL' => $triggerUrl,
         ], $extra);
@@ -69,7 +68,7 @@ class PaymeraClient
 
         $this->log('info', 'create-payment accepted', [
             'payment_id' => $created->paymentId,
-            'amount' => $amountMinor,
+            'amount' => $chargedAmount,
         ]);
 
         return $created;
@@ -88,7 +87,7 @@ class PaymeraClient
         $this->log('info', 'get-payment-status', [
             'payment_id' => $paymentId,
             'status' => $result->rawStatus,
-            'amount' => $result->amountMinor,
+            'amount' => $result->chargedAmount,
             'rrn' => $result->rrn,
         ]);
 

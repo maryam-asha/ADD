@@ -38,9 +38,8 @@ class PaymentFactory extends Factory
             'user_id' => User::factory(),
             'wallet_id' => Wallet::factory(),
             'plan_id' => null,
-            'amount_minor' => 1000,
+            'charged_amount' => 10,
             'currency' => 'USD',
-            'currency_exponent' => 2,
             'points_to_credit' => $points,
             // Follows `points_to_credit` unless a test states otherwise, so
             // overriding one does not leave the two disagreeing.
@@ -103,9 +102,8 @@ class PaymentFactory extends Factory
             'payment_id' => null,
             'callback_token' => null,
             'terminal_id' => null,
-            'amount_minor' => null,
+            'charged_amount' => null,
             'currency' => null,
-            'currency_exponent' => null,
             'lang' => null,
             'points_to_credit' => 0,
             'amount_points' => $points,

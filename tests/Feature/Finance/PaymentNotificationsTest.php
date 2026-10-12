@@ -153,7 +153,6 @@ class PaymentNotificationsTest extends TestCase
             'paymera.api_key' => 'k',
             'paymera.terminal_id' => '99990001',
             'paymera.currency' => 'USD',
-            'paymera.currency_exponent' => 2,
         ]);
         Http::fake(['*/api/get-payment-status/*' => Http::response([
             'ErrorMessage' => 'Success', 'ErrorCode' => 0,
@@ -164,7 +163,7 @@ class PaymentNotificationsTest extends TestCase
             'payment_id' => 'pay-1',
             'user_id' => $member->id,
             'wallet_id' => Wallet::first()->id,
-            'amount_minor' => 1000,
+            'charged_amount' => 1000,
             'points_to_credit' => 100,
             'terminal_id' => '99990001',
         ]);

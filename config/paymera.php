@@ -43,12 +43,9 @@ return [
     'saved_cards_enabled' => (bool) env('PAYMERA_SAVED_CARDS_ENABLED', false),
 
     /*
-     * The currency actually charged, and its minor-unit exponent. Paymera
-     * takes `amount` as a whole number with no decimal point, so a charge
-     * is amount × 10^exponent. Made explicit rather than assuming ×100,
-     * since SYP is customarily quoted without minor units at all.
+     * The currency actually charged. Paymera takes `amount` as a whole
+     * number of it, sent as it is.
      */
     'currency' => env('PAYMERA_CURRENCY', 'SYP'),
-    'currency_exponent' => (int) env('PAYMERA_CURRENCY_EXPONENT', 2),
 
 ];

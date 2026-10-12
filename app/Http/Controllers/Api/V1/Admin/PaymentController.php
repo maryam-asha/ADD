@@ -101,19 +101,12 @@ class PaymentController extends Controller
 
         $card = $this->filtered($validated)
             ->where('status', $accepted)
-            ->whereNotNull('amount_minor')
-            ->selectRaw('currency, currency_exponent, SUM(amount_minor) as minor')
-            ->groupBy('currency', 'currency_exponent')
+            ->whereNotNull('charged_amount')
+            ->selectRaw('currency, SUM(charged_amount) as amount')
+            ->groupBy('currency')
             ->toBase()
             ->get()
-            ->map(function (object $row) {
-                $exponent = (int) ($row->currency_exponent ?? 2);
-
-                return [
-                    'currency' => $row->currency,
-                    'amount' => PlainAmount::of(bcdiv((string) $row->minor, bcpow('10', (string) $exponent, 0), $exponent)),
-                ];
-            })
+            ->map(fn (object $row) => ['currency' => $row->currency, 'amount' => PlainAmount::of($row->amount)])
             ->values();
 
         return response()->json(['data' => [

@@ -31,8 +31,8 @@ use Illuminate\Support\Str;
  * because there is no gateway to ask. Nothing else in the app may set
  * `status`.
  *
- * The gateway columns (`terminal_id`, `callback_token`, `amount_minor`,
- * `currency`, `currency_exponent`, `lang`) are null for a payment that did
+ * The gateway columns (`terminal_id`, `callback_token`, `charged_amount`,
+ * `currency`, `lang`) are null for a payment that did
  * not go through one.
  */
 class Payment extends Model
@@ -50,9 +50,8 @@ class Payment extends Model
         'plan_id',
         'membership_id',
         'wallet_transaction_id',
-        'amount_minor',
+        'charged_amount',
         'currency',
-        'currency_exponent',
         'points_to_credit',
         'terminal_id',
         'lang',
@@ -90,8 +89,7 @@ class Payment extends Model
             // `collected_via` is different — it is always one of the
             // ways reception can take money, which is PaymentMethod.
             'collected_via' => PaymentMethod::class,
-            'amount_minor' => 'integer',
-            'currency_exponent' => 'integer',
+            'charged_amount' => 'integer',
             'points_to_credit' => 'integer',
             'amount_points' => 'integer',
             'list_price_points' => 'integer',

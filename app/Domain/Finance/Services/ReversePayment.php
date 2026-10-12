@@ -88,7 +88,7 @@ class ReversePayment
 
             $this->logSensitiveAction('payment_reversed', $payment, [
                 'gateway_payment_id' => $payment->payment_id,
-                'amount_minor' => $payment->amount_minor,
+                'charged_amount' => $payment->charged_amount,
                 'currency' => $payment->currency,
                 'points_credited' => $payment->points_to_credit,
                 'reversed_by' => $actor->id,

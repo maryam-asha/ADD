@@ -647,7 +647,9 @@ class PaymentService
             points: $payment->points_to_credit,
             method: $this->methods->gatewayFor($payment)->ledgerMethod(),
             currency: $payment->currency,
-            amount: $this->amounts->minorToCharged($payment->amount_minor),
+            // In the currency it was charged in, next to the `currency` naming
+            // it — the USD value there would make the pair a lie.
+            amount: (string) $payment->charged_amount,
             rateToBase: $this->amounts->appliedExchangeRate(),
             pointRateUsd: null,
             performedBy: null,

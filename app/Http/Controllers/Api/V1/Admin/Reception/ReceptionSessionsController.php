@@ -141,8 +141,8 @@ class ReceptionSessionsController extends Controller
                         'currency' => $payment->received_currency,
                         'received_by' => $payment->receivedBy?->name,
                     ],
-                    'card' => $payment->amount_minor === null ? null : [
-                        'amount' => PlainAmount::of(bcdiv((string) $payment->amount_minor, bcpow('10', (string) ($payment->currency_exponent ?? 2), 0), (int) ($payment->currency_exponent ?? 2))),
+                    'card' => $payment->charged_amount === null ? null : [
+                        'amount' => PlainAmount::of((string) $payment->charged_amount),
                         'currency' => $payment->currency,
                         'reference' => $payment->rrn,
                     ],
