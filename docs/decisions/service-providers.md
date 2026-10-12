@@ -19,7 +19,7 @@ access or seats or moves money.
 | Decision | Outcome |
 |---|---|
 | Entity | Its own `providers` table; not a company with a type, not only a role. |
-| Accounts | Fortify accounts (email + password + 2FA) on the dashboard, holding the protected `provider` role, linked by `provider_user` (one provider per account, all of a provider's accounts equal). Admin creates them. |
+| Accounts | Fortify accounts (email + password + 2FA) on the dashboard, holding the protected `provider` role, linked by `provider_user` (one provider per account, all of a provider's accounts equal). Admin creates them: the first one with the provider itself — `POST admin/providers` requires an `account` block (name, email, phone, password + confirmation) and creates the provider, a `provider`-role user and the link in one transaction (2026-10-12); more accounts are created under Users and linked with `POST admin/providers/{provider}/users/{user}`. |
 | Companies | `companies.provider_id`; `null` = ADD deals with the company directly. |
 | Approval needed | New company, employee, company admin, plan design, plan assignment (even of an existing plan), wallet top-up. |
 | No approval | Doors, balance distribution, removing an employee. Principle: what grants goes through ADD; what withdraws or manages within the granted is direct. |

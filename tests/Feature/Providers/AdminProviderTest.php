@@ -4,21 +4,61 @@ namespace Tests\Feature\Providers;
 
 use App\Domain\Identity\Models\User;
 use App\Domain\Providers\Models\Provider;
+use Illuminate\Support\Facades\Hash;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
 
 class AdminProviderTest extends ProviderTestCase
 {
-    public function test_an_admin_creates_and_lists_providers(): void
+    /** @return array<string, string> */
+    private function account(array $overrides = []): array
+    {
+        return [
+            'name' => 'Platform Desk',
+            'email' => 'desk@platform.test',
+            'phone' => '+963944555001',
+            'password' => 'Secret-pass-123',
+            'password_confirmation' => 'Secret-pass-123',
+            ...$overrides,
+        ];
+    }
+
+    public function test_an_admin_creates_a_provider_with_its_linked_account(): void
     {
         $this->actingAsAdmin();
 
-        $this->postJson('/api/v1/admin/providers', ['name' => 'Platform', 'contract_ref' => 'P-1'])
+        $this->postJson('/api/v1/admin/providers', ['name' => 'Platform', 'contract_ref' => 'P-1', 'account' => $this->account()])
             ->assertCreated()
             ->assertJsonPath('data.name', 'Platform')
-            ->assertJsonPath('data.status', 'active');
+            ->assertJsonPath('data.status', 'active')
+            ->assertJsonPath('data.users_count', 1)
+            ->assertJsonPath('data.users.0.email', 'desk@platform.test');
+
+        $provider = Provider::query()->sole();
+        $user = User::query()->where('email', 'desk@platform.test')->sole();
+        $this->assertTrue($user->hasRole('provider'));
+        $this->assertFalse($user->hasRole('admin'));
+        $this->assertTrue($provider->users()->whereKey($user->id)->exists());
+        $this->assertTrue(Hash::check('Secret-pass-123', $user->password));
 
         $this->getJson('/api/v1/admin/providers')->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_the_account_is_required_and_validated(): void
+    {
+        $this->actingAsAdmin();
+        User::factory()->create(['email' => 'taken@platform.test']);
+
+        $this->postJson('/api/v1/admin/providers', ['name' => 'Platform', 'contract_ref' => 'P-1'])
+            ->assertUnprocessable()->assertJsonValidationErrors('account');
+
+        $this->postJson('/api/v1/admin/providers', [
+            'name' => 'Platform',
+            'contract_ref' => 'P-1',
+            'account' => $this->account(['email' => 'taken@platform.test', 'phone' => '0944', 'password_confirmation' => 'other']),
+        ])->assertUnprocessable()->assertJsonValidationErrors(['account.email', 'account.phone', 'account.password']);
+
+        $this->assertSame(0, Provider::query()->count());
     }
 
     public function test_an_admin_updates_a_provider(): void

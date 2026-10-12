@@ -24158,7 +24158,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Platform\",\n    \"contract_ref\": \"CT-2026-001\"\n}",
+                                    "raw": "{\n    \"name\": \"Platform\",\n    \"contract_ref\": \"CT-2026-001\",\n    \"payment_terms_days\": 30,\n    \"account\": {\n        \"name\": \"Platform Desk\",\n        \"email\": \"desk@platform.example\",\n        \"phone\": \"+963944555001\",\n        \"password\": \"Secret-pass-123\",\n        \"password_confirmation\": \"Secret-pass-123\"\n    }\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"

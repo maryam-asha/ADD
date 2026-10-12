@@ -5,7 +5,6 @@ namespace Tests\Feature\Providers;
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
-use App\Domain\Providers\Models\Provider;
 
 /** The list shapes the dashboard's pickers and filters rely on. */
 class DashboardListsTest extends ProviderTestCase
@@ -53,13 +52,14 @@ class DashboardListsTest extends ProviderTestCase
     {
         $this->actingAsAdmin();
 
-        $id = $this->postJson('/api/v1/admin/providers', ['name' => 'Kappa', 'contract_ref' => 'K-1', 'payment_terms_days' => 45])
+        $this->postJson('/api/v1/admin/providers', [
+            'name' => 'Kappa',
+            'contract_ref' => 'K-1',
+            'payment_terms_days' => 45,
+            'account' => ['name' => 'Kappa', 'email' => 'k@kappa.test', 'phone' => '+963944555002', 'password' => 'Secret-pass-123', 'password_confirmation' => 'Secret-pass-123'],
+        ])
             ->assertCreated()
-            ->assertJsonPath('data.payment_terms_days', 45)
-            ->json('data.id');
-
-        $this->providerAccount(Provider::query()->findOrFail($id));
-        $this->actingAsAdmin();
+            ->assertJsonPath('data.payment_terms_days', 45);
 
         $this->getJson('/api/v1/admin/providers')
             ->assertOk()
