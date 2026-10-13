@@ -2,6 +2,7 @@
 
 namespace App\Domain\Services\Models;
 
+use App\Casts\AsMediaUrl;
 use App\Concerns\HasTranslations;
 use App\Domain\Forms\Concerns\InteractsWithForms;
 use App\Domain\Forms\Contracts\HasForms;
@@ -22,9 +23,12 @@ class ServiceType extends Model implements HasForms
         'slug',
         'name',
         'description',
+        'about',
         'icon',
+        'image_url',
         'is_active',
         'is_coming_soon',
+        'show_on_home',
         'requires_location',
         'requires_review',
         'visibility',
@@ -39,8 +43,11 @@ class ServiceType extends Model implements HasForms
         return [
             'name' => 'array',
             'description' => 'array',
+            'about' => 'array',
+            'image_url' => AsMediaUrl::class,
             'is_active' => 'boolean',
             'is_coming_soon' => 'boolean',
+            'show_on_home' => 'boolean',
             'requires_location' => 'boolean',
             'requires_review' => 'boolean',
             'request_method' => RequestMethod::class,
@@ -73,6 +80,14 @@ class ServiceType extends Model implements HasForms
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /** The services a member may see: active, member-facing, and open to the plan modules they hold. */
+    public function scopeVisibleToMember(Builder $query, array $moduleIds): Builder
+    {
+        return $query->active()
+            ->where(fn (Builder $q) => $q->where('visibility', 'member')->orWhere('visibility', 'both'))
+            ->accessibleByModules($moduleIds);
     }
 
     public function scopeOrdered(Builder $query): Builder

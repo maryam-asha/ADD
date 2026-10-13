@@ -2,6 +2,8 @@
 
 namespace Database\Factories;
 
+use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
+use App\Domain\Ecosystem\Enums\AnnouncementType;
 use App\Domain\Ecosystem\Models\Announcement;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -18,7 +20,8 @@ class AnnouncementFactory extends Factory
     public function definition(): array
     {
         return [
-            'type' => fake()->randomElement(['news', 'event', 'offer']),
+            'type' => fake()->randomElement(AnnouncementType::cases()),
+            'placement' => AnnouncementPlacement::All,
             'image_url' => fake()->imageUrl(),
             'link_url' => null,
             'sort_order' => 0,
@@ -30,17 +33,27 @@ class AnnouncementFactory extends Factory
 
     public function news(): static
     {
-        return $this->state(['type' => 'news']);
+        return $this->state(['type' => AnnouncementType::News]);
     }
 
     public function event(): static
     {
-        return $this->state(['type' => 'event']);
+        return $this->state(['type' => AnnouncementType::Event]);
     }
 
     public function offer(): static
     {
-        return $this->state(['type' => 'offer']);
+        return $this->state(['type' => AnnouncementType::Offer]);
+    }
+
+    public function onKiosk(): static
+    {
+        return $this->state(['placement' => AnnouncementPlacement::Kiosk]);
+    }
+
+    public function onApp(): static
+    {
+        return $this->state(['placement' => AnnouncementPlacement::App]);
     }
 
     /** Scheduled to start in the future — not yet live. */

@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
+use App\Http\Controllers\Api\V1\Member\HomeController;
 use App\Http\Controllers\Api\V1\Member\MemberCouponController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
@@ -33,6 +34,12 @@ use Illuminate\Support\Facades\Route;
 // applied once, from the group wrapping this file in routes/api.php. A
 // company member is still just a `member` role-wise (D.8), so this group
 // covers both individual and company-affiliated members with no split.
+
+// The app's home screen in one read: the greeting, the unread count, the
+// running co-working session, the banners (announcements placed on the
+// app), today's bookings and events, and "Explore ADD" (the services put on
+// the home screen; each one's page is services/{slug}).
+Route::get('home', [HomeController::class, 'show']);
 
 // The member's own (personal) wallet: balances per category, the history
 // newest first, and one row as a receipt with the balance either side of

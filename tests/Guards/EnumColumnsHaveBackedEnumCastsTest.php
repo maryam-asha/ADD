@@ -20,6 +20,9 @@ use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SessionEndRequest;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
+use App\Domain\Ecosystem\Enums\AnnouncementType;
+use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\ExchangeRateSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionSource;
@@ -113,6 +116,10 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
 {
     /** @var array<class-string, array<string, class-string>> model => [column => expected enum class] */
     private const EXPECTED_CASTS = [
+        Announcement::class => [
+            'type' => AnnouncementType::class,
+            'placement' => AnnouncementPlacement::class,
+        ],
         EventAttendee::class => [
             'status' => EventRegistrationStatus::class,
             'payment_state' => EventPaymentState::class,

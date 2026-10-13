@@ -48,17 +48,86 @@ class AnnouncementTest extends TestCase
         ]);
     }
 
-    public function test_a_new_type_string_is_accepted_without_any_migration_or_allow_list(): void
+    public function test_a_type_outside_the_closed_set_is_rejected(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'holiday_hours',
+            'image_url' => 'https://example.com/holiday.png',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('type');
+    }
+
+    public function test_it_is_placed_on_every_screen_unless_told_otherwise_and_never_on_none(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.placement', 'all');
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+            'placement' => 'app',
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.placement', 'app');
+
+        $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'news',
+            'image_url' => 'https://example.com/news.png',
+            'placement' => null,
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('placement');
+    }
+
+    public function test_the_text_drawn_over_the_image_is_stored_in_both_languages(): void
     {
         $this->actingAsAdmin();
 
         $response = $this->postJson('/api/v1/admin/announcements', [
-            'type' => 'holiday_hours',
-            'image_url' => 'https://example.com/holiday.png',
+            'type' => 'offer',
+            'image_url' => 'https://example.com/offer.png',
+            'link_url' => 'https://example.com/explore',
+            'subtitle' => ['en' => 'ADD Smart Ecosystem', 'ar' => 'منظومة ADD الذكية'],
+            'title' => ['en' => 'Build. Connect. Grow.', 'ar' => 'ابن. تواصل. انمُ.'],
+            'description' => ['en' => 'Everything your business needs.', 'ar' => 'كل ما يحتاجه عملك.'],
+            'cta_label' => ['en' => 'Explore ADD', 'ar' => 'استكشف ADD'],
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.type', 'holiday_hours');
+        $response->assertJsonPath('data.title.en', 'Build. Connect. Grow.');
+        $response->assertJsonPath('data.title.ar', 'ابن. تواصل. انمُ.');
+        $response->assertJsonPath('data.cta_label.ar', 'استكشف ADD');
+        $this->assertSame('ADD Smart Ecosystem', Announcement::query()->sole()->subtitle['en']);
+    }
+
+    public function test_options_lists_every_type_and_placement_with_its_label(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/announcements/options')
+            ->assertOk()
+            ->assertExactJson(['data' => [
+                'types' => [
+                    ['key' => 'offer', 'label' => 'Offer'],
+                    ['key' => 'event', 'label' => 'Event'],
+                    ['key' => 'news', 'label' => 'News'],
+                ],
+                'placements' => [
+                    ['key' => 'kiosk', 'label' => 'Reception kiosk'],
+                    ['key' => 'app', 'label' => 'Member app'],
+                    ['key' => 'all', 'label' => 'Kiosk and app'],
+                ],
+            ]]);
     }
 
     public function test_end_date_before_start_date_is_rejected(): void
@@ -92,7 +161,7 @@ class AnnouncementTest extends TestCase
 
         $this->withHeader('lang', 'en')
             ->putJson("/api/v1/admin/announcements/{$announcement->id}", [
-                'type' => $announcement->type,
+                'type' => $announcement->type->value,
                 'image_url' => 'https://example.com/new.png',
                 'is_active' => false,
             ])

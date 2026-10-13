@@ -728,4 +728,26 @@ return [
         'lease_not_active' => 'لا يمكن تجديد إلا عقد سارٍ.',
         'superseded' => 'للشركة اشتراك أحدث.',
     ],
+
+    'announcements' => [
+        'types' => [
+            'offer' => 'عرض',
+            'event' => 'فعالية',
+            'news' => 'خبر',
+        ],
+        'placements' => [
+            'kiosk' => 'شاشة الاستقبال',
+            'app' => 'تطبيق الأعضاء',
+            'all' => 'الشاشة والتطبيق',
+        ],
+    ],
+
+    'home' => [
+        'greeting' => [
+            'morning' => 'صباح الخير',
+            'afternoon' => 'نهارك سعيد',
+            'evening' => 'مساء الخير',
+            'with_name' => ':greeting، :name',
+        ],
+    ],
 ];

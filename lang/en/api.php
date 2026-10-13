@@ -741,4 +741,26 @@ return [
         'lease_not_active' => 'Only an active lease can be renewed.',
         'superseded' => 'The company already has a newer subscription.',
     ],
+
+    'announcements' => [
+        'types' => [
+            'offer' => 'Offer',
+            'event' => 'Event',
+            'news' => 'News',
+        ],
+        'placements' => [
+            'kiosk' => 'Reception kiosk',
+            'app' => 'Member app',
+            'all' => 'Kiosk and app',
+        ],
+    ],
+
+    'home' => [
+        'greeting' => [
+            'morning' => 'Good morning',
+            'afternoon' => 'Good afternoon',
+            'evening' => 'Good evening',
+            'with_name' => ':greeting, :name',
+        ],
+    ],
 ];

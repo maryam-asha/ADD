@@ -2,9 +2,16 @@
 
 namespace App\Http\Resources;
 
+use App\Domain\Ecosystem\Models\Announcement;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
+/**
+ * The dashboard's view of an announcement: the text fields whole, both
+ * languages, since this is where they are edited.
+ *
+ * @property Announcement $resource
+ */
 class AnnouncementResource extends JsonResource
 {
     /**
@@ -14,7 +21,13 @@ class AnnouncementResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'type' => $this->type,
+            'type' => $this->type->value,
+            'type_label' => $this->type->label(),
+            'placement' => $this->placement->value,
+            'subtitle' => $this->subtitle,
+            'title' => $this->title,
+            'description' => $this->description,
+            'cta_label' => $this->cta_label,
             'image_url' => $this->image_url,
             'link_url' => $this->link_url,
             'sort_order' => $this->sort_order,

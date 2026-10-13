@@ -197,6 +197,26 @@ class ServiceCatalogService
             ->first();
     }
 
+    /**
+     * The home screen's "Explore ADD": the services put on it, that this
+     * member may see, by layer (the axis's order) and then their own order.
+     *
+     * @return Collection<int, ServiceType> (with 'axis' loaded)
+     */
+    public function homeServicesForMember(User $user): Collection
+    {
+        return ServiceType::query()
+            ->visibleToMember($this->activePlanModuleIds($user))
+            ->where('show_on_home', true)
+            ->with('axis')
+            ->get()
+            ->sortBy([
+                fn (ServiceType $a, ServiceType $b) => $a->axis->order <=> $b->axis->order,
+                fn (ServiceType $a, ServiceType $b) => $a->order <=> $b->order,
+            ])
+            ->values();
+    }
+
     // ── Internal ─────────────────────────────────────────────────────────────
 
     /**

@@ -2,6 +2,8 @@
 
 namespace Tests\Unit\Domain\Ecosystem;
 
+use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
+use App\Domain\Ecosystem\Enums\AnnouncementType;
 use App\Domain\Ecosystem\Models\Announcement;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -11,22 +13,41 @@ class AnnouncementModelTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_an_announcement_can_be_created_with_each_seeded_type(): void
+    public function test_an_announcement_can_be_created_with_each_type(): void
     {
         $news = Announcement::factory()->news()->create();
         $event = Announcement::factory()->event()->create();
         $offer = Announcement::factory()->offer()->create();
 
-        $this->assertSame('news', $news->type);
-        $this->assertSame('event', $event->type);
-        $this->assertSame('offer', $offer->type);
+        $this->assertSame(AnnouncementType::News, $news->fresh()->type);
+        $this->assertSame(AnnouncementType::Event, $event->fresh()->type);
+        $this->assertSame(AnnouncementType::Offer, $offer->fresh()->type);
     }
 
-    public function test_an_arbitrary_new_type_string_is_accepted_with_no_cast(): void
+    public function test_a_new_one_is_shown_on_every_screen(): void
     {
-        $announcement = Announcement::factory()->create(['type' => 'holiday_hours']);
+        $announcement = Announcement::query()->create([
+            'type' => AnnouncementType::News,
+            'image_url' => 'https://example.com/news.png',
+        ]);
 
-        $this->assertSame('holiday_hours', $announcement->fresh()->type);
+        $this->assertSame(AnnouncementPlacement::All, $announcement->fresh()->placement);
+    }
+
+    public function test_shown_on_a_screen_means_placed_on_it_or_on_every_screen(): void
+    {
+        $kiosk = Announcement::factory()->onKiosk()->create();
+        $app = Announcement::factory()->onApp()->create();
+        $all = Announcement::factory()->create();
+
+        $this->assertEqualsCanonicalizing(
+            [$app->id, $all->id],
+            Announcement::query()->shownOn(AnnouncementPlacement::App)->pluck('id')->all(),
+        );
+        $this->assertEqualsCanonicalizing(
+            [$kiosk->id, $all->id],
+            Announcement::query()->shownOn(AnnouncementPlacement::Kiosk)->pluck('id')->all(),
+        );
     }
 
     public function test_is_active_and_window_columns_cast_correctly(): void
