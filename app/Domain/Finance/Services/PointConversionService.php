@@ -50,6 +50,15 @@ class PointConversionService
     }
 
     /**
+     * The published rate without trailing zeros ("0.1", "0.0125") — the
+     * form every amount reaches the member app in.
+     */
+    public function plainRate(): string
+    {
+        return rtrim(rtrim($this->publishedRate(), '0'), '.');
+    }
+
+    /**
      * Exact, unrounded USD value of a point count. Accepts negatives —
      * the ledger stores debits as negative integers and a refund needs
      * to render them.

@@ -56,7 +56,7 @@ class TokenPairService
                 'expires_at' => now()->addDays(config('tokens.refresh_ttl_days')),
             ]);
 
-            return new TokenPair($accessToken->plainTextToken, $plainRefreshToken, $expiresAt);
+            return new TokenPair($accessToken->plainTextToken, $plainRefreshToken, $expiresAt, $user);
         });
     }
 

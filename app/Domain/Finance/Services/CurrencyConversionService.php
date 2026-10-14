@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Support\PlainAmount;
 
 /**
  * Raw numeric conversion only — no locale/display formatting (that's a
@@ -33,6 +34,32 @@ class CurrencyConversionService
         $rate = ExchangeRate::current($currencyCode);
 
         return $rate !== null ? (string) $rate->rate_to_base : null;
+    }
+
+    /**
+     * How many units of `$currencyCode` one unit of the base currency buys —
+     * the "1 USD = 140 SYP" figure people read, the reciprocal of what is
+     * stored (rate_to_base is base per one unit of the currency). Rounded
+     * half-up to the currency's own decimals, which also absorbs what the
+     * stored 10-decimal reciprocal loses (1 / 0.0071428571 = 140.00000056).
+     * Null when the currency has no current rate.
+     */
+    public function baseToCurrencyRate(string $currencyCode): ?string
+    {
+        if ($currencyCode === $this->baseCurrencyCode()) {
+            return '1';
+        }
+
+        $rateToBase = $this->rateToBase($currencyCode);
+
+        if ($rateToBase === null || bccomp($rateToBase, '0', 10) <= 0) {
+            return null;
+        }
+
+        $decimals = (int) (Currency::query()->whereKey($currencyCode)->value('decimal_places') ?? 2);
+        $half = '0.'.str_repeat('0', $decimals).'5';
+
+        return PlainAmount::of(bcadd(bcdiv('1', $rateToBase, $decimals + 1), $half, $decimals));
     }
 
     public function convert(float $amount, string $fromCurrency, string $toCurrency): ?float

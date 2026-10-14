@@ -2,11 +2,14 @@
 
 namespace App\Services\Auth;
 
+use App\Domain\Identity\Models\User;
 use DateTimeInterface;
 
 /**
  * The two credentials a session is made of. Kept as one value so no caller can
- * hand back an access token without the refresh token that renews it.
+ * hand back an access token without the refresh token that renews it. Carries
+ * the account it was issued to, so a refresh — which arrives with nothing but
+ * the refresh token — can still answer with the user.
  */
 final readonly class TokenPair
 {
@@ -14,6 +17,7 @@ final readonly class TokenPair
         public string $accessToken,
         public string $refreshToken,
         public DateTimeInterface $accessTokenExpiresAt,
+        public User $user,
     ) {}
 
     /**

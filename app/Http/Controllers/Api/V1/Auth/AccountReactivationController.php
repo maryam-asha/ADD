@@ -7,7 +7,7 @@ use App\Domain\Identity\Models\User;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\ReactivateAccountRequest;
 use App\Http\Requests\Auth\ReactivateAccountVerifyRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Services\Auth\TokenPairService;
 use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
@@ -107,7 +107,7 @@ class AccountReactivationController extends Controller
 
         return response()->json([
             ...$pair->toArray(),
-            'user' => new UserResource($user),
+            'user' => new AuthenticatedUserResource($user),
         ]);
     }
 

@@ -15,7 +15,7 @@ use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\RefreshTokenRequest;
 use App\Http\Requests\Auth\RegisterRequest;
 use App\Http\Requests\Auth\RegisterVerifyRequest;
-use App\Http\Resources\UserResource;
+use App\Http\Resources\AuthenticatedUserResource;
 use App\Services\Auth\Exceptions\InvalidRefreshTokenException;
 use App\Services\Auth\TokenPairService;
 use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
@@ -206,7 +206,7 @@ class MemberAuthController extends Controller
 
         return response()->json([
             ...$this->tokens->issue($user)->toArray(),
-            'user' => new UserResource($user),
+            'user' => new AuthenticatedUserResource($user),
         ]);
     }
 
@@ -256,7 +256,7 @@ class MemberAuthController extends Controller
 
         return response()->json([
             ...$this->tokens->issue($user)->toArray(),
-            'user' => new UserResource($user),
+            'user' => new AuthenticatedUserResource($user),
         ]);
     }
 
@@ -313,7 +313,9 @@ class MemberAuthController extends Controller
     }
 
     /**
-     * Trade a refresh token for a new pair. Unauthenticated on purpose — the
+     * Trade a refresh token for a new pair, answered with the user and the
+     * current rates like login is — so a rate changed mid-session reaches the
+     * app at its next refresh. Unauthenticated on purpose — the
      * whole point is to be reachable once the access token has expired, and
      * the refresh token is itself the credential being presented.
      */
@@ -325,7 +327,10 @@ class MemberAuthController extends Controller
             return response()->json(['message' => __('api.auth.refresh_token_invalid')], 401);
         }
 
-        return response()->json($pair->toArray());
+        return response()->json([
+            ...$pair->toArray(),
+            'user' => new AuthenticatedUserResource($pair->user),
+        ]);
     }
 
     /**
