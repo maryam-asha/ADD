@@ -11,6 +11,7 @@ use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
@@ -52,6 +53,7 @@ class StartPayment
         private readonly PriceQuoteService $quotes,
         private readonly CouponLedger $couponLedger,
         private readonly QuoteRecorder $recorder,
+        private readonly MembershipActivationService $activations,
     ) {}
 
     /**
@@ -81,6 +83,14 @@ class StartPayment
 
         if (! $gateway instanceof PaymentGateway) {
             throw new InvalidArgumentException("[{$method}] is not a gateway: StartPayment opens card payments only.");
+        }
+
+        // A plan is activated only once its card is accepted, and activation
+        // refuses a plan whose seats are gone — the member would have paid,
+        // and been left with points and no plan. Refused before the row,
+        // as paying with points refuses it.
+        if ($purpose === PaymentPurpose::PlanPurchase) {
+            $this->activations->assertSeatsFree($plan, OwnerType::User, $user->id);
         }
 
         // A member always funds their own personal wallet here. Company

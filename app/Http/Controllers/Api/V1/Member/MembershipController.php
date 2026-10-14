@@ -18,6 +18,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PackageBrowseService;
 use App\Domain\Pricing\Models\Coupon;
@@ -31,8 +32,9 @@ use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
 use App\Support\Presenters\CouponOutcomePresenter;
+use App\Support\Time\LocalTime;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -176,14 +178,8 @@ class MembershipController extends Controller
             // The message this endpoint has always given, without the
             // numbers the newer payment endpoints add.
             abort(422, __('api.wallet.insufficient_balance_for_plan'));
-        } catch (SeatPoolExhaustedException $e) {
-            // Every co-working seat in the branch is held for part of the
-            // plan's period (docs/decisions/coworking-seat-pool.md); nothing
-            // was charged.
-            throw new HttpResponseException(response()->json([
-                'message' => __('api.membership.seat_pool_full'),
-                'first_shortfall_at' => $e->firstShortfall->toIso8601String(),
-            ], 422));
+        } catch (SeatPoolExhaustedException) {
+            return $this->seatPoolFull($plan, $ownerType, $ownerId);
         }
 
         $membership = Membership::query()->findOrFail($payment->membership_id);
@@ -216,6 +212,8 @@ class MembershipController extends Controller
                 lang: $lang,
                 coupon: $coupon,
             );
+        } catch (SeatPoolExhaustedException) {
+            return $this->seatPoolFull($plan, OwnerType::User, $member->id);
         } catch (Throwable $e) {
             return $this->gatewayFailureResponse($e, $member->id) ?? throw $e;
         }
@@ -227,6 +225,36 @@ class MembershipController extends Controller
                 'next' => 'redirect',
             ],
         ] + $this->couponOutcome($coupon, $payment), 201);
+    }
+
+    /**
+     * Every co-working seat in the branch is held for part of the plan's
+     * period (docs/decisions/coworking-seat-pool.md) — the same answer
+     * whether it was to be paid with points or by card; nothing was charged.
+     * It says when the plan could be had — `available_from`, null when not
+     * within a year — as a forecast, not a hold.
+     */
+    private function seatPoolFull(Plan $plan, OwnerType $ownerType, int $ownerId): JsonResponse
+    {
+        $from = app(MembershipActivationService::class)->availableFrom($plan, $ownerType, $ownerId);
+
+        return response()->json([
+            'message' => $from === null
+                ? __('api.membership.seat_pool_full')
+                : __('api.membership.seat_pool_full_until', ['date' => $this->localDateTime($from)]),
+            'available_from' => $from?->toIso8601String(),
+        ], 422);
+    }
+
+    /** "October 25, 2026, 10:00 AM" in the district's time, as the booking messages read. */
+    private function localDateTime(CarbonInterface $at): string
+    {
+        $local = app(LocalTime::class)->toLocal($at);
+        $locale = app()->getLocale();
+
+        return $local->copy()->locale($locale)->translatedFormat($locale === 'ar' ? 'j F Y' : 'F j, Y')
+            .($locale === 'ar' ? '، ' : ', ')
+            .$local->format('h:i A');
     }
 
     /**

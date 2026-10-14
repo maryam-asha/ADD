@@ -94,7 +94,7 @@ class MembershipPurchaseTest extends TestCase
         Cache::forget('default_branch_id');
         $branch = Branch::factory()->create(['is_default' => true]);
         $this->coSpaceIn($branch->id, 1);
-        Membership::factory()->create(['branch_id' => $branch->id]);
+        $holder = Membership::factory()->create(['branch_id' => $branch->id]);
         $member = $this->makeFundedMember(5000);
         $plan = Plan::factory()->create(['price_points' => 1200, 'duration_days' => 30]);
         Sanctum::actingAs($member, ['*']);
@@ -102,8 +102,8 @@ class MembershipPurchaseTest extends TestCase
         $this->withHeader('lang', 'en')
             ->postJson('/api/v1/member/memberships', ['plan_id' => $plan->id])
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.membership.seat_pool_full', [], 'en'))
-            ->assertJsonStructure(['message', 'first_shortfall_at']);
+            ->assertJsonPath('available_from', $holder->current_period_end->utc()->toIso8601String())
+            ->assertJsonMissingPath('first_shortfall_at');
 
         $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->first();
         $this->assertSame(5000, $this->rawGeneralBalance($wallet));

@@ -6,6 +6,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Services\SyncPaymentStatus;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
@@ -19,6 +20,7 @@ use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -191,6 +193,34 @@ class PlanPurchasePaymentMethodTest extends TestCase
             ->assertJsonPath('data.payment.gateway_payment_id', 'pay-777');
 
         $this->assertSame(0, Membership::count());
+    }
+
+    /**
+     * Refused as the wallet refuses it, before any payment is opened: a card
+     * accepted for a plan with no seat left would leave the member with
+     * points and no subscription.
+     */
+    public function test_a_card_is_not_opened_for_a_plan_when_its_branch_has_no_seat_left(): void
+    {
+        Http::fake();
+        Cache::forget('default_branch_id');
+        $branch = Branch::factory()->create(['is_default' => true]);
+        Space::factory()->create([
+            'building_id' => Building::factory()->create(['branch_id' => $branch->id])->id,
+            'capacity' => 1,
+        ]);
+        $holder = Membership::factory()->create(['branch_id' => $branch->id]);
+        $member = $this->member(0);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->withHeader('lang', 'en')
+            ->postJson('/api/v1/member/memberships', ['plan_id' => $this->plan()->id, 'payment_method' => 'paymera'])
+            ->assertStatus(422)
+            ->assertJsonPath('available_from', $holder->current_period_end->utc()->toIso8601String())
+            ->assertJsonMissingPath('first_shortfall_at');
+
+        $this->assertSame(0, Payment::count());
+        Http::assertNothingSent();
     }
 
     public function test_a_company_plan_cannot_be_bought_by_card(): void

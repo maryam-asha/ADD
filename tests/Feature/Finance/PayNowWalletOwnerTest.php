@@ -259,14 +259,14 @@ class PayNowWalletOwnerTest extends TestCase
             'building_id' => Building::factory()->create(['branch_id' => $branch->id])->id,
             'capacity' => 1,
         ]);
-        Membership::factory()->create(['branch_id' => $branch->id]);
+        $holder = Membership::factory()->create(['branch_id' => $branch->id]);
         $member = $this->member(5000);
         Sanctum::actingAs($member, ['*']);
 
         $this->buyPlan(['payment_method' => 'wallet', 'plan_id' => $this->plan()->id])
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.membership.seat_pool_full', [], 'en'))
-            ->assertJsonStructure(['message', 'first_shortfall_at']);
+            ->assertJsonPath('available_from', $holder->current_period_end->utc()->toIso8601String())
+            ->assertJsonMissingPath('first_shortfall_at');
 
         $this->assertSame(5000, $this->balance(Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail()));
         $this->assertSame(0, Membership::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->count());

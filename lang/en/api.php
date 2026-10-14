@@ -534,6 +534,7 @@ return [
         'desks_outside_branch' => 'Every desk must be in a co-working space of the subscription\'s branch.',
         'desk_taken' => 'A desk is already held by another subscription during some of these hours and dates.',
         'seat_pool_full' => 'Every co-working seat in this branch is already taken for part of this plan\'s period, so it cannot be subscribed to now.',
+        'seat_pool_full_until' => 'Every co-working seat in this branch is already taken for part of this plan\'s period. The earliest you can subscribe: :date.',
     ],
 
     'package' => [

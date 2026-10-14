@@ -15,6 +15,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -174,11 +175,78 @@ class CoworkingPoolService
     }
 
     /**
+     * The pool as it is expected to be over [$from, $to): the timeline,
+     * with every subscription set to renew itself — auto_renew, its renewal
+     * not stopped, none made yet — holding its seats to $to. It renews ahead
+     * of its end (renewals:run) and would take them again.
+     */
+    public function forecast(Branch $branch, CarbonInterface $from, CarbonInterface $to): PoolTimeline
+    {
+        return $this->gather($branch, $from, $to, null, baseOnly: false, assumeRenewals: true);
+    }
+
+    /**
+     * The earliest moment in [$from, $latest] a subscription to $plan
+     * holding $seats would find them free for its whole period, while its
+     * plan is open, as the pool is expected to be (forecast()); null when
+     * none does. A forecast, not a hold: a sale made first can take them.
+     */
+    public function earliestSubscriptionStart(Branch $branch, Plan $plan, int $seats, CarbonInterface $from, CarbonInterface $latest): ?CarbonImmutable
+    {
+        $from = CarbonImmutable::instance($from)->utc();
+        $latest = CarbonImmutable::instance($latest)->utc();
+        $days = (int) $plan->duration_days;
+        $to = $latest->addDays($days);
+
+        // Every stretch, while the plan is open, with fewer than $seats free —
+        // in order, since both the segments and the plan's windows are.
+        $short = [];
+        $windows = $plan->windowSegments($from, $to);
+        $first = 0;
+
+        foreach ($this->forecast($branch, $from, $to)->segments() as $segment) {
+            if ($seats <= $segment['capacity'] - $segment['usage']) {
+                continue;
+            }
+
+            while ($first < count($windows) && $windows[$first][1]->lessThanOrEqualTo($segment['start'])) {
+                $first++;
+            }
+
+            for ($i = $first; $i < count($windows) && $windows[$i][0]->lessThan($segment['end']); $i++) {
+                $short[] = [
+                    $windows[$i][0]->greaterThan($segment['start']) ? $windows[$i][0] : $segment['start'],
+                    $windows[$i][1]->lessThan($segment['end']) ? $windows[$i][1] : $segment['end'],
+                ];
+            }
+        }
+
+        // A start fits until a short stretch falls inside its period; the
+        // next start worth trying is that stretch's end.
+        $start = $from;
+
+        foreach ($short as [$shortFrom, $shortUntil]) {
+            if ($shortUntil->lessThanOrEqualTo($start)) {
+                continue;
+            }
+
+            if ($shortFrom->greaterThanOrEqualTo($start->addDays($days))) {
+                break;
+            }
+
+            $start = $shortUntil;
+        }
+
+        return $start->lessThanOrEqualTo($latest) ? $start : null;
+    }
+
+    /**
      * The pool's timeline; with $baseOnly, only the branch's own co-working
      * seats and the people sitting in them — the rooms lent to co-working,
-     * and whoever was placed in one, left out.
+     * and whoever was placed in one, left out. With $assumeRenewals, the
+     * subscriptions set to renew themselves hold their seats to $to.
      */
-    private function gather(Branch $branch, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate, bool $baseOnly): PoolTimeline
+    private function gather(Branch $branch, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate, bool $baseOnly, bool $assumeRenewals = false): PoolTimeline
     {
         $from = CarbonImmutable::instance($from)->utc();
         $to = CarbonImmutable::instance($to)->utc();
@@ -195,10 +263,15 @@ class CoworkingPoolService
         ];
 
         $memberships = $this->heldMemberships($branch, $from, $to);
+        $renewing = $assumeRenewals ? $this->renewing($memberships) : [];
         $holds = [];
 
         foreach ($memberships as $membership) {
-            foreach ($this->heldStretches($membership, $from, $to) as [$start, $end]) {
+            $stretches = in_array($membership->id, $renewing, true)
+                ? $membership->plan->windowSegments(max($from, CarbonImmutable::instance($membership->current_period_start)->utc()), $to)
+                : $this->heldStretches($membership, $from, $to);
+
+            foreach ($stretches as [$start, $end]) {
                 $holds[] = ['membership' => $membership->id, 'start' => $start, 'end' => $end, 'seats' => $membership->seats];
             }
         }
@@ -258,6 +331,25 @@ class CoworkingPoolService
         }
 
         return PoolTimeline::build($from, $to, $supply, $holds, $presences);
+    }
+
+    /**
+     * The subscriptions set to renew themselves: auto_renew, the renewal not
+     * stopped (renewal_stop_reason), and no renewal made yet — one already
+     * made is a subscription of its own, counted as such.
+     *
+     * @param  Collection<int, Membership>  $memberships
+     * @return list<int>
+     */
+    private function renewing(Collection $memberships): array
+    {
+        $renewed = Membership::query()->whereIn('renewed_from_id', $memberships->modelKeys())->pluck('renewed_from_id')->all();
+
+        return $memberships
+            ->filter(fn (Membership $membership) => $membership->auto_renew
+                && $membership->renewal_stop_reason === null
+                && ! in_array($membership->id, $renewed, true))
+            ->modelKeys();
     }
 
     /** The fewest free seats in [$from, $to); negative when overbooked. */

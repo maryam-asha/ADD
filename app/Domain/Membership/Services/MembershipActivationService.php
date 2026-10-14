@@ -14,6 +14,7 @@ use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,53 @@ class MembershipActivationService
         private readonly CoworkingPoolService $pool,
         private readonly DedicatedDeskService $desks,
     ) {}
+
+    /**
+     * Whether the plan's seats would fit if it were activated now for this
+     * owner — the check activate() makes, made ahead, for a sale paid before
+     * it is activated (a card: the gateway's page comes first). It takes no
+     * lock, so activate() still decides; this only spares the member paying
+     * for a plan that cannot be had.
+     *
+     * @throws SeatPoolExhaustedException
+     */
+    public function assertSeatsFree(Plan $plan, OwnerType $ownerType, int $ownerId, int $seats = 1): void
+    {
+        $branchId = $this->branches->branchFor($ownerType, $ownerId);
+        $branch = $branchId === null ? null : Branch::query()->find($branchId);
+
+        if ($branch !== null) {
+            $this->assertSeatsIn($branch, $plan, $seats, now(), now()->addDays($plan->duration_days));
+        }
+    }
+
+    /**
+     * When the plan's seats are expected to be free for its whole period, for
+     * an owner it was just refused to (CoworkingPoolService::earliestSubscriptionStart),
+     * looking a year ahead; null when not within it.
+     */
+    public function availableFrom(Plan $plan, OwnerType $ownerType, int $ownerId, int $seats = 1): ?CarbonImmutable
+    {
+        $branchId = $this->branches->branchFor($ownerType, $ownerId);
+        $branch = $branchId === null ? null : Branch::query()->find($branchId);
+
+        return $branch === null ? null : $this->pool->earliestSubscriptionStart($branch, $plan, $seats, now(), now()->addYear());
+    }
+
+    /** @throws SeatPoolExhaustedException */
+    private function assertSeatsIn(Branch $branch, Plan $plan, int $seats, CarbonInterface $periodStart, CarbonInterface $periodEnd): void
+    {
+        $timeline = $this->pool->timeline(
+            $branch,
+            $periodStart,
+            $periodEnd,
+            PoolDemand::subscription($plan, $seats, $periodStart, $periodEnd),
+        );
+
+        if ($timeline->minFree() < 0) {
+            throw new SeatPoolExhaustedException($timeline->firstShortfall());
+        }
+    }
 
     /**
      * Throws InsufficientBalanceException when $charge is true and the wallet
@@ -102,16 +150,7 @@ class MembershipActivationService
             $branch = $branchId === null ? null : Branch::query()->whereKey($branchId)->lockForUpdate()->first();
 
             if ($branch !== null && ! $overrideCapacity) {
-                $timeline = $this->pool->timeline(
-                    $branch,
-                    $periodStart,
-                    $periodEnd,
-                    PoolDemand::subscription($plan, $seats, $periodStart, $periodEnd),
-                );
-
-                if ($timeline->minFree() < 0) {
-                    throw new SeatPoolExhaustedException($timeline->firstShortfall());
-                }
+                $this->assertSeatsIn($branch, $plan, $seats, $periodStart, $periodEnd);
             }
 
             $wallet = $this->wallets->walletFor($ownerType, $ownerId);
