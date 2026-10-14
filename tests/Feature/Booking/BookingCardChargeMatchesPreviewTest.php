@@ -85,8 +85,6 @@ class BookingCardChargeMatchesPreviewTest extends TestCase
             'an amount-off coupon' => [100, 90, 'coupon:30pts', 120],
             'an offer' => [100, 120, 'offer', 120],
             'an offer and a coupon that stacks on it' => [100, 120, 'offer+coupon:10%', 108],
-            // Not combinable: 20% off the list price is 160, above the offer's 120, so the offer stays.
-            'an offer beats a coupon that does not stack' => [100, 120, 'offer+coupon:20%-alone', 120],
         ];
     }
 
@@ -170,7 +168,6 @@ class BookingCardChargeMatchesPreviewTest extends TestCase
             str_ends_with($discount, 'coupon:20%') => $this->coupon(Coupon::factory()->percentage(20)),
             str_ends_with($discount, 'coupon:30pts') => $this->coupon(Coupon::factory()->amountOff(30)),
             str_ends_with($discount, 'coupon:10%') => $this->coupon(Coupon::factory()->percentage(10), ['combinable_with_offers' => true]),
-            str_ends_with($discount, 'coupon:20%-alone') => $this->coupon(Coupon::factory()->percentage(20), ['combinable_with_offers' => false]),
             default => null,
         };
     }

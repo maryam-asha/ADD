@@ -227,21 +227,33 @@ class PlanCouponPurchaseTest extends TestCase
      * plan is bought at the offer price and the response says why the code
      * was not used (D2) — the use is not spent.
      */
-    public function test_a_coupon_beaten_by_the_offer_says_so(): void
+    /** A code the offer beats is refused with its reason, and nothing is bought. */
+    public function test_a_coupon_beaten_by_the_offer_is_refused(): void
     {
         $this->offerOnPlan($this->plan, 100, now()->subDay(), now()->addDay());
         $coupon = Coupon::factory()->percentage(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
         $this->member(500);
 
         $this->buy('solo')
-            ->assertCreated()
-            ->assertJsonPath('coupon.code', 'SOLO')
-            ->assertJsonPath('coupon.applied', false)
-            ->assertJsonPath('coupon.points_discounted', 0)
-            ->assertJsonPath('coupon.message', __('api.coupon.offer_is_better', [], 'en'));
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.coupon.offer_is_better', [], 'en'));
 
-        $this->assertSame(100, Payment::sole()->amount_points);
+        $this->assertSame(0, Payment::count());
         $this->assertSame(0, app(CouponLedger::class)->liveUsage($coupon));
+    }
+
+    /** Only as low as the offer: the offer stays, so the code is refused, by card too. */
+    public function test_a_coupon_that_only_matches_the_offer_is_refused_by_card(): void
+    {
+        $this->offerOnPlan($this->plan, intdiv((int) $this->plan->price_points * 9, 10), now()->subDay(), now()->addDay());
+        Coupon::factory()->percentage(10)->create(['code' => 'TIE', 'combinable_with_offers' => false]);
+        $this->member(0);
+
+        $this->buy('TIE', 'paymera')
+            ->assertStatus(422)
+            ->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.offer_is_better'));
+
+        $this->assertSame(0, Payment::count());
     }
 
     public function test_an_amount_off_coupon_lowers_a_plan_bought_with_points(): void

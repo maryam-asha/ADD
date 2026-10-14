@@ -178,17 +178,17 @@ class PriceQuoteBookingTest extends TestCase
         $this->assertSame(['base' => 200, 'coupon' => -100], $this->lines($quote));
     }
 
-    public function test_a_non_combinable_coupon_that_loses_to_the_offer_is_not_used(): void
+    public function test_a_non_combinable_coupon_that_loses_to_the_offer_is_refused(): void
     {
         $this->sale(80);
         $coupon = Coupon::factory()->percentage(10)->create(['combinable_with_offers' => false]);
 
-        $quote = $this->quote($coupon);
-
-        $this->assertSame(PriceChoice::Offer, $quote->choice);
-        $this->assertSame(CouponOutcome::OfferIsBetter, $quote->couponOutcome);
-        $this->assertNull($quote->appliedCoupon());
-        $this->assertSame(160, $quote->finalPoints);
+        try {
+            $this->quote($coupon);
+            $this->fail('Expected offer_is_better.');
+        } catch (CouponRejectedException $e) {
+            $this->assertSame(CouponRejection::OfferIsBetter, $e->rejection);
+        }
     }
 
     public function test_a_coupon_needs_the_minimum_amount(): void

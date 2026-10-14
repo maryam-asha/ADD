@@ -288,12 +288,9 @@ class MemberCouponsTest extends TestCase
 
         $response = $this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id]);
 
-        // 10% of 120 leaves 108, above the offer's 100: the offer stands.
-        $small = $this->besideOffer($response, 'SMALL');
-        $this->assertSame(['original_points' => 120, 'points' => 100], array_diff_key($small['offer'], ['name' => 1]));
-        $this->assertFalse($small['applied']);
-        $this->assertSame(100, $small['price_points']);
-        $this->assertSame(__('api.coupon.with_offer.offer_is_better', [], 'en'), $small['note']);
+        // 10% of 120 leaves 108, above the offer's 100: the purchase would refuse it.
+        $this->assertFalse($this->canApply($response)['SMALL']);
+        $this->assertNull($this->besideOffer($response, 'SMALL'));
 
         // 50% of 120 leaves 60: the code beats the offer.
         $big = $this->besideOffer($response, 'BIG');

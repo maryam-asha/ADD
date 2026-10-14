@@ -116,48 +116,37 @@ class CouponApplicationTest extends TestCase
             ->assertJsonPath('message', __('api.coupon.already_applied', [], 'en'));
     }
 
-    /**
-     * A card in flight would settle at the old amount, so no coupon is
-     * applied — but that must not block paying: the payment goes ahead at the
-     * current price and the answer says the code was not used.
-     */
-    public function test_a_booking_with_a_payment_under_way_takes_no_coupon_and_is_still_paid(): void
+    /** A card in flight would settle at the old amount: the code is refused, and nothing is paid. */
+    public function test_a_booking_with_a_payment_under_way_refuses_the_coupon(): void
     {
         Coupon::factory()->create(['code' => 'WAIT']);
         $booking = $this->unpaidBooking();
         Payment::factory()->forPayable($booking)->create(['purpose' => PaymentPurpose::Booking, 'status' => PaymentStatus::Pending, 'user_id' => $this->member->id]);
 
         $this->pay('booking', $booking->id, 'WAIT')
-            ->assertOk()
-            ->assertJsonPath('coupon.applied', false)
-            ->assertJsonPath('coupon.message', __('api.coupon.payment_in_progress', [], 'en'));
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.coupon.payment_in_progress', [], 'en'));
 
         $booking->refresh();
         $this->assertSame(100, $booking->price_points);
-        $this->assertSame(PaymentState::Paid, $booking->payment_state);
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
         $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 
-    /**
-     * A coupon that does not combine is not applied on a price an offer
-     * already set — and the payment goes ahead at that price.
-     */
-    public function test_a_non_combinable_coupon_is_not_applied_on_an_offer_price_and_the_payment_goes_ahead(): void
+    /** A coupon that does not combine is refused on a price an offer already set, and nothing is paid. */
+    public function test_a_non_combinable_coupon_on_an_offer_price_is_refused(): void
     {
         Coupon::factory()->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
         $booking = $this->unpaidBooking(['price_points' => 80, 'list_price_points' => 100]);
 
         $this->pay('booking', $booking->id, 'SOLO')
-            ->assertOk()
-            ->assertJsonPath('coupon.code', 'SOLO')
-            ->assertJsonPath('coupon.applied', false)
-            ->assertJsonPath('coupon.points_discounted', 0)
-            ->assertJsonPath('coupon.message', __('api.coupon.offer_is_better', [], 'en'));
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.coupon.not_combinable', [], 'en'));
 
         $booking->refresh();
         $this->assertSame(80, $booking->price_points);
-        $this->assertSame(PaymentState::Paid, $booking->payment_state);
-        $this->assertSame(80, Payment::sole()->amount_points);
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertSame(0, Payment::count());
         $this->assertNull(app(CouponLedger::class)->couponFor($booking));
     }
 

@@ -412,8 +412,8 @@ class ReceptionPlanPurchaseTest extends TestCase
         $member = $this->member();
         $body = ['plan_id' => $this->plan->id, 'user_id' => $member->id, 'payment_method' => 'cash', 'coupon_code' => 'NOPE'];
 
-        $this->preview($body)->assertStatus(422)->assertJsonPath('reason', 'not_found');
-        $this->sell($body)->assertStatus(422)->assertJsonPath('reason', 'not_found');
+        $this->preview($body)->assertStatus(422)->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.not_found'));
+        $this->sell($body)->assertStatus(422)->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.not_found'));
 
         $this->assertSame(0, Payment::count());
         $this->assertSame(0, Membership::count());

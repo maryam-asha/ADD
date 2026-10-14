@@ -194,12 +194,11 @@ return Application::configure(basePath: dirname(__DIR__))
             'shortage' => $e->shortage,
         ], 422));
 
-        // A coupon code that cannot be used, with its reason — the one answer
-        // every purchase path gives, wherever the refusal is raised
+        // A coupon code that cannot be used: its message says why — the one
+        // answer every purchase path gives, wherever the refusal is raised
         // (docs/superpowers/specs/2026-10-04-pricing-offers-coupons-design.md).
         $exceptions->render(fn (CouponRejectedException $e) => response()->json([
             'message' => __($e->messageKey, $e->params),
-            'reason' => $e->rejection->value,
         ], $e->status));
 
         // Registered last: Throwable matches everything, so an earlier match

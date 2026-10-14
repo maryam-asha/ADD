@@ -7,8 +7,6 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Identity\Models\User;
-use App\Domain\Pricing\Enums\CouponRejection;
-use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponApplication;
 use App\Domain\Pricing\Services\CouponEligibility;
@@ -26,12 +24,10 @@ use Illuminate\Database\Eloquent\Model;
  * A coupon code is applied to what the record owes before the payment
  * opens (CouponApplication), as pay now always did. The code the record
  * already carries is ignored rather than refused: the app re-sends, with the
- * id, the request it made the record with — coupon included. For the same
- * reason a code that creation did not apply (it does not combine with the
- * offer the record was priced at, or a payment for it is already under way)
- * does not stop the payment: it goes ahead at the record's current price and
- * the outcome says the code was not used. Any other refusal is the member's
- * to hear, as at creation.
+ * id, the request it made the record with — coupon included. Any code that
+ * cannot apply is refused (422, its message saying why) and nothing is paid, as at
+ * creation: the member hears why, rather than paying a price the code had no
+ * part in.
  *
  * Failures are not caught here: the endpoint decides how each one reads.
  */
@@ -70,22 +66,14 @@ class PayableCheckout
         $outcome = null;
 
         if ($coupon !== null) {
-            try {
-                $quote = $this->application->apply($payable, $member, $coupon);
-                $outcome = $this->outcomes->fromQuote($couponCode, $quote);
+            $quote = $this->application->apply($payable, $member, $coupon);
+            $outcome = $this->outcomes->fromQuote($couponCode, $quote);
 
-                if ($quote->finalPoints === 0) {
-                    // Nothing left to pay: nothing to hold for.
-                    $this->releaseHold($payable);
+            if ($quote->finalPoints === 0) {
+                // Nothing left to pay: nothing to hold for.
+                $this->releaseHold($payable);
 
-                    return new CheckoutOutcome(null, PaymentStart::done(), $outcome);
-                }
-            } catch (CouponRejectedException $e) {
-                $outcome = match ($e->rejection) {
-                    CouponRejection::NotCombinable => $this->outcomes->notAppliedBecause($couponCode, __('api.coupon.offer_is_better')),
-                    CouponRejection::PaymentInProgress => $this->outcomes->notAppliedBecause($couponCode, __($e->messageKey, $e->params)),
-                    default => throw $e,
-                };
+                return new CheckoutOutcome(null, PaymentStart::done(), $outcome);
             }
         }
 

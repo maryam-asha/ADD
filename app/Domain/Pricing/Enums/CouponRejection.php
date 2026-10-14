@@ -21,6 +21,8 @@ enum CouponRejection: string
     case NotApplicable = 'not_applicable';
     case MinAmountNotMet = 'min_amount_not_met';
     case NotCombinable = 'not_combinable';
+    /** Does not combine, and the offer already gives the same price or a lower one. */
+    case OfferIsBetter = 'offer_is_better';
     case AlreadyApplied = 'already_applied';
     case PaymentInProgress = 'payment_in_progress';
 

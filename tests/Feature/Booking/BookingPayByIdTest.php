@@ -195,12 +195,10 @@ class BookingPayByIdTest extends TestCase
     }
 
     /**
-     * A code that creation did not apply (it does not combine with the sale
-     * the room is on) must not block paying later: the confirm screen sends
-     * it again with the id, and the payment goes ahead at the current price,
-     * the answer saying the code was not used.
+     * A code that does not combine with the sale the room is on, and does
+     * not beat it, is refused at creation with its reason: no booking is made.
      */
-    public function test_a_code_that_creation_did_not_apply_does_not_block_paying_by_another_method(): void
+    public function test_a_code_the_offer_beats_refuses_the_booking(): void
     {
         $this->member();
         $space = $this->openSpace();
@@ -211,29 +209,16 @@ class BookingPayByIdTest extends TestCase
             Carbon::parse('2026-08-18 00:00:00', 'Asia/Damascus')->utc()->toDateTimeString(),
         );
         Coupon::factory()->amountOff(10)->create(['code' => 'SOLO', 'combinable_with_offers' => false]);
-        Http::fake(['*' => Http::response('', 500)]);
 
-        $first = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera', 'coupon_code' => 'SOLO']))
-            ->assertCreated()
-            ->assertJsonPath('coupon.applied', false);
-        $this->assertSame(80, Booking::findOrFail($first->json('data.id'))->price_points);
+        $this->book($this->confirmScreen($space, ['payment_method' => 'paymera', 'coupon_code' => 'SOLO']))
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.coupon.offer_is_better', [], 'en'));
 
-        $this->book($this->confirmScreen($space, [
-            'payment_method' => 'cash',
-            'booking_id' => $first->json('data.id'),
-            'coupon_code' => 'SOLO',
-        ]))
-            ->assertOk()
-            ->assertJsonPath('coupon.code', 'SOLO')
-            ->assertJsonPath('coupon.applied', false)
-            ->assertJsonPath('coupon.points_discounted', 0)
-            ->assertJsonPath('coupon.message', __('api.coupon.offer_is_better', [], 'en'))
-            ->assertJsonPath('next', 'pay_at_reception');
-
-        $this->assertSame(1, Booking::count());
+        $this->assertSame(0, Booking::count());
+        $this->assertSame(0, Payment::count());
     }
 
-    public function test_a_code_sent_while_a_card_is_pending_does_not_block_paying_by_the_wallet(): void
+    public function test_a_code_sent_while_a_card_is_pending_refuses_paying_by_the_wallet(): void
     {
         $member = $this->member(300);
         $space = $this->openSpace();
@@ -254,14 +239,11 @@ class BookingPayByIdTest extends TestCase
         ]);
 
         $this->book(['booking_id' => $booking->id, 'payment_method' => 'wallet', 'coupon_code' => 'WAIT'])
-            ->assertOk()
-            ->assertJsonPath('coupon.applied', false)
-            ->assertJsonPath('coupon.message', __('api.coupon.payment_in_progress', [], 'en'))
-            ->assertJsonPath('next', 'done');
+            ->assertStatus(422)
+            ->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.payment_in_progress'));
 
-        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
-        $this->assertSame(100, $booking->price_points);
-        $this->assertSame(200, app(WalletService::class)->generalBalance(
+        $this->assertSame(PaymentState::Unpaid, $booking->refresh()->payment_state);
+        $this->assertSame(300, app(WalletService::class)->generalBalance(
             Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail()
         ));
     }

@@ -369,14 +369,16 @@ class PriceQuoteService
         }
 
         // Does not combine: the coupon on the list price, if that is lower.
+        // When the offer is as low or lower the code is refused, so the
+        // member hears why rather than paying a price it had no part in.
         $this->assertMinimum($coupon, $list);
         $off = $this->coupons->discountFor($terms, $list);
 
-        if ($list - $off < $automatic) {
-            return $this->quote($list, PriceChoice::List, $list, $discount, null, $coupon, CouponOutcome::Applied, $list, $off);
+        if ($list - $off >= $automatic) {
+            throw new CouponRejectedException(CouponRejection::OfferIsBetter);
         }
 
-        return $this->quote($list, $choice, $automatic, $discount, $offerModel, $coupon, CouponOutcome::OfferIsBetter, 0, 0);
+        return $this->quote($list, PriceChoice::List, $list, $discount, null, $coupon, CouponOutcome::Applied, $list, $off);
     }
 
     /**

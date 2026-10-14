@@ -664,7 +664,6 @@ return [
     ],
 
     'coupon' => [
-        'valid' => 'This code is valid and can be used.',
         'not_found' => 'This code is not valid.',
         'not_started' => 'This code is not active yet.',
         'expired' => 'This code has expired.',
@@ -677,7 +676,7 @@ return [
         'not_combinable' => 'This code cannot be combined with the current offer.',
         'already_applied' => 'A code has already been applied to this.',
         'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
-        'offer_is_better' => 'The current offer already gives you a lower price, so the code was not applied.',
+        'offer_is_better' => 'This code cannot be applied: it does not combine with the current offer, which already gives the same price or a lower one.',
         'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
         // "My coupons" asked about an item: how a code sits beside the offer there now.
         'with_offer' => [

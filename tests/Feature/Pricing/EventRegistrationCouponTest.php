@@ -170,7 +170,7 @@ class EventRegistrationCouponTest extends TestCase
 
         $this->register($this->event(), 'ANYTHING')
             ->assertStatus(422)
-            ->assertJsonPath('reason', 'not_applicable');
+            ->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.not_applicable'));
 
         $this->assertSame(0, EventAttendee::count());
     }
