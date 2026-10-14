@@ -60,11 +60,25 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'half', 'purpose' => 'plan_purchase', 'plan_id' => $plan->id])
             ->assertOk()
-            ->assertJsonPath('data.coupon.code', 'HALF')
-            ->assertJsonPath('data.coupon.applied', true)
-            ->assertJsonPath('data.coupon.points_discounted', 60)
-            ->assertJsonPath('data.list_points', 120)
-            ->assertJsonPath('data.price_points', 60);
+            ->assertJsonPath('data.code', 'HALF')
+            ->assertJsonPath('data.applied', true)
+            ->assertJsonPath('data.points_discounted', 60)
+            ->assertJsonMissingPath('data.price_points')
+            ->assertJsonMissingPath('data.lines');
+    }
+
+    /** The coupon reads as "my coupons" lists it: a flat amount off also in the display currency. */
+    public function test_a_flat_amount_off_is_shown_in_the_display_currency(): void
+    {
+        Coupon::factory()->amountOff(30)->create(['code' => 'FLAT30']);
+
+        $this->preview(['code' => 'FLAT30'])
+            ->assertOk()
+            ->assertJsonPath('data.discount_amount', ['amount' => '3', 'label' => '3 $', 'currency' => 'USD']);
+
+        $this->preview(['code' => 'HALF'])
+            ->assertOk()
+            ->assertJsonPath('data.discount_amount', null);
     }
 
     public function test_a_booking_window(): void
@@ -80,8 +94,7 @@ class CouponPreviewControllerTest extends TestCase
             'end_at' => '2026-08-17T12:00:00+03:00',
         ])
             ->assertOk()
-            ->assertJsonPath('data.list_points', 200)
-            ->assertJsonPath('data.price_points', 100);
+            ->assertJsonPath('data.points_discounted', 100);
     }
 
     /** A preview on something already owed changes nothing and spends nothing. */
@@ -97,7 +110,7 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'HALF', 'purpose' => 'booking', 'payable_id' => $booking->id])
             ->assertOk()
-            ->assertJsonPath('data.price_points', 50);
+            ->assertJsonPath('data.points_discounted', 50);
 
         $this->assertSame(100, $booking->refresh()->price_points);
         $this->assertNull(app(CouponLedger::class)->couponFor($booking));
@@ -111,11 +124,11 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'EVENTHALF', 'purpose' => 'event_registration', 'event_id' => $event->id])
             ->assertOk()
-            ->assertJsonPath('data.price_points', 40);
+            ->assertJsonPath('data.points_discounted', 40);
 
         $this->preview(['code' => 'HALF', 'purpose' => 'event_registration', 'event_id' => $event->id])
             ->assertStatus(422)
-            ->assertJsonPath('reason', 'not_applicable');
+            ->assertJsonMissingPath('reason')->assertJsonPath('message', __('api.coupon.not_applicable'));
     }
 
     public function test_a_code_that_cannot_be_used_says_why(): void
@@ -124,7 +137,6 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'NOPE', 'purpose' => 'plan_purchase', 'plan_id' => $plan->id])
             ->assertStatus(422)
-            ->assertJsonPath('reason', 'not_found')
             ->assertJsonPath('message', __('api.coupon.not_found', [], 'en'));
     }
 
@@ -151,7 +163,7 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase'])
             ->assertOk()
-            ->assertJsonPath('data.price_points', null);
+            ->assertJsonPath('data.points_discounted', null);
     }
 
     /** The coupon's terms come back beside the price. */
@@ -161,10 +173,10 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'HALF', 'purpose' => 'plan_purchase', 'plan_id' => $plan->id])
             ->assertOk()
-            ->assertJsonPath('message', __('api.coupon.valid', [], 'en'))
-            ->assertJsonPath('data.coupon.discount_type', 'percentage')
-            ->assertJsonPath('data.coupon.discount_value', 50)
-            ->assertJsonPath('data.coupon.message', null);
+            ->assertJsonMissingPath('message')
+            ->assertJsonMissingPath('data.message')
+            ->assertJsonPath('data.discount_type', 'percentage')
+            ->assertJsonPath('data.discount_value', 50);
     }
 
     /** The payment methods screen weighs the wallet against the coupon price. */

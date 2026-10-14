@@ -55,7 +55,6 @@ class CouponPreviewCheckTest extends TestCase
     private function refused(TestResponse $response, string $reason): void
     {
         $response->assertStatus(422)
-            ->assertJsonPath('reason', $reason)
             ->assertJsonPath('message', __("api.coupon.{$reason}", [], 'en'));
     }
 
@@ -65,16 +64,15 @@ class CouponPreviewCheckTest extends TestCase
 
         $this->check(['code' => 'spring'])
             ->assertOk()
-            ->assertJsonPath('message', __('api.coupon.valid', [], 'en'))
-            ->assertJsonPath('data.coupon.code', 'SPRING')
-            ->assertJsonPath('data.coupon.discount_type', 'percentage')
-            ->assertJsonPath('data.coupon.discount_value', 15)
-            ->assertJsonPath('data.coupon.uses_left', 2)
+            ->assertJsonMissingPath('message')
+            ->assertJsonPath('data.code', 'SPRING')
+            ->assertJsonPath('data.discount_type', 'percentage')
+            ->assertJsonPath('data.discount_value', 15)
+            ->assertJsonPath('data.uses_left', 2)
             // Nothing named to price: the same keys, null.
-            ->assertJsonPath('data.coupon.applied', null)
-            ->assertJsonPath('data.coupon.points_discounted', null)
-            ->assertJsonPath('data.price_points', null)
-            ->assertJsonPath('data.lines', null);
+            ->assertJsonPath('data.applied', null)
+            ->assertJsonPath('data.points_discounted', null)
+            ->assertJsonPath('data.discount_amount', null);
     }
 
     /** An unknown and a switched-off code answer alike (D11): probing learns nothing. */

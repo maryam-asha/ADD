@@ -14,13 +14,11 @@ use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponPreview;
 use App\Domain\Pricing\Services\MemberCoupons;
-use App\Domain\Pricing\ValueObjects\PriceLine;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\PreviewCouponRequest;
 use App\Http\Resources\MemberCouponResource;
 use App\Support\Presenters\CouponOutcomePresenter;
-use App\Support\Presenters\PriceLabelPresenter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 
@@ -30,15 +28,16 @@ use Illuminate\Http\JsonResponse;
  *
  * 1. The check: does the code exist, is it live, may this member use it,
  *    and — given a purpose and an item — does it apply there. A code that
- *    cannot be used answers 422 `{message, reason}`; an unknown code and a
+ *    cannot be used answers 422 with a message saying why; an unknown code and a
  *    switched-off one answer alike (D11).
  * 2. Given something that can be priced, the price: the same quote the
  *    purchase makes, so its minimum price and how it sits beside an offer
  *    are answered too.
  *
- * The response keeps one shape: `data.coupon` is the coupon's terms and
- * `uses_left`, with `applied` / `points_discounted` / `message` from the
- * quote; the price fields are null when nothing was priced.
+ * The response keeps one shape: `data` is the coupon as "my coupons"
+ * lists it (MemberCouponResource, `discount_amount` included), with
+ * `applied` / `points_discounted` from the quote — null when nothing was
+ * priced. No message on success: a code that cannot apply is a 422.
  */
 class CouponPreviewController extends Controller
 {
@@ -49,7 +48,6 @@ class CouponPreviewController extends Controller
         CouponPreview $preview,
         MemberPayables $payables,
         CouponOutcomePresenter $outcomes,
-        PriceLabelPresenter $prices,
     ): JsonResponse {
         $member = $request->user();
         $code = $request->validated('code');
@@ -62,23 +60,12 @@ class CouponPreviewController extends Controller
         $quote = $this->quote($request, $member, $coupon, $preview, $payables);
         $outcome = $quote !== null ? $outcomes->fromQuote($code, $quote) : null;
 
-        $coupon->load('targets')->setAttribute('uses_left', $coupons->usesLeft($coupon, $member));
+        $coupon->setAttribute('uses_left', $coupons->usesLeft($coupon, $member));
 
         return response()->json([
-            'message' => $outcome['message'] ?? __('api.coupon.valid'),
-            'data' => [
-                'coupon' => (new MemberCouponResource($coupon))->resolve($request) + [
-                    'applied' => $outcome['applied'] ?? null,
-                    'points_discounted' => $outcome['points_discounted'] ?? null,
-                    'message' => $outcome['message'] ?? null,
-                ],
-                'list_points' => $quote?->listPoints,
-                'list_price' => $quote !== null ? $prices->total($quote->listPoints, $member)['price'] : null,
-                'price_points' => $quote?->finalPoints,
-                'price' => $quote !== null ? $prices->total($quote->finalPoints, $member)['price'] : null,
-                'lines' => $quote !== null
-                    ? array_map(fn (PriceLine $line) => ['key' => $line->key, 'points' => $line->points], $quote->lines())
-                    : null,
+            'data' => (new MemberCouponResource($coupon))->resolve($request) + [
+                'applied' => $outcome['applied'] ?? null,
+                'points_discounted' => $outcome['points_discounted'] ?? null,
             ],
         ]);
     }
