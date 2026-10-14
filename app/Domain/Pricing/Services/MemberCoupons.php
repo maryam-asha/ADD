@@ -11,21 +11,23 @@ use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\ValueObjects\CouponBesideOffer;
 use App\Domain\Pricing\ValueObjects\OfferPrice;
 use App\Domain\Pricing\ValueObjects\PricingTarget;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 
 /**
  * "My coupons": the codes given to this member — by name, or through a
- * company they belong to — that they could use now, and, given what they
- * are about to buy, only those that apply to it. Each is put through the
- * same CouponEligibility the purchase runs, so nothing is listed that the
+ * company they belong to — that they could use now, and, given a purpose,
+ * every one for that purpose. Each is put through the same
+ * CouponEligibility the purchase runs, so nothing is listed that the
  * purchase would then refuse (bar, on time in a space, its minimum price,
  * which only a slot's length decides).
  *
- * Asked about an item, each coupon also says how it sits beside the offer
- * live there now (`with_offer`, CouponBesideOffer). A plan or an event is
- * quoted with the coupon as the purchase would quote it — so one whose
- * price is below the coupon's minimum is left out.
+ * Asked about an item, each coupon says whether it can be used on it
+ * (`can_apply`) and, if it can, how it sits beside the offer live there now
+ * (`with_offer`, CouponBesideOffer). A plan or an event is quoted with the
+ * coupon as the purchase would quote it — so one whose price is below the
+ * coupon's minimum cannot apply.
  *
  * A code given to no one in particular is never listed: it stays a code
  * handed out outside the app (D11). Offers are not codes, and are shown on
@@ -48,6 +50,8 @@ class MemberCoupons
         $now = now();
         $offer = $item !== null ? $this->offerOn($item, $member, $target) : null;
         $companyIds = $member->companies()->pluck('companies.id');
+        // Listed by purpose alone; the item only decides `can_apply`.
+        $forPurpose = $target !== null ? new PricingTarget($target->purpose) : null;
 
         return Coupon::query()
             ->where('is_automatic', false)
@@ -62,11 +66,28 @@ class MemberCoupons
             ->orderBy('ends_at')
             ->orderBy('id')
             ->get()
-            ->filter(fn (Coupon $coupon) => $this->eligibility->rejection($coupon, $member, $target, at: $now) === null)
+            ->filter(fn (Coupon $coupon) => $this->eligibility->rejection($coupon, $member, $forPurpose, at: $now) === null)
             ->each(fn (Coupon $coupon) => $coupon->setAttribute('uses_left', $this->usesLeft($coupon, $member)))
-            ->each(fn (Coupon $coupon) => $coupon->setAttribute('with_offer', $item !== null ? $this->besideOffer($coupon, $member, $item, $offer) : null))
-            ->reject(fn (Coupon $coupon) => $coupon->getAttribute('with_offer') === false)
+            ->each(fn (Coupon $coupon) => $this->markApplicable($coupon, $member, $target, $item, $offer, $now))
             ->values();
+    }
+
+    /**
+     * `can_apply`: whether the code can be used on the item asked about —
+     * always true with no item. A code that cannot has no `with_offer`.
+     */
+    private function markApplicable(Coupon $coupon, User $member, ?PricingTarget $target, Space|Plan|Event|null $item, ?OfferPrice $offer, CarbonInterface $now): void
+    {
+        $beside = null;
+        $applies = $item === null || $this->eligibility->rejection($coupon, $member, $target, at: $now) === null;
+
+        if ($applies && $item !== null) {
+            $beside = $this->besideOffer($coupon, $member, $item, $offer);
+            $applies = $beside !== false;
+        }
+
+        $coupon->setAttribute('can_apply', $applies);
+        $coupon->setAttribute('with_offer', $beside ?: null);
     }
 
     /** The offer live now on the item for this member: the one the `sale` block shows. */

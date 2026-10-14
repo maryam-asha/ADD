@@ -115,7 +115,25 @@ class MemberCouponsTest extends TestCase
         $response->assertJsonPath('data.0.uses_left', 2);
     }
 
-    public function test_asked_about_a_space_lists_only_what_applies_to_it(): void
+    public function test_asked_about_a_purpose_alone_lists_every_code_for_it_whatever_item_it_names(): void
+    {
+        $room = Space::factory()->room()->create();
+        $this->given(['code' => 'ANYTHING']);
+        $this->given(['code' => 'THISROOM'])->targets()->create(['purpose' => 'booking', 'space_id' => $room->id]);
+        $this->given(['code' => 'ROOMS'])->targets()->create(['purpose' => 'booking', 'space_type' => 'room']);
+        $this->given(['code' => 'SESSIONS'])->targets()->create(['purpose' => 'coworking_session', 'space_id' => $room->id]);
+        $this->given(['code' => 'PLANS'])->targets()->create(['purpose' => 'plan_purchase']);
+
+        $this->assertSame(['ANYTHING', 'ROOMS', 'THISROOM'], $this->codes($this->mine(['purpose' => 'booking'])));
+    }
+
+    /** @return array<string, bool> code => can_apply */
+    private function canApply(TestResponse $response): array
+    {
+        return collect($response->assertOk()->json('data'))->pluck('can_apply', 'code')->sortKeys()->all();
+    }
+
+    public function test_asked_about_a_space_lists_every_code_for_the_purpose_saying_which_apply_to_it(): void
     {
         $room = Space::factory()->room()->create();
         $desk = Space::factory()->create();
@@ -126,10 +144,13 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'DESK'])->targets()->create(['purpose' => 'booking', 'space_id' => $desk->id]);
         $this->given(['code' => 'SESSIONS'])->targets()->create(['purpose' => 'coworking_session', 'space_id' => $room->id]);
 
-        $this->assertSame(['ANYTHING', 'ROOMS', 'THISROOM'], $this->codes($this->mine(['purpose' => 'booking', 'space_id' => $room->id])));
+        $this->assertSame(
+            ['ANYTHING' => true, 'DESK' => false, 'ROOMS' => true, 'THISROOM' => true],
+            $this->canApply($this->mine(['purpose' => 'booking', 'space_id' => $room->id])),
+        );
     }
 
-    public function test_asked_about_a_plan_lists_only_what_applies_to_it(): void
+    public function test_asked_about_a_plan_lists_every_code_for_the_purpose_saying_which_apply_to_it(): void
     {
         $plan = Plan::factory()->create(['is_active' => true, 'is_public' => true]);
         $other = Plan::factory()->create(['is_active' => true, 'is_public' => true]);
@@ -138,7 +159,10 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'ANYPLAN'])->targets()->create(['purpose' => 'plan_purchase']);
         $this->given(['code' => 'OTHERPLAN'])->targets()->create(['purpose' => 'plan_purchase', 'plan_id' => $other->id]);
 
-        $this->assertSame(['ANYPLAN', 'THISPLAN'], $this->codes($this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])));
+        $this->assertSame(
+            ['ANYPLAN' => true, 'OTHERPLAN' => false, 'THISPLAN' => true],
+            $this->canApply($this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])),
+        );
     }
 
     /** An event lists only codes targeted at events: one for everything stops short of them. */
@@ -149,8 +173,12 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'ANYTHING']);
         $this->given(['code' => 'EVENTS'])->targets()->create(['purpose' => 'event_registration']);
         $this->given(['code' => 'THISEVENT'])->targets()->create(['purpose' => 'event_registration', 'event_id' => $event->id]);
+        $this->given(['code' => 'OTHEREVENT'])->targets()->create(['purpose' => 'event_registration', 'event_id' => Event::factory()->create()->id]);
 
-        $this->assertSame(['EVENTS', 'THISEVENT'], $this->codes($this->mine(['purpose' => 'event_registration', 'event_id' => $event->id])));
+        $this->assertSame(
+            ['EVENTS' => true, 'OTHEREVENT' => false, 'THISEVENT' => true],
+            $this->canApply($this->mine(['purpose' => 'event_registration', 'event_id' => $event->id])),
+        );
     }
 
     public function test_shows_what_a_code_takes_off_and_where_it_applies(): void
@@ -262,14 +290,17 @@ class MemberCouponsTest extends TestCase
         $this->assertSame(__('api.coupon.with_offer.stacks', [], 'en'), $onTop['note']);
     }
 
-    /** Below a code's minimum price it could not be used here, so it is not listed. */
-    public function test_on_a_plan_below_a_codes_minimum_the_code_is_left_out(): void
+    /** Below a code's minimum price it could not be used here: listed, but it cannot apply. */
+    public function test_on_a_plan_below_a_codes_minimum_the_code_cannot_apply(): void
     {
         $plan = Plan::factory()->create(['price_points' => 120, 'is_active' => true, 'is_public' => true]);
         $this->given(['code' => 'BIGSPEND', 'min_amount_points' => 500]);
         $this->given(['code' => 'ANY']);
 
-        $this->assertSame(['ANY'], $this->codes($this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])));
+        $response = $this->mine(['purpose' => 'plan_purchase', 'plan_id' => $plan->id]);
+
+        $this->assertSame(['ANY' => true, 'BIGSPEND' => false], $this->canApply($response));
+        $this->assertNull($this->besideOffer($response, 'BIGSPEND'));
     }
 
     public function test_on_an_event_the_offer_targeted_at_events_is_quoted(): void

@@ -39,9 +39,13 @@ class MemberCouponResource extends JsonResource
                 'space_type' => $target->space_type,
                 'event_id' => $target->event_id,
             ]),
-            // "My coupons" only, where it is always set — null unless an item was asked about.
+            // "My coupons" only, where both are always set: whether it can be used on the item asked
+            // about (true with none), and beside its offer — null unless it can and an item was asked about.
             ...(array_key_exists('with_offer', $this->resource->getAttributes())
-                ? ['with_offer' => $this->withOffer($this->resource->getAttribute('with_offer'))]
+                ? [
+                    'can_apply' => (bool) $this->resource->getAttribute('can_apply'),
+                    'with_offer' => $this->withOffer($this->resource->getAttribute('with_offer')),
+                ]
                 : []),
         ];
     }

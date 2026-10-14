@@ -22,6 +22,12 @@ final class PricingTarget
         public readonly ?int $eventId = null,
     ) {}
 
+    /** Whether a plan, a space or an event is named, not just a purpose. */
+    public function namesItem(): bool
+    {
+        return $this->planId !== null || $this->spaceId !== null || $this->spaceType !== null || $this->eventId !== null;
+    }
+
     /** Time in a space: a booking, or a co-working session. */
     public static function forSpace(PricingPurpose $purpose, Space $space): self
     {

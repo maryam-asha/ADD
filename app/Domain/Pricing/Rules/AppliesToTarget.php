@@ -33,10 +33,22 @@ class AppliesToTarget implements CouponRule
         return $targets->contains(fn (CouponTarget $t) => $this->matches($t, $target)) ? null : CouponRejection::NotApplicable;
     }
 
+    /**
+     * Asked about a purpose with no item ("my coupons" for bookings), a
+     * target of that purpose matches whatever item it names: the coupon
+     * applies to some of what the member may buy for it.
+     */
     private function matches(CouponTarget $t, PricingTarget $target): bool
     {
-        return $t->purpose === $target->purpose
-            && ($t->plan_id === null || $t->plan_id === $target->planId)
+        if ($t->purpose !== $target->purpose) {
+            return false;
+        }
+
+        if (! $target->namesItem()) {
+            return true;
+        }
+
+        return ($t->plan_id === null || $t->plan_id === $target->planId)
             && ($t->space_id === null || $t->space_id === $target->spaceId)
             && ($t->space_type === null || $t->space_type === $target->spaceType)
             && ($t->event_id === null || $t->event_id === $target->eventId);
