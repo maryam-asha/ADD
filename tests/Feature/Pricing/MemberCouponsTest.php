@@ -5,6 +5,7 @@ namespace Tests\Feature\Pricing;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -15,6 +16,8 @@ use App\Domain\Pricing\Enums\DiscountKind;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\AppliedDiscount;
 use App\Domain\Pricing\Models\Coupon;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
@@ -142,10 +145,11 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'THISROOM'])->targets()->create(['purpose' => 'booking', 'space_id' => $room->id]);
         $this->given(['code' => 'ROOMS'])->targets()->create(['purpose' => 'booking', 'space_type' => 'room']);
         $this->given(['code' => 'DESK'])->targets()->create(['purpose' => 'booking', 'space_id' => $desk->id]);
+        $this->given(['code' => 'HALLS'])->targets()->create(['purpose' => 'booking', 'space_type' => 'event_hall']);
         $this->given(['code' => 'SESSIONS'])->targets()->create(['purpose' => 'coworking_session', 'space_id' => $room->id]);
 
         $this->assertSame(
-            ['ANYTHING' => true, 'DESK' => false, 'ROOMS' => true, 'THISROOM' => true],
+            ['ANYTHING' => true, 'DESK' => false, 'HALLS' => false, 'ROOMS' => true, 'THISROOM' => true],
             $this->canApply($this->mine(['purpose' => 'booking', 'space_id' => $room->id])),
         );
     }
@@ -196,8 +200,22 @@ class MemberCouponsTest extends TestCase
             ->assertJsonPath('data.0.max_discount_points', 50)
             ->assertJsonPath('data.0.ends_at', '2026-08-30T21:00:00.000000Z')
             ->assertJsonPath('data.0.uses_left', null)
-            ->assertJsonPath('data.0.targets.0.purpose', 'booking')
-            ->assertJsonPath('data.0.targets.0.space_id', $room->id);
+            ->assertJsonMissingPath('data.0.targets');
+    }
+
+    public function test_a_flat_amount_off_is_also_shown_in_the_chosen_currency(): void
+    {
+        app(SettingService::class)->setDefault('point.rate_usd', '0.10', SettingValueType::String);
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001']);
+        $this->given(['code' => 'FLAT30', 'discount_type' => 'amount_off', 'discount_value' => 30]);
+        $this->given(['code' => 'TENPCT', 'discount_type' => 'percentage', 'discount_value' => 10]);
+
+        $usd = collect($this->mine()->assertOk()->json('data'))->keyBy('code');
+        $this->assertSame(['amount' => '3', 'label' => '3 $', 'currency' => 'USD'], $usd['FLAT30']['discount_amount']);
+        $this->assertNull($usd['TENPCT']['discount_amount']);
+
+        $syp = collect($this->withHeader('currency', 'SYP')->mine()->assertOk()->json('data'))->keyBy('code');
+        $this->assertSame(['amount' => '30000', 'label' => '30,000 SYP', 'currency' => 'SYP'], $syp['FLAT30']['discount_amount']);
     }
 
     public function test_an_item_needs_its_purpose(): void

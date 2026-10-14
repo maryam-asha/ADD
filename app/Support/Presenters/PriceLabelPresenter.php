@@ -119,6 +119,19 @@ class PriceLabelPresenter
     }
 
     /**
+     * A number of points as money in the display currency — the amount (a
+     * plain string, PlainAmount), its label, and the currency.
+     *
+     * @return array{amount: string, label: string, currency: string}
+     */
+    public function money(int $points, ?User $user, ?string $locale = null): array
+    {
+        [$amount, $currency] = $this->amountFor($points, $user);
+
+        return ['amount' => $amount, 'label' => $this->currencyLabel($amount, $currency, $locale), 'currency' => $currency];
+    }
+
+    /**
      * A number of points as the member reads it, e.g. "1,200 pts".
      */
     public function pointsLabel(int $points, ?string $locale = null): string
