@@ -2,9 +2,13 @@
 
 namespace Tests\Feature\Member;
 
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -234,5 +238,62 @@ class ProfileControllerTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['gender']);
+    }
+
+    private function showAsMember(User $member): TestResponse
+    {
+        Sanctum::actingAs($member, ['*']);
+
+        return $this->getJson('/api/v1/member/profile')->assertOk();
+    }
+
+    private function member(): User
+    {
+        $member = User::factory()->create();
+        $member->assignRole('member');
+
+        return $member;
+    }
+
+    public function test_has_active_membership_is_false_without_a_plan(): void
+    {
+        $this->showAsMember($this->member())->assertJsonPath('data.has_active_membership', false);
+    }
+
+    public function test_has_active_membership_is_true_with_a_live_personal_plan(): void
+    {
+        $member = $this->member();
+        Membership::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+
+        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', true);
+    }
+
+    public function test_has_active_membership_is_true_with_a_live_company_plan(): void
+    {
+        $member = $this->member();
+        $company = Company::factory()->create();
+        $member->companies()->attach($company->id);
+        Membership::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+
+        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', true);
+    }
+
+    public function test_has_active_membership_is_false_for_an_ended_or_upcoming_plan(): void
+    {
+        $member = $this->member();
+        Membership::factory()->create([
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'current_period_start' => now()->subDays(40),
+            'current_period_end' => now()->subDays(10),
+        ]);
+        Membership::factory()->create([
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'current_period_start' => now()->addDay(),
+            'current_period_end' => now()->addDays(31),
+        ]);
+
+        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', false);
     }
 }

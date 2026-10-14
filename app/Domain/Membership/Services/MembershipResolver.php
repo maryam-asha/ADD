@@ -48,6 +48,15 @@ class MembershipResolver
     }
 
     /**
+     * Whether activeFor() would find a membership — the same personal-or-
+     * company rule, as one exists() query, without loading the plan.
+     */
+    public function hasActiveFor(User $user): bool
+    {
+        return $this->heldBy($user)->live()->exists();
+    }
+
+    /**
      * Whether this user ever held any membership, personal or through one
      * of their companies, whatever its status or period — what tells an
      * expired plan apart from never having had one.

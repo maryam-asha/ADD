@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Domain\Identity\Models\UserPersonalProfile;
 use App\Domain\Identity\Models\UserProfessionalProfile;
 use App\Domain\Identity\Services\ProfileCompletionService;
+use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
@@ -17,7 +18,11 @@ use Illuminate\Support\Facades\DB;
 
 class ProfileController extends Controller
 {
-    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings, WalletService $wallets, PriceLabelPresenter $prices): JsonResponse
+    /**
+     * `has_active_membership` is true while the member holds a live plan,
+     * their own or a company's — exactly when memberships/current returns one.
+     */
+    public function show(Request $request, ProfileCompletionService $completion, SettingService $settings, WalletService $wallets, PriceLabelPresenter $prices, MembershipResolver $memberships): JsonResponse
     {
         $user = $request->user();
 
@@ -25,6 +30,7 @@ class ProfileController extends Controller
             'data' => [
                 'user' => new MemberProfileResource($user),
                 'points_label' => $prices->pointsLabel($wallets->personalGeneralBalance($user)),
+                'has_active_membership' => $memberships->hasActiveFor($user),
                 'completion' => [
                     'score' => $completion->score($user),
                     'threshold' => $settings->get('profile.completion_threshold', 80),
