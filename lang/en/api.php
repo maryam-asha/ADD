@@ -449,6 +449,11 @@ return [
         'method_not_supported' => 'This payment method cannot be used for this.',
         'already_paid' => 'This has already been paid.',
         'booking_not_payable' => 'A cancelled, rejected or not-attended booking cannot be paid.',
+        'reception_only' => 'Not available in the app.',
+        'reception_only_hints' => [
+            'wallet_top_up' => 'To top up with cash, visit reception.',
+            'plan_purchase' => 'To pay for the package in cash, visit reception.',
+        ],
         'nothing_due' => 'There is nothing to pay.',
         'invalid_amount' => 'Enter the amount as a plain number, such as 12 or 12.50.',
         'no_wallet' => 'There is no wallet to record this payment against.',

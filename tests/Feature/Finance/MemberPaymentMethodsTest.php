@@ -142,11 +142,17 @@ class MemberPaymentMethodsTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.amount_points', null)
             ->assertJsonPath('data.price', null)
-            ->assertJsonPath('data.methods.0.key', 'paymera')
-            ->assertJsonPath('data.methods.0.hint', null);
+            ->assertJsonPath('data.methods.0.key', 'cash')
+            ->assertJsonPath('data.methods.0.available', false)
+            ->assertJsonPath('data.methods.0.reason', __('api.payment.reception_only'))
+            ->assertJsonPath('data.methods.0.hint', __('api.payment.reception_only_hints.wallet_top_up'))
+            ->assertJsonPath('data.methods.1.key', 'paymera')
+            ->assertJsonPath('data.methods.1.available', true)
+            ->assertJsonPath('data.methods.1.hint', null);
 
-        // Points cannot buy points; cash for points is reception's.
-        $this->assertSame(['paymera'], array_column($response->json('data.methods'), 'key'));
+        // Points cannot buy points; cash for points is reception's, so the
+        // app shows it only to send the member to the desk.
+        $this->assertSame(['cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
     }
 
     public function test_a_plan_is_priced_from_the_plan(): void
@@ -164,8 +170,11 @@ class MemberPaymentMethodsTest extends TestCase
             ->assertJsonPath('data.amount_points', 1200)
             ->assertJsonPath('data.methods.0.available', true);
 
-        // Points or a card: there is no subscription without payment, so no cash.
-        $this->assertSame(['wallet', 'paymera'], array_column($response->json('data.methods'), 'key'));
+        // Points or a card: there is no subscription without payment, so cash
+        // is shown only to send the member to reception.
+        $this->assertSame(['wallet', 'cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
+        $response->assertJsonPath('data.methods.1.available', false)
+            ->assertJsonPath('data.methods.1.hint', __('api.payment.reception_only_hints.plan_purchase'));
         // A plan bought here is the member's own: only their wallet pays.
         $this->assertSame(['user'], array_column($response->json('data.methods.0.wallets'), 'owner_type'));
     }

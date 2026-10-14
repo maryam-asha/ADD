@@ -153,17 +153,18 @@ class PlanPurchasePaymentMethodTest extends TestCase
         $this->assertSame(0, Payment::count());
     }
 
-    public function test_cash_is_not_offered_for_a_plan(): void
+    public function test_cash_is_shown_unavailable_for_a_plan(): void
     {
         $member = $this->member(5000);
         Sanctum::actingAs($member, ['*']);
 
-        $keys = collect($this->getJson('/api/v1/member/payment-methods?purpose=plan_purchase&plan_id='.$this->plan()->id)
+        $methods = collect($this->getJson('/api/v1/member/payment-methods?purpose=plan_purchase&plan_id='.$this->plan()->id)
             ->assertOk()
-            ->json('data.methods'))->pluck('key')->all();
+            ->json('data.methods'))->keyBy('key');
 
-        $this->assertNotContains('cash', $keys);
-        $this->assertContains('wallet', $keys);
+        $this->assertFalse($methods['cash']['available']);
+        $this->assertSame(__('api.payment.reception_only_hints.plan_purchase'), $methods['cash']['hint']);
+        $this->assertTrue($methods['wallet']['available']);
     }
 
     public function test_a_plan_bought_by_card_returns_where_to_pay(): void

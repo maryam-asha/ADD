@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Payments;
 
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -17,6 +18,12 @@ use Illuminate\Database\Eloquent\Model;
  * so a gateway added to config/payments.php appears here with no other
  * change — each saying whether it can pay right now and, if not, why, and
  * `hint`: what the member does next, when the label alone does not say.
+ *
+ * Cash cannot pay for a top-up or a plan from the app, but reception takes
+ * it for both (admin/reception/wallet-top-ups, admin/reception/plan-purchases),
+ * so it is listed for them unavailable, with a hint sending the member to the
+ * desk, rather than left out. Starting a payment still refuses it
+ * (CashMethod::supports()).
  *
  * The wallet method also lists the wallets the member may spend from, each
  * with its usable balance and whether it covers the amount, so the app can
@@ -44,14 +51,21 @@ class PaymentMethodOptions
         // `$points`: a price the caller already quoted — with a coupon the
         // member is about to use (CouponPreview).
         $points ??= $this->pointsDue($purpose, $member, $payable, $plan);
-        $drivers = $purpose === null ? $this->methods->enabled() : $this->methods->availableFor($purpose);
 
         $methods = [];
 
-        foreach ($drivers as $key => $driver) {
+        foreach ($this->methods->enabled() as $key => $driver) {
             $option = ['key' => $key, 'label' => $driver->label(), 'available' => true, 'reason' => null, 'hint' => null];
 
-            if ($key === WalletMethod::KEY) {
+            if ($purpose !== null && ! $driver->supports($purpose)) {
+                if (! $this->paidAtReceptionOnly($key, $purpose)) {
+                    continue;
+                }
+
+                $option['available'] = false;
+                $option['reason'] = __('api.payment.reception_only');
+                $option['hint'] = __('api.payment.reception_only_hints.'.$purpose->value);
+            } elseif ($key === WalletMethod::KEY) {
                 $option = $this->walletOption($option, $purpose, $member, $points);
             }
 
@@ -59,6 +73,13 @@ class PaymentMethodOptions
         }
 
         return ['amount_points' => $points, 'methods' => $methods];
+    }
+
+    /** Cash for a top-up or a plan: the desk takes it, the app does not. */
+    private function paidAtReceptionOnly(string $key, PaymentPurpose $purpose): bool
+    {
+        return $key === CashMethod::KEY
+            && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
     }
 
     private function pointsDue(?PaymentPurpose $purpose, ?User $member, ?Model $payable, ?Plan $plan): ?int

@@ -138,8 +138,9 @@ class MemberTopUpTest extends TestCase
 
     public function test_the_payment_methods_for_a_top_up_are_prepaid_only(): void
     {
-        $keys = array_column($this->getJson('/api/v1/member/payment-methods?purpose=wallet_top_up')->json('data.methods'), 'key');
+        $methods = collect($this->getJson('/api/v1/member/payment-methods?purpose=wallet_top_up')->json('data.methods'));
 
-        $this->assertSame(['paymera'], $keys);
+        // Cash is listed only to send the member to reception.
+        $this->assertSame(['paymera'], $methods->where('available', true)->pluck('key')->all());
     }
 }

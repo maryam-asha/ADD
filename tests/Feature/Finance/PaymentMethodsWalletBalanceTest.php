@@ -115,11 +115,19 @@ class PaymentMethodsWalletBalanceTest extends TestCase
     {
         [, $token] = $this->memberWithToken(0);
 
-        // Cash for points is reception's, not the app's.
-        $this->assertSame(
-            ['paymera'],
-            array_column($this->methods(['purpose' => 'wallet_top_up'], $token)->assertOk()->json('data.methods'), 'key'),
-        );
+        // Cash for points is reception's, not the app's: listed unavailable.
+        $methods = $this->methods(['purpose' => 'wallet_top_up'], $token)->assertOk()->json('data.methods');
+
+        $this->assertSame(['cash', 'paymera'], array_column($methods, 'key'));
+        $this->assertSame([false, true], array_column($methods, 'available'));
+    }
+
+    public function test_a_disabled_cash_method_is_not_shown_for_a_top_up(): void
+    {
+        config(['payments.methods.cash.enabled' => false]);
+        [, $token] = $this->memberWithToken(0);
+
+        $this->assertSame(['paymera'], array_column($this->methods(['purpose' => 'wallet_top_up'], $token)->json('data.methods'), 'key'));
     }
 
     public function test_a_disabled_method_is_absent(): void
