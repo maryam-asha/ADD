@@ -8,7 +8,10 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\CoworkingPoolService;
 use App\Domain\Ecosystem\Enums\SiteInquiryStatus;
 use App\Domain\Ecosystem\Models\SiteInquiry;
+use App\Domain\Foundation\Enums\OperationalStatus;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Enums\PrivateOfficeRequestStatus;
 use App\Domain\Identity\Models\PrivateOfficeRequest;
 use App\Domain\Reports\ValueObjects\DashboardPeriod;
@@ -59,23 +62,42 @@ final class OperationsOverview
         $branches = $branch !== null
             ? collect([$branch])
             : Branch::query()->where('is_active', true)->orderBy('id')->get();
+        $today = $now->setTimezone($this->time->timezone())->toDateString();
         $locale = app()->getLocale();
 
         return [
             'active_sessions' => $this->inBranch(Booking::query()->inProgress(), $branch)->count()
                 + $this->inBranch(WalkinSession::query()->open(), $branch)->count(),
             'expected_today' => $this->inBranch(Booking::query()->expectedBy($now, $endOfToday), $branch)->count(),
-            'branches' => $branches->map(function (Branch $b) use ($now, $locale) {
+            'branches' => $branches->map(function (Branch $b) use ($now, $today, $locale) {
                 $pool = $this->pool->timeline($b, $now, $now->addSecond());
+                $offices = $this->offices($b);
 
                 return [
                     'id' => $b->id,
                     'name' => $b->translate('name', $locale),
+                    // Seats the pool has handed out — a subscription holds its
+                    // seats whether or not anyone sits in them; staff may sell
+                    // past capacity (override_capacity), so taken can exceed seats.
                     'seats' => $pool->capacityAt($now),
                     'taken' => $pool->usageAt($now),
+                    'offices' => (clone $offices)->count(),
+                    'offices_leased' => $offices->whereHas('officeLeases', fn (Builder $lease) => $lease->holdingOn($today))->count(),
                 ];
             })->values()->all(),
         ];
+    }
+
+    /**
+     * A branch's private offices: every business space not retired — one
+     * under maintenance is still an office, and may still be leased.
+     */
+    private function offices(Branch $branch): Builder
+    {
+        return Space::query()
+            ->where('space_type', SpaceType::Business)
+            ->where('status', '!=', OperationalStatus::Retired)
+            ->whereHas('building', fn (Builder $building) => $building->where('branch_id', $branch->id));
     }
 
     /**

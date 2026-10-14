@@ -14,6 +14,7 @@ use App\Domain\Finance\Models\CashRegisterSession;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
@@ -90,6 +91,36 @@ class DashboardOverviewTest extends InvoicingTestCase
         foreach (['operations', 'finance', 'members', 'spaces'] as $section) {
             $this->getJson("/api/v1/admin/dashboard/{$section}")->assertOk();
         }
+    }
+
+    public function test_operations_counts_each_branchs_private_offices_and_those_leased_today(): void
+    {
+        $branch = Branch::factory()->create();
+        $leased = $this->space($branch, SpaceType::Business, 2);
+        $inMaintenance = $this->space($branch, SpaceType::Business, 2);
+        $inMaintenance->update(['status' => OperationalStatus::Maintenance]);
+        $terminated = $this->space($branch, SpaceType::Business, 2);
+        $later = $this->space($branch, SpaceType::Business, 2);
+        $this->space($branch, SpaceType::Business, 2);
+        $retired = $this->space($branch, SpaceType::Business, 2);
+        $retired->update(['status' => OperationalStatus::Retired]);
+        $this->space($branch, SpaceType::Room);
+
+        OfficeLease::factory()->create(['space_id' => $leased->id, 'starts_on' => '2026-06-01']);
+        // Leased while under maintenance: still held, still an office of the branch.
+        OfficeLease::factory()->create(['space_id' => $inMaintenance->id, 'starts_on' => '2026-10-15', 'duration_months' => 1]);
+        // terminated_on is the first day without access.
+        OfficeLease::factory()->create(['space_id' => $terminated->id, 'starts_on' => '2026-06-01', 'terminated_on' => '2026-10-15', 'status' => OfficeLeaseStatus::Terminated]);
+        OfficeLease::factory()->create(['space_id' => $later->id, 'starts_on' => '2026-11-01']);
+        // Another branch's office counts there, not here.
+        OfficeLease::factory()->create(['space_id' => $this->space(Branch::factory()->create(), SpaceType::Business, 2)->id, 'starts_on' => '2026-06-01']);
+
+        $this->actingAsAdmin();
+        $data = $this->getJson('/api/v1/admin/dashboard/operations')->assertOk()->json('data');
+
+        $here = collect($data['now']['branches'])->firstWhere('id', $branch->id);
+        $this->assertSame(5, $here['offices']);
+        $this->assertSame(2, $here['offices_leased']);
     }
 
     public function test_operations_shows_who_is_inside_who_is_expected_and_what_waits_on_staff(): void
