@@ -23,6 +23,8 @@ use App\Http\Controllers\Api\V1\Admin\CouponController;
 use App\Http\Controllers\Api\V1\Admin\CoworkingPoolController;
 use App\Http\Controllers\Api\V1\Admin\CoworkingWindowController;
 use App\Http\Controllers\Api\V1\Admin\CurrencyController;
+use App\Http\Controllers\Api\V1\Admin\DashboardController;
+use App\Http\Controllers\Api\V1\Admin\DashboardStatsController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\DiscountReportController;
@@ -542,4 +544,19 @@ Route::withoutMiddleware('role:admin|operations')->group(function () {
 Route::withoutMiddleware('role:admin|operations')->group(function () {
     Route::get('reports/revenue', [ReportController::class, 'revenue'])->middleware('permission:reports.view');
     Route::get('reports/providers', [ReportController::class, 'providers'])->middleware('permission:reports.view');
+});
+
+// The dashboard's home page: one section per permission, so each role sees
+// what its work needs — operations the floor, admin everything.
+Route::withoutMiddleware('role:admin|operations')->group(function () {
+    Route::get('dashboard/operations', [DashboardController::class, 'operations'])->middleware('permission:dashboard.operations');
+    Route::get('dashboard/finance', [DashboardController::class, 'finance'])->middleware('permission:dashboard.finance');
+    Route::get('dashboard/members', [DashboardController::class, 'members'])->middleware('permission:dashboard.members');
+    Route::get('dashboard/spaces', [DashboardController::class, 'spaces'])->middleware('permission:dashboard.spaces');
+    // One statistics card each, behind its section's permission.
+    Route::get('dashboard/stats/bookings-by-status', [DashboardStatsController::class, 'bookingsByStatus'])->middleware('permission:dashboard.operations');
+    Route::get('dashboard/stats/service-requests', [DashboardStatsController::class, 'serviceRequests'])->middleware('permission:dashboard.operations');
+    Route::get('dashboard/stats/daily-bookings', [DashboardStatsController::class, 'dailyBookings'])->middleware('permission:dashboard.operations');
+    Route::get('dashboard/stats/daily-members', [DashboardStatsController::class, 'dailyMembers'])->middleware('permission:dashboard.members');
+    Route::get('dashboard/stats/app-users', [DashboardStatsController::class, 'appUsers'])->middleware('permission:dashboard.members');
 });

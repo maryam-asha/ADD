@@ -149,6 +149,27 @@ class Booking extends Model
         return $query->where('space_id', $spaceId);
     }
 
+    /**
+     * Not yet arrived and due by $until: still to start, or started without
+     * a check-in and not yet over. A booking held for its payment is not
+     * expected until it is paid or switched to another method.
+     */
+    public function scopeExpectedBy(Builder $query, CarbonInterface $now, CarbonInterface $until): Builder
+    {
+        return $query->whereIn('status', BookingStatus::expected())
+            ->whereNull('checked_in_at')
+            ->where('end_at', '>', $now)
+            ->where('start_at', '<=', $until);
+    }
+
+    /** Checked in and not yet out: someone is inside on it now. */
+    public function scopeInProgress(Builder $query): Builder
+    {
+        return $query->where('status', BookingStatus::Confirmed)
+            ->whereNotNull('checked_in_at')
+            ->whereNull('checked_out_at');
+    }
+
     public function space(): BelongsTo
     {
         return $this->belongsTo(Space::class);

@@ -741,4 +741,7 @@ return [
         'lease_not_active' => 'Only an active lease can be renewed.',
         'superseded' => 'The company already has a newer subscription.',
     ],
+    'dashboard' => [
+        'period_too_long' => 'A spaces report covers a year at most. Choose a shorter period.',
+    ],
 ];

@@ -5,17 +5,17 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
 use App\Domain\Leasing\Models\OfficeLease;
-use App\Domain\Membership\Enums\MembershipStatus;
-use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use App\Domain\Renewals\Exceptions\RenewalRefused;
 use App\Domain\Renewals\Services\LeaseRenewalService;
 use App\Domain\Renewals\Services\MembershipRenewalService;
 use App\Domain\Renewals\Services\RenewalSettings;
+use App\Domain\Renewals\Services\StoppedRenewals;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\ListStoppedRenewalsRequest;
 use App\Http\Requests\Admin\UpdateAutoRenewRequest;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -48,12 +48,13 @@ class RenewalController extends Controller
     }
 
     /** Stopped subscriptions and leases, soonest end first. */
-    public function stopped(ListStoppedRenewalsRequest $request): JsonResponse
+    public function stopped(ListStoppedRenewalsRequest $request, StoppedRenewals $stopped): JsonResponse
     {
         $type = $request->input('type');
+        $reason = $request->input('reason');
         $rows = collect()
-            ->concat($type === 'lease' ? [] : $this->stoppedMemberships($request))
-            ->concat($type === 'membership' ? [] : $this->stoppedLeases($request))
+            ->concat($type === 'lease' ? [] : $this->stoppedMemberships($stopped->memberships($reason)))
+            ->concat($type === 'membership' ? [] : $this->stoppedLeases($stopped->leases($reason)))
             ->when($request->filled('provider_id'), fn (Collection $c) => $c->filter(fn ($row) => ($row['provider']['id'] ?? null) === $request->integer('provider_id')))
             ->sortBy('ends_at')
             ->values();
@@ -72,39 +73,26 @@ class RenewalController extends Controller
         ]);
     }
 
-    /** @return Collection<int, array<string, mixed>> */
-    private function stoppedMemberships(ListStoppedRenewalsRequest $request): Collection
+    /**
+     * @param  EloquentCollection<int, Membership>  $memberships
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function stoppedMemberships(EloquentCollection $memberships): Collection
     {
-        $memberships = Membership::query()
-            ->whereNotNull('renewal_stop_reason')
-            ->where('owner_type', OwnerType::Company)
-            ->when($request->filled('reason'), fn ($q) => $q->where('renewal_stop_reason', $request->input('reason')))
-            ->get();
         $companies = Company::query()->with('provider')->whereIn('id', $memberships->pluck('owner_id'))->get()->keyBy('id');
-        // Live or upcoming subscriptions of these companies: an ended stopped
-        // one is moot once its company holds another.
-        $current = Membership::query()
-            ->where('owner_type', OwnerType::Company)
-            ->whereIn('owner_id', $memberships->pluck('owner_id'))
-            ->where('status', MembershipStatus::Active)
-            ->where('current_period_end', '>=', now())
-            ->get(['id', 'owner_id'])
-            ->groupBy('owner_id');
 
         return $memberships
-            ->reject(fn (Membership $m) => $m->current_period_end->isPast()
-                && $current->get($m->owner_id, collect())->contains(fn (Membership $other) => $other->id !== $m->id))
             ->map(fn (Membership $m) => $this->row('membership', $m->id, $companies->get($m->owner_id), $m->renewal_stop_reason, $m->current_period_end->toIso8601String(), $m->current_period_end->isPast()));
     }
 
-    /** @return Collection<int, array<string, mixed>> */
-    private function stoppedLeases(ListStoppedRenewalsRequest $request): Collection
+    /**
+     * @param  EloquentCollection<int, OfficeLease>  $leases
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function stoppedLeases(EloquentCollection $leases): Collection
     {
-        return OfficeLease::query()
-            ->with('company.provider')
-            ->whereNotNull('renewal_stop_reason')
-            ->when($request->filled('reason'), fn ($q) => $q->where('renewal_stop_reason', $request->input('reason')))
-            ->get()
+        return $leases
+            ->load('company.provider')
             ->map(fn (OfficeLease $l) => $this->row('lease', $l->id, $l->company, $l->renewal_stop_reason, $l->ends_on->toDateString(), $l->ends_on->toDateString() < now()->toDateString()));
     }
 

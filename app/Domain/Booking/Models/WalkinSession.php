@@ -13,6 +13,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -73,6 +74,12 @@ class WalkinSession extends Model
     protected function referencePrefix(): string
     {
         return 'WS';
+    }
+
+    /** Checked in and not yet out: someone is inside on it now. */
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->whereNotNull('checked_in_at')->whereNull('checked_out_at');
     }
 
     public function space(): BelongsTo

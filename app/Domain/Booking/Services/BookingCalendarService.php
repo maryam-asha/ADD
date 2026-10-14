@@ -18,8 +18,9 @@ use Illuminate\Support\Collection;
  * The operations calendar: every space as a row, every day in the view as
  * a cell, with what is booked and how full it is.
  *
- * Occupancy is booked minutes over open minutes, where "open" comes from
- * the same BusinessHoursService periods the member calendar uses. That
+ * Occupancy is booked minutes over open minutes (OccupancyMeter), where
+ * "open" comes from the same BusinessHoursService periods the member
+ * calendar uses. That
  * matters: if this computed its own notion of open hours, a room could
  * read 60% full here and be offered as free there.
  *
@@ -40,6 +41,7 @@ class BookingCalendarService
         private readonly AvailabilityService $availability,
         private readonly AvailabilityPresenter $presenter,
         private readonly LocalTime $time,
+        private readonly OccupancyMeter $meter,
     ) {}
 
     /**
@@ -218,7 +220,7 @@ class BookingCalendarService
                 'periods' => $periods,
                 'occupancy' => $pool !== null
                     ? $this->poolOccupancy($pool, $periods, $date)
-                    : $this->occupancy($onThisDay, $periods, $date, $rules->concurrencyCeiling),
+                    : $this->meter->day($onThisDay, $periods, $date, $rules->concurrencyCeiling),
                 // Occupancy above counts every booking; the list is the
                 // member's alone when the calendar is narrowed to one.
                 'bookings' => $onThisDay
@@ -240,56 +242,6 @@ class BookingCalendarService
                 'requires_approval' => $rules->requiresApproval,
             ],
             'days' => $days,
-        ];
-    }
-
-    /**
-     * How much of the open day is sold.
-     *
-     * Booked minutes are clipped to the day's open periods, so a booking
-     * that runs to closing time does not report more minutes than the day
-     * actually has, and a closed day reports 0% rather than dividing by
-     * zero. A space that admits several concurrent bookings is measured
-     * against its ceiling, so a hot desk with 20 seats is not "500% full".
-     *
-     * @param  Collection<int, Booking>  $bookings
-     * @param  array<int, array{open_time: string, close_time: string}>  $periods
-     * @return array<string, int>
-     */
-    private function occupancy(Collection $bookings, array $periods, CarbonImmutable $date, int $ceiling): array
-    {
-        $openMinutes = 0;
-
-        foreach ($periods as $period) {
-            $open = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['open_time'], $date->timezone);
-            $close = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['close_time'], $date->timezone);
-            $openMinutes += (int) $open->diffInMinutes($close);
-        }
-
-        $bookedMinutes = 0;
-
-        foreach ($bookings as $booking) {
-            foreach ($periods as $period) {
-                $open = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['open_time'], $date->timezone)->utc();
-                $close = CarbonImmutable::parse($date->format('Y-m-d').' '.$period['close_time'], $date->timezone)->utc();
-
-                $start = $booking->start_at->greaterThan($open) ? $booking->start_at : $open;
-                $end = $booking->end_at->lessThan($close) ? $booking->end_at : $close;
-
-                if ($start->lessThan($end)) {
-                    $bookedMinutes += (int) $start->diffInMinutes($end);
-                }
-            }
-        }
-
-        $capacityMinutes = $openMinutes * max(1, $ceiling);
-
-        return [
-            'booked_minutes' => $bookedMinutes,
-            'open_minutes' => $openMinutes,
-            'percent' => $capacityMinutes === 0
-                ? 0
-                : (int) min(100, round($bookedMinutes / $capacityMinutes * 100)),
         ];
     }
 

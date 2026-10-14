@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
-use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
@@ -34,14 +33,8 @@ class ReceptionSummaryController extends Controller
         $endOfToday = $now->setTimezone($timezone)->endOfDay()->utc();
         $locale = app()->getLocale();
 
-        // Today's bookings not yet arrived: still to start, or started
-        // without a check-in and not yet over. A booking held for its payment
-        // is not expected until it is paid or switched to another method.
-        $expected = Booking::query()
-            ->whereIn('status', BookingStatus::expected())
-            ->whereNull('checked_in_at')
-            ->where('end_at', '>', $now)
-            ->where('start_at', '<=', $endOfToday);
+        // Today's bookings not yet arrived.
+        $expected = Booking::query()->expectedBy($now, $endOfToday);
 
         $endRequests = SessionEndRequest::query()
             ->where('status', SessionEndRequestStatus::Pending)
@@ -92,15 +85,9 @@ class ReceptionSummaryController extends Controller
             ->map(fn (array $row) => [...$row, 'at' => $time->toLocal($row['at'])->toIso8601String()])
             ->values();
 
-        $activeBookings = Booking::query()
-            ->where('status', BookingStatus::Confirmed)
-            ->whereNotNull('checked_in_at')
-            ->whereNull('checked_out_at')
-            ->count();
-
         return response()->json(['data' => [
             'stats' => [
-                'active_sessions' => $activeBookings + WalkinSession::query()->whereNotNull('checked_in_at')->whereNull('checked_out_at')->count(),
+                'active_sessions' => Booking::query()->inProgress()->count() + WalkinSession::query()->open()->count(),
                 'expected_bookings' => $expected->count(),
                 'pending_arrivals' => $arrivals->count(),
                 'pending_end_requests' => $endRequests->count(),

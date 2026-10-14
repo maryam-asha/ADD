@@ -4,6 +4,8 @@ namespace App\Services\Permissions;
 
 use App\Http\Controllers\Api\V1\Admin\AdminResourceController;
 use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
+use App\Http\Controllers\Api\V1\Admin\DashboardController;
+use App\Http\Controllers\Api\V1\Admin\DashboardStatsController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
 use App\Http\Controllers\Api\V1\Admin\InvoiceController;
 use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
@@ -66,6 +68,13 @@ class PermissionSyncService
         // Invoice reports (docs/decisions/provider-reports.md).
         ReportController::class => [
             'reports' => ['view'],
+        ],
+        // The dashboard's home page, one permission per section.
+        DashboardController::class => [
+            'dashboard' => ['operations', 'finance', 'members', 'spaces'],
+        ],
+        DashboardStatsController::class => [
+            'dashboard' => ['operations', 'members'],
         ],
         // Card payments. `reverse` is the only one actually enforced as a
         // permission today (routes/api/v1/admin.php) — reversing moves real
