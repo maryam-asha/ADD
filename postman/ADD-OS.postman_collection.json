@@ -1166,177 +1166,9 @@
                             ]
                         },
                         {
-                            "name": "Privacy, Terms & Consent",
+                            "name": "Privacy & Consent",
                             "description": "The privacy policy and its consent, and the opt-in to the public member directory.",
                             "item": [
-                                {
-                                    "name": "Get Privacy Policy",
-                                    "request": {
-                                        "method": "GET",
-                                        "header": [
-                                            {
-                                                "key": "Authorization",
-                                                "value": "Bearer {{member_token}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "Accept",
-                                                "value": "application/json",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/privacy-policy",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "privacy-policy"
-                                            ]
-                                        },
-                                        "description": "The policy text alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. `content` is null until a policy is written."
-                                    },
-                                    "response": [
-                                        {
-                                            "name": "200 OK",
-                                            "originalRequest": {
-                                                "method": "GET",
-                                                "header": [
-                                                    {
-                                                        "key": "Authorization",
-                                                        "value": "Bearer {{member_token}}",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "Accept",
-                                                        "value": "application/json",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/privacy-policy",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "privacy-policy"
-                                                    ]
-                                                },
-                                                "description": "The policy text alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. `content` is null until a policy is written."
-                                            },
-                                            "status": "OK",
-                                            "code": 200,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "body": "{\n  \"data\": {\n    \"content\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\"\n  }\n}"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "name": "Get Terms of Use",
-                                    "request": {
-                                        "method": "GET",
-                                        "header": [
-                                            {
-                                                "key": "Authorization",
-                                                "value": "Bearer {{member_token}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "Accept",
-                                                "value": "application/json",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/terms-of-use",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "terms-of-use"
-                                            ]
-                                        },
-                                        "description": "The terms of use alone, in the `lang` header's language, as Markdown ready to render. `content` is null until written."
-                                    },
-                                    "response": [
-                                        {
-                                            "name": "200 OK",
-                                            "originalRequest": {
-                                                "method": "GET",
-                                                "header": [
-                                                    {
-                                                        "key": "Authorization",
-                                                        "value": "Bearer {{member_token}}",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "Accept",
-                                                        "value": "application/json",
-                                                        "type": "text"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/terms-of-use",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "terms-of-use"
-                                                    ]
-                                                },
-                                                "description": "The terms of use alone, in the `lang` header's language, as Markdown ready to render. `content` is null until written."
-                                            },
-                                            "status": "OK",
-                                            "code": 200,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "body": "{\n  \"data\": {\n    \"content\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\"\n  }\n}"
-                                        }
-                                    ]
-                                },
                                 {
                                     "name": "Record Consent",
                                     "request": {
@@ -1374,7 +1206,8 @@
                                                 "type": "text",
                                                 "value": "application/json"
                                             }
-                                        ]
+                                        ],
+                                        "description": "Records that the signed-in member agreed to the current privacy policy. Reading the policy needs no login: GET /api/v1/privacy-policy."
                                     }
                                 },
                                 {
@@ -10251,6 +10084,150 @@
                                 },
                                 "description": "Ingests a client-reported error/crash from the member mobile app. Lives under mobile.php, not member.php \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c deliberately UNAUTHENTICATED (no bearer token needed): a crash can happen before login, e.g. on the splash/login screen itself, so this can't depend on a session existing yet. Placed here for discoverability alongside the rest of the mobile app's requests. Only `error_type` and `message` are required; everything else is optional context. `platform` is restricted to `android`/`ios`; `occurred_at` defaults to now() if omitted. Throttled at 60/min per IP. Returns a `message`-only body on success (201), not the created error-log resource."
                             }
+                        },
+                        {
+                            "name": "Get Privacy Policy",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/privacy-policy",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "privacy-policy"
+                                    ]
+                                },
+                                "description": "The privacy policy alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. No authentication \u2014 sign-up shows it before there is an account (throttled 60/min per IP). `content` is null until written."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/privacy-policy",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "privacy-policy"
+                                            ]
+                                        },
+                                        "description": "The privacy policy alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. No authentication \u2014 sign-up shows it before there is an account (throttled 60/min per IP). `content` is null until written."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"content\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\"\n  }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get Terms of Use",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/terms-of-use",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "terms-of-use"
+                                    ]
+                                },
+                                "description": "The terms of use alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. No authentication \u2014 sign-up shows it before there is an account (throttled 60/min per IP). `content` is null until written."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/terms-of-use",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "terms-of-use"
+                                            ]
+                                        },
+                                        "description": "The terms of use alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. No authentication \u2014 sign-up shows it before there is an account (throttled 60/min per IP). `content` is null until written."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"content\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\"\n  }\n}"
+                                }
+                            ]
                         },
                         {
                             "name": "Get Help & Support",

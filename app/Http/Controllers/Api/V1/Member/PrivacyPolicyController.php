@@ -8,15 +8,10 @@ use Illuminate\Http\JsonResponse;
 
 class PrivacyPolicyController extends Controller
 {
-    public function show(): JsonResponse
-    {
-        $policy = PrivacyPolicy::first();
-
-        // One language, the request's (or the fallback), as Markdown ready to
-        // render — nothing else; null until the operations team has written one.
-        return response()->json(['data' => ['content' => $policy?->translate('content')]]);
-    }
-
+    /**
+     * Reading the policy needs no login (Mobile\PrivacyPolicyController);
+     * agreeing to it is the member's, so it stays here.
+     */
     public function consent(): JsonResponse
     {
         $policy = PrivacyPolicy::first();
