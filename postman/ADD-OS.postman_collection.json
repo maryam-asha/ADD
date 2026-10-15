@@ -999,7 +999,6 @@
                                             "host": [
                                                 "{{base_url}}"
                                             ],
-                                            "protocol": "http",
                                             "raw": "{{base_url}}/api/v1/member/profile/image",
                                             "path": [
                                                 "api",
@@ -1178,7 +1177,6 @@
                                             "host": [
                                                 "{{base_url}}"
                                             ],
-                                            "protocol": "http",
                                             "raw": "{{base_url}}/api/v1/member/privacy-policy",
                                             "path": [
                                                 "api",
@@ -1208,7 +1206,6 @@
                                             "host": [
                                                 "{{base_url}}"
                                             ],
-                                            "protocol": "http",
                                             "raw": "{{base_url}}/api/v1/member/privacy-policy/consent",
                                             "path": [
                                                 "api",
@@ -1459,7 +1456,6 @@
                                             "host": [
                                                 "{{base_url}}"
                                             ],
-                                            "protocol": "http",
                                             "raw": "{{base_url}}/api/v1/member/account",
                                             "path": [
                                                 "api",
@@ -20508,7 +20504,6 @@
                                     "host": [
                                         "{{base_url}}"
                                     ],
-                                    "protocol": "http",
                                     "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "path": [
                                         "api",
@@ -20538,7 +20533,6 @@
                                     "host": [
                                         "{{base_url}}"
                                     ],
-                                    "protocol": "http",
                                     "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "path": [
                                         "api",
@@ -26215,32 +26209,6 @@
                     }
                 },
                 {
-                    "name": "Get Kiosk Data",
-                    "request": {
-                        "method": "GET",
-                        "header": [
-                            {
-                                "key": "lang",
-                                "value": "{{lang}}",
-                                "type": "text"
-                            }
-                        ],
-                        "url": {
-                            "raw": "{{base_url}}/api/v1/public/kiosk",
-                            "host": [
-                                "{{base_url}}"
-                            ],
-                            "path": [
-                                "api",
-                                "v1",
-                                "public",
-                                "kiosk"
-                            ]
-                        },
-                        "description": "docs/decisions/kiosk-display.md. One aggregate call for the reception kiosk screen: banner (one flat, mixed list of live Announcements, each item carrying its own `type` -- news/event/offer -- ordered by sort_order across all types together), plans (the active Plan catalog, its own top-level section, minimal shape -- no currency conversion; `name` is resolved to one string for the current `lang` header, unlike PlanResource's raw {ar,en} object), social_links (visible Contact Links, minimal shape), app_download.app_store / app_download.google_play and arrival_qr.value (Setting rows, editable via Admin > Settings -- the frontend renders the QR client-side from arrival_qr.value, this endpoint never generates an image). Every section key is always present, even as an empty array, so the kiosk app never has to guard against a missing key."
-                    }
-                },
-                {
                     "name": "Get Currencies",
                     "request": {
                         "method": "GET",
@@ -26734,8 +26702,72 @@
         },
         {
             "name": "Kiosk (device app)",
-            "description": "Endpoints the kiosk device calls itself, with no login (routes/api/v1/kiosk.php). Today only pairing: after it, the kiosk generates its rotating codes offline and never calls in. See docs/decisions/coworking-self-service-sessions.md.",
+            "description": "Endpoints the kiosk device calls itself, with no login. Get Kiosk Data is the screen's content (routed in routes/api/v1/public.php as public/kiosk, docs/decisions/kiosk-display.md). Pair Kiosk (routes/api/v1/kiosk.php) is the one-time pairing: after it, the kiosk generates its rotating codes offline. See docs/decisions/coworking-self-service-sessions.md.",
             "item": [
+                {
+                    "name": "Get Kiosk Data",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/public/kiosk",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "public",
+                                "kiosk"
+                            ]
+                        },
+                        "description": "docs/decisions/kiosk-display.md. No login. One aggregate call for the kiosk screen, every section inside `data`:\n\n- `banner`: one flat, mixed list of live Announcements (each carries its own `type`: news / event / offer), ordered by sort_order across all types together.\n- `plans`: exactly the member app's package catalog (`GET member/packages` -> `data`), same fields item for item: active, public subscription plans; `pricing` in the base currency (no viewer to pick another); only offers open to everyone in `sale`; `is_current` always false. Full details of one plan (balances, discounts, resources) stay on `member/packages/{plan}`.\n- `social_links`: visible Contact Links.\n- `app_download.app_store` / `app_download.google_play` and `arrival_qr.value`: Setting rows (Admin > Settings). The client renders every QR itself; this endpoint never generates an image.\n\nEvery section key is always present, even as an empty array."
+                    },
+                    "response": [
+                        {
+                            "name": "200 OK",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/public/kiosk",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "public",
+                                        "kiosk"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"data\": {\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"points_label\": \"1,000 pts / mo\",\n                    \"price\": 100,\n                    \"price_label\": \"100 $ / mo\",\n                    \"currency\": \"USD\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        },\n        \"arrival_qr\": {\n            \"value\": \"addapp://arrival\"\n        }\n    }\n}"
+                        }
+                    ]
+                },
                 {
                     "name": "Pair Kiosk",
                     "event": [

@@ -47,6 +47,18 @@ class PackageBrowseService
     }
 
     /**
+     * The same catalog for a screen with no member — the reception kiosk.
+     * Prices fall back to the base currency, only offers for everyone show,
+     * and `is_current` is always false.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPublicPackages(?string $moduleFilter = null): array
+    {
+        return $this->formatAvailablePackages(null, null, $moduleFilter);
+    }
+
+    /**
      * The member's own active plan (for the "My Subscription" tab): status,
      * billing cycle, benefit badges, and this-cycle usage per balance
      * category. `null` when the member has no active membership — a normal
