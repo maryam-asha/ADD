@@ -23,6 +23,8 @@ class ContactLinkSeeder extends Seeder
             ['type' => 'website', 'value' => 'https://example.local', 'label' => null, 'sort_order' => 4],
             ['type' => 'phone', 'value' => '+963 21 000 0000', 'label' => 'الاستقبال', 'sort_order' => 5],
             ['type' => 'whatsapp', 'value' => '+963 944 000 000', 'label' => 'واتساب', 'sort_order' => 6],
+            ['type' => 'email', 'value' => 'support@example.local', 'label' => null, 'sort_order' => 7],
+            ['type' => 'address', 'value' => 'حي حلب الرقمي (ADD)، حلب، سوريا', 'label' => null, 'sort_order' => 8],
         ];
 
         foreach ($links as $link) {

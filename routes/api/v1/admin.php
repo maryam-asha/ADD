@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\V1\Admin\ExchangeRateController;
 use App\Http\Controllers\Api\V1\Admin\ExchangeRateSuggestionController;
 use App\Http\Controllers\Api\V1\Admin\FloorController;
 use App\Http\Controllers\Api\V1\Admin\FounderController;
+use App\Http\Controllers\Api\V1\Admin\HelpSupportController;
 use App\Http\Controllers\Api\V1\Admin\InvoiceController;
 use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
@@ -99,6 +100,10 @@ Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
 // Terms of Use
 Route::get('terms-of-use', [TermsOfUseController::class, 'show']);
 Route::patch('terms-of-use', [TermsOfUseController::class, 'update']);
+
+// Help & Support
+Route::get('help-support', [HelpSupportController::class, 'show']);
+Route::patch('help-support', [HelpSupportController::class, 'update']);
 
 // Settings — global key/value config (docs/decisions/settings-key-value-store.md).
 Route::get('settings', [SettingController::class, 'index']);

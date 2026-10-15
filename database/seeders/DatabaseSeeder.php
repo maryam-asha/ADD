@@ -20,6 +20,9 @@ class DatabaseSeeder extends Seeder
         $this->call(CurrencySeeder::class);
         $this->call(AnnouncementSeeder::class);
         $this->call(ContactLinkSeeder::class);
+        $this->call(PrivacyPolicySeeder::class);
+        $this->call(TermsOfUseSeeder::class);
+        $this->call(HelpSupportSeeder::class);
         $this->call(AdminUserSeeder::class);
         $this->call(SpaceSeeder::class);
         $this->call(PlanModuleSeeder::class);
