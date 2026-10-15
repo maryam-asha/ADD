@@ -76,6 +76,7 @@ use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\SiteInquiryController;
 use App\Http\Controllers\Api\V1\Admin\SpaceController;
 use App\Http\Controllers\Api\V1\Admin\SpaceTypeAmenityController;
+use App\Http\Controllers\Api\V1\Admin\TermsOfUseController;
 use App\Http\Controllers\Api\V1\Admin\UserController;
 use App\Http\Controllers\Api\V1\Admin\ZoneController;
 use App\Http\Controllers\Api\V1\CurrentUserController;
@@ -94,6 +95,10 @@ Route::get('me', [CurrentUserController::class, 'show']);
 // Privacy Policy
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
 Route::patch('privacy-policy', [PrivacyPolicyController::class, 'update']);
+
+// Terms of Use
+Route::get('terms-of-use', [TermsOfUseController::class, 'show']);
+Route::patch('terms-of-use', [TermsOfUseController::class, 'update']);
 
 // Settings — global key/value config (docs/decisions/settings-key-value-store.md).
 Route::get('settings', [SettingController::class, 'index']);

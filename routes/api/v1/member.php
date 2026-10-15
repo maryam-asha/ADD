@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
 use App\Http\Controllers\Api\V1\Member\SpaceController;
+use App\Http\Controllers\Api\V1\Member\TermsOfUseController;
 use App\Http\Controllers\Api\V1\Member\TopUpController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -180,6 +181,9 @@ Route::post('profile/image', [AccountController::class, 'updateProfileImage']);
 // Privacy Policy
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show']);
 Route::post('privacy-policy/consent', [PrivacyPolicyController::class, 'consent']);
+
+// Terms of Use
+Route::get('terms-of-use', [TermsOfUseController::class, 'show']);
 
 // Notifications — in-app notification inbox (database channel).
 Route::get('notifications', [MemberNotificationController::class, 'index']);
