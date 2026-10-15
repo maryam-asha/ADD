@@ -10,7 +10,9 @@ use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Access\Exceptions\LockAccessDeniedException;
 use App\Domain\Access\Models\AccessEvent;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\AccessArrivalCheckIn;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
@@ -27,7 +29,10 @@ use Illuminate\Support\Facades\Log;
  */
 class PasscodeIssuanceService
 {
-    public function __construct(private readonly TTLockClient $ttlock) {}
+    public function __construct(
+        private readonly TTLockClient $ttlock,
+        private readonly AccessArrivalCheckIn $arrivals,
+    ) {}
 
     public function issueForBooking(Booking $booking): AccessGrant
     {
@@ -130,6 +135,9 @@ class PasscodeIssuanceService
             'actor_user_id' => $actor->id,
             'occurred_at' => now(),
         ]);
+
+        // Activation happens on the member's arrival: for a booking, its check-in.
+        $this->arrivals->forGrant($activated, SessionStartSource::Reception);
     }
 
     public function revokeForSpace(Space $space): void

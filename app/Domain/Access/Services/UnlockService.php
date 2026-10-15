@@ -11,6 +11,8 @@ use App\Domain\Access\Exceptions\TTLockException;
 use App\Domain\Access\Models\AccessEvent;
 use App\Domain\Access\Models\AccessGrant;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Services\AccessArrivalCheckIn;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -24,7 +26,10 @@ use App\Domain\Membership\Enums\OwnerType;
  */
 class UnlockService
 {
-    public function __construct(private readonly TTLockClient $ttlock) {}
+    public function __construct(
+        private readonly TTLockClient $ttlock,
+        private readonly AccessArrivalCheckIn $arrivals,
+    ) {}
 
     public function unlock(User $user, string $qrValue): void
     {
@@ -52,6 +57,9 @@ class UnlockService
         }
 
         $this->logEvent($lock, $grant, AccessEventType::Unlock, $user);
+
+        // A booked room has no kiosk scan: opening its door is the arrival.
+        $this->arrivals->forGrant($grant, SessionStartSource::Door);
     }
 
     private function activeGrantFor(User $user, Device $lock): ?AccessGrant
