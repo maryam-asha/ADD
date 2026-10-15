@@ -2,12 +2,15 @@
 
 namespace App\Domain\Ecosystem\Models;
 
+use App\Concerns\HasTranslations;
 use App\Domain\Identity\Models\UserPrivacyPolicyConsent;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PrivacyPolicy extends Model
 {
+    use HasTranslations;
+
     protected $fillable = ['content'];
 
     protected function casts(): array

@@ -12,7 +12,9 @@ class PrivacyPolicyController extends Controller
     {
         $policy = PrivacyPolicy::first();
 
-        return response()->json($policy);
+        // One language, the request's (or the fallback), as Markdown ready to
+        // render — nothing else; null until the operations team has written one.
+        return response()->json(['data' => ['content' => $policy?->translate('content')]]);
     }
 
     public function consent(): JsonResponse
