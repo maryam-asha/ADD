@@ -1166,18 +1166,35 @@
                             ]
                         },
                         {
-                            "name": "Privacy & Consent",
+                            "name": "Privacy, Terms & Consent",
                             "description": "The privacy policy and its consent, and the opt-in to the public member directory.",
                             "item": [
                                 {
                                     "name": "Get Privacy Policy",
                                     "request": {
                                         "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Authorization",
+                                                "value": "Bearer {{member_token}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
                                         "url": {
+                                            "raw": "{{base_url}}/api/v1/member/privacy-policy",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
-                                            "raw": "{{base_url}}/api/v1/member/privacy-policy",
                                             "path": [
                                                 "api",
                                                 "v1",
@@ -1185,19 +1202,140 @@
                                                 "privacy-policy"
                                             ]
                                         },
+                                        "description": "The policy text alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. `content` is null until a policy is written."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "200 OK",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "Authorization",
+                                                        "value": "Bearer {{member_token}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/privacy-policy",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "privacy-policy"
+                                                    ]
+                                                },
+                                                "description": "The policy text alone, in the `lang` header's language (falling back to English, then Arabic), as Markdown ready to render. `content` is null until a policy is written."
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "body": "{\n  \"data\": {\n    \"content\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\"\n  }\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Get Terms of Use",
+                                    "request": {
+                                        "method": "GET",
                                         "header": [
                                             {
                                                 "key": "Authorization",
-                                                "type": "text",
-                                                "value": "Bearer {{member_token}}"
+                                                "value": "Bearer {{member_token}}",
+                                                "type": "text"
                                             },
                                             {
                                                 "key": "Accept",
-                                                "type": "text",
-                                                "value": "application/json"
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
                                             }
-                                        ]
-                                    }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/terms-of-use",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "terms-of-use"
+                                            ]
+                                        },
+                                        "description": "The terms of use alone, in the `lang` header's language, as Markdown ready to render. `content` is null until written."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "200 OK",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "Authorization",
+                                                        "value": "Bearer {{member_token}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/terms-of-use",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "terms-of-use"
+                                                    ]
+                                                },
+                                                "description": "The terms of use alone, in the `lang` header's language, as Markdown ready to render. `content` is null until written."
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "body": "{\n  \"data\": {\n    \"content\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\"\n  }\n}"
+                                        }
+                                    ]
                                 },
                                 {
                                     "name": "Record Consent",
@@ -10113,6 +10251,78 @@
                                 },
                                 "description": "Ingests a client-reported error/crash from the member mobile app. Lives under mobile.php, not member.php \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c deliberately UNAUTHENTICATED (no bearer token needed): a crash can happen before login, e.g. on the splash/login screen itself, so this can't depend on a session existing yet. Placed here for discoverability alongside the rest of the mobile app's requests. Only `error_type` and `message` are required; everything else is optional context. `platform` is restricted to `android`/`ios`; `occurred_at` defaults to now() if omitted. Throttled at 60/min per IP. Returns a `message`-only body on success (201), not the created error-log resource."
                             }
+                        },
+                        {
+                            "name": "Get Help & Support",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/help-support",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "help-support"
+                                    ]
+                                },
+                                "description": "No authentication: someone who cannot sign in is exactly who needs it (throttled 60/min per IP). `content` is Markdown in the `lang` header's language (null until written). `contacts` are the visible contact links in their order; draw each row with an icon by `type` and open `url` on tap \u2014 mailto: for email, tel: for phone/mobile, wa.me for whatsapp, t.me for telegram, a map search for address, else the link itself (null when there is nothing to open)."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/help-support",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "help-support"
+                                            ]
+                                        },
+                                        "description": "No authentication: someone who cannot sign in is exactly who needs it (throttled 60/min per IP). `content` is Markdown in the `lang` header's language (null until written). `contacts` are the visible contact links in their order; draw each row with an icon by `type` and open `url` on tap \u2014 mailto: for email, tel: for phone/mobile, wa.me for whatsapp, t.me for telegram, a map search for address, else the link itself (null when there is nothing to open)."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"content\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\",\n    \"contacts\": [\n      {\n        \"type\": \"email\",\n        \"label\": null,\n        \"value\": \"support@add-district.sy\",\n        \"url\": \"mailto:support@add-district.sy\"\n      },\n      {\n        \"type\": \"phone\",\n        \"label\": \"\u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644\",\n        \"value\": \"+963 21 000 0000\",\n        \"url\": \"tel:+963210000000\"\n      },\n      {\n        \"type\": \"whatsapp\",\n        \"label\": \"\u0648\u0627\u062a\u0633\u0627\u0628\",\n        \"value\": \"+963 944 000 000\",\n        \"url\": \"https://wa.me/963944000000\"\n      },\n      {\n        \"type\": \"address\",\n        \"label\": null,\n        \"value\": \"\u062d\u0644\u0628\u060c \u0633\u0648\u0631\u064a\u0627\",\n        \"url\": \"https://www.google.com/maps/search/?api=1&query=%D8%AD%D9%84%D8%A8%D8%8C%20%D8%B3%D9%88%D8%B1%D9%8A%D8%A7\"\n      },\n      {\n        \"type\": \"website\",\n        \"label\": null,\n        \"value\": \"https://add-district.sy\",\n        \"url\": \"https://add-district.sy\"\n      }\n    ]\n  }\n}"
+                                }
+                            ]
                         }
                     ]
                 }
@@ -20001,7 +20211,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"type\": \"social_instagram\",\n  \"value\": \"https://instagram.com/adddistrict\",\n  \"label\": \"Instagram\",\n  \"sort_order\": 1\n}",
+                                            "raw": "{\n  \"type\": \"instagram\",\n  \"value\": \"https://instagram.com/adddistrict\",\n  \"label\": \"Instagram\",\n  \"sort_order\": 1\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -20020,7 +20230,7 @@
                                                 "contact-links"
                                             ]
                                         },
-                                        "description": "`type` is an open string, not a fixed list \u00e2\u20ac\u201d a new platform is a row insert here, never a code change or migration."
+                                        "description": "`type` is stored as given, but the dashboard offers the types the app can draw: email, phone, mobile, whatsapp, telegram, address, website, instagram, facebook, linkedin. The app's Help & Support page shows each visible link with an icon for its type and a tap `url` built from it (GET /api/v1/help-support)."
                                     }
                                 },
                                 {
@@ -20500,11 +20710,23 @@
                             "name": "Get Privacy Policy",
                             "request": {
                                 "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
                                 "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "host": [
                                         "{{base_url}}"
                                     ],
-                                    "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "path": [
                                         "api",
                                         "v1",
@@ -20512,28 +20734,87 @@
                                         "privacy-policy"
                                     ]
                                 },
-                                "header": [
-                                    {
-                                        "key": "Authorization",
-                                        "type": "text",
-                                        "value": "Bearer {{member_token}}"
+                                "description": "The privacy policy in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/privacy-policy",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "privacy-policy"
+                                            ]
+                                        },
+                                        "description": "The privacy policy in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
                                     },
-                                    {
-                                        "key": "Accept",
-                                        "type": "text",
-                                        "value": "application/json"
-                                    }
-                                ]
-                            }
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"content\": {\n      \"ar\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\",\n      \"en\": \"# Privacy Policy\\n\\n...\"\n    },\n    \"updated_at\": \"2026-10-15T12:00:00+00:00\"\n  }\n}"
+                                }
+                            ]
                         },
                         {
                             "name": "Update Privacy Policy",
                             "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"content\": {\n    \"en\": \"# Privacy Policy\\n\\n...\",\n    \"ar\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
                                 "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "host": [
                                         "{{base_url}}"
                                     ],
-                                    "raw": "{{base_url}}/api/v1/admin/privacy-policy",
                                     "path": [
                                         "api",
                                         "v1",
@@ -20541,24 +20822,427 @@
                                         "privacy-policy"
                                     ]
                                 },
-                                "method": "PATCH",
-                                "body": {
-                                    "raw": "{\n  \"content\": {\n    \"en\": \"Privacy Policy content in English\",\n    \"ar\": \"\u0638\u2026\u0637\u00ad\u0637\u06be\u0638\u02c6\u0638\u2030 \u0637\u00b3\u0638\u0679\u0637\u00a7\u0637\u00b3\u0637\u00a9 \u0637\u00a7\u0638\u201e\u0637\u00ae\u0637\u00b5\u0638\u02c6\u0637\u00b5\u0638\u0679\u0637\u00a9 \u0637\u00a8\u0637\u00a7\u0638\u201e\u0637\u00b9\u0637\u00b1\u0637\u00a8\u0638\u0679\u0637\u00a9\"\n  }\n}",
-                                    "mode": "raw"
+                                "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"content\": {\n    \"en\": \"# Privacy Policy\\n\\n...\",\n    \"ar\": \"# \u0633\u064a\u0627\u0633\u0629 \u0627\u0644\u062e\u0635\u0648\u0635\u064a\u0629\\n\\n...\"\n  }\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/privacy-policy",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "privacy-policy"
+                                            ]
+                                        },
+                                        "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"message\": \"Updated successfully.\"\n}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Terms of Use",
+                    "item": [
+                        {
+                            "name": "Get Terms of Use",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/terms-of-use",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "terms-of-use"
+                                    ]
                                 },
+                                "description": "The terms of use in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/terms-of-use",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "terms-of-use"
+                                            ]
+                                        },
+                                        "description": "The terms of use in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"content\": {\n      \"ar\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\",\n      \"en\": \"# Terms of Use\\n\\n...\"\n    },\n    \"updated_at\": \"2026-10-15T12:00:00+00:00\"\n  }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update Terms of Use",
+                            "request": {
+                                "method": "PATCH",
                                 "header": [
                                     {
                                         "key": "Content-Type",
-                                        "type": "text",
-                                        "value": "application/json"
+                                        "value": "application/json",
+                                        "type": "text"
                                     },
                                     {
                                         "key": "Accept",
-                                        "type": "text",
-                                        "value": "application/json"
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
                                     }
-                                ]
-                            }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"content\": {\n    \"en\": \"# Terms of Use\\n\\n...\",\n    \"ar\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/terms-of-use",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "terms-of-use"
+                                    ]
+                                },
+                                "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"content\": {\n    \"en\": \"# Terms of Use\\n\\n...\",\n    \"ar\": \"# \u0634\u0631\u0648\u0637 \u0627\u0644\u0627\u0633\u062a\u062e\u062f\u0627\u0645\\n\\n...\"\n  }\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/terms-of-use",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "terms-of-use"
+                                            ]
+                                        },
+                                        "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"message\": \"Updated successfully.\"\n}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Help & Support",
+                    "item": [
+                        {
+                            "name": "Get Help & Support",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/help-support",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "help-support"
+                                    ]
+                                },
+                                "description": "The help & support in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/help-support",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "help-support"
+                                            ]
+                                        },
+                                        "description": "The help & support in both languages, for the dashboard's editor. `data` is null until it is first saved. `content.ar` / `content.en` are Markdown."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"data\": {\n    \"id\": 1,\n    \"content\": {\n      \"ar\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\",\n      \"en\": \"# Help & Support\\n\\n...\"\n    },\n    \"updated_at\": \"2026-10-15T12:00:00+00:00\"\n  }\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update Help & Support",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"content\": {\n    \"en\": \"# Help & Support\\n\\n...\",\n    \"ar\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/help-support",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "help-support"
+                                    ]
+                                },
+                                "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"content\": {\n    \"en\": \"# Help & Support\\n\\n...\",\n    \"ar\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\"\n  }\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/help-support",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "help-support"
+                                            ]
+                                        },
+                                        "description": "Both languages are required, as Markdown. The first save creates the row; every later one edits it. Answers a message, not the resource."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n  \"message\": \"Updated successfully.\"\n}"
+                                }
+                            ]
                         }
                     ]
                 },
