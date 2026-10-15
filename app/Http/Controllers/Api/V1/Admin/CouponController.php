@@ -59,6 +59,7 @@ class CouponController extends AdminResourceController
         $query = Coupon::query()
             ->with('targets')
             ->withCount(['redemptions as live_redemptions_count' => fn (Builder $q) => $q->live()])
+            ->withExists('redemptions')
             ->latest('id');
 
         if ($request->filled('search')) {
@@ -94,6 +95,7 @@ class CouponController extends AdminResourceController
             Coupon::query()
                 ->with(['targets', 'users'])
                 ->withCount(['redemptions as live_redemptions_count' => fn (Builder $q) => $q->live()])
+                ->withExists('redemptions')
                 ->findOrFail($id)
         );
     }
@@ -120,7 +122,7 @@ class CouponController extends AdminResourceController
 
         $this->logSensitiveAction('coupon_created', $coupon, $validated);
 
-        return new CouponResource($coupon->refresh()->load(['targets', 'users']));
+        return new CouponResource($coupon->refresh()->load(['targets', 'users'])->loadExists('redemptions'));
     }
 
     public function update(UpdateCouponRequest $request, Coupon $coupon, CouponHistory $history): JsonResponse

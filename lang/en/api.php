@@ -678,6 +678,7 @@ return [
         'payment_in_progress' => 'A payment for this is in progress; finish or cancel it before applying a code.',
         'offer_is_better' => 'This code cannot be applied: it does not combine with the current offer, which already gives the same price or a lower one.',
         'has_redemptions' => 'This coupon has been used; deactivate it instead of deleting it.',
+        'used_locked' => 'This coupon or offer has been used, so it can no longer be changed; it can only be deactivated.',
         // "My coupons" asked about an item: how a code sits beside the offer there now.
         'with_offer' => [
             'stacks' => 'Adds on top of the current offer.',

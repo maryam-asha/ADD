@@ -12239,7 +12239,7 @@
                 },
                 {
                     "name": "Coupons",
-                    "description": "Discount coupons (docs/decisions/pricing-offers-and-coupons.md). Reads are open to admin and operations; create, update and delete are admin-only and audited (`coupon_created` / `coupon_updated` / `coupon_deleted`).\n\n- `code`: letters, digits, `-` and `_`, stored upper-case; members type it in any case.\n- `discount_type`: `percentage` (1\u2013100) or `amount_off` (points). `max_discount_points` caps a percentage; `min_amount_points` is compared with the price after any offer.\n- `combinable_with_offers: false` \u2014 the code is weighed against the list price instead of stacking on a sale/plan discount; when the offer is already lower the purchase goes through at the offer price with `coupon.applied: false`.\n- Who: `user_ids` (none = anyone), `company_id` (that company's members), `new_members_only`, `usage_limit` (first N uses), `per_user_limit` (defaults to 1 on create; send null for unlimited).\n- What: `targets` (none = every purchase a coupon can be spent on \u2014 never a wallet top-up). Each target is a `purpose` (`booking` | `coworking_session` | `plan_purchase` | `event_registration`) and at most one item: `plan_id` for a plan, `space_id` or `space_type` for time in a space, `event_id` for an event.\n- `starts_at`/`ends_at` are local (Damascus) wall-clock times, like every other typed time.\n\nUses are counted live from the record they are on: cancelling a booking, a failed card or an expired cash hold gives the use back.",
+                    "description": "Discount coupons (docs/decisions/pricing-offers-and-coupons.md). Reads are open to admin and operations; create, update and delete are admin-only and audited (`coupon_created` / `coupon_updated` / `coupon_deleted`).\n\n- `code`: letters, digits, `-` and `_`, stored upper-case; members type it in any case.\n- `discount_type`: `percentage` (1\u2013100) or `amount_off` (points). `max_discount_points` caps a percentage; `min_amount_points` is compared with the price after any offer.\n- `combinable_with_offers: false` \u2014 the code is weighed against the list price instead of stacking on a sale/plan discount; when the offer is already lower the purchase goes through at the offer price with `coupon.applied: false`.\n- Who: `user_ids` (none = anyone), `company_id` (that company's members), `new_members_only`, `usage_limit` (first N uses), `per_user_limit` (defaults to 1 on create; send null for unlimited).\n- What: `targets` (none = every purchase a coupon can be spent on \u2014 never a wallet top-up). Each target is a `purpose` (`booking` | `coworking_session` | `plan_purchase` | `event_registration`) and at most one item: `plan_id` for a plan, `space_id` or `space_type` for time in a space, `event_id` for an event.\n- `starts_at`/`ends_at` are local (Damascus) wall-clock times, like every other typed time.\n\nUses are counted live from the record they are on: cancelling a booking, a failed card or an expired cash hold gives the use back.\n- `locked: true` (List/Get): the coupon or offer has been used, so it can only be switched on/off (`Set Coupon Active`); editing it is 409 `api.coupon.used_locked` and deleting it 409 `api.coupon.has_redemptions`.",
                     "item": [
                         {
                             "name": "List Coupons",
@@ -12518,7 +12518,47 @@
                                         "{{coupon_id}}"
                                     ]
                                 },
-                                "description": "Admin only. Returns `{\"message\": \"...\"}`. `targets` and `user_ids` are replaced when sent and kept when left out. Uses already made keep the terms they were made on."
+                                "description": "Admin only. Returns `{\"message\": \"...\"}`. `targets` and `user_ids` are replaced when sent and kept when left out. Uses already made keep the terms they were made on.\n\nOnce a coupon or offer has been used (`locked: true` on List/Get \u2014 any use, even one later cancelled) it can no longer be edited: any field other than `is_active` is refused with 409 (`api.coupon.used_locked`). Switch it on or off with `Set Coupon Active` instead."
+                            }
+                        },
+                        {
+                            "name": "Set Coupon Active",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"is_active\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/coupons/{{coupon_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "coupons",
+                                        "{{coupon_id}}"
+                                    ]
+                                },
+                                "description": "Admin only. The on/off switch: a body of `is_active` alone, accepted for any coupon or offer \u2014 and the only change a used (`locked`) one accepts. Returns `{\"message\": \"...\"}`; nothing else on the coupon changes."
                             }
                         },
                         {
@@ -12545,14 +12585,14 @@
                                         "{{coupon_id}}"
                                     ]
                                 },
-                                "description": "Admin only. 204 for a coupon nobody used; 409 (`api.coupon.has_redemptions`) once used \u2014 deactivate it with `is_active: false` instead."
+                                "description": "Admin only. 204 for a coupon nobody used; 409 (`api.coupon.has_redemptions`) once used \u2014 deactivate it with `Set Coupon Active` (`is_active: false`) instead."
                             }
                         }
                     ]
                 },
                 {
                     "name": "Offers (automatic)",
-                    "description": "Automatic offers are coupons with `is_automatic: true` and no code: the best one for the member applies itself (docs/decisions/automatic-offers-savings-discount-ledger.md). Offers and coupons share the same two discount types: `percentage` and `amount_off` (`fixed_price` was dropped on 2026-10-08). Update and delete use the Coupons requests.",
+                    "description": "Automatic offers are coupons with `is_automatic: true` and no code: the best one for the member applies itself (docs/decisions/automatic-offers-savings-discount-ledger.md). Offers and coupons share the same two discount types: `percentage` and `amount_off` (`fixed_price` was dropped on 2026-10-08). Update, switch on/off and delete use the Coupons requests; a used offer, like a used coupon, can only be switched off.",
                     "item": [
                         {
                             "name": "List Offers",

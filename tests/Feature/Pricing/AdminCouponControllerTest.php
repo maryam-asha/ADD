@@ -231,6 +231,41 @@ class AdminCouponControllerTest extends TestCase
         $this->assertTrue(Activity::where('description', 'coupon_deleted')->where('subject_id', $unused->id)->exists());
     }
 
+    public function test_a_used_coupon_or_offer_is_only_switched_off_never_edited(): void
+    {
+        $this->signInAs('admin');
+        $coupon = Coupon::factory()->create(['code' => 'USED', 'discount_value' => 10]);
+        $offer = Coupon::factory()->create(['code' => null, 'is_automatic' => true, 'discount_value' => 10]);
+        foreach ([$coupon, $offer] as $used) {
+            app(CouponLedger::class)->record($used, User::factory()->create(), Booking::factory()->create(['status' => BookingStatus::Cancelled]), PricingPurpose::Booking, 100, 10);
+        }
+
+        $this->putJson("/api/v1/admin/coupons/{$coupon->id}", $this->payload(['code' => 'USED', 'discount_value' => 50]))
+            ->assertStatus(409)
+            ->assertJsonPath('message', __('api.coupon.used_locked'));
+        $this->patchJson("/api/v1/admin/coupons/{$offer->id}", ['discount_value' => 50, 'is_active' => false])->assertStatus(409);
+        $this->assertSame(10, $coupon->refresh()->discount_value);
+        $this->assertTrue($offer->refresh()->is_active);
+
+        $this->patchJson("/api/v1/admin/coupons/{$offer->id}", ['is_active' => false])
+            ->assertOk()->assertJsonPath('message', __('api.admin.coupon_updated'));
+        $this->assertFalse($offer->refresh()->is_active);
+
+        $this->getJson("/api/v1/admin/coupons/{$coupon->id}")->assertJsonPath('data.locked', true);
+    }
+
+    public function test_an_unused_coupon_is_switched_with_is_active_alone(): void
+    {
+        $this->signInAs('admin');
+        $coupon = Coupon::factory()->create(['discount_value' => 10]);
+
+        $this->patchJson("/api/v1/admin/coupons/{$coupon->id}", ['is_active' => false])->assertOk();
+
+        $this->assertFalse($coupon->refresh()->is_active);
+        $this->assertSame(10, $coupon->discount_value);
+        $this->getJson("/api/v1/admin/coupons/{$coupon->id}")->assertJsonPath('data.locked', false);
+    }
+
     public function test_operations_reads_but_does_not_write(): void
     {
         $this->signInAs('operations');

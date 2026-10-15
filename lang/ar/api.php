@@ -667,6 +667,7 @@ return [
         'payment_in_progress' => 'هناك عملية دفع جارية لهذا الطلب؛ أكملها أو ألغها قبل تطبيق الكود.',
         'offer_is_better' => 'لا يمكن تطبيق هذا الكود: لا يُجمع مع العرض الحالي، والعرض يمنحك سعراً مساوياً أو أقل.',
         'has_redemptions' => 'هذا الكوبون مُستخدَم؛ عطّله بدلاً من حذفه.',
+        'used_locked' => 'هذا الكوبون أو العرض مُستخدَم، فلا يمكن تعديله؛ يمكن إيقافه فقط.',
         // "My coupons" asked about an item: how a code sits beside the offer there now.
         'with_offer' => [
             'stacks' => 'يُضاف فوق العرض الحالي.',

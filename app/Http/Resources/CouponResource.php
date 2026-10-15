@@ -9,7 +9,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * A coupon on the dashboard, as the admin wrote it. `used` is how many uses
  * still count against its limits — a cancelled booking's use gave itself
- * back (AppliedDiscount::scopeLive).
+ * back (AppliedDiscount::scopeLive). `locked`: it has been used at all, so
+ * it can only be switched on or off — never edited or deleted.
  */
 class CouponResource extends JsonResource
 {
@@ -38,6 +39,7 @@ class CouponResource extends JsonResource
             'ends_at' => $this->ends_at?->toISOString(),
             'is_active' => $this->is_active,
             'used' => $this->whenHas('live_redemptions_count'),
+            'locked' => $this->whenHas('redemptions_exists', fn () => (bool) $this->redemptions_exists),
             'targets' => $this->whenLoaded('targets', fn () => $this->targets->map(fn (CouponTarget $target) => [
                 'id' => $target->id,
                 'purpose' => $target->purpose,
