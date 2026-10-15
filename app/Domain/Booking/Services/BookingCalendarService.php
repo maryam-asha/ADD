@@ -12,6 +12,7 @@ use App\Domain\Leasing\Models\OfficeLease;
 use App\Support\Presenters\AvailabilityPresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 
 /**
@@ -101,8 +102,10 @@ class BookingCalendarService
         // The offices a company leases over the range, in one query: a lease
         // day is the tenant's, never a free day (docs/decisions/office-leases.md).
         $leases = $this->availability
-            ->blockingLeases($spaces->pluck('id'), $from->utc(), $to->addDay()->utc(), $timezone)
-            ->groupBy('space_id');
+            ->blockingLeases($spaces->pluck('id'), $from->utc(), $to->addDay()->utc(), $timezone);
+        // Named on the calendar's leases view: whose office it is.
+        EloquentCollection::make($leases->all())->load('company:id,legal_name');
+        $leases = $leases->groupBy('space_id');
 
         $memberId = isset($filters['member_id']) ? (int) $filters['member_id'] : null;
 
@@ -242,6 +245,20 @@ class BookingCalendarService
                 'requires_approval' => $rules->requiresApproval,
             ],
             'days' => $days,
+            // The leases holding this office over the range, whole: the
+            // calendar draws each as one bar on its own view, apart from the
+            // bookings, instead of a "leased" mark on every day.
+            'leases' => ($leases ?? collect())
+                ->sortBy('starts_on')
+                ->map(fn (OfficeLease $lease) => [
+                    'id' => $lease->id,
+                    'company' => $lease->company?->legal_name,
+                    'starts_on' => $lease->starts_on->format('Y-m-d'),
+                    'ends_on' => $lease->accessEndsOn()->format('Y-m-d'),
+                    'status' => $lease->status->value,
+                ])
+                ->values()
+                ->all(),
         ];
     }
 

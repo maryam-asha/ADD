@@ -181,6 +181,26 @@ class LeasedOfficeIsNotBookableTest extends TestCase
         $this->assertSame('open', $states['2026-08-19']);
     }
 
+    public function test_the_reception_calendar_lists_each_lease_whole_with_its_company(): void
+    {
+        $calendar = app(BookingCalendarService::class)->build([
+            'view' => 'week',
+            'date' => '2026-08-17',
+            'branch_id' => $this->office->building->branch_id,
+            'space_id' => $this->office->id,
+        ], 'en');
+
+        $lease = OfficeLease::query()->with('company')->sole();
+
+        $this->assertSame([[
+            'id' => $lease->id,
+            'company' => $lease->company->legal_name,
+            'starts_on' => '2026-08-18',
+            'ends_on' => '2026-08-18',
+            'status' => $lease->status->value,
+        ]], $calendar['resources'][0]['leases']);
+    }
+
     public function test_a_walk_in_is_refused_on_a_lease_day(): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-18 10:00:00', 'Asia/Damascus'));
