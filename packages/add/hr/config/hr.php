@@ -35,6 +35,7 @@ return [
         'time' => true,
         'timesheets' => true,
         'payroll' => true,
+        'benefits' => true,
     ],
 
     'documents' => [

@@ -80,6 +80,12 @@ final class Abilities
 
     public const LOANS_MANAGE = 'hr.loans.manage';
 
+    /** Benefits, who holds them and what was granted, read-only. */
+    public const BENEFITS_VIEW = 'hr.benefits.view';
+
+    /** Defining and assigning benefits, granting, retrying and cancelling grants. */
+    public const BENEFITS_MANAGE = 'hr.benefits.manage';
+
     /**
      * @return list<string>
      */

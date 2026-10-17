@@ -4,7 +4,10 @@ namespace Add\Hr;
 
 use Add\Hr\Approvals\Console\ProcessTimeouts;
 use Add\Hr\Approvals\Services\ApprovalTypes;
+use Add\Hr\Benefits\Console\GrantBenefits;
+use Add\Hr\Benefits\Listeners\SettleBenefitAllowances;
 use Add\Hr\Contracts\AccountProvisioner;
+use Add\Hr\Contracts\BenefitFulfiller;
 use Add\Hr\Contracts\EndOfServiceCalculator;
 use Add\Hr\Contracts\ExchangeRateProvider;
 use Add\Hr\Contracts\HrClock;
@@ -22,12 +25,14 @@ use Add\Hr\Integrations\CostCenterJournal;
 use Add\Hr\Integrations\DaysPerYearEndOfService;
 use Add\Hr\Integrations\LogHrNotifier;
 use Add\Hr\Integrations\NullAccountProvisioner;
+use Add\Hr\Integrations\RecordOnlyBenefitFulfiller;
 use Add\Hr\Leave\Console\AccrueLeave;
 use Add\Hr\Leave\Console\CloseLeaveYear;
 use Add\Hr\Leave\Listeners\CancelLeaveAfterTermination;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Services\LeaveApprovalHandler;
 use Add\Hr\Leave\Services\LeaveService;
+use Add\Hr\Payroll\Events\PayrollRunApproved;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Payroll\Services\LoanApprovalHandler;
 use Add\Hr\Payroll\Services\LoanService;
@@ -60,6 +65,7 @@ class HrServiceProvider extends ServiceProvider
         $this->app->singletonIf(ExchangeRateProvider::class, ConfigExchangeRateProvider::class);
         $this->app->singletonIf(EndOfServiceCalculator::class, DaysPerYearEndOfService::class);
         $this->app->singletonIf(PayrollAccountingExporter::class, CostCenterJournal::class);
+        $this->app->singletonIf(BenefitFulfiller::class, RecordOnlyBenefitFulfiller::class);
 
         // Each module's request types; a host may register more on the same
         // singleton.
@@ -85,6 +91,7 @@ class HrServiceProvider extends ServiceProvider
         Event::listen(EmployeeHired::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CancelLeaveAfterTermination::class);
+        Event::listen(PayrollRunApproved::class, SettleBenefitAllowances::class);
 
         // Approval subjects, by name rather than class. Not enforced, so the
         // host's own morph map is unaffected.
@@ -104,6 +111,7 @@ class HrServiceProvider extends ServiceProvider
                 AccrueLeave::class,
                 CloseLeaveYear::class,
                 ProcessAttendance::class,
+                GrantBenefits::class,
             ]);
         }
 

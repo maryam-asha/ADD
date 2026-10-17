@@ -8,6 +8,7 @@ use Add\Hr\Payroll\Enums\InstallmentStatus;
 use Add\Hr\Payroll\Enums\LoanStatus;
 use Add\Hr\Payroll\Enums\PayrollRunKind;
 use Add\Hr\Payroll\Enums\PayrollRunStatus;
+use Add\Hr\Payroll\Events\PayrollRunApproved;
 use Add\Hr\Payroll\Models\Compensation;
 use Add\Hr\Payroll\Models\LoanInstallment;
 use Add\Hr\Payroll\Models\PayrollAdjustment;
@@ -143,6 +144,7 @@ class PayrollRunService
             $run->update(['status' => PayrollRunStatus::Approved, 'approved_at' => now(), 'approved_by' => $userId]);
             $run->payslips()->update(['published_at' => now()]);
             $this->deductInstallments($run);
+            PayrollRunApproved::dispatch($run);
         });
 
         $payslips = $approved->payslips()->with('employee')->get();

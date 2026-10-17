@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Payroll\Calculation;
 
+use Add\Hr\Benefits\Calculators\BenefitAllowanceCalculator;
 use Add\Hr\Payroll\Calculators\FixedCalculator;
 use Add\Hr\Payroll\Calculators\LoanInstallmentCalculator;
 use Add\Hr\Payroll\Calculators\OvertimeCalculator;
@@ -25,6 +26,7 @@ class CalculatorRegistry
         'overtime' => OvertimeCalculator::class,
         'unpaid_days' => UnpaidDaysCalculator::class,
         'loan_installment' => LoanInstallmentCalculator::class,
+        'benefit_allowance' => BenefitAllowanceCalculator::class,
     ];
 
     /**
