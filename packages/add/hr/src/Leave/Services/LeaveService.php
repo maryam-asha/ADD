@@ -14,6 +14,7 @@ use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Support\HrException;
 use Add\Hr\Support\PlainNumber;
+use Add\Hr\Time\Services\ScheduleResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -34,14 +35,17 @@ class LeaveService
         private readonly LeavePolicyResolver $policies,
         private readonly ApprovalEngine $approvals,
         private readonly DocumentVault $vault,
+        private readonly ScheduleResolver $schedule,
     ) {}
 
     /**
-     * How much a request would take, in the type's unit.
+     * How much a request would take, in the type's unit. Days count against
+     * the employee's own schedule when given (their rest days and holidays
+     * are free), else against the global calendar.
      *
      * @param  array<string, mixed>  $data  starts_on, ends_on, half_day?, hours?
      */
-    public function quote(LeaveType $type, array $data): float
+    public function quote(LeaveType $type, array $data, ?Employee $employee = null): float
     {
         $from = CarbonImmutable::parse($data['starts_on']);
         $to = CarbonImmutable::parse($data['ends_on']);
@@ -58,7 +62,7 @@ class LeaveService
                 HrException::fail('hr::leave.hours_on_one_day');
             }
 
-            $this->assertWorkingDay($type, $from);
+            $this->assertWorkingDay($type, $from, $employee);
 
             return round($hours, 2);
         }
@@ -72,14 +76,14 @@ class LeaveService
                 HrException::fail('hr::leave.half_day_not_allowed');
             }
 
-            $this->assertWorkingDay($type, $from);
+            $this->assertWorkingDay($type, $from, $employee);
 
             return 0.5;
         }
 
         $days = $type->counts_calendar_days
             ? count($this->calendar->days($from, $to))
-            : count($this->calendar->workingDays($from, $to));
+            : count(array_filter($this->calendar->days($from, $to), fn (CarbonImmutable $day) => $this->isWorkingDay($day, $employee)));
 
         if ($days === 0) {
             HrException::fail('hr::leave.no_working_days');
@@ -110,7 +114,7 @@ class LeaveService
                 HrException::fail('hr::leave.not_employed_on_dates');
             }
 
-            $amount = $this->quote($type, $data);
+            $amount = $this->quote($type, $data, $employee);
 
             if ($employee->leaveRequests()->live()->overlapping($from, $to)->exists()) {
                 HrException::fail('hr::leave.overlap');
@@ -266,10 +270,17 @@ class LeaveService
         $this->ledger->reverse($request, $actorId);
     }
 
-    private function assertWorkingDay(LeaveType $type, CarbonImmutable $day): void
+    private function assertWorkingDay(LeaveType $type, CarbonImmutable $day, ?Employee $employee): void
     {
-        if (! $type->counts_calendar_days && ! $this->calendar->isWorkingDay($day)) {
+        if (! $type->counts_calendar_days && ! $this->isWorkingDay($day, $employee)) {
             HrException::fail('hr::leave.no_working_days');
         }
+    }
+
+    private function isWorkingDay(CarbonImmutable $day, ?Employee $employee): bool
+    {
+        return $employee === null
+            ? $this->calendar->isWorkingDay($day)
+            : $this->schedule->planned($employee, $day)->isWorking();
     }
 }

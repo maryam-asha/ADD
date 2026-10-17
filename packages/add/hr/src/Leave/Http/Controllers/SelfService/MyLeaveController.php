@@ -53,7 +53,7 @@ class MyLeaveController extends Controller
     {
         $employee = $this->employee($request);
         $type = LeaveType::query()->where('is_active', true)->findOrFail($request->validated('leave_type_id'));
-        $amount = $this->leave->quote($type, $request->validated());
+        $amount = $this->leave->quote($type, $request->validated(), $employee);
         $available = $type->tracks_balance
             ? $ledger->balance($employee, $type) - $ledger->pending($employee, $type)
             : null;

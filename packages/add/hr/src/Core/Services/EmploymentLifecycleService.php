@@ -36,7 +36,7 @@ class EmploymentLifecycleService
     /** Assignment fields, in a hire, a change or a rehire. */
     private const ASSIGNMENT_FIELDS = [
         'org_unit_id', 'position_id', 'job_grade_id', 'manager_id', 'work_location_id',
-        'job_title', 'employment_type', 'work_mode',
+        'job_title', 'employment_type', 'work_mode', 'work_pattern_id',
     ];
 
     public function __construct(

@@ -52,6 +52,7 @@ class HireEmployeeRequest extends FormRequest
             ...TranslatableField::rules('assignment.job_title', required: false),
             'assignment.employment_type' => ['required', Rule::enum(EmploymentType::class)],
             'assignment.work_mode' => ['required', Rule::enum(WorkMode::class)],
+            'assignment.work_pattern_id' => ['nullable', 'integer', 'exists:hr_work_patterns,id'],
         ];
     }
 }

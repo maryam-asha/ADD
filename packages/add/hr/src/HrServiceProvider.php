@@ -5,6 +5,7 @@ namespace Add\Hr;
 use Add\Hr\Approvals\Console\ProcessTimeouts;
 use Add\Hr\Approvals\Services\ApprovalTypes;
 use Add\Hr\Contracts\AccountProvisioner;
+use Add\Hr\Contracts\HrClock;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Core\Console\RefreshStatuses;
 use Add\Hr\Core\Console\SendAlerts;
@@ -12,6 +13,7 @@ use Add\Hr\Core\Events\EmployeeHired;
 use Add\Hr\Core\Events\EmployeeTerminated;
 use Add\Hr\Core\Listeners\CreateChecklistTasks;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
+use Add\Hr\Integrations\ConfigHrClock;
 use Add\Hr\Integrations\LogHrNotifier;
 use Add\Hr\Integrations\NullAccountProvisioner;
 use Add\Hr\Leave\Console\AccrueLeave;
@@ -20,6 +22,13 @@ use Add\Hr\Leave\Listeners\CancelLeaveAfterTermination;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Services\LeaveApprovalHandler;
 use Add\Hr\Leave\Services\LeaveService;
+use Add\Hr\Time\Console\ProcessAttendance;
+use Add\Hr\Time\Models\AttendanceEntry;
+use Add\Hr\Time\Models\OvertimeRequest;
+use Add\Hr\Time\Services\AttendanceEntryApprovalHandler;
+use Add\Hr\Time\Services\AttendanceEntryService;
+use Add\Hr\Time\Services\OvertimeApprovalHandler;
+use Add\Hr\Time\Services\OvertimeService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
@@ -35,11 +44,18 @@ class HrServiceProvider extends ServiceProvider
         // registers after package providers and so wins.
         $this->app->singletonIf(AccountProvisioner::class, NullAccountProvisioner::class);
         $this->app->singletonIf(HrNotifier::class, LogHrNotifier::class);
+        $this->app->singletonIf(HrClock::class, ConfigHrClock::class);
 
         // Each module's request types; a host may register more on the same
         // singleton.
-        $this->app->singleton(ApprovalTypes::class, fn () => tap(new ApprovalTypes)
-            ->register(LeaveService::APPROVAL_TYPE, LeaveApprovalHandler::class));
+        $this->app->singleton(ApprovalTypes::class, function () {
+            $types = new ApprovalTypes;
+            $types->register(LeaveService::APPROVAL_TYPE, LeaveApprovalHandler::class);
+            $types->register(AttendanceEntryService::APPROVAL_TYPE, AttendanceEntryApprovalHandler::class);
+            $types->register(OvertimeService::APPROVAL_TYPE, OvertimeApprovalHandler::class);
+
+            return $types;
+        });
     }
 
     public function boot(): void
@@ -55,7 +71,11 @@ class HrServiceProvider extends ServiceProvider
 
         // Approval subjects, by name rather than class. Not enforced, so the
         // host's own morph map is unaffected.
-        Relation::morphMap(['hr_leave_request' => LeaveRequest::class]);
+        Relation::morphMap([
+            'hr_leave_request' => LeaveRequest::class,
+            'hr_attendance_entry' => AttendanceEntry::class,
+            'hr_overtime_request' => OvertimeRequest::class,
+        ]);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
@@ -64,6 +84,7 @@ class HrServiceProvider extends ServiceProvider
                 ProcessTimeouts::class,
                 AccrueLeave::class,
                 CloseLeaveYear::class,
+                ProcessAttendance::class,
             ]);
         }
 

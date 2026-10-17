@@ -43,6 +43,20 @@ final class Abilities
     /** Leave on an employee's behalf: filing, cancelling, balance adjustments. */
     public const LEAVE_MANAGE = 'hr.leave.manage';
 
+    /** Attendance, the roster, exceptions, entries and overtime, read-only. */
+    public const ATTENDANCE_VIEW = 'hr.attendance.view';
+
+    /** HR punches, resolving exceptions, rebuilding days. */
+    public const ATTENDANCE_CORRECT = 'hr.attendance.correct';
+
+    /** Locking and unlocking a month for payroll. */
+    public const ATTENDANCE_LOCK = 'hr.attendance.lock';
+
+    /** Issuing and revoking employees' QR cards. */
+    public const ATTENDANCE_CARDS = 'hr.attendance.cards';
+
+    public const ROSTER_MANAGE = 'hr.roster.manage';
+
     /**
      * @return list<string>
      */

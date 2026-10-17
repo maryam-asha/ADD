@@ -33,6 +33,11 @@ class WorkCalendar
         return $this->isWorkingDayGiven(CarbonImmutable::parse($day), $this->holidaysBetween($day, $day));
     }
 
+    public function isHoliday(CarbonInterface $day): bool
+    {
+        return isset($this->holidaysBetween($day, $day)[$day->toDateString()]);
+    }
+
     /**
      * @return list<CarbonImmutable>
      */

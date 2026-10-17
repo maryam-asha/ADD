@@ -32,6 +32,7 @@ class AssignmentResource extends JsonResource
             'job_title' => $this->resolvedTitle(),
             'employment_type' => $this->employment_type->value,
             'work_mode' => $this->work_mode->value,
+            'work_pattern_id' => $this->work_pattern_id,
         ];
     }
 }

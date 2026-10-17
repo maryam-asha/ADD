@@ -32,6 +32,7 @@ return [
         'core' => true,
         'approvals' => true,
         'leave' => true,
+        'time' => true,
     ],
 
     'documents' => [
@@ -67,6 +68,33 @@ return [
 
         // The longest single leave request, in calendar days.
         'max_request_days' => 366,
+    ],
+
+    /*
+     * The organisation's local timezone (shifts, work dates, "today" for
+     * attendance). Null: the application's. A host that keeps it elsewhere
+     * binds its own Add\Hr\Contracts\HrClock.
+     */
+    'timezone' => null,
+
+    'attendance' => [
+        // A card's QR value is "{card_prefix}:{token}".
+        'card_prefix' => 'hr-card:v1',
+
+        // A second scan of the same card within this many seconds is the
+        // same punch.
+        'duplicate_seconds' => 60,
+
+        // How long after a night shift ends its punches still belong to it
+        // (when no shift follows it the next day).
+        'night_margin_minutes' => 360,
+
+        // Defaults while no attendance policy is in force.
+        'grace_minutes' => 10,
+        'early_leave_grace_minutes' => 10,
+        'min_overtime_minutes' => 30,
+        'overtime_requires_pre_approval' => false,
+        'entry_tolerance_minutes' => 15,
     ],
 
 ];
