@@ -21,4 +21,19 @@ class TranslatableField
             "$field.en" => ['nullable', 'string', 'max:255'],
         ];
     }
+
+    /**
+     * For updates: the field may be left out, but when sent it still needs
+     * its Arabic value.
+     *
+     * @return array<string, list<string>>
+     */
+    public static function sometimes(string $field): array
+    {
+        return [
+            $field => ['sometimes', 'array'],
+            "$field.ar" => ["required_with:$field", 'string', 'max:255'],
+            "$field.en" => ['nullable', 'string', 'max:255'],
+        ];
+    }
 }
