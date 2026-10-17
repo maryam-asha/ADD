@@ -234,6 +234,10 @@ return [
             'title' => 'Benefits not delivered',
             'body' => ':count benefit grants for :month could not be delivered. Review them and retry.',
         ],
+        'interview_scheduled' => [
+            'title' => 'You have an interview to conduct',
+            'body' => 'Interview with :candidate for :opening_en on :at.',
+        ],
     ],
 
 ];

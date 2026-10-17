@@ -234,6 +234,10 @@ return [
             'title' => 'مزايا لم تُنفَّذ',
             'body' => 'تعذّر تنفيذ :count من منح المزايا لشهر :month. راجعها وأعد المحاولة.',
         ],
+        'interview_scheduled' => [
+            'title' => 'لديك مقابلة توظيف',
+            'body' => 'مقابلة مع :candidate على وظيفة :opening_ar في :at.',
+        ],
     ],
 
 ];

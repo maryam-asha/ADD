@@ -1,5 +1,6 @@
 <?php
 
+use Add\Hr\Hr;
 use App\Http\Controllers\Api\V1\Public\CommunityMemberController;
 use App\Http\Controllers\Api\V1\Public\ContactLinkController;
 use App\Http\Controllers\Api\V1\Public\CurrencyController;
@@ -31,6 +32,11 @@ Route::get('currencies', [CurrencyController::class, 'index']);
 Route::get('member-directory', [MemberDirectoryController::class, 'index'])->middleware('throttle:60,1');
 Route::get('site-content', [SiteContentController::class, 'show']);
 Route::post('site-inquiries', [SiteInquiryController::class, 'store'])->middleware('throttle:10,1');
+
+// The careers page (packages/add/hr): open jobs and applying with a CV.
+// Anyone may call it, so it has its own rate limit, counted apart from the
+// other public routes.
+Route::prefix('hr')->middleware('throttle:20,1,careers')->group(fn () => Hr::publicRoutes());
 
 // Literal "public/" segment per docs/decisions/kiosk-display.md — the
 // aggregate kiosk endpoint is documented and tested at

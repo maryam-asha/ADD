@@ -27467,6 +27467,162 @@
                         "description": "The categories that published events actually use, as {id, name} in the requested language. Get Event Categories lists every category."
                     },
                     "response": []
+                },
+                {
+                    "name": "Careers (HR)",
+                    "description": "The careers page from packages/add/hr, mounted under /api/v1/hr without login.",
+                    "item": [
+                        {
+                            "name": "List openings",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/careers/openings",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "careers",
+                                        "openings"
+                                    ]
+                                },
+                                "description": "Public openings taking applications. Rate-limited (20/min per IP)."
+                            }
+                        },
+                        {
+                            "name": "Show opening",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/careers/openings/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "careers",
+                                        "openings",
+                                        "1"
+                                    ]
+                                },
+                                "description": "404 once closed or internal."
+                            }
+                        },
+                        {
+                            "name": "Apply",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/careers/openings/1/applications",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "careers",
+                                        "openings",
+                                        "1",
+                                        "applications"
+                                    ]
+                                },
+                                "description": "No account needed. consent must be accepted. The same email is the same candidate; one application per opening (422 already_applied). The CV is stored encrypted. 201 with a message.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "name",
+                                            "value": "Sara Kassab",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "email",
+                                            "value": "sara@example.test",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "phone",
+                                            "value": "+963944000000",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "cover_letter",
+                                            "value": "Two years as a barista.",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "cv",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "pdf, doc or docx, up to hr.recruitment.cv_max_kb (5 MB)."
+                                        },
+                                        {
+                                            "key": "consent",
+                                            "value": "1",
+                                            "type": "text"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    ]
                 }
             ]
         },
@@ -35014,6 +35170,1624 @@
                     "description": "Benefits and who holds them; granted monthly by hr:benefits-grant. Abilities: hr.benefits.view | manage."
                 },
                 {
+                    "name": "Recruitment",
+                    "description": "Requisitions through approvals, openings, candidates and applications through the pipeline, interviews, offers and the hire. Abilities: hr.recruitment.view | manage; hiring also needs hr.employees.create. Candidates never hired and inactive for hr.recruitment.retention_months (24) are deleted daily by hr:recruitment-purge.",
+                    "item": [
+                        {
+                            "name": "Pipeline stages",
+                            "item": [
+                                {
+                                    "name": "List stages",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pipeline-stages",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pipeline-stages"
+                                            ]
+                                        },
+                                        "description": "applied, screening, interview (type open), then the fixed offer, hired, rejected, withdrawn, by sort."
+                                    }
+                                },
+                                {
+                                    "name": "Add stage",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pipeline-stages",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pipeline-stages"
+                                            ]
+                                        },
+                                        "description": "An open stage; sort 1-79, so it comes before the offer.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"assessment\",\n  \"name\": {\n    \"ar\": \"\u0627\u062e\u062a\u0628\u0627\u0631 \u0639\u0645\u0644\u064a\",\n    \"en\": \"Assessment\"\n  },\n  \"sort\": 30\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Update stage",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pipeline-stages/8",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pipeline-stages",
+                                                "8"
+                                            ]
+                                        },
+                                        "description": "Open stages only (name, sort, is_active); the fixed stages refuse with 422.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"sort\": 45,\n  \"is_active\": false\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Requisitions",
+                            "item": [
+                                {
+                                    "name": "List requisitions",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions?status=pending",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "pending"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, org_unit_id."
+                                    }
+                                },
+                                {
+                                    "name": "File requisition",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions"
+                                            ]
+                                        },
+                                        "description": "Filed for a hiring manager, who is the approval requester (approval type requisition). Starts pending.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"hiring_manager_id\": 4,\n  \"org_unit_id\": 3,\n  \"position_id\": 7,\n  \"job_grade_id\": 2,\n  \"title\": {\n    \"ar\": \"\u0628\u0627\u0631\u064a\u0633\u062a\u0627\",\n    \"en\": \"Barista\"\n  },\n  \"headcount\": 2,\n  \"employment_type\": \"full_time\",\n  \"reason\": \"new_position\",\n  \"budget_min\": 400,\n  \"budget_max\": 600,\n  \"budget_currency\": \"USD\",\n  \"justification\": \"Evening shift opening.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show requisition",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Cancel requisition",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Pending (its approval is cancelled) or approved with nobody hired yet. Closes its openings."
+                                    }
+                                },
+                                {
+                                    "name": "Close requisition",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions/1/close",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions",
+                                                "1",
+                                                "close"
+                                            ]
+                                        },
+                                        "description": "Stops hiring for an approved requisition, whoever was hired so far. Closes its openings."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Job openings",
+                            "item": [
+                                {
+                                    "name": "List openings",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings?status=open",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "open"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, requisition_id. With applications_count."
+                                    }
+                                },
+                                {
+                                    "name": "Create opening",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/requisitions/1/job-openings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "requisitions",
+                                                "1",
+                                                "job-openings"
+                                            ]
+                                        },
+                                        "description": "Approved requisitions only. Title and employment type default to the requisition's. open: true opens it now, else draft.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"description\": {\n    \"ar\": \"\u0646\u0628\u062d\u062b \u0639\u0646 \u0628\u0627\u0631\u064a\u0633\u062a\u0627 \u0644\u0648\u0631\u062f\u064a\u0629 \u0627\u0644\u0645\u0633\u0627\u0621.\",\n    \"en\": \"We are hiring a barista for the evening shift.\"\n  },\n  \"work_location_id\": 1,\n  \"visibility\": \"public\",\n  \"closes_on\": \"2026-11-30\",\n  \"open\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show opening",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Update opening",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"closes_on\": \"2026-12-15\",\n  \"visibility\": \"internal\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Open opening",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings/1/open",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings",
+                                                "1",
+                                                "open"
+                                            ]
+                                        },
+                                        "description": "While its requisition is approved."
+                                    }
+                                },
+                                {
+                                    "name": "Close opening",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings/1/close",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings",
+                                                "1",
+                                                "close"
+                                            ]
+                                        },
+                                        "description": "Also closed by itself when the requisition ends."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Candidates",
+                            "item": [
+                                {
+                                    "name": "List candidates",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/candidates?search=sara",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "candidates"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "search",
+                                                    "value": "sara"
+                                                }
+                                            ]
+                                        },
+                                        "description": "search: name, email or phone."
+                                    }
+                                },
+                                {
+                                    "name": "Show candidate",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/candidates/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "candidates",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With their applications."
+                                    }
+                                },
+                                {
+                                    "name": "Update candidate",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/candidates/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "candidates",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "A new application never changes a known candidate; HR does.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"phone\": \"+963944000001\",\n  \"notes\": \"Prefers evening shifts.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Erase candidate",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/candidates/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "candidates",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "A request to be forgotten: every application, interview, offer and CV. 204."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Applications",
+                            "item": [
+                                {
+                                    "name": "List applications",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications?job_opening_id=1&stage=screening",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "job_opening_id",
+                                                    "value": "1"
+                                                },
+                                                {
+                                                    "key": "stage",
+                                                    "value": "screening"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: job_opening_id, stage. Latest move first."
+                                    }
+                                },
+                                {
+                                    "name": "Add application",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/job-openings/1/applications",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "job-openings",
+                                                "1",
+                                                "applications"
+                                            ]
+                                        },
+                                        "description": "Entered by HR: a known candidate_id, or name with email/phone. source direct | referral | agency; referral needs referred_by_employee_id. Send as form-data to attach a cv.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": \"Omar Haddad\",\n  \"email\": \"omar@example.test\",\n  \"phone\": \"+963944000002\",\n  \"source\": \"referral\",\n  \"referred_by_employee_id\": 4,\n  \"cover_letter\": \"Worked three years at a specialty caf\u00e9.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show application",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With the stage history, interviews with every scorecard, and offers."
+                                    }
+                                },
+                                {
+                                    "name": "Move application",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/move",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "move"
+                                            ]
+                                        },
+                                        "description": "To an active open stage only; the offer and hired stages are reached by making an offer and hiring.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"stage\": \"interview\",\n  \"note\": \"Good screening call.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Reject application",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/reject",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "reject"
+                                            ]
+                                        },
+                                        "description": "Calls off an offer in play and its approval.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"reason\": \"Salary expectations\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Withdraw application",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/withdraw",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "withdraw"
+                                            ]
+                                        },
+                                        "description": "The candidate withdrew.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"reason\": \"Accepted another job\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "CV link",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/cv-link",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "cv-link"
+                                            ]
+                                        },
+                                        "description": "A signed link valid for hr.documents.link_ttl_minutes (5); each link is audited. 404 without a CV."
+                                    }
+                                },
+                                {
+                                    "name": "Hire candidate",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/hire",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "hire"
+                                            ]
+                                        },
+                                        "description": "Needs an accepted offer and hr.employees.create. The hire is pre-filled from the application (name, phone, personal email, the offer's start date, the requisition's unit, position, grade and manager); anything sent wins. The offer's pay lines become the first compensation. In ADD a work_email is required for the dashboard account. 201 with the employee.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"work_email\": \"omar.haddad@add.sy\",\n  \"contract\": {\n    \"probation_ends_on\": \"2027-02-28\"\n  }\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Interviews",
+                            "item": [
+                                {
+                                    "name": "List interviews",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/interviews?application_id=1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "interviews"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "application_id",
+                                                    "value": "1"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: application_id, status."
+                                    }
+                                },
+                                {
+                                    "name": "Schedule interview",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/interviews",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "interviews"
+                                            ]
+                                        },
+                                        "description": "scheduled_at is local time (Y-m-d H:i). Each interviewer is notified (hr.interview_scheduled) and scores it from My HR.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"scheduled_at\": \"2026-11-05 11:00\",\n  \"duration_minutes\": 45,\n  \"mode\": \"in_person\",\n  \"location\": \"Branch 1, meeting room\",\n  \"interviewer_ids\": [\n    4,\n    9\n  ],\n  \"notes\": \"Bring a latte art sample.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Complete interview",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/interviews/1/complete",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "interviews",
+                                                "1",
+                                                "complete"
+                                            ]
+                                        },
+                                        "description": "Scheduled interviews only."
+                                    }
+                                },
+                                {
+                                    "name": "Cancel interview",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/interviews/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "interviews",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Scheduled interviews only."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Offers",
+                            "item": [
+                                {
+                                    "name": "List offers",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/offers?status=pending",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "offers"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "pending"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filter: status."
+                                    }
+                                },
+                                {
+                                    "name": "Show offer",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/offers/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "offers",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Make offer",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/applications/1/offers",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "applications",
+                                                "1",
+                                                "offers"
+                                            ]
+                                        },
+                                        "description": "One offer in play per application. Approved through approvals (type offer) with the hiring manager as requester; moves the application to the offer stage.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"start_on\": \"2026-12-01\",\n  \"expires_on\": \"2026-11-20\",\n  \"compensation\": [\n    {\n      \"pay_component_id\": 1,\n      \"amount\": 500,\n      \"currency\": \"USD\"\n    }\n  ],\n  \"terms\": \"Three-month probation.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Accept offer",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/offers/1/accept",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "offers",
+                                                "1",
+                                                "accept"
+                                            ]
+                                        },
+                                        "description": "Approved and not expired offers only."
+                                    }
+                                },
+                                {
+                                    "name": "Decline offer",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/offers/1/decline",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "offers",
+                                                "1",
+                                                "decline"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"note\": \"Start date too late.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Withdraw offer",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/offers/1/withdraw",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "offers",
+                                                "1",
+                                                "withdraw"
+                                            ]
+                                        },
+                                        "description": "Cancels its approval if still pending."
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
@@ -36922,6 +38696,316 @@
                                             ]
                                         },
                                         "description": "What I hold today and my latest grants (no costs or delivery details)."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Recruitment",
+                            "item": [
+                                {
+                                    "name": "Open jobs",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/job-openings",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "job-openings"
+                                            ]
+                                        },
+                                        "description": "Every opening taking applications, internal and public."
+                                    }
+                                },
+                                {
+                                    "name": "Apply",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/job-openings/1/apply",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "job-openings",
+                                                "1",
+                                                "apply"
+                                            ]
+                                        },
+                                        "description": "As an internal candidate (my employee record). Send as form-data to attach a cv.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"cover_letter\": \"I know the team and the evening routine.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "My applications",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/applications",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "applications"
+                                            ]
+                                        },
+                                        "description": "Stage of each of my applications."
+                                    }
+                                },
+                                {
+                                    "name": "My requisitions",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/requisitions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "requisitions"
+                                            ]
+                                        },
+                                        "description": "Requisitions I am the hiring manager of."
+                                    }
+                                },
+                                {
+                                    "name": "File requisition",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/requisitions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "requisitions"
+                                            ]
+                                        },
+                                        "description": "I am the hiring manager and the approval requester; my approval chain decides.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"org_unit_id\": 3,\n  \"title\": {\n    \"ar\": \"\u0628\u0627\u0631\u064a\u0633\u062a\u0627\",\n    \"en\": \"Barista\"\n  },\n  \"headcount\": 1,\n  \"employment_type\": \"part_time\",\n  \"reason\": \"replacement\",\n  \"replaces_employee_id\": 12,\n  \"justification\": \"Replacing a leaver.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "My interviews",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/interviews",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "interviews"
+                                            ]
+                                        },
+                                        "description": "Interviews I conduct, with my own scorecard only."
+                                    }
+                                },
+                                {
+                                    "name": "Submit scorecard",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/interviews/1/scorecard",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "interviews",
+                                                "1",
+                                                "scorecard"
+                                            ]
+                                        },
+                                        "description": "Interviewers of that interview only (403 otherwise). recommendation strong_yes | yes | no | strong_no; ratings 1-5.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"recommendation\": \"yes\",\n  \"ratings\": {\n    \"communication\": 4,\n    \"skills\": 5\n  },\n  \"notes\": \"Strong practical test.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
                                     }
                                 }
                             ]
