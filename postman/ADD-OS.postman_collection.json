@@ -29742,6 +29742,1222 @@
                     ]
                 },
                 {
+                    "name": "Approvals",
+                    "description": "Approval flows per request type (hr.approvals.manage). A type without an active flow goes to the employee's direct manager. Steps: direct_manager, unit_head, ability (with `ability`), employee (with `employee_id`); optional timeout_hours + on_timeout (escalate | approve | reject). A step that resolves to nobody, to the requester, or to someone no longer employed goes to holders of hr.approvals.manage. Nobody decides a request that is theirs or that they filed, override included.",
+                    "item": [
+                        {
+                            "name": "Request types",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-types"
+                                    ]
+                                },
+                                "description": "The request types a flow can be defined for (e.g. `leave`)."
+                            }
+                        },
+                        {
+                            "name": "List flows",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-flows",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-flows"
+                                    ]
+                                },
+                                "description": "Every flow, by request type."
+                            }
+                        },
+                        {
+                            "name": "Create flow",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-flows",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-flows"
+                                    ]
+                                },
+                                "description": "Manager first, then HR within 48 hours or it escalates. Requests copy the steps when submitted, so editing a flow never changes open requests.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"request_type\": \"leave\",\n  \"name\": {\n    \"ar\": \"\u0645\u0633\u0627\u0631 \u0627\u0644\u0625\u062c\u0627\u0632\u0627\u062a\",\n    \"en\": \"Leave flow\"\n  },\n  \"steps\": [\n    {\n      \"approver\": \"direct_manager\",\n      \"timeout_hours\": 48,\n      \"on_timeout\": \"escalate\"\n    },\n    {\n      \"approver\": \"ability\",\n      \"ability\": \"hr.leave.manage\"\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update flow",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-flows/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-flows",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Name, steps or is_active; the request type never changes. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"is_active\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete flow",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-flows/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-flows",
+                                        "1"
+                                    ]
+                                },
+                                "description": "The type goes back to the direct manager alone."
+                            }
+                        },
+                        {
+                            "name": "List requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-requests?status=pending&request_type=leave",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "status",
+                                            "value": "pending"
+                                        },
+                                        {
+                                            "key": "request_type",
+                                            "value": "leave"
+                                        }
+                                    ]
+                                },
+                                "description": "Every request, whoever it waits for; paginated. Filters: status, request_type, employee_id."
+                            }
+                        },
+                        {
+                            "name": "Show request",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-requests/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-requests",
+                                        "1"
+                                    ]
+                                },
+                                "description": "With its steps (who, status, decided_via approver|delegate|override|timeout, comment, due_at) and the subject as its type describes it."
+                            }
+                        },
+                        {
+                            "name": "Approve (override)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-requests/1/approve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-requests",
+                                        "1",
+                                        "approve"
+                                    ]
+                                },
+                                "description": "Decides the current step for an approver who is away; recorded as `override`. 403 on a request of your own.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"comment\": \"Approved while the manager is travelling\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Reject (override)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/approval-requests/1/reject",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "approval-requests",
+                                        "1",
+                                        "reject"
+                                    ]
+                                },
+                                "description": "Rejects the request; later steps are cancelled.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"comment\": \"Peak season\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Leave",
+                    "description": "Leave types, effective-dated policies, public holidays, coverage rules (read: hr.leave.view; write: hr.settings.manage), and employees' leave (hr.leave.manage to file, cancel or adjust). Balances are a ledger: opening, accrual, usage, reversal, adjustment, expiry, encashment. Amounts are strings without trailing zeros. Weekend days come from config hr.leave.weekend_days (ADD: Friday and Saturday).",
+                    "item": [
+                        {
+                            "name": "List leave types",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-types"
+                                    ]
+                                },
+                                "description": "All types."
+                            }
+                        },
+                        {
+                            "name": "Create leave type",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-types",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-types"
+                                    ]
+                                },
+                                "description": "unit day|hour (fixed once created). tracks_balance false = unpaid/unlimited leave, still approved. attachment_document_type_id makes an attachment required, stored as an encrypted employee document. hide_reason shows it as plain leave in team calendars.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"annual\",\n  \"name\": {\n    \"ar\": \"\u0625\u062c\u0627\u0632\u0629 \u0633\u0646\u0648\u064a\u0629\",\n    \"en\": \"Annual leave\"\n  },\n  \"unit\": \"day\",\n  \"is_paid\": true,\n  \"tracks_balance\": true,\n  \"allows_half_day\": true,\n  \"counts_calendar_days\": false,\n  \"hide_reason\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update leave type",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-types/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-types",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Everything but the unit. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"hide_reason\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete leave type",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-types/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-types",
+                                        "1"
+                                    ]
+                                },
+                                "description": "409 when it has policies, requests or balances: deactivate it instead."
+                            }
+                        },
+                        {
+                            "name": "List policies",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-policies?leave_type_id=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-policies"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "leave_type_id",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Filter by leave_type_id."
+                            }
+                        },
+                        {
+                            "name": "Create policy",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-policies",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-policies"
+                                    ]
+                                },
+                                "description": "accrual_method monthly (a twelfth per completed month, prorated) | annual_grant (on 1 January; prorated in the hire year, in halves) | none. service_tiers raise the entitlement with seniority. carry_over_max null = everything carries over; carried days expire carry_over_expiry_months into the new year. contract_types / job_grade_ids / org_unit_ids null = everyone; the most specific policy wins (grade > unit > contract type).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"leave_type_id\": 1,\n  \"effective_from\": \"2026-01-01\",\n  \"accrual_method\": \"monthly\",\n  \"annual_entitlement\": 14,\n  \"service_tiers\": [\n    {\n      \"min_years\": 5,\n      \"entitlement\": 21\n    }\n  ],\n  \"carry_over_max\": 7,\n  \"carry_over_expiry_months\": 3,\n  \"max_negative\": 0,\n  \"contract_types\": [\n    \"open_ended\",\n    \"fixed_term\"\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update policy",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-policies/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-policies",
+                                        "1"
+                                    ]
+                                },
+                                "description": "To change the rules from a date, close this policy and create another. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"effective_to\": \"2026-12-31\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List holidays",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/holidays?year=2026",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "holidays"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "year",
+                                            "value": "2026"
+                                        }
+                                    ]
+                                },
+                                "description": "?year= keeps that year's holidays and every recurring one."
+                            }
+                        },
+                        {
+                            "name": "Create holiday",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/holidays",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "holidays"
+                                    ]
+                                },
+                                "description": "At most 31 days. recurs_annually for fixed-date holidays; lunar ones are entered per year.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u0639\u064a\u062f \u0627\u0644\u0641\u0637\u0631\",\n    \"en\": \"Eid al-Fitr\"\n  },\n  \"starts_on\": \"2026-03-20\",\n  \"ends_on\": \"2026-03-22\",\n  \"recurs_annually\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List coverage rules",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/coverage-rules",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "coverage-rules"
+                                    ]
+                                },
+                                "description": "Minimum headcounts checked when a full-day leave is approved."
+                            }
+                        },
+                        {
+                            "name": "Create coverage rule",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/coverage-rules",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "coverage-rules"
+                                    ]
+                                },
+                                "description": "org_unit_id or position_id, not both. Approving a full-day leave that would leave fewer than min_present at work on any working day is refused with that day.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"org_unit_id\": 1,\n  \"min_present\": 2\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List leave requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-requests?status=pending",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "status",
+                                            "value": "pending"
+                                        }
+                                    ]
+                                },
+                                "description": "Paginated. Filters: status, employee_id, leave_type_id, from, to."
+                            }
+                        },
+                        {
+                            "name": "Leave calendar",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-calendar?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-calendar"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Pending and approved leave overlapping the range (at most three months); optional org_unit_id."
+                            }
+                        },
+                        {
+                            "name": "File leave for an employee",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/leave-requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "leave-requests"
+                                    ]
+                                },
+                                "description": "HR files on the employee's behalf (hr.leave.manage); it still goes through the employee's approval flow.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"leave_type_id\": 1,\n  \"starts_on\": \"2026-03-08\",\n  \"ends_on\": \"2026-03-12\",\n  \"reason\": \"Recorded by HR\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel leave request",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/leave-requests/1/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "leave-requests",
+                                        "1",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Pending: withdrawn. Approved: only before its first day, and its days come back."
+                            }
+                        },
+                        {
+                            "name": "Employee balances",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/leave-balances",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "leave-balances"
+                                    ]
+                                },
+                                "description": "Per type the employee may request: balance, pending, available."
+                            }
+                        },
+                        {
+                            "name": "Employee ledger",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/leave-ledger?leave_type_id=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "leave-ledger"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "leave_type_id",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Every movement, oldest first; paginated. Filters: leave_type_id, year."
+                            }
+                        },
+                        {
+                            "name": "Adjust balance",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/leave-adjustments",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "leave-adjustments"
+                                    ]
+                                },
+                                "description": "kind opening (balance at go-live) | adjustment (either sign) | encashment (negative). notes required. Returns the ledger entry.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"leave_type_id\": 1,\n  \"kind\": \"opening\",\n  \"amount\": 9.5,\n  \"notes\": \"Balance carried in at go-live\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "description": "Self-service for any account with an active employee record \u2014 operations, sales, the caf\u00e9: no role or permission needed, and nothing but the caller's own data. 403 when the account has no employee record or is past its last working day.",
                     "item": [
@@ -29996,6 +31212,682 @@
                                     ]
                                 },
                                 "description": "Direct reports today: employees whose current assignment names the caller as manager."
+                            }
+                        },
+                        {
+                            "name": "My approvals inbox",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/approvals",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "approvals"
+                                    ]
+                                },
+                                "description": "Requests waiting for me: as the approver, as a delegate, or as holder of an ability a step asks for. Never my own."
+                            }
+                        },
+                        {
+                            "name": "Approval details",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/approvals/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "approvals",
+                                        "1"
+                                    ]
+                                },
+                                "description": "404 when it is not waiting for me."
+                            }
+                        },
+                        {
+                            "name": "Approve",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/approvals/1/approve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "approvals",
+                                        "1",
+                                        "approve"
+                                    ]
+                                },
+                                "description": "Re-checks the balance and coverage; a refusal (422) leaves the step pending.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"comment\": \"Enjoy\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Reject",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/approvals/1/reject",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "approvals",
+                                        "1",
+                                        "reject"
+                                    ]
+                                },
+                                "description": "Ends the request.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"comment\": \"Month-end close\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "My delegations",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/delegations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "delegations"
+                                    ]
+                                },
+                                "description": "Delegations I gave that have not ended."
+                            }
+                        },
+                        {
+                            "name": "Delegate my approvals",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/delegations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "delegations"
+                                    ]
+                                },
+                                "description": "While I am away the delegate decides what waits for me; request_type null = every type.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"delegate_employee_id\": 2,\n  \"starts_on\": \"2026-03-10\",\n  \"ends_on\": \"2026-03-20\",\n  \"request_type\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Remove delegation",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/delegations/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "delegations",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Only my own."
+                            }
+                        },
+                        {
+                            "name": "My leave balances",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/balances",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "balances"
+                                    ]
+                                },
+                                "description": "The types I may request, with balance, pending and available."
+                            }
+                        },
+                        {
+                            "name": "My leave ledger",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/ledger",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "ledger"
+                                    ]
+                                },
+                                "description": "My balance movements; optional leave_type_id."
+                            }
+                        },
+                        {
+                            "name": "Quote leave",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/quote",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "quote"
+                                    ]
+                                },
+                                "description": "What a request would take (working days, or calendar days for counts_calendar_days types) and what would be left.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"leave_type_id\": 1,\n  \"starts_on\": \"2026-03-08\",\n  \"ends_on\": \"2026-03-14\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "My leave requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "requests"
+                                    ]
+                                },
+                                "description": "Newest first; paginated."
+                            }
+                        },
+                        {
+                            "name": "Request leave",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "requests"
+                                    ]
+                                },
+                                "description": "half_day first_half|second_half on one day (types that allow it); hourly types take `hours` on one working day. Use multipart with `attachment` when the type requires one.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"leave_type_id\": 1,\n  \"starts_on\": \"2026-03-08\",\n  \"ends_on\": \"2026-03-12\",\n  \"reason\": \"Family visit\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Request sick leave with attachment",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "requests"
+                                    ]
+                                },
+                                "description": "Multipart: the attachment is stored encrypted as an employee document of the type's attachment document type.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "leave_type_id",
+                                            "value": "2",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "starts_on",
+                                            "value": "2026-03-09",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "ends_on",
+                                            "value": "2026-03-09",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "attachment",
+                                            "type": "file",
+                                            "src": []
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel my leave",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/leave/requests/1/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "leave",
+                                        "requests",
+                                        "1",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Pending: withdrawn. Approved: until its first day."
+                            }
+                        },
+                        {
+                            "name": "My team's leave",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/team/leave?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "team",
+                                        "leave"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "My direct reports' pending and approved leave; private types show as plain leave, and no reasons."
                             }
                         }
                     ]
