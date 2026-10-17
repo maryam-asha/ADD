@@ -150,7 +150,9 @@ class MemberServiceUnifiedContractTest extends TestCase
         $this->assertArrayNotHasKey('requires_approval', $data);
         $this->assertArrayNotHasKey('has_form', $data);
         $this->assertArrayNotHasKey('has_registration_form', $data);
-        $this->assertArrayNotHasKey('request_config', $data);
+        // The one view that says where the service's button leads (its
+        // "Explore ADD" page); the catalog's lists still leave it out.
+        $this->assertArrayHasKey('request_config', $data);
         $this->assertCount(2, $data['registration_form']);
         $this->assertCount(2, $data['fields']);
 

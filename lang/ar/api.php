@@ -737,4 +737,26 @@ return [
     'dashboard' => [
         'period_too_long' => 'تقرير المساحات يغطي سنة على الأكثر. اختر فترة أقصر.',
     ],
+
+    'announcements' => [
+        'types' => [
+            'offer' => 'عرض',
+            'event' => 'فعالية',
+            'news' => 'خبر',
+        ],
+        'placements' => [
+            'kiosk' => 'شاشة الاستقبال',
+            'app' => 'تطبيق الأعضاء',
+            'all' => 'الشاشة والتطبيق',
+        ],
+    ],
+
+    'home' => [
+        'greeting' => [
+            'morning' => 'صباح الخير',
+            'afternoon' => 'نهارك سعيد',
+            'evening' => 'مساء الخير',
+            'with_name' => ':greeting، :name',
+        ],
+    ],
 ];

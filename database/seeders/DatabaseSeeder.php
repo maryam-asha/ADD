@@ -29,6 +29,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ResourceTypeSeeder::class);
         $this->call(PlanSeeder::class);
         $this->call(ServiceAxisSeeder::class);
+        $this->call(BrandServiceSeeder::class);
         $this->call(EventSeeder::class);
         $this->call(EventRegistrationFormSeeder::class);
     }

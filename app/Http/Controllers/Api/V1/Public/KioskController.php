@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Public;
 
+use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\ContactLink;
 use App\Domain\Membership\Services\PackageBrowseService;
@@ -44,17 +45,14 @@ class KioskController extends Controller
      */
     private function liveAnnouncements(): array
     {
-        $now = now();
-
         return Announcement::query()
-            ->where('is_active', true)
-            ->where(fn ($query) => $query->whereNull('starts_at')->orWhere('starts_at', '<=', $now))
-            ->where(fn ($query) => $query->whereNull('ends_at')->orWhere('ends_at', '>=', $now))
+            ->live()
+            ->shownOn(AnnouncementPlacement::Kiosk)
             ->orderBy('sort_order')
             ->get()
             ->map(fn (Announcement $announcement) => [
                 'id' => $announcement->id,
-                'type' => $announcement->type,
+                'type' => $announcement->type->value,
                 'image_url' => $announcement->image_url,
                 'link_url' => $announcement->link_url,
             ])

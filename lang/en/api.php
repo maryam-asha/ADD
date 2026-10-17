@@ -750,4 +750,26 @@ return [
     'dashboard' => [
         'period_too_long' => 'A spaces report covers a year at most. Choose a shorter period.',
     ],
+
+    'announcements' => [
+        'types' => [
+            'offer' => 'Offer',
+            'event' => 'Event',
+            'news' => 'News',
+        ],
+        'placements' => [
+            'kiosk' => 'Reception kiosk',
+            'app' => 'Member app',
+            'all' => 'Kiosk and app',
+        ],
+    ],
+
+    'home' => [
+        'greeting' => [
+            'morning' => 'Good morning',
+            'afternoon' => 'Good afternoon',
+            'evening' => 'Good evening',
+            'with_name' => ':greeting, :name',
+        ],
+    ],
 ];

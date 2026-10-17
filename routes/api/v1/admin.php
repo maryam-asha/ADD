@@ -210,9 +210,11 @@ Route::apiResource('resource-types', ResourceTypeController::class)
 Route::apiResource('contact-links', ContactLinkController::class)
     ->parameters(['contact-links' => 'contactLink']);
 
-// Reception kiosk banner content (docs/decisions/kiosk-display.md). Same
-// permission tier as Founders/Partners/ContactLinks (no narrower role:admin
-// group).
+// Banner content for the reception kiosk and the member app's home
+// (docs/decisions/kiosk-display.md). Same permission tier as
+// Founders/Partners/ContactLinks (no narrower role:admin group). `options`
+// before the resource, so `{announcement}` does not swallow it.
+Route::get('announcements/options', [AnnouncementController::class, 'options']);
 Route::apiResource('announcements', AnnouncementController::class);
 Route::apiResource('event-categories', EventCategoryController::class)
     ->parameters(['event-categories' => 'eventCategory']);

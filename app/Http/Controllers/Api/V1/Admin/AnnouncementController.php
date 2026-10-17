@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
+use App\Domain\Ecosystem\Enums\AnnouncementType;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Http\Requests\Admin\StoreAnnouncementRequest;
 use App\Http\Requests\Admin\UpdateAnnouncementRequest;
@@ -47,6 +49,23 @@ class AnnouncementController extends AdminResourceController
             ['sort_order' => 0, 'is_active' => true],
             $request->validated()
         )));
+    }
+
+    /** The types and placements the form offers, with their labels in the requested language. */
+    public function options(): JsonResponse
+    {
+        return response()->json([
+            'data' => [
+                'types' => array_map(fn (AnnouncementType $type) => [
+                    'key' => $type->value,
+                    'label' => $type->label(),
+                ], AnnouncementType::cases()),
+                'placements' => array_map(fn (AnnouncementPlacement $placement) => [
+                    'key' => $placement->value,
+                    'label' => $placement->label(),
+                ], AnnouncementPlacement::cases()),
+            ],
+        ]);
     }
 
     public function update(UpdateAnnouncementRequest $request, Announcement $announcement): JsonResponse

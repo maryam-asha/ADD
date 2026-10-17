@@ -55,6 +55,20 @@ class KioskControllerTest extends TestCase
         $response->assertJsonPath('data.banner.1.type', 'offer');
     }
 
+    public function test_banner_leaves_out_what_is_placed_on_the_app_alone(): void
+    {
+        $kiosk = Announcement::factory()->onKiosk()->create(['sort_order' => 1]);
+        Announcement::factory()->onApp()->create(['sort_order' => 2]);
+        $everywhere = Announcement::factory()->create(['sort_order' => 3]);
+
+        $response = $this->getJson('/api/v1/public/kiosk');
+
+        $response->assertOk();
+        $response->assertJsonCount(2, 'data.banner');
+        $response->assertJsonPath('data.banner.0.id', $kiosk->id);
+        $response->assertJsonPath('data.banner.1.id', $everywhere->id);
+    }
+
     public function test_plans_is_a_top_level_section_reading_the_existing_active_plan_catalog(): void
     {
         $plan = Plan::factory()->create(['is_active' => true, 'order' => 1, 'name' => ['ar' => 'خطة شهرية', 'en' => 'Monthly plan']]);

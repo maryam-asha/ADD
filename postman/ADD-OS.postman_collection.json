@@ -7577,7 +7577,7 @@
                                         "{{slug}}"
                                     ]
                                 },
-                                "description": "\u062c\u0644\u0628 \u062a\u0641\u0627\u0635\u064a\u0644 \u062e\u062f\u0645\u0629 \u0645\u062d\u062f\u062f\u0629 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0645\u062a\u063a\u064a\u0631 {{slug}} (\u0645\u062b\u0644: general, technical, business-address, mentorship) \u0645\u0639 \u0646\u0645\u0648\u0630\u062c \u0627\u0644\u062a\u0633\u062c\u064a\u0644 registration_form \u0627\u0644\u062e\u0627\u0635 \u0628\u0647\u0627."
+                                "description": "\u062c\u0644\u0628 \u062a\u0641\u0627\u0635\u064a\u0644 \u062e\u062f\u0645\u0629 \u0645\u062d\u062f\u062f\u0629 \u0628\u0627\u0633\u062a\u062e\u062f\u0627\u0645 \u0627\u0644\u0645\u062a\u063a\u064a\u0631 {{slug}} (\u0645\u062b\u0644: general, technical, business-address, mentorship) \u0645\u0639 \u0646\u0645\u0648\u0630\u062c \u0627\u0644\u062a\u0633\u062c\u064a\u0644 registration_form \u0627\u0644\u062e\u0627\u0635 \u0628\u0647\u0627.\n\n\u0635\u0641\u062d\u0629 \"Explore ADD\" \u0644\u0644\u062e\u062f\u0645\u0629: `about` \u0634\u0631\u062d \u0627\u0644\u062e\u062f\u0645\u0629 HTML \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 (\u064a\u0639\u0631\u0636\u0647 \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0641\u064a WebView)\u060c \u0648`image_url` \u0635\u0648\u0631\u0629 \u0627\u0644\u063a\u0644\u0627\u0641\u060c \u0648`request_config` \u0645\u0627 \u064a\u062d\u062a\u0627\u062c\u0647 \u0632\u0631 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 \u0644\u0640 internal_redirect: `{route, params}` \u0645\u062b\u0644 `{\"route\": \"spaces\", \"params\": {\"space_type\": \"room\"}}`. `about` \u0648`request_config` \u0641\u064a \u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0641\u0642\u0637\u060c \u0644\u0627 \u0641\u064a \u0627\u0644\u0642\u0648\u0627\u0626\u0645."
                             }
                         },
                         {
@@ -10300,6 +10300,52 @@
                                     "body": "{\n  \"data\": {\n    \"content\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\",\n    \"contacts\": [\n      {\n        \"type\": \"email\",\n        \"label\": null,\n        \"value\": \"support@add-district.sy\",\n        \"url\": \"mailto:support@add-district.sy\"\n      },\n      {\n        \"type\": \"phone\",\n        \"label\": \"\u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644\",\n        \"value\": \"+963 21 000 0000\",\n        \"url\": \"tel:+963210000000\"\n      },\n      {\n        \"type\": \"whatsapp\",\n        \"label\": \"\u0648\u0627\u062a\u0633\u0627\u0628\",\n        \"value\": \"+963 944 000 000\",\n        \"url\": \"https://wa.me/963944000000\"\n      },\n      {\n        \"type\": \"address\",\n        \"label\": null,\n        \"value\": \"\u062d\u0644\u0628\u060c \u0633\u0648\u0631\u064a\u0627\",\n        \"url\": \"https://www.google.com/maps/search/?api=1&query=%D8%AD%D9%84%D8%A8%D8%8C%20%D8%B3%D9%88%D8%B1%D9%8A%D8%A7\"\n      },\n      {\n        \"type\": \"website\",\n        \"label\": null,\n        \"value\": \"https://add-district.sy\",\n        \"url\": \"https://add-district.sy\"\n      }\n    ]\n  }\n}"
                                 }
                             ]
+                        }
+                    ]
+                },
+                {
+                    "name": "13. Home",
+                    "item": [
+                        {
+                            "name": "Get Home",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/home",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "home"
+                                    ]
+                                },
+                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{type: walkin|booking, id, space {id, name, type}, branch {id, name}, checked_in_at, end_requested}`. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current.\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                }
+                            }
                         }
                     ]
                 }
@@ -20334,6 +20380,33 @@
                                     }
                                 },
                                 {
+                                    "name": "Get Announcement Options",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/admin/announcements/options",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "admin",
+                                                "announcements",
+                                                "options"
+                                            ]
+                                        },
+                                        "description": "The form's pickers: `{data: {types: [{key, label}], placements: [{key, label}]}}`, labels in the request's language."
+                                    }
+                                },
+                                {
                                     "name": "Create Announcement",
                                     "event": [
                                         {
@@ -20363,7 +20436,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"type\": \"offer\",\n  \"image_url\": \"https://example.local/offer.png\",\n  \"link_url\": \"https://example.local/offer\",\n  \"sort_order\": 1\n}",
+                                            "raw": "{\n    \"type\": \"offer\",\n    \"placement\": \"app\",\n    \"subtitle\": {\n        \"en\": \"ADD Smart Ecosystem\",\n        \"ar\": \"\u0645\u0646\u0638\u0648\u0645\u0629 ADD \u0627\u0644\u0630\u0643\u064a\u0629\"\n    },\n    \"title\": {\n        \"en\": \"Build. Connect. Grow.\",\n        \"ar\": \"\u0627\u0628\u0646\u0650. \u062a\u0648\u0627\u0635\u0644. \u0627\u0646\u0645\u064f.\"\n    },\n    \"description\": {\n        \"en\": \"Everything your business needs, within one ecosystem.\",\n        \"ar\": \"\u0643\u0644 \u0645\u0627 \u064a\u062d\u062a\u0627\u062c\u0647 \u0639\u0645\u0644\u0643 \u0641\u064a \u0645\u0646\u0638\u0648\u0645\u0629 \u0648\u0627\u062d\u062f\u0629.\"\n    },\n    \"cta_label\": {\n        \"en\": \"Explore ADD\",\n        \"ar\": \"\u0627\u0633\u062a\u0643\u0634\u0641 ADD\"\n    },\n    \"image_url\": \"https://example.local/offer.png\",\n    \"link_url\": \"https://example.local/offer\",\n    \"sort_order\": 1\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -20382,7 +20455,7 @@
                                                 "announcements"
                                             ]
                                         },
-                                        "description": "`type` accepts any string (news/event/offer are just the seeded examples). starts_at/ends_at are optional -- when set, an announcement is only \"live\" (returned by Get Kiosk Data) while is_active is true and now() falls inside that window."
+                                        "description": "`type`: offer | event | news only (GET announcements/options lists them with labels). `placement`: kiosk | app | all \u2014 which screen shows it; left out it is `all`, never null. `subtitle`/`title`/`description`/`cta_label` are optional {en, ar} text the app draws over the image (the small line above the title, the title, the text, the button label); leave them out for an image-only banner. `link_url` is where the button leads (a web URL or an addapp:// deep link). starts_at/ends_at are optional -- when set, an announcement is only \"live\" (returned by Get Kiosk Data and member/home) while is_active is true and now() falls inside that window."
                                     }
                                 },
                                 {
@@ -20428,7 +20501,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"type\": \"offer\",\n  \"image_url\": \"https://example.local/offer-v2.png\",\n  \"is_active\": false\n}",
+                                            "raw": "{\n    \"type\": \"offer\",\n    \"placement\": \"all\",\n    \"subtitle\": {\n        \"en\": \"ADD Smart Ecosystem\",\n        \"ar\": \"\u0645\u0646\u0638\u0648\u0645\u0629 ADD \u0627\u0644\u0630\u0643\u064a\u0629\"\n    },\n    \"title\": {\n        \"en\": \"Build. Connect. Grow.\",\n        \"ar\": \"\u0627\u0628\u0646\u0650. \u062a\u0648\u0627\u0635\u0644. \u0627\u0646\u0645\u064f.\"\n    },\n    \"description\": {\n        \"en\": \"Everything your business needs, within one ecosystem.\",\n        \"ar\": \"\u0643\u0644 \u0645\u0627 \u064a\u062d\u062a\u0627\u062c\u0647 \u0639\u0645\u0644\u0643 \u0641\u064a \u0645\u0646\u0638\u0648\u0645\u0629 \u0648\u0627\u062d\u062f\u0629.\"\n    },\n    \"cta_label\": {\n        \"en\": \"Explore ADD\",\n        \"ar\": \"\u0627\u0633\u062a\u0643\u0634\u0641 ADD\"\n    },\n    \"image_url\": \"https://example.local/offer-v2.png\",\n    \"is_active\": false\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -23488,14 +23561,14 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"service_axis_id\": 1,\n    \"slug\": \"printing\",\n    \"name\": {\n        \"en\": \"Printing Service\",\n        \"ar\": \"\u062e\u062f\u0645\u0629 \u0627\u0644\u0637\u0628\u0627\u0639\u0629\"\n    },\n    \"description\": {\n        \"en\": \"Request printing for your documents.\",\n        \"ar\": \"\u0637\u0644\u0628 \u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a.\"\n    },\n    \"icon\": \"printer\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"requires_location\": true,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"form\",\n    \"request_config\": null,\n    \"allowed_plan_module_ids\": null,\n    \"order\": 10\n}",
+                                    "raw": "{\n    \"service_axis_id\": 1,\n    \"slug\": \"printing\",\n    \"name\": {\n        \"en\": \"Printing Service\",\n        \"ar\": \"\u062e\u062f\u0645\u0629 \u0627\u0644\u0637\u0628\u0627\u0639\u0629\"\n    },\n    \"description\": {\n        \"en\": \"Request printing for your documents.\",\n        \"ar\": \"\u0637\u0644\u0628 \u0637\u0628\u0627\u0639\u0629 \u0627\u0644\u0645\u0633\u062a\u0646\u062f\u0627\u062a.\"\n    },\n    \"about\": {\n        \"en\": \"<h2>Printing</h2><p>Print your documents at reception.</p>\",\n        \"ar\": \"<h2>\u0627\u0644\u0637\u0628\u0627\u0639\u0629</h2><p>\u0627\u0637\u0628\u0639 \u0645\u0633\u062a\u0646\u062f\u0627\u062a\u0643 \u0645\u0646 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644.</p>\"\n    },\n    \"icon\": \"printer\",\n    \"image_url\": \"https://example.local/services/printing.jpg\",\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"show_on_home\": false,\n    \"requires_location\": true,\n    \"requires_review\": false,\n    \"visibility\": \"member\",\n    \"request_method\": \"form\",\n    \"request_config\": null,\n    \"allowed_plan_module_ids\": null,\n    \"order\": 10\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 },
-                                "description": "**Form** (the request as saved). request_method: form | external_link | phone | whatsapp | internal_redirect | info_only\n\n\u0645\u062b\u0627\u0644 external_link:\n\"request_method\": \"external_link\",\n\"request_config\": {\"url\": \"https://example.com\", \"open\": \"browser\"}\n\n\u0645\u062b\u0627\u0644 phone:\n\"request_method\": \"phone\",\n\"request_config\": {\"number\": \"+963944000000\"}\n\n### Cases \u2014 see this request's saved examples\n- **External Link**"
+                                "description": "**Form** (the request as saved). request_method: form | external_link | phone | whatsapp | internal_redirect | info_only\n\n\u0645\u062b\u0627\u0644 external_link:\n\"request_method\": \"external_link\",\n\"request_config\": {\"url\": \"https://example.com\", \"open\": \"browser\"}\n\n\u0645\u062b\u0627\u0644 phone:\n\"request_method\": \"phone\",\n\"request_config\": {\"number\": \"+963944000000\"}\n\n### Cases \u2014 see this request's saved examples\n- **External Link**\n\n\"Explore ADD\": `about` ({en, ar} HTML) is the service's page in the app, `image_url` its cover, `show_on_home` puts it on the member app's home. Its button is request_method/request_config (e.g. internal_redirect \u2192 {route, params})."
                             },
                             "event": [
                                 {
@@ -23598,7 +23671,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"order\": 5\n}",
+                                    "raw": "{\n    \"is_active\": true,\n    \"is_coming_soon\": false,\n    \"order\": 5,\n    \"show_on_home\": true\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
