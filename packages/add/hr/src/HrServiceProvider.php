@@ -2,6 +2,8 @@
 
 namespace Add\Hr;
 
+use Add\Hr\Approvals\Console\ProcessTimeouts;
+use Add\Hr\Approvals\Services\ApprovalTypes;
 use Add\Hr\Contracts\AccountProvisioner;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Core\Console\RefreshStatuses;
@@ -26,6 +28,8 @@ class HrServiceProvider extends ServiceProvider
         // registers after package providers and so wins.
         $this->app->singletonIf(AccountProvisioner::class, NullAccountProvisioner::class);
         $this->app->singletonIf(HrNotifier::class, LogHrNotifier::class);
+
+        $this->app->singleton(ApprovalTypes::class);
     }
 
     public function boot(): void
@@ -42,6 +46,7 @@ class HrServiceProvider extends ServiceProvider
             $this->commands([
                 RefreshStatuses::class,
                 SendAlerts::class,
+                ProcessTimeouts::class,
             ]);
         }
 

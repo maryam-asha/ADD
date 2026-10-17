@@ -10,6 +10,7 @@ use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Services\AlertService;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Fixtures\RecordingNotifier;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -162,18 +163,9 @@ class AlertsTest extends TestCase
         $this->assertSame([], $notifier->calls);
     }
 
-    private function fakeNotifier(): object
+    private function fakeNotifier(): RecordingNotifier
     {
-        $notifier = new class implements HrNotifier
-        {
-            public array $calls = [];
-
-            public function notifyHolders(string $ability, string $key, array $placeholders = []): void
-            {
-                $this->calls[] = [$ability, $key, $placeholders];
-            }
-        };
-
+        $notifier = new RecordingNotifier;
         $this->app->instance(HrNotifier::class, $notifier);
 
         return $notifier;

@@ -35,6 +35,14 @@ final class Abilities
 
     public const SETTINGS_MANAGE = 'hr.settings.manage';
 
+    /** Approval flows, every open request, and deciding for an absent approver. */
+    public const APPROVALS_MANAGE = 'hr.approvals.manage';
+
+    public const LEAVE_VIEW = 'hr.leave.view';
+
+    /** Leave on an employee's behalf: filing, cancelling, balance adjustments. */
+    public const LEAVE_MANAGE = 'hr.leave.manage';
+
     /**
      * @return list<string>
      */

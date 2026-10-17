@@ -7,11 +7,11 @@ use PHPUnit\Framework\TestCase;
 
 class AbilitiesTest extends TestCase
 {
-    public function test_all_lists_every_phase_one_ability_once(): void
+    public function test_all_lists_every_ability_once(): void
     {
         $all = Abilities::all();
 
-        $this->assertCount(12, $all);
+        $this->assertCount(15, $all);
         $this->assertSame($all, array_values(array_unique($all)));
     }
 

@@ -30,6 +30,8 @@ return [
      */
     'modules' => [
         'core' => true,
+        'approvals' => true,
+        'leave' => true,
     ],
 
     'documents' => [
@@ -49,6 +51,22 @@ return [
         'contract_days' => 30,
         'probation_days' => 21,
         'document_days' => 45,
+    ],
+
+    'approvals' => [
+        // Who decides a step that resolves to nobody (no manager, no unit
+        // head, or the requester themselves), and who may decide any open
+        // request for an absent approver.
+        'fallback_ability' => 'hr.approvals.manage',
+    ],
+
+    'leave' => [
+        // ISO weekdays (1 = Monday ... 7 = Sunday) that are not working
+        // days. Holidays come from hr_holidays.
+        'weekend_days' => [6, 7],
+
+        // The longest single leave request, in calendar days.
+        'max_request_days' => 366,
     ],
 
 ];

@@ -3,6 +3,7 @@
 namespace Add\Hr\Integrations;
 
 use Add\Hr\Contracts\HrNotifier;
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -14,5 +15,10 @@ class LogHrNotifier implements HrNotifier
     public function notifyHolders(string $ability, string $key, array $placeholders = []): void
     {
         Log::info('[hr] notification', ['ability' => $ability, 'key' => $key, 'placeholders' => $placeholders]);
+    }
+
+    public function notifyEmployee(Employee $employee, string $key, array $placeholders = []): void
+    {
+        Log::info('[hr] notification', ['employee' => $employee->id, 'key' => $key, 'placeholders' => $placeholders]);
     }
 }
