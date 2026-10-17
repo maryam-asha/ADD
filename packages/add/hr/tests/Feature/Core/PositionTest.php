@@ -6,10 +6,13 @@ use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\JobGrade;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
+use Add\Hr\Tests\Concerns\HiresEmployees;
 use Add\Hr\Tests\TestCase;
 
 class PositionTest extends TestCase
 {
+    use HiresEmployees;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -58,6 +61,16 @@ class PositionTest extends TestCase
         $this->assertSame(3, $position->fresh()->headcount);
 
         $this->deleteJson("/api/hr/positions/{$position->id}")->assertNoContent();
+    }
+
+    public function test_position_held_by_an_employee_cannot_be_deleted(): void
+    {
+        $position = Position::factory()->create();
+        $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+
+        $this->deleteJson("/api/hr/positions/{$position->id}")
+            ->assertStatus(409)
+            ->assertJsonPath('message', __('hr::core.position_in_use'));
     }
 
     public function test_headcount_must_be_positive(): void

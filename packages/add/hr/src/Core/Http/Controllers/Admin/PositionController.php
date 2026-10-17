@@ -6,6 +6,7 @@ use Add\Hr\Core\Http\Requests\StorePositionRequest;
 use Add\Hr\Core\Http\Requests\UpdatePositionRequest;
 use Add\Hr\Core\Http\Resources\PositionResource;
 use Add\Hr\Core\Models\Position;
+use Add\Hr\Support\HrException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -41,8 +42,15 @@ class PositionController extends Controller
         return response()->json(['message' => __('hr::core.position_updated')]);
     }
 
+    /**
+     * A position anyone has ever held stays, as part of their job history.
+     */
     public function destroy(Position $position): Response
     {
+        if ($position->assignments()->exists()) {
+            HrException::fail('hr::core.position_in_use', [], 409);
+        }
+
         $position->delete();
 
         return response()->noContent();

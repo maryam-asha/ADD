@@ -57,7 +57,7 @@ class OrgUnitController extends Controller
      */
     public function destroy(OrgUnit $orgUnit): Response
     {
-        if ($orgUnit->children()->exists() || $orgUnit->positions()->exists()) {
+        if ($orgUnit->children()->exists() || $orgUnit->positions()->exists() || $orgUnit->assignments()->exists()) {
             HrException::fail('hr::core.org_unit_in_use', [], 409);
         }
 

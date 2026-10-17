@@ -5,10 +5,13 @@ namespace Add\Hr\Tests\Feature\Core;
 use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
+use Add\Hr\Tests\Concerns\HiresEmployees;
 use Add\Hr\Tests\TestCase;
 
 class OrgUnitTest extends TestCase
 {
+    use HiresEmployees;
+
     private function manager(): void
     {
         $this->actingAsWith([Abilities::ORG_VIEW, Abilities::ORG_MANAGE]);
@@ -91,6 +94,29 @@ class OrgUnitTest extends TestCase
         Position::factory()->create(['org_unit_id' => $unit->id]);
 
         $this->deleteJson("/api/hr/org-units/{$unit->id}")->assertStatus(409);
+    }
+
+    public function test_unit_with_assigned_employees_cannot_be_deleted(): void
+    {
+        $this->manager();
+        $unit = OrgUnit::factory()->create();
+        $this->hireEmployee(['assignment' => ['org_unit_id' => $unit->id]]);
+
+        $this->deleteJson("/api/hr/org-units/{$unit->id}")->assertStatus(409);
+    }
+
+    public function test_head_employee_can_be_set_and_must_exist(): void
+    {
+        $this->manager();
+        $unit = OrgUnit::factory()->create();
+        $head = $this->hireEmployee(['assignment' => ['org_unit_id' => $unit->id]]);
+
+        $this->patchJson("/api/hr/org-units/{$unit->id}", ['head_employee_id' => $head->id])->assertOk();
+        $this->assertSame($head->id, (int) $unit->fresh()->head_employee_id);
+
+        $this->patchJson("/api/hr/org-units/{$unit->id}", ['head_employee_id' => 9999])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('head_employee_id');
     }
 
     public function test_an_empty_unit_is_deleted(): void

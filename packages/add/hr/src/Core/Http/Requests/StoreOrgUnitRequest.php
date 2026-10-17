@@ -21,6 +21,7 @@ class StoreOrgUnitRequest extends FormRequest
             ...TranslatableField::rules('name'),
             'code' => ['nullable', 'string', 'max:32', 'unique:hr_org_units,code'],
             'parent_id' => ['nullable', 'integer', 'exists:hr_org_units,id'],
+            'head_employee_id' => ['nullable', 'integer', 'exists:hr_employees,id'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }

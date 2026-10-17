@@ -22,6 +22,7 @@ class UpdateOrgUnitRequest extends FormRequest
             ...TranslatableField::sometimes('name'),
             'code' => ['nullable', 'string', 'max:32', Rule::unique('hr_org_units', 'code')->ignore($this->route('orgUnit'))],
             'parent_id' => ['nullable', 'integer', 'exists:hr_org_units,id'],
+            'head_employee_id' => ['nullable', 'integer', 'exists:hr_employees,id'],
             'is_active' => ['sometimes', 'boolean'],
         ];
     }
