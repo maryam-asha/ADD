@@ -25,6 +25,12 @@ return [
         'weekend_days' => [5, 6],
     ],
 
+    'timesheets' => [
+        // ADD's working week runs Sunday to Thursday, so a timesheet week
+        // starts on Sunday (ISO 7). Other settings keep the package's.
+        'week_starts_on' => 7,
+    ],
+
     'attendance' => [
         // Printed in staff cards' QR codes; scanned by reception kiosks
         // (POST kiosk/attendance/punches). Other attendance settings keep

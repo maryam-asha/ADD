@@ -32150,6 +32150,449 @@
                     ]
                 },
                 {
+                    "name": "Timesheets & cost",
+                    "description": "Cost centers (read: hr.timesheets.view; write: hr.settings.manage), employees' effective-dated cost splits (hr.timesheets.manage), weekly timesheets decided through the approval engine (type `timesheet`), and the time-by-cost-center report. A week is addressed by its first day (ADD: Sunday). Cost is distributed by approved timesheet hours, else by the planned split.",
+                    "item": [
+                        {
+                            "name": "List cost centers",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/cost-centers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "cost-centers"
+                                    ]
+                                },
+                                "description": "All cost centers."
+                            }
+                        },
+                        {
+                            "name": "Create cost center",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/cost-centers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "cost-centers"
+                                    ]
+                                },
+                                "description": "costable_type / costable_id optionally link a host record (a project, a grant).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"lab-eu-grant\",\n  \"name\": {\n    \"ar\": \"\u0645\u0646\u062d\u0629 \u0627\u0644\u0645\u062e\u062a\u0628\u0631\",\n    \"en\": \"Lab EU grant\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update cost center",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/cost-centers/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "cost-centers",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"is_active\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete cost center",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/cost-centers/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "cost-centers",
+                                        "1"
+                                    ]
+                                },
+                                "description": "409 once hours or splits are charged to it."
+                            }
+                        },
+                        {
+                            "name": "Employee cost splits",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/cost-allocations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "cost-allocations"
+                                    ]
+                                },
+                                "description": "Every split, oldest first."
+                            }
+                        },
+                        {
+                            "name": "Replace cost split",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/cost-allocations",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "cost-allocations"
+                                    ]
+                                },
+                                "description": "From effective_from; closes the split running the day before. Lines sum to 100.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"effective_from\": \"2026-03-01\",\n  \"lines\": [\n    {\n      \"cost_center_id\": 1,\n      \"percent\": 70\n    },\n    {\n      \"cost_center_id\": 2,\n      \"percent\": 30\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List timesheets",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/timesheets?week_start=2026-03-01&status=submitted",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "timesheets"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "week_start",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "submitted"
+                                        }
+                                    ]
+                                },
+                                "description": "Filters: week_start, status (draft | submitted | approved | rejected), employee_id."
+                            }
+                        },
+                        {
+                            "name": "Show timesheet",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/timesheets/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "timesheets",
+                                        "1"
+                                    ]
+                                },
+                                "description": "With its lines and `reconciliation`: timesheet vs attendance hours per day."
+                            }
+                        },
+                        {
+                            "name": "Timesheet compliance",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/timesheets/compliance?week_start=2026-03-01",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "timesheets",
+                                        "compliance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "week_start",
+                                            "value": "2026-03-01"
+                                        }
+                                    ]
+                                },
+                                "description": "Employees employed that week with no submitted or approved timesheet; optional org_unit_id."
+                            }
+                        },
+                        {
+                            "name": "Time by cost center",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/time-by-cost-center?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "time-by-cost-center"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Approved hours per cost center and employee (the donor / project report). Optional cost_center_id; format=csv downloads it (audited)."
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "description": "Self-service for any account with an active employee record \u2014 operations, sales, the caf\u00e9: no role or permission needed, and nothing but the caller's own data. 403 when the account has no employee record or is past its last working day.",
                     "item": [
@@ -33469,6 +33912,248 @@
                                     ]
                                 },
                                 "description": "My direct reports: plan, status, first in, last out, minutes late. Optional ?date=."
+                            }
+                        },
+                        {
+                            "name": "Cost centers to charge",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/cost-centers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "cost-centers"
+                                    ]
+                                },
+                                "description": "Active cost centers."
+                            }
+                        },
+                        {
+                            "name": "My timesheets",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/timesheets",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "timesheets"
+                                    ]
+                                },
+                                "description": "Newest week first."
+                            }
+                        },
+                        {
+                            "name": "My timesheet week",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/timesheets/2026-03-01",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "timesheets",
+                                        "2026-03-01"
+                                    ]
+                                },
+                                "description": "The week (an unstarted one answers an empty draft) and its reconciliation with attendance."
+                            }
+                        },
+                        {
+                            "name": "Save my week",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/timesheets/2026-03-01",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "timesheets",
+                                        "2026-03-01"
+                                    ]
+                                },
+                                "description": "Replaces the week's lines while it is a draft or was rejected. Hours in steps of 0.5, at most 24 a day, days inside the week.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"entries\": [\n    {\n      \"cost_center_id\": 1,\n      \"work_date\": \"2026-03-01\",\n      \"hours\": 6\n    },\n    {\n      \"cost_center_id\": 2,\n      \"work_date\": \"2026-03-01\",\n      \"hours\": 2,\n      \"note\": \"Workshop prep\"\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Submit my week",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/timesheets/2026-03-01/submit",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "timesheets",
+                                        "2026-03-01",
+                                        "submit"
+                                    ]
+                                },
+                                "description": "Into the approval flow. Refused when hr.timesheets.max_variance_hours is set and the week is further from attendance."
+                            }
+                        },
+                        {
+                            "name": "Recall my week",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/timesheets/2026-03-01/recall",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "timesheets",
+                                        "2026-03-01",
+                                        "recall"
+                                    ]
+                                },
+                                "description": "Back to draft while nobody has decided it."
                             }
                         }
                     ]
