@@ -206,6 +206,22 @@ return [
             'title' => 'HR alerts',
             'body' => ':count HR alerts need attention (contracts, probations, documents).',
         ],
+        'approval_pending' => [
+            'title' => 'Approval needed',
+            'body' => 'A request is waiting for your approval.',
+        ],
+        'approval_escalated' => [
+            'title' => 'Overdue request',
+            'body' => 'A request passed its approval deadline and was escalated to you.',
+        ],
+        'request_approved' => [
+            'title' => 'Request approved',
+            'body' => 'Your request has been approved.',
+        ],
+        'request_rejected' => [
+            'title' => 'Request rejected',
+            'body' => 'Your request has been rejected.',
+        ],
     ],
 
 ];

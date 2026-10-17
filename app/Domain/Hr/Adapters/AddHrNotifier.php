@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Adapters;
 
 use Add\Hr\Contracts\HrNotifier;
+use Add\Hr\Core\Models\Employee;
 use App\Domain\Identity\Models\User;
 use App\Services\Notification\NotificationService;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
@@ -27,6 +28,15 @@ class AddHrNotifier implements HrNotifier
 
         if ($users->isNotEmpty()) {
             $this->notifications->sendToUsers($users, "hr.{$key}", $placeholders);
+        }
+    }
+
+    public function notifyEmployee(Employee $employee, string $key, array $placeholders = []): void
+    {
+        $user = $employee->user_id === null ? null : User::query()->find($employee->user_id);
+
+        if ($user !== null) {
+            $this->notifications->sendToUser($user, "hr.{$key}", $placeholders);
         }
     }
 }
