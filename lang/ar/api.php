@@ -770,5 +770,8 @@ return [
         'kiosk_unauthorized' => 'لم يُتعرَّف على هذا الكشك. أعد إقرانه من لوحة التحكم.',
         'kiosk_unknown_card' => 'هذه ليست بطاقة موظف صالحة.',
         'kiosk_scan_out_of_window' => 'وقت المسح قديم جداً أو في المستقبل؛ تحقق من ساعة الكشك.',
+        'benefit_no_wallet' => 'لا يملك الموظف محفظة: حسابه غير مسجّل كعضو.',
+        'benefit_points_whole' => 'نقاط المحفظة أعداد صحيحة، و:amount ليس كذلك.',
+        'benefit_wallet_description' => 'ميزة موظف: :benefit',
     ],
 ];

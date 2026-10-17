@@ -226,6 +226,14 @@ return [
             'title' => 'Your payslip is ready',
             'body' => 'Your payslip for :month has been issued.',
         ],
+        'benefit_granted' => [
+            'title' => 'You received a benefit',
+            'body' => ':amount points from :benefit_en were added to your wallet.',
+        ],
+        'benefit_grants_failed' => [
+            'title' => 'Benefits not delivered',
+            'body' => ':count benefit grants for :month could not be delivered. Review them and retry.',
+        ],
     ],
 
 ];

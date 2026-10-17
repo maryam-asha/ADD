@@ -783,5 +783,8 @@ return [
         'kiosk_unauthorized' => 'This kiosk is not recognised. Pair it again from the dashboard.',
         'kiosk_unknown_card' => 'This card is not a valid staff card.',
         'kiosk_scan_out_of_window' => 'The scan time is too old or in the future; check the kiosk clock.',
+        'benefit_no_wallet' => 'The employee has no wallet: their account is not registered as a member.',
+        'benefit_points_whole' => 'Wallet points are whole numbers; :amount is not.',
+        'benefit_wallet_description' => 'Employee benefit: :benefit',
     ],
 ];

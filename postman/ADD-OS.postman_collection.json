@@ -34192,6 +34192,828 @@
                     "description": "Pay components and legal rate tables (data entered after legal review; ADD ships trial values in HrPayrollTrialSeeder), pay, runs, loans and end of service. Abilities: hr.payroll.view | manage | approve | pay, hr.compensation.manage, hr.loans.manage."
                 },
                 {
+                    "name": "Benefits",
+                    "item": [
+                        {
+                            "name": "Benefits",
+                            "item": [
+                                {
+                                    "name": "List benefits",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits"
+                                            ]
+                                        },
+                                        "description": "With assignments_count."
+                                    }
+                                },
+                                {
+                                    "name": "Create in-kind benefit",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits"
+                                            ]
+                                        },
+                                        "description": "in_kind_credit: units delivered by the host. In ADD: whole wallet points (unit points); fulfillment.category general | cafe | printing_internet; fulfillment.expires_after_days (else the end of the period granted; general never expires).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"cafe_credit\",\n  \"name\": {\n    \"ar\": \"\u0631\u0635\u064a\u062f \u0645\u0642\u0647\u0649\",\n    \"en\": \"Cafe credit\"\n  },\n  \"kind\": \"in_kind_credit\",\n  \"frequency\": \"monthly\",\n  \"amount\": 100,\n  \"unit\": \"points\",\n  \"employer_cost\": 5,\n  \"cost_currency\": \"USD\",\n  \"fulfillment\": {\n    \"category\": \"cafe\"\n  },\n  \"eligible_after_days\": 90\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Create cash allowance",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits"
+                                            ]
+                                        },
+                                        "description": "cash_allowance: paid by payroll through pay_component_id, an earning using the benefit_allowance calculator with applies_to_all. Its cost is its payslip line (no employer_cost).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"phone_allowance\",\n  \"name\": {\n    \"ar\": \"\u0628\u062f\u0644 \u0647\u0627\u062a\u0641\",\n    \"en\": \"Phone allowance\"\n  },\n  \"kind\": \"cash_allowance\",\n  \"frequency\": \"monthly\",\n  \"amount\": 20,\n  \"currency\": \"USD\",\n  \"pay_component_id\": 10\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Create entitlement",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits"
+                                            ]
+                                        },
+                                        "description": "entitlement: recorded for its cost (insurance cover). frequency monthly | quarterly | yearly (grant_month) | one_time.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"health_cover\",\n  \"name\": {\n    \"ar\": \"\u062a\u0623\u0645\u064a\u0646 \u0635\u062d\u064a\",\n    \"en\": \"Health cover\"\n  },\n  \"kind\": \"entitlement\",\n  \"frequency\": \"yearly\",\n  \"grant_month\": 1,\n  \"amount\": 300,\n  \"currency\": \"USD\",\n  \"employer_cost\": 300,\n  \"cost_currency\": \"USD\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show benefit",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "One benefit."
+                                    }
+                                },
+                                {
+                                    "name": "Update benefit",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Worth from now on; kind, frequency, currency/unit and pay component stay. Grants keep their values.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"amount\": 150,\n  \"is_active\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Delete benefit",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "409 once granted; deactivate instead."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Assignments",
+                            "item": [
+                                {
+                                    "name": "List assignments",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1/assignments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1",
+                                                "assignments"
+                                            ]
+                                        },
+                                        "description": "Newest first."
+                                    }
+                                },
+                                {
+                                    "name": "Assign to a grade",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1/assignments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1",
+                                                "assignments"
+                                            ]
+                                        },
+                                        "description": "Exactly one of employee_id, job_grade_id, org_unit_id (with its sub-units). Most specific wins: employee > grade > nearest unit. Never overlapping for the same target.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"job_grade_id\": 1,\n  \"effective_from\": \"2026-05-01\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Exclude an employee",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefits/1/assignments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefits",
+                                                "1",
+                                                "assignments"
+                                            ]
+                                        },
+                                        "description": "excluded keeps one employee out of what their grade or unit receives.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"employee_id\": 1,\n  \"excluded\": true,\n  \"effective_from\": \"2026-05-01\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "End assignment",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-assignments/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-assignments",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Only earlier; extend with a new one.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"effective_to\": \"2026-12-31\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Delete assignment",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-assignments/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-assignments",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "409 once something was granted under it."
+                                    }
+                                },
+                                {
+                                    "name": "Employee benefits",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/1/benefits?as_of=2026-05-01",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "1",
+                                                "benefits"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "as_of",
+                                                    "value": "2026-05-01"
+                                                }
+                                            ]
+                                        },
+                                        "description": "What they hold that day and where it comes from, plus their latest grants."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Grants",
+                            "item": [
+                                {
+                                    "name": "List grants",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-grants?status=failed&month=2026-05",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-grants"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "failed"
+                                                },
+                                                {
+                                                    "key": "month",
+                                                    "value": "2026-05"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: benefit_id, employee_id, status (pending | fulfilled | failed | cancelled), month."
+                                    }
+                                },
+                                {
+                                    "name": "Grant a month now",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-grants/run",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-grants",
+                                                "run"
+                                            ]
+                                        },
+                                        "description": "What the daily hr:benefits-grant does: everyone employed on the 1st and eligible, once per period. month defaults to the current one.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"month\": \"2026-05\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Retry grant",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-grants/1/retry",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-grants",
+                                                "1",
+                                                "retry"
+                                            ]
+                                        },
+                                        "description": "A failed in-kind delivery (e.g. no wallet), once the cause is fixed."
+                                    }
+                                },
+                                {
+                                    "name": "Cancel grant",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/benefit-grants/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "benefit-grants",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Pending or failed only."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Employee cost report",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/employee-cost?month=2026-05",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "employee-cost"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "month",
+                                            "value": "2026-05"
+                                        }
+                                    ]
+                                },
+                                "description": "Per employee and currency: approved payroll employer cost + benefits granted that month. hr.payroll.view."
+                            }
+                        }
+                    ],
+                    "description": "Benefits and who holds them; granted monthly by hr:benefits-grant. Abilities: hr.benefits.view | manage."
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
@@ -36058,6 +36880,48 @@
                                             ]
                                         },
                                         "description": "Plus current monthly pay and the last issued net."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Benefits",
+                            "item": [
+                                {
+                                    "name": "My benefits",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/benefits",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "benefits"
+                                            ]
+                                        },
+                                        "description": "What I hold today and my latest grants (no costs or delivery details)."
                                     }
                                 }
                             ]
