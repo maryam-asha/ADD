@@ -27740,6 +27740,72 @@
                             "body": "{\n    \"message\": \"Too many attempts. Please wait before trying again.\"\n}"
                         }
                     ]
+                },
+                {
+                    "name": "Staff card punches",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "currency",
+                                "value": "{{currency}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Accept",
+                                "value": "application/json",
+                                "type": "text"
+                            },
+                            {
+                                "key": "X-Kiosk-Id",
+                                "value": "1",
+                                "type": "text"
+                            },
+                            {
+                                "key": "X-Kiosk-Timestamp",
+                                "value": "{{$timestamp}}",
+                                "type": "text"
+                            },
+                            {
+                                "key": "X-Kiosk-Signature",
+                                "value": "<hmac computed by the kiosk>",
+                                "type": "text"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json",
+                                "type": "text"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/kiosk/attendance/punches",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "kiosk",
+                                "attendance",
+                                "punches"
+                            ]
+                        },
+                        "description": "The reception kiosk scanning staff QR cards, like a fingerprint clock. No token: sign each request with the kiosk's pairing secret. X-Kiosk-Id, X-Kiosk-Timestamp (unix seconds, within 5 minutes) and X-Kiosk-Signature = hex HMAC-SHA256(secret, \"{id}\\n{timestamp}\\n{raw body}\"); 401 otherwise. Up to 100 scans per request (an offline queue), each with its own uuid (a resend answers `duplicate`) and scanned_at with its UTC offset, at most 72 hours old. One result per scan: recorded | duplicate | unknown_card | rejected (with a message), with the employee's id and name to greet them.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"punches\": [\n    {\n      \"id\": \"0b8f3c4e-6a2d-4f1e-9a51-2c7d1e0f9a10\",\n      \"card\": \"add-staff:v1:...\",\n      \"scanned_at\": \"2026-03-02T07:58:12+03:00\"\n    }\n  ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
                 }
             ]
         },
@@ -30958,6 +31024,1132 @@
                     ]
                 },
                 {
+                    "name": "Time & attendance",
+                    "description": "Shifts (local H:i; an end at or before the start runs past midnight), work patterns (fixed weekdays | roster | flexible), the roster, attendance policies, staff QR cards, punches, computed days, exceptions, own-time entries, overtime and the monthly lock. Instants are returned in the organisation's timezone with their offset. Punches have no direction: the first of a day is the arrival, the last the departure. A planned working day with no punch is `no_record` (needs review), never `absent` until resolved. Abilities: hr.attendance.view (read), hr.settings.manage (shifts, patterns, policies), hr.roster.manage, hr.attendance.cards, hr.attendance.correct, hr.attendance.lock.",
+                    "item": [
+                        {
+                            "name": "List shifts",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/shift-templates",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "shift-templates"
+                                    ]
+                                },
+                                "description": "All shift templates."
+                            }
+                        },
+                        {
+                            "name": "Create shift",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/shift-templates",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "shift-templates"
+                                    ]
+                                },
+                                "description": "planned_minutes = length less break.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"morning\",\n  \"name\": {\n    \"ar\": \"\u0635\u0628\u0627\u062d\u064a\",\n    \"en\": \"Morning\"\n  },\n  \"starts_at\": \"08:00\",\n  \"ends_at\": \"16:00\",\n  \"break_minutes\": 30\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update shift",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/shift-templates/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "shift-templates",
+                                        "1"
+                                    ]
+                                },
+                                "description": "Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"break_minutes\": 45\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete shift",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/shift-templates/1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "shift-templates",
+                                        "1"
+                                    ]
+                                },
+                                "description": "409 once planned or worked: deactivate instead."
+                            }
+                        },
+                        {
+                            "name": "List work patterns",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/work-patterns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "work-patterns"
+                                    ]
+                                },
+                                "description": "All patterns."
+                            }
+                        },
+                        {
+                            "name": "Create work pattern",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/work-patterns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "work-patterns"
+                                    ]
+                                },
+                                "description": "fixed: `weekly` maps ISO weekdays (1 = Monday) to a shift id or null (rest); a day left out is rest. flexible: weekly_hours. roster: days come from the roster only. Set on an employee's assignment as work_pattern_id (hire or assignment_change).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"sun-thu\",\n  \"name\": {\n    \"ar\": \"\u0627\u0644\u0623\u062d\u062f-\u0627\u0644\u062e\u0645\u064a\u0633\",\n    \"en\": \"Sun-Thu\"\n  },\n  \"kind\": \"fixed\",\n  \"weekly\": {\n    \"7\": 1,\n    \"1\": 1,\n    \"2\": 1,\n    \"3\": 1,\n    \"4\": 1\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List attendance policies",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-policies",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-policies"
+                                    ]
+                                },
+                                "description": "Effective-dated; package defaults apply when none is in force."
+                            }
+                        },
+                        {
+                            "name": "Create attendance policy",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-policies",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-policies"
+                                    ]
+                                },
+                                "description": "Grace for lateness / early leave, minimum overtime, whether overtime must be approved ahead, and how far an employee's own time may be from a card scan to be confirmed by it.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"effective_from\": \"2026-01-01\",\n  \"grace_minutes\": 10,\n  \"early_leave_grace_minutes\": 10,\n  \"min_overtime_minutes\": 30,\n  \"overtime_requires_pre_approval\": false,\n  \"entry_tolerance_minutes\": 15\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Roster grid",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/roster?from=2026-03-01&to=2026-03-07&org_unit_id=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "roster"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-07"
+                                        },
+                                        {
+                                            "key": "org_unit_id",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Each employee's plan per day (shift | flexible | unscheduled | rest | holiday | leave | not_employed) and whether a roster entry set it. At most 62 days."
+                            }
+                        },
+                        {
+                            "name": "Save roster",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/roster",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "roster"
+                                    ]
+                                },
+                                "description": "Sets days (null shift = rest) or removes an entry (remove: true) so the pattern applies again. A roster entry wins over the pattern and holidays. Refused in a locked month.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"entries\": [\n    {\n      \"employee_id\": 1,\n      \"work_date\": \"2026-03-06\",\n      \"shift_template_id\": 1\n    },\n    {\n      \"employee_id\": 1,\n      \"work_date\": \"2026-03-02\",\n      \"shift_template_id\": null\n    },\n    {\n      \"employee_id\": 2,\n      \"work_date\": \"2026-03-03\",\n      \"remove\": true\n    }\n  ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Copy a roster week",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/roster/copy-week",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "roster",
+                                        "copy-week"
+                                    ]
+                                },
+                                "description": "Copies the 7 days from `from` onto the 7 days from `to`, for org_unit_id or employee_ids.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"from\": \"2026-03-01\",\n  \"to\": \"2026-03-08\",\n  \"org_unit_id\": 1\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Card status",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/attendance-card",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "attendance-card"
+                                    ]
+                                },
+                                "description": "Whether the employee has a live card; never its value."
+                            }
+                        },
+                        {
+                            "name": "Issue card",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/attendance-card",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "attendance-card"
+                                    ]
+                                },
+                                "description": "Returns qr_value once (ADD: add-staff:v1:...): print it now. Issuing again replaces the card; the old one stops working."
+                            }
+                        },
+                        {
+                            "name": "Revoke card",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/attendance-card",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "attendance-card"
+                                    ]
+                                },
+                                "description": "The card stops working."
+                            }
+                        },
+                        {
+                            "name": "Employee punches",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/attendance-punches?from=2026-03-01&to=2026-03-07",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "attendance-punches"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-07"
+                                        }
+                                    ]
+                                },
+                                "description": "Raw punches between two local dates."
+                            }
+                        },
+                        {
+                            "name": "Add a punch (HR)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/employees/1/attendance-punches",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "employees",
+                                        "1",
+                                        "attendance-punches"
+                                    ]
+                                },
+                                "description": "Local Y-m-d H:i, with a reason (audited). The day is rebuilt; an exception it fixes goes away.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"punched_at\": \"2026-03-02 16:00\",\n  \"reason\": \"Card reader was down\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Attendance days",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-days?from=2026-03-01&to=2026-03-31&status=no_record",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-days"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "no_record"
+                                        }
+                                    ]
+                                },
+                                "description": "Computed days with their exceptions. Filters: employee_id, org_unit_id, status (present | incomplete | no_record | absent | excused | rest | holiday | leave | open). At most 62 days."
+                            }
+                        },
+                        {
+                            "name": "Attendance exceptions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-exceptions?from=2026-03-01&to=2026-03-31&status=open",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-exceptions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "open"
+                                        }
+                                    ]
+                                },
+                                "description": "missing_out | no_record | late | early_leave | unscheduled_work. Filters: status, type, employee_id, org_unit_id."
+                            }
+                        },
+                        {
+                            "name": "Resolve exception",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-exceptions/1/resolve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-exceptions",
+                                        "1",
+                                        "resolve"
+                                    ]
+                                },
+                                "description": "excused | absent | dismissed | corrected. On a missing record, absent / excused decide the day's status.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"resolution\": \"excused\",\n  \"note\": \"Approved remote day\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Rebuild attendance",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance/reprocess",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance",
+                                        "reprocess"
+                                    ]
+                                },
+                                "description": "Rebuilds days (e.g. after changing a shift). Locked months are skipped.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"from\": \"2026-03-01\",\n  \"to\": \"2026-03-31\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Time entries",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/attendance-entries?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "attendance-entries"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Employees' own times (verified | pending | approved | rejected | cancelled)."
+                            }
+                        },
+                        {
+                            "name": "Overtime requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/overtime-requests?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "overtime-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Decided through the approval engine (type `overtime`)."
+                            }
+                        },
+                        {
+                            "name": "Periods",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/time-periods",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "time-periods"
+                                    ]
+                                },
+                                "description": "Months with a state; a month with no row is open."
+                            }
+                        },
+                        {
+                            "name": "Lock month",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/time-periods/2026/3/lock",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "time-periods",
+                                        "2026",
+                                        "3",
+                                        "lock"
+                                    ]
+                                },
+                                "description": "Only after the month ends. Rebuilds it, then refuses while open exceptions or pending entries / overtime remain (they stay listed). A locked month refuses punches, roster changes, entries and overtime."
+                            }
+                        },
+                        {
+                            "name": "Unlock month",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/time-periods/2026/3/unlock",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "time-periods",
+                                        "2026",
+                                        "3",
+                                        "unlock"
+                                    ]
+                                },
+                                "description": "Audited."
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "description": "Self-service for any account with an active employee record \u2014 operations, sales, the caf\u00e9: no role or permission needed, and nothing but the caller's own data. 403 when the account has no employee record or is past its last working day.",
                     "item": [
@@ -31888,6 +33080,395 @@
                                     ]
                                 },
                                 "description": "My direct reports' pending and approved leave; private types show as plain leave, and no reasons."
+                            }
+                        },
+                        {
+                            "name": "My schedule",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/schedule?from=2026-03-01&to=2026-03-14",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "schedule"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-14"
+                                        }
+                                    ]
+                                },
+                                "description": "My plan per day, with shift times."
+                            }
+                        },
+                        {
+                            "name": "My attendance",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/attendance?from=2026-03-01&to=2026-03-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "attendance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-03-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-03-31"
+                                        }
+                                    ]
+                                },
+                                "description": "My computed days and their exceptions."
+                            }
+                        },
+                        {
+                            "name": "My time entries",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/attendance/entries",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "attendance",
+                                        "entries"
+                                    ]
+                                },
+                                "description": "Newest first."
+                            }
+                        },
+                        {
+                            "name": "Enter my times",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/attendance/entries",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "attendance",
+                                        "entries"
+                                    ]
+                                },
+                                "description": "Local H:i on a day up to today. When a card scan sits within the policy's tolerance of every time given, the entry is `verified` and nothing else happens. Otherwise it goes to my manager (`attendance_entry`); once approved, the times become punches.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"work_date\": \"2026-03-02\",\n  \"check_in\": \"08:00\",\n  \"check_out\": \"16:30\",\n  \"note\": \"Forgot my card in the evening\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel my entry",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/attendance/entries/1/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "attendance",
+                                        "entries",
+                                        "1",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Pending only."
+                            }
+                        },
+                        {
+                            "name": "My overtime",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/overtime",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "overtime"
+                                    ]
+                                },
+                                "description": "Newest first."
+                            }
+                        },
+                        {
+                            "name": "Request overtime",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/overtime",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "overtime"
+                                    ]
+                                },
+                                "description": "Today or later: `pre`. A past day: `post`, only when the policy allows it and up to the overtime attendance recorded that day.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"work_date\": \"2026-03-04\",\n  \"minutes\": 120,\n  \"reason\": \"Inventory count\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel my overtime",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/overtime/1/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "overtime",
+                                        "1",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Pending only."
+                            }
+                        },
+                        {
+                            "name": "My team today",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/me/team/attendance",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "me",
+                                        "team",
+                                        "attendance"
+                                    ]
+                                },
+                                "description": "My direct reports: plan, status, first in, last out, minutes late. Optional ?date=."
                             }
                         }
                     ]
