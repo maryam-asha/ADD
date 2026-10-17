@@ -1,6 +1,7 @@
 <?php
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Http\Controllers\Admin\AlertController;
 use Add\Hr\Core\Http\Controllers\Admin\ChecklistTaskController;
 use Add\Hr\Core\Http\Controllers\Admin\ChecklistTemplateController;
 use Add\Hr\Core\Http\Controllers\Admin\DocumentTypeController;
@@ -68,6 +69,9 @@ Route::middleware('can:'.Abilities::DOCUMENTS_MANAGE)->group(function () {
     Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
     Route::delete('documents/{document}', [EmployeeDocumentController::class, 'destroy'])->name('documents.destroy');
 });
+
+Route::get('alerts', [AlertController::class, 'index'])
+    ->middleware('can:'.Abilities::ALERTS_VIEW)->name('alerts.index');
 
 // Onboarding / offboarding
 Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
