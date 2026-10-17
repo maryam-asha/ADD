@@ -772,4 +772,12 @@ return [
             'with_name' => ':greeting, :name',
         ],
     ],
+
+    // HR (packages/add/hr) — ADD's account adapter (App\Domain\Hr\Adapters).
+    'hr' => [
+        'account_conflict' => 'The phone number and the work email belong to two different accounts (or to a deleted one).',
+        'work_email_required' => 'A new employee account needs a work email: it is how they sign in to the dashboard.',
+        'phone_required' => 'A new employee account needs a phone number.',
+        'phone_invalid' => 'The phone number must be in international format, e.g. +963944123456.',
+    ],
 ];

@@ -200,4 +200,12 @@ return [
         ],
     ],
 
+    // HR (packages/add/hr), sent through App\Domain\Hr\Adapters\AddHrNotifier.
+    'hr' => [
+        'alerts_digest' => [
+            'title' => 'HR alerts',
+            'body' => ':count HR alerts need attention (contracts, probations, documents).',
+        ],
+    ],
+
 ];

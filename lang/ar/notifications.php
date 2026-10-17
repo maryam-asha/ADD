@@ -200,4 +200,12 @@ return [
         ],
     ],
 
+    // الموارد البشرية (packages/add/hr)، عبر App\Domain\Hr\Adapters\AddHrNotifier.
+    'hr' => [
+        'alerts_digest' => [
+            'title' => 'تنبيهات الموارد البشرية',
+            'body' => ':count تنبيهات تحتاج متابعة (عقود، فترات تجربة، وثائق).',
+        ],
+    ],
+
 ];

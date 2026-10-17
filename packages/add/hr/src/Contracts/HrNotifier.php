@@ -10,7 +10,8 @@ namespace Add\Hr\Contracts;
 interface HrNotifier
 {
     /**
-     * Notify every account granted `$ability`.
+     * Notify every account granted `$ability`. Keys are the package's own
+     * (`alerts_digest`); a host usually namespaces them (ADD: `hr.alerts_digest`).
      *
      * @param  array<string, scalar>  $placeholders
      */
