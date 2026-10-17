@@ -25,4 +25,11 @@ return [
         'weekend_days' => [5, 6],
     ],
 
+    'attendance' => [
+        // Printed in staff cards' QR codes; scanned by reception kiosks
+        // (POST kiosk/attendance/punches). Other attendance settings keep
+        // the package's defaults.
+        'card_prefix' => 'add-staff:v1',
+    ],
+
 ];

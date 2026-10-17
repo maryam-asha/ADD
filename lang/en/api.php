@@ -780,5 +780,8 @@ return [
         'phone_required' => 'A new employee account needs a phone number.',
         'phone_invalid' => 'The phone number must be in international format, e.g. +963944123456.',
         'account_link_forbidden' => 'This account holds staff roles; only someone who may assign roles can link it to an employee.',
+        'kiosk_unauthorized' => 'This kiosk is not recognised. Pair it again from the dashboard.',
+        'kiosk_unknown_card' => 'This card is not a valid staff card.',
+        'kiosk_scan_out_of_window' => 'The scan time is too old or in the future; check the kiosk clock.',
     ],
 ];
