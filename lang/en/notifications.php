@@ -222,6 +222,10 @@ return [
             'title' => 'Request rejected',
             'body' => 'Your request has been rejected.',
         ],
+        'payslip_issued' => [
+            'title' => 'Your payslip is ready',
+            'body' => 'Your payslip for :month has been issued.',
+        ],
     ],
 
 ];

@@ -3,9 +3,11 @@
 namespace App\Providers;
 
 use Add\Hr\Contracts\AccountProvisioner;
+use Add\Hr\Contracts\ExchangeRateProvider;
 use Add\Hr\Contracts\HrClock;
 use Add\Hr\Contracts\HrNotifier;
 use App\Domain\Hr\Adapters\AddAccountProvisioner;
+use App\Domain\Hr\Adapters\AddExchangeRateProvider;
 use App\Domain\Hr\Adapters\AddHrClock;
 use App\Domain\Hr\Adapters\AddHrNotifier;
 use App\Domain\Hr\HrPermissionSource;
@@ -24,6 +26,7 @@ class HrIntegrationServiceProvider extends ServiceProvider
         $this->app->singleton(AccountProvisioner::class, AddAccountProvisioner::class);
         $this->app->singleton(HrNotifier::class, AddHrNotifier::class);
         $this->app->singleton(HrClock::class, AddHrClock::class);
+        $this->app->singleton(ExchangeRateProvider::class, AddExchangeRateProvider::class);
 
         $this->app->tag([HrPermissionSource::class], 'permissions.sources');
     }

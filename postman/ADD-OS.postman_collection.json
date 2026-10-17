@@ -32704,6 +32704,1494 @@
                     "description": "Cost centers (read: hr.timesheets.view; write: hr.settings.manage), employees' effective-dated cost splits (hr.timesheets.manage), weekly timesheets decided through the approval engine (type `timesheet`), and the time-by-cost-center report. A week is addressed by its first day (ADD: Sunday). Cost is distributed by approved timesheet hours, else by the planned split."
                 },
                 {
+                    "name": "Payroll",
+                    "item": [
+                        {
+                            "name": "Pay components",
+                            "item": [
+                                {
+                                    "name": "List calculators",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-calculators",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-calculators"
+                                            ]
+                                        },
+                                        "description": "Calculator keys: fixed, per_attendance_day, percent_of, rate_table, overtime, unpaid_days, loan_installment, plus the host's."
+                                    }
+                                },
+                                {
+                                    "name": "List pay components",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pay-components",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pay-components"
+                                            ]
+                                        },
+                                        "description": "In calculation order (`sort`)."
+                                    }
+                                },
+                                {
+                                    "name": "Create pay component",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pay-components",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pay-components"
+                                            ]
+                                        },
+                                        "description": "kind earning | deduction | employer_contribution | in_kind. applies_to_all: everyone (insurance, tax) vs only employees with pay on it (basic, allowances). `config` belongs to the calculator.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"income_tax\",\n  \"name\": {\n    \"ar\": \"\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u062f\u062e\u0644\",\n    \"en\": \"Income tax\"\n  },\n  \"kind\": \"deduction\",\n  \"calculator\": \"rate_table\",\n  \"config\": {\n    \"table\": \"income_tax\",\n    \"base\": \"taxable\",\n    \"less\": [\n      \"si_employee\"\n    ],\n    \"in_off_cycle\": true\n  },\n  \"applies_to_all\": true,\n  \"sort\": 60\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Update pay component",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pay-components/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pay-components",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Issued payslips keep the component as it was.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"is_active\": false\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Delete pay component",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/pay-components/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "pay-components",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "409 once pay or payslips use it."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Rate tables",
+                            "item": [
+                                {
+                                    "name": "List rate tables",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/rate-tables",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "rate-tables"
+                                            ]
+                                        },
+                                        "description": "Legal rates and scales with their versions \u2014 data, never code."
+                                    }
+                                },
+                                {
+                                    "name": "Create rate table",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/rate-tables",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "rate-tables"
+                                            ]
+                                        },
+                                        "description": "kind percent (one rate, optional ceiling) | brackets (progressive).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"income_tax\",\n  \"name\": {\n    \"ar\": \"\u0636\u0631\u064a\u0628\u0629 \u0627\u0644\u062f\u062e\u0644\",\n    \"en\": \"Income tax\"\n  },\n  \"kind\": \"brackets\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Add version",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/rate-tables/1/versions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "rate-tables",
+                                                "1",
+                                                "versions"
+                                            ]
+                                        },
+                                        "description": "From a date; versions never overlap. Brackets ascend, the last with up_to null; amounts in `currency` (default: the run's). Audited.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"effective_from\": \"2026-01-01\",\n  \"brackets\": [\n    {\n      \"up_to\": 100,\n      \"rate\": 0\n    },\n    {\n      \"up_to\": 500,\n      \"rate\": 5\n    },\n    {\n      \"up_to\": null,\n      \"rate\": 15\n    }\n  ],\n  \"currency\": \"USD\",\n  \"note\": \"Per decree ...\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Close version",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/rate-table-versions/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "rate-table-versions",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "A version is never rewritten: it is closed, and a new one added.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"effective_to\": \"2026-12-31\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Compensation",
+                            "item": [
+                                {
+                                    "name": "Employee pay history",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/1/compensation",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "1",
+                                                "compensation"
+                                            ]
+                                        },
+                                        "description": "Every pay line, oldest first."
+                                    }
+                                },
+                                {
+                                    "name": "Change pay",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/1/compensation",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "1",
+                                                "compensation"
+                                            ]
+                                        },
+                                        "description": "The employee's whole pay from a date: running lines close the day before, a compensation_change lands on the timeline. hr.compensation.manage.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"effective_from\": \"2026-05-01\",\n  \"reason\": \"annual_raise\",\n  \"lines\": [\n    {\n      \"pay_component_id\": 1,\n      \"amount\": 1400,\n      \"currency\": \"USD\"\n    },\n    {\n      \"pay_component_id\": 2,\n      \"amount\": 1000000,\n      \"currency\": \"SYP\"\n    }\n  ]\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Runs",
+                            "item": [
+                                {
+                                    "name": "List runs",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs?year=2026",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "year",
+                                                    "value": "2026"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: year, status."
+                                    }
+                                },
+                                {
+                                    "name": "Open run",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs"
+                                            ]
+                                        },
+                                        "description": "regular (needs the month's attendance locked when calculated) or off_cycle with employee_ids (made of adjustments). parallel_run must be reconciled before approval.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"year\": 2026,\n  \"month\": 3,\n  \"kind\": \"regular\",\n  \"currency\": \"USD\",\n  \"parallel_run\": false\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show run",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With totals (gross, deductions, net, employer cost, warnings)."
+                                    }
+                                },
+                                {
+                                    "name": "Add adjustment",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/adjustments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "adjustments"
+                                            ]
+                                        },
+                                        "description": "A one-off line (bonus, correction); sends the run back to open.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"employee_id\": 1,\n  \"pay_component_id\": 3,\n  \"amount\": 200,\n  \"currency\": \"USD\",\n  \"note\": \"Q1 bonus\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "List adjustments",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/adjustments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "adjustments"
+                                            ]
+                                        },
+                                        "description": "The run's adjustments."
+                                    }
+                                },
+                                {
+                                    "name": "Remove adjustment",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-adjustments/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-adjustments",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Before approval only."
+                                    }
+                                },
+                                {
+                                    "name": "Calculate",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/calculate",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "calculate"
+                                            ]
+                                        },
+                                        "description": "Recomputes every payslip; exchange rates are fixed on the run. hr.payroll.manage."
+                                    }
+                                },
+                                {
+                                    "name": "Payslips",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/payslips",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "payslips"
+                                            ]
+                                        },
+                                        "description": "Every slip of the run."
+                                    }
+                                },
+                                {
+                                    "name": "Payslip",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payslips/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payslips",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "One slip with its lines (snapshot)."
+                                    }
+                                },
+                                {
+                                    "name": "Variance",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/variance",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "variance"
+                                            ]
+                                        },
+                                        "description": "Against the last approved regular run: per employee net change, changed components, `flagged` beyond hr.payroll.variance_threshold_percent."
+                                    }
+                                },
+                                {
+                                    "name": "Review",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/review",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "review"
+                                            ]
+                                        },
+                                        "description": "calculated \u2192 reviewed."
+                                    }
+                                },
+                                {
+                                    "name": "Confirm parallel run",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/reconcile",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "reconcile"
+                                            ]
+                                        },
+                                        "description": "For a parallel run, before approval."
+                                    }
+                                },
+                                {
+                                    "name": "Approve",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/approve",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "approve"
+                                            ]
+                                        },
+                                        "description": "hr.payroll.approve. Never by who calculated the run, nor by anyone who changed an employee's pay for that month. Issues the payslips (employees notified), deducts loan installments; the run is frozen."
+                                    }
+                                },
+                                {
+                                    "name": "Mark paid",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "pay"
+                                            ]
+                                        },
+                                        "description": "hr.payroll.pay.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"payment_reference\": \"BANK-2026-03\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Journal",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/journal?format=csv",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "journal"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "format",
+                                                    "value": "csv"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Debits by cost center (approved timesheets, else the planned split), credits to payables and net pay. format=csv downloads it (audited)."
+                                    }
+                                },
+                                {
+                                    "name": "Mark posted",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1/post",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1",
+                                                "post"
+                                            ]
+                                        },
+                                        "description": "Once."
+                                    }
+                                },
+                                {
+                                    "name": "Cancel run",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/payroll-runs/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "payroll-runs",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Before approval only."
+                                    }
+                                }
+                            ],
+                            "description": "open \u2192 calculated \u2192 reviewed \u2192 approved \u2192 paid; posted once. Each step has its own permission."
+                        },
+                        {
+                            "name": "Loans",
+                            "item": [
+                                {
+                                    "name": "List loans",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/loans?status=active",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "loans"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "active"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, employee_id. hr.loans.manage."
+                                    }
+                                },
+                                {
+                                    "name": "Show loan",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/loans/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "loans",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With its schedule and what is outstanding."
+                                    }
+                                },
+                                {
+                                    "name": "Request a loan for an employee",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/1/loans",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "1",
+                                                "loans"
+                                            ]
+                                        },
+                                        "description": "Still goes through the approval flow (`loan`). Limits: hr.payroll.loans.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"amount\": 1000,\n  \"currency\": \"USD\",\n  \"installments\": 5,\n  \"first_month\": \"2026-05\",\n  \"reason\": \"Medical\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Settle loan",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/loans/1/settle",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "loans",
+                                                "1",
+                                                "settle"
+                                            ]
+                                        },
+                                        "description": "What is still due is settled outside payroll.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"note\": \"Repaid in cash\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "End of service",
+                            "item": [
+                                {
+                                    "name": "Employee entitlement",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/1/end-of-service?as_of=2026-12-31",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "1",
+                                                "end-of-service"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "as_of",
+                                                    "value": "2026-12-31"
+                                                }
+                                            ]
+                                        },
+                                        "description": "By the host's EndOfServiceCalculator (default: days per year of service \u00d7 daily basic)."
+                                    }
+                                },
+                                {
+                                    "name": "Liability report",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/reports/end-of-service-liability?as_of=2026-12-31",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "reports",
+                                                "end-of-service-liability"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "as_of",
+                                                    "value": "2026-12-31"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Everyone employed that day, with totals per currency."
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    "description": "Pay components and legal rate tables (data entered after legal review; ADD ships trial values in HrPayrollTrialSeeder), pay, runs, loans and end of service. Abilities: hr.payroll.view | manage | approve | pay, hr.compensation.manage, hr.loans.manage."
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
@@ -34287,6 +35775,289 @@
                                             ]
                                         },
                                         "description": "Back to draft while nobody has decided it."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Pay",
+                            "item": [
+                                {
+                                    "name": "My payslips",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/payslips",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "payslips"
+                                            ]
+                                        },
+                                        "description": "Only payslips of approved runs."
+                                    }
+                                },
+                                {
+                                    "name": "My payslip",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/payslips/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "payslips",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With its lines."
+                                    }
+                                },
+                                {
+                                    "name": "My loans",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/loans",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "loans"
+                                            ]
+                                        },
+                                        "description": "With schedules."
+                                    }
+                                },
+                                {
+                                    "name": "Request a loan",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/loans",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "loans"
+                                            ]
+                                        },
+                                        "description": "Into my approval flow.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"amount\": 600,\n  \"currency\": \"USD\",\n  \"installments\": 3,\n  \"reason\": \"Rent deposit\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Cancel my loan request",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/loans/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "loans",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Pending only."
+                                    }
+                                },
+                                {
+                                    "name": "Employment certificate",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/certificates/employment",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "certificates",
+                                                "employment"
+                                            ]
+                                        },
+                                        "description": "The facts a certificate states, for the client to lay out."
+                                    }
+                                },
+                                {
+                                    "name": "Salary certificate",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/certificates/salary",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "certificates",
+                                                "salary"
+                                            ]
+                                        },
+                                        "description": "Plus current monthly pay and the last issued net."
                                     }
                                 }
                             ]
