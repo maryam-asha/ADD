@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Tests;
 
+use Add\Hr\Hr;
 use Add\Hr\HrServiceProvider;
 use Add\Hr\Tests\Fixtures\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -28,6 +29,20 @@ abstract class TestCase extends Orchestra
     {
         $app['config']->set('hr.user_model', User::class);
         $app['config']->set('database.default', 'testing');
+    }
+
+    /**
+     * Mounted the way a host does it (ADD: routes/api.php): admin and
+     * self-service behind authentication, signed routes without it.
+     */
+    protected function defineRoutes($router): void
+    {
+        $router->middleware(['api', 'auth'])->prefix('api/hr')->group(function () use ($router) {
+            $router->middleware('hr.employee')->prefix('me')->group(fn () => Hr::selfServiceRoutes());
+            Hr::adminRoutes();
+        });
+
+        $router->middleware('api')->prefix('api/hr')->group(fn () => Hr::signedRoutes());
     }
 
     protected function defineDatabaseMigrations(): void
