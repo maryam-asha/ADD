@@ -238,6 +238,18 @@ return [
             'title' => 'لديك مقابلة توظيف',
             'body' => 'مقابلة مع :candidate على وظيفة :opening_ar في :at.',
         ],
+        'review_self_open' => [
+            'title' => 'بدأ تقييمك الذاتي',
+            'body' => 'قيّم نفسك على أهدافك وكفاءاتك في :cycle_ar.',
+        ],
+        'review_manager_open' => [
+            'title' => 'تقييمات بانتظارك',
+            'body' => 'قيّم الموظفين الذين تقيّمهم في :cycle_ar.',
+        ],
+        'review_finalized' => [
+            'title' => 'نتيجة تقييمك جاهزة',
+            'body' => 'صدرت نتيجة :cycle_ar.',
+        ],
     ],
 
 ];

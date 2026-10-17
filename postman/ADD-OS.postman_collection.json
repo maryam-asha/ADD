@@ -36788,6 +36788,880 @@
                     ]
                 },
                 {
+                    "name": "Performance",
+                    "description": "Review templates, cycles moved phase by phase, reviews with calibration, and goals. Abilities: hr.performance.view | manage. Recommendations (promotion, compensation change, improvement plan) are suggestions, never applied.",
+                    "item": [
+                        {
+                            "name": "Review templates",
+                            "item": [
+                                {
+                                    "name": "List templates",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-templates",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-templates"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Create template",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-templates",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-templates"
+                                            ]
+                                        },
+                                        "description": "Competencies with weights (default 1), ratings 1..scale_max (3-10), goals_weight = the share of the overall score from goals. Changes reach only cycles launched afterwards.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u0627\u0644\u062a\u0642\u064a\u064a\u0645 \u0627\u0644\u0633\u0646\u0648\u064a\",\n    \"en\": \"Annual review\"\n  },\n  \"scale_max\": 5,\n  \"goals_weight\": 40,\n  \"competencies\": [\n    {\n      \"code\": \"teamwork\",\n      \"name\": {\n        \"ar\": \"\u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u062c\u0645\u0627\u0639\u064a\",\n        \"en\": \"Teamwork\"\n      },\n      \"weight\": 2\n    },\n    {\n      \"code\": \"quality\",\n      \"name\": {\n        \"ar\": \"\u062c\u0648\u062f\u0629 \u0627\u0644\u0639\u0645\u0644\",\n        \"en\": \"Quality of work\"\n      },\n      \"weight\": 1\n    }\n  ]\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show template",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-templates/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-templates",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Update template",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-templates/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-templates",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"goals_weight\": 50,\n  \"is_active\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Review cycles",
+                            "item": [
+                                {
+                                    "name": "List cycles",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles?status=self_review",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "self_review"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filter: status."
+                                    }
+                                },
+                                {
+                                    "name": "Create cycle",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles"
+                                            ]
+                                        },
+                                        "description": "Draft. org_unit_id limits it to that unit and its sub-units; null = everyone.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u062a\u0642\u064a\u064a\u0645 2026\",\n    \"en\": \"2026 review\"\n  },\n  \"review_template_id\": 1,\n  \"period_start\": \"2026-01-01\",\n  \"period_end\": \"2026-12-31\",\n  \"org_unit_id\": null,\n  \"goals_due_on\": \"2026-12-10\",\n  \"self_due_on\": \"2026-12-20\",\n  \"manager_due_on\": \"2026-12-31\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show cycle",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With reviews_by_status."
+                                    }
+                                },
+                                {
+                                    "name": "Update cycle",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Draft cycles only.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"self_due_on\": \"2026-12-22\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Launch cycle",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1/launch",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1",
+                                                "launch"
+                                            ]
+                                        },
+                                        "description": "Copies the template into the cycle and opens one review per employee employed today in scope, reviewed by their current manager. Goal setting opens."
+                                    }
+                                },
+                                {
+                                    "name": "Advance cycle",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1/advance",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1",
+                                                "advance"
+                                            ]
+                                        },
+                                        "description": "goal_setting -> self_review (employees notified) -> manager_review (reviewers notified) -> calibration -> closed (every review finalized; employees notified)."
+                                    }
+                                },
+                                {
+                                    "name": "Cycle reviews",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1/reviews?status=manager_submitted",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1",
+                                                "reviews"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "manager_submitted"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, reviewer_id."
+                                    }
+                                },
+                                {
+                                    "name": "Add employee to cycle",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/review-cycles/1/reviews",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "review-cycles",
+                                                "1",
+                                                "reviews"
+                                            ]
+                                        },
+                                        "description": "Someone the launch did not include.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"employee_id\": 12\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Reviews",
+                            "item": [
+                                {
+                                    "name": "Show review",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/reviews/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "reviews",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Everything: self and manager ratings per item, scores, recommendation, calibration."
+                                    }
+                                },
+                                {
+                                    "name": "Change reviewer",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/reviews/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "reviews",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Until the reviewer has rated it.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"reviewer_id\": 4\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Calibrate review",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/reviews/1/calibrate",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "reviews",
+                                                "1",
+                                                "calibrate"
+                                            ]
+                                        },
+                                        "description": "During calibration, on a rated review. The final rating is the calibrated score (else the overall) rounded.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"score\": 4.4,\n  \"note\": \"Consistent with the unit.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Goals",
+                            "item": [
+                                {
+                                    "name": "List goals",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/goals?review_cycle_id=1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "goals"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "review_cycle_id",
+                                                    "value": "1"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: employee_id, review_cycle_id, status."
+                                    }
+                                },
+                                {
+                                    "name": "Set goal",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/12/goals",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "12",
+                                                "goals"
+                                            ]
+                                        },
+                                        "description": "Weights of an employee's goals in a cycle total 100 at most. Title and weight are fixed once the cycle leaves goal setting.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"review_cycle_id\": 1,\n  \"title\": \"Cut coffee waste by 15%\",\n  \"metric\": \"kg wasted per week\",\n  \"target\": \"under 4 kg\",\n  \"weight\": 60,\n  \"due_on\": \"2026-12-31\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Update goal",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/goals/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "goals",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Progress and status move until the cycle closes.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"progress\": 80,\n  \"status\": \"active\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Delete goal",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/goals/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "goals",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "While its cycle is in goal setting. 204."
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
@@ -39000,6 +39874,412 @@
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n  \"recommendation\": \"yes\",\n  \"ratings\": {\n    \"communication\": 4,\n    \"skills\": 5\n  },\n  \"notes\": \"Strong practical test.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Performance",
+                            "item": [
+                                {
+                                    "name": "My goals",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/goals?review_cycle_id=1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "goals"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "review_cycle_id",
+                                                    "value": "1"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Mine, or a direct report's with employee_id."
+                                    }
+                                },
+                                {
+                                    "name": "Set goal",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/goals",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "goals"
+                                            ]
+                                        },
+                                        "description": "For myself, or a direct report (employee_id).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"employee_id\": 12,\n  \"review_cycle_id\": 1,\n  \"title\": \"Train two new baristas\",\n  \"weight\": 40\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Update goal",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/goals/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "goals",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"progress\": 50\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "My reviews",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/reviews",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "reviews"
+                                            ]
+                                        },
+                                        "description": "The reviewer's ratings and my result appear once the cycle closes."
+                                    }
+                                },
+                                {
+                                    "name": "My review",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/reviews/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "reviews",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "With every item."
+                                    }
+                                },
+                                {
+                                    "name": "Submit self review",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/reviews/1/self",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "reviews",
+                                                "1",
+                                                "self"
+                                            ]
+                                        },
+                                        "description": "Once, during self review. Rate any items (1..scale_max).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"answers\": [\n    {\n      \"kind\": \"competency\",\n      \"key\": \"teamwork\",\n      \"rating\": 4,\n      \"comment\": \"Covers shifts without being asked.\"\n    },\n    {\n      \"kind\": \"competency\",\n      \"key\": \"quality\",\n      \"rating\": 3\n    },\n    {\n      \"kind\": \"goal\",\n      \"key\": \"1\",\n      \"rating\": 4\n    }\n  ],\n  \"comment\": \"A good year; I want to lead a shift.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Reviews I conduct",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/team-reviews",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "team-reviews"
+                                            ]
+                                        },
+                                        "description": "Filter: review_cycle_id."
+                                    }
+                                },
+                                {
+                                    "name": "Review I conduct",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/team-reviews/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "team-reviews",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "The self review shows once submitted."
+                                    }
+                                },
+                                {
+                                    "name": "Submit review",
+                                    "request": {
+                                        "method": "PUT",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/team-reviews/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "team-reviews",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "The reviewer only, during manager review: every competency and goal rated. recommendation none | promotion | compensation_change | improvement_plan. Computes the scores.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"answers\": [\n    {\n      \"kind\": \"competency\",\n      \"key\": \"teamwork\",\n      \"rating\": 4,\n      \"comment\": \"Covers shifts without being asked.\"\n    },\n    {\n      \"kind\": \"competency\",\n      \"key\": \"quality\",\n      \"rating\": 3\n    },\n    {\n      \"kind\": \"goal\",\n      \"key\": \"1\",\n      \"rating\": 4\n    },\n    {\n      \"kind\": \"goal\",\n      \"key\": \"2\",\n      \"rating\": 2\n    }\n  ],\n  \"comment\": \"Ready for more responsibility.\",\n  \"recommendation\": \"promotion\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"

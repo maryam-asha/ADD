@@ -238,6 +238,18 @@ return [
             'title' => 'You have an interview to conduct',
             'body' => 'Interview with :candidate for :opening_en on :at.',
         ],
+        'review_self_open' => [
+            'title' => 'Your self review is open',
+            'body' => 'Rate yourself on your goals and competencies for :cycle_en.',
+        ],
+        'review_manager_open' => [
+            'title' => 'Reviews are waiting for you',
+            'body' => 'Rate the employees you review in :cycle_en.',
+        ],
+        'review_finalized' => [
+            'title' => 'Your review is ready',
+            'body' => 'The result of :cycle_en is available.',
+        ],
     ],
 
 ];
