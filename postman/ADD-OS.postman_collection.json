@@ -38680,6 +38680,239 @@
                     ]
                 },
                 {
+                    "name": "Reports",
+                    "description": "The combined HR reports and dashboard. Ability: hr.reports.view; money also needs hr.payroll.view. Every CSV export is audited.",
+                    "item": [
+                        {
+                            "name": "Dashboard",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/dashboard?as_of=2026-11-01",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "dashboard"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "as_of",
+                                            "value": "2026-11-01"
+                                        }
+                                    ]
+                                },
+                                "description": "Headcount, alerts, and a section per enabled module (approvals, leave, attendance, timesheets, recruitment, performance, training). payroll appears only with hr.payroll.view."
+                            }
+                        },
+                        {
+                            "name": "Headcount and turnover",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/headcount?from=2026-01-01&to=2026-10-31&format=json",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "headcount"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-01-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-10-31"
+                                        },
+                                        {
+                                            "key": "format",
+                                            "value": "json"
+                                        }
+                                    ]
+                                },
+                                "description": "Per month: opening, hires, leavers (by last working day), closing, turnover % = leavers / mean headcount. by_unit at `to`. Up to 36 months. format=csv downloads the months."
+                            }
+                        },
+                        {
+                            "name": "Attendance exceptions",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/attendance-exceptions?from=2026-10-01&to=2026-10-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "attendance-exceptions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "from",
+                                            "value": "2026-10-01"
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": "2026-10-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Per employee and type, total and still open; totals by type. format=csv downloads the rows."
+                            }
+                        },
+                        {
+                            "name": "Timesheet compliance",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/timesheet-compliance?week_start=2026-10-25",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "timesheet-compliance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "week_start",
+                                            "value": "2026-10-25"
+                                        }
+                                    ]
+                                },
+                                "description": "Every employee employed in the week with their timesheet status, or missing. format=csv downloads the rows."
+                            }
+                        },
+                        {
+                            "name": "Liabilities",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/hr/reports/liabilities?as_of=2026-10-31",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "hr",
+                                        "reports",
+                                        "liabilities"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "as_of",
+                                            "value": "2026-10-31"
+                                        }
+                                    ]
+                                },
+                                "description": "Leave days owed per employee and type; outstanding loan installments per employee and currency with hr.payroll.view (else loans: null). End of service: reports/end-of-service-liability."
+                            }
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
