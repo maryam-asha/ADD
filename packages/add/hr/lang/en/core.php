@@ -20,4 +20,15 @@ return [
     'position_unit_mismatch' => 'The position does not belong to the chosen unit.',
     'manager_cycle' => 'An employee cannot report to themselves or to someone who reports to them.',
     'manager_not_employed' => 'The manager is not employed on that date.',
+
+    // Employment events
+    'not_employed_on_date' => 'The employee is not employed on that date.',
+    'not_on_probation' => 'This employee is not on probation.',
+    'event_date_invalid' => 'That date does not fit the employee\'s current assignment or contract.',
+    'event_changes_nothing' => 'This event does not change what its type requires (grade or position for a promotion, unit for a transfer).',
+    'contract_overlap' => 'A new contract can only start after the current one has ended.',
+    'already_suspended' => 'The employee is already suspended on that date.',
+    'not_suspended' => 'The employee is not suspended on that date.',
+    'already_terminated' => 'A termination is already recorded for this employee.',
+    'rehire_not_allowed' => 'Only a former employee can be rehired, after their last working day.',
 ];

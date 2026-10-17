@@ -7,6 +7,7 @@ use Add\Hr\Contracts\AccountProvisioner;
 use Add\Hr\Core\Enums\EmployeeStatus;
 use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Events\EmployeeHired;
+use Add\Hr\Core\Events\EmployeeTerminated;
 use Add\Hr\Core\Models\Assignment;
 use Add\Hr\Core\Models\Contract;
 use Add\Hr\Core\Models\Employee;
@@ -85,12 +86,295 @@ class EmploymentLifecycleService
     }
 
     /**
+     * Any event after the hire. The employee row is locked for the whole
+     * change, so two concurrent events cannot both pass the same check.
+     *
+     * @param  array<string, mixed>  $data  the RecordEmploymentEventRequest shape
+     */
+    public function record(Employee $employee, EmploymentEventType $type, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        return DB::transaction(function () use ($employee, $type, $data, $actorId) {
+            $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
+            $on = CarbonImmutable::parse($data['effective_on']);
+
+            if ($type === EmploymentEventType::Termination && $employee->terminated_on !== null) {
+                HrException::fail('hr::core.already_terminated');
+            }
+
+            if ($type !== EmploymentEventType::Rehire && ! $employee->isEmployedOn($on)) {
+                HrException::fail('hr::core.not_employed_on_date');
+            }
+
+            $event = match ($type) {
+                EmploymentEventType::Confirmation => $this->confirm($employee, $on, $data, $actorId),
+                EmploymentEventType::Promotion,
+                EmploymentEventType::Transfer,
+                EmploymentEventType::AssignmentChange => $this->changeAssignment($employee, $type, $on, $data, $actorId),
+                EmploymentEventType::ContractRenewal => $this->renewContract($employee, $on, $data, $actorId),
+                EmploymentEventType::Suspension => $this->suspend($employee, $on, $data, $actorId),
+                EmploymentEventType::Reinstatement => $this->reinstate($employee, $on, $data, $actorId),
+                EmploymentEventType::Termination => $this->terminate($employee, $on, $data, $actorId),
+                EmploymentEventType::Rehire => $this->rehire($employee, $on, $data, $actorId),
+                EmploymentEventType::Hire => HrException::fail('hr::core.event_date_invalid'),
+            };
+
+            $this->refreshStatus($employee);
+            HrAudit::record('employment_event_recorded', $employee, ['event_id' => $event->id, 'type' => $type->value]);
+
+            return $event;
+        });
+    }
+
+    /**
+     * Tell the host the employment is over, exactly once. Runs for a
+     * termination dated in the past and, for a future one, from
+     * hr:refresh-statuses the day after the last working day.
+     */
+    public function revokeAccess(Employee $employee): void
+    {
+        DB::transaction(function () use ($employee) {
+            $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
+
+            if ($employee->access_revoked_at !== null || $employee->isEmployedOn(CarbonImmutable::today())) {
+                return;
+            }
+
+            $this->accounts->deprovision($employee);
+
+            $employee->access_revoked_at = now();
+            $employee->save();
+
+            HrAudit::record('access_revoked', $employee);
+        });
+    }
+
+    /**
      * Recompute and store the cached status for today.
      */
     public function refreshStatus(Employee $employee): void
     {
         $employee->status = $this->statuses->resolve($employee, CarbonImmutable::today());
         $employee->save();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function confirm(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        if ($employee->probation_ends_on === null || $employee->confirmed_on !== null) {
+            HrException::fail('hr::core.not_on_probation');
+        }
+
+        $employee->confirmed_on = $on;
+
+        return $this->recordEvent($employee, EmploymentEventType::Confirmation, $on, $actorId, notes: $data['notes'] ?? null);
+    }
+
+    /**
+     * Close the assignment running that day and open a new one from it,
+     * copying every field the event does not change. Moving to another unit
+     * drops a position that belonged to the old one unless a new one is sent.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function changeAssignment(Employee $employee, EmploymentEventType $type, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        $current = $employee->currentAssignment($on);
+        $later = $employee->assignments()->where('effective_from', '>', $on->toDateString())->exists();
+
+        if ($current === null || $later || $on->toDateString() <= $current->effective_from->toDateString()) {
+            HrException::fail('hr::core.event_date_invalid');
+        }
+
+        $before = Arr::only($current->getAttributes(), self::ASSIGNMENT_FIELDS);
+        $before['job_title'] = $current->job_title;
+        $changes = Arr::only($data['assignment'] ?? [], self::ASSIGNMENT_FIELDS);
+
+        if (array_key_exists('org_unit_id', $changes)
+            && (int) $changes['org_unit_id'] !== (int) $before['org_unit_id']
+            && ! array_key_exists('position_id', $changes)) {
+            $changes['position_id'] = null;
+        }
+
+        $after = array_replace($before, $changes);
+        $changed = array_keys(array_filter($after, fn ($value, $key) => $value != $before[$key], ARRAY_FILTER_USE_BOTH));
+
+        $required = match ($type) {
+            EmploymentEventType::Promotion => ['job_grade_id', 'position_id'],
+            EmploymentEventType::Transfer => ['org_unit_id'],
+            default => self::ASSIGNMENT_FIELDS,
+        };
+
+        if (array_intersect($changed, $required) === []) {
+            HrException::fail('hr::core.event_changes_nothing');
+        }
+
+        $this->assertAssignable($after, $on, $employee);
+
+        $current->effective_to = $on->subDay();
+        $current->save();
+
+        $event = $this->recordEvent($employee, $type, $on, $actorId,
+            payload: ['before' => Arr::only($before, $changed), 'after' => Arr::only($after, $changed)],
+            reason: $data['reason'] ?? null,
+            notes: $data['notes'] ?? null,
+        );
+
+        $this->openAssignment($employee, $after, $on, $event);
+
+        return $event;
+    }
+
+    /**
+     * A new contract starting after the last one has ended. An open-ended
+     * contract never ends, so it is never renewed.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function renewContract(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        $last = $employee->contracts()->latest('starts_on')->first();
+
+        if ($last !== null && ($last->ends_on === null || $on->toDateString() <= $last->ends_on->toDateString())) {
+            HrException::fail('hr::core.contract_overlap');
+        }
+
+        $event = $this->recordEvent($employee, EmploymentEventType::ContractRenewal, $on, $actorId, notes: $data['notes'] ?? null);
+        $this->openContract($employee, $data['contract'], $on, $event);
+
+        return $event;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function suspend(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        if ($this->openSuspension($employee, $on) !== null) {
+            HrException::fail('hr::core.already_suspended');
+        }
+
+        return $this->recordEvent($employee, EmploymentEventType::Suspension, $on, $actorId,
+            reason: $data['reason'] ?? null,
+            notes: $data['notes'] ?? null,
+            to: isset($data['effective_to']) ? CarbonImmutable::parse($data['effective_to']) : null,
+        );
+    }
+
+    /**
+     * Ends the suspension running that day: it covers up to the day before.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function reinstate(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        $suspension = $this->openSuspension($employee, $on);
+
+        if ($suspension === null) {
+            HrException::fail('hr::core.not_suspended');
+        }
+
+        if ($on->toDateString() <= $suspension->effective_on->toDateString()) {
+            HrException::fail('hr::core.event_date_invalid');
+        }
+
+        $suspension->effective_to = $on->subDay();
+        $suspension->save();
+
+        return $this->recordEvent($employee, EmploymentEventType::Reinstatement, $on, $actorId, notes: $data['notes'] ?? null);
+    }
+
+    /**
+     * `effective_on` is the last working day. The assignment and contract end
+     * that day; access is revoked once it has passed.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function terminate(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        $day = $on->toDateString();
+
+        if ($employee->assignments()->where('effective_from', '>', $day)->exists()
+            || $employee->contracts()->where('starts_on', '>', $day)->exists()) {
+            HrException::fail('hr::core.event_date_invalid');
+        }
+
+        $employee->terminated_on = $on;
+        $employee->termination_reason = $data['reason'];
+
+        $employee->assignments()
+            ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>', $day))
+            ->update(['effective_to' => $day]);
+        $employee->contracts()
+            ->where(fn ($q) => $q->whereNull('ends_on')->orWhere('ends_on', '>', $day))
+            ->update(['ends_on' => $day]);
+
+        $event = $this->recordEvent($employee, EmploymentEventType::Termination, $on, $actorId,
+            reason: $data['reason'],
+            notes: $data['notes'] ?? null,
+        );
+
+        $employee->save();
+        EmployeeTerminated::dispatch($employee, $event);
+
+        if ($day < CarbonImmutable::today()->toDateString()) {
+            $this->accounts->deprovision($employee);
+            $employee->access_revoked_at = now();
+            HrAudit::record('access_revoked', $employee);
+        }
+
+        return $event;
+    }
+
+    /**
+     * A former employee comes back on the same record: a new employment
+     * period with its own contract and assignment.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    private function rehire(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
+    {
+        if ($employee->terminated_on === null || $on->toDateString() <= $employee->terminated_on->toDateString()) {
+            HrException::fail('hr::core.rehire_not_allowed');
+        }
+
+        $assignment = Arr::only($data['assignment'], self::ASSIGNMENT_FIELDS);
+        $this->assertAssignable($assignment, $on, $employee);
+
+        $employee->forceFill([
+            'hired_on' => $on,
+            'terminated_on' => null,
+            'termination_reason' => null,
+            'access_revoked_at' => null,
+            'confirmed_on' => null,
+            'probation_ends_on' => $data['contract']['probation_ends_on'] ?? null,
+        ]);
+
+        if ($employee->user_id === null) {
+            $this->linkAccount($employee, null);
+        }
+
+        $event = $this->recordEvent($employee, EmploymentEventType::Rehire, $on, $actorId, notes: $data['notes'] ?? null);
+        $this->openContract($employee, $data['contract'], $on, $event);
+        $this->openAssignment($employee, $assignment, $on, $event);
+
+        $employee->save();
+        EmployeeHired::dispatch($employee, $event);
+
+        return $event;
+    }
+
+    private function openSuspension(Employee $employee, CarbonImmutable $on): ?EmploymentEvent
+    {
+        $day = $on->toDateString();
+
+        return $employee->events()
+            ->where('type', EmploymentEventType::Suspension->value)
+            ->where('effective_on', '<=', $day)
+            ->where(fn ($q) => $q->whereNull('effective_to')->orWhere('effective_to', '>=', $day))
+            ->latest('effective_on')
+            ->first();
     }
 
     /**

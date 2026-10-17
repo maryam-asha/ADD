@@ -3,6 +3,7 @@
 namespace Add\Hr;
 
 use Add\Hr\Contracts\AccountProvisioner;
+use Add\Hr\Core\Console\RefreshStatuses;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
 use Add\Hr\Integrations\NullAccountProvisioner;
 use Illuminate\Routing\Router;
@@ -25,6 +26,12 @@ class HrServiceProvider extends ServiceProvider
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'hr');
 
         $this->app->make(Router::class)->aliasMiddleware('hr.employee', EnsureActiveEmployee::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                RefreshStatuses::class,
+            ]);
+        }
 
         $this->publishes([__DIR__.'/../config/hr.php' => config_path('hr.php')], 'hr-config');
     }
