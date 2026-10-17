@@ -9,10 +9,15 @@ use App\Domain\Identity\Models\User;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Contracts\Auth\PasswordBroker;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Password;
 use Laravel\Sanctum\Sanctum;
+use Mockery;
+use RuntimeException;
+use Spatie\Permission\Models\Role;
 use Tests\Feature\Hr\Concerns\HiresAddEmployees;
 use Tests\TestCase;
 
@@ -113,6 +118,61 @@ class AddAccountProvisionerTest extends TestCase
             ->assertJsonPath('message', __('api.hr.account_conflict'));
 
         $this->assertDatabaseCount('hr_employees', 0);
+    }
+
+    public function test_hr_manager_cannot_link_a_staff_account_but_admin_can(): void
+    {
+        Role::create(['name' => 'hr_manager', 'guard_name' => 'web'])->givePermissionTo(['hr.employees.create', 'hr.lifecycle.manage']);
+        $hrManager = User::factory()->create();
+        $hrManager->assignRole('hr_manager');
+        $administrator = User::factory()->create(['phone' => '+963944000777']);
+        $administrator->assignRole('admin');
+        Sanctum::actingAs($hrManager, ['*']);
+
+        // Linking gives HR the power to strip the account's roles at termination.
+        $this->postJson('/api/v1/hr/employees', $this->hirePayload(['user_id' => $administrator->id]))
+            ->assertForbidden()
+            ->assertJsonPath('message', __('api.hr.account_link_forbidden'));
+        $this->postJson('/api/v1/hr/employees', $this->hirePayload(['phone' => '+963944000777']))
+            ->assertForbidden();
+        $this->assertDatabaseCount('hr_employees', 0);
+
+        // A member's account carries no staff role: HR may link it.
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        $this->postJson('/api/v1/hr/employees', $this->hirePayload(['user_id' => $member->id]))->assertCreated();
+
+        // Someone who may assign roles may link a staff account.
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+        $this->postJson('/api/v1/hr/employees', $this->hirePayload(['user_id' => $administrator->id]))->assertCreated();
+    }
+
+    public function test_termination_never_strips_admin_or_provider(): void
+    {
+        $user = User::factory()->create();
+        $user->assignRole(['admin', 'operations', 'member']);
+        $employee = $this->hireFor($user, ['hired_on' => now()->subYear()->toDateString()]);
+
+        app(EmploymentLifecycleService::class)->record($employee, EmploymentEventType::Termination, [
+            'effective_on' => now()->subDay()->toDateString(),
+            'reason' => 'retirement',
+        ], null);
+
+        $this->assertEqualsCanonicalizing(['admin', 'member'], $user->fresh()->getRoleNames()->all());
+    }
+
+    public function test_a_failing_reset_link_does_not_fail_the_saved_hire(): void
+    {
+        $broker = Mockery::mock(PasswordBroker::class);
+        $broker->shouldReceive('sendResetLink')->andThrow(new RuntimeException('smtp down'));
+        Password::shouldReceive('broker')->andReturn($broker);
+
+        $this->postJson('/api/v1/hr/employees', $this->hirePayload(['phone' => '+963933000123', 'work_email' => 'nomail@add.sy']))
+            ->assertCreated();
+
+        $this->assertDatabaseHas('users', ['email' => 'nomail@add.sy']);
     }
 
     public function test_termination_strips_staff_roles_keeps_member_and_ends_sessions(): void

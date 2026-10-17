@@ -124,6 +124,21 @@ class LifecycleEventsTest extends TestCase
             ->assertJsonPath('message', __('hr::core.manager_cycle'));
     }
 
+    public function test_manager_cycle_is_checked_on_later_dated_changes_too(): void
+    {
+        $manager = $this->hireEmployee();
+        $report = $this->hireEmployee();
+
+        // From day +20 the manager will report to the report...
+        $this->record($manager->id, ['type' => 'assignment_change', 'effective_on' => now()->addDays(20)->toDateString(), 'assignment' => ['manager_id' => $report->id]])
+            ->assertCreated();
+
+        // ...so the report may not report to the manager from day +5 on.
+        $this->record($report->id, ['type' => 'assignment_change', 'effective_on' => now()->addDays(5)->toDateString(), 'assignment' => ['manager_id' => $manager->id]])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('hr::core.manager_cycle'));
+    }
+
     public function test_transfer_into_full_position_is_rejected(): void
     {
         $position = Position::factory()->create(['headcount' => 1]);

@@ -10,6 +10,8 @@ use Add\Hr\Core\Models\Employee;
  */
 class NullAccountProvisioner implements AccountProvisioner
 {
+    public function authorizeLink(int|string $userId): void {}
+
     public function provision(Employee $employee): int|string|null
     {
         return null;

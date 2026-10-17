@@ -9,6 +9,7 @@ use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Fixtures\RecordingProvisioner;
 use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
 
@@ -28,6 +29,8 @@ class HireEmployeeTest extends TestCase
         {
             public function __construct(private readonly int|string|null $userId) {}
 
+            public function authorizeLink(int|string $userId): void {}
+
             public function provision(Employee $employee): int|string|null
             {
                 return $this->userId;
@@ -35,6 +38,16 @@ class HireEmployeeTest extends TestCase
 
             public function deprovision(Employee $employee): void {}
         });
+    }
+
+    public function test_an_explicit_user_is_checked_by_the_host_before_linking(): void
+    {
+        $user = User::query()->create(['name' => 'Admin', 'email' => 'admin@example.test']);
+        $this->app->instance(AccountProvisioner::class, new RecordingProvisioner(refuseLinks: true));
+
+        $this->postJson('/api/hr/employees', $this->hirePayload(['user_id' => $user->id]))->assertForbidden();
+
+        $this->assertDatabaseCount('hr_employees', 0);
     }
 
     public function test_hire_creates_employee_contract_assignment_and_hire_event(): void

@@ -73,6 +73,33 @@ class PositionTest extends TestCase
             ->assertJsonPath('message', __('hr::core.position_in_use'));
     }
 
+    public function test_position_shows_occupied_seats(): void
+    {
+        $position = Position::factory()->create(['headcount' => 3]);
+        $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+
+        $this->getJson("/api/hr/positions/{$position->id}")->assertOk()->assertJsonPath('data.occupied', 1);
+        $this->getJson("/api/hr/positions?org_unit_id={$position->org_unit_id}")->assertOk()->assertJsonPath('data.0.occupied', 1);
+        $this->assertSame(1, $position->occupiedCount());
+    }
+
+    public function test_a_held_position_cannot_move_to_another_unit_or_shrink_below_its_holders(): void
+    {
+        $position = Position::factory()->create(['headcount' => 2]);
+        $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+        $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+
+        $this->patchJson("/api/hr/positions/{$position->id}", ['org_unit_id' => OrgUnit::factory()->create()->id])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('hr::core.position_held'));
+
+        $this->patchJson("/api/hr/positions/{$position->id}", ['headcount' => 1])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('hr::core.headcount_below_occupancy', ['count' => 2]));
+
+        $this->patchJson("/api/hr/positions/{$position->id}", ['headcount' => 2, 'org_unit_id' => $position->org_unit_id])->assertOk();
+    }
+
     public function test_headcount_must_be_positive(): void
     {
         $position = Position::factory()->create();

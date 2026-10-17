@@ -23,6 +23,8 @@ class PositionResource extends JsonResource
             'code' => $this->code,
             'title' => $this->title,
             'headcount' => $this->headcount,
+            // Lists load it with withCount; single reads count it here.
+            'occupied' => (int) ($this->resource->getAttribute('occupied') ?? $this->occupiedCount()),
             'is_active' => $this->is_active,
         ];
     }

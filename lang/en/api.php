@@ -779,5 +779,6 @@ return [
         'work_email_required' => 'A new employee account needs a work email: it is how they sign in to the dashboard.',
         'phone_required' => 'A new employee account needs a phone number.',
         'phone_invalid' => 'The phone number must be in international format, e.g. +963944123456.',
+        'account_link_forbidden' => 'This account holds staff roles; only someone who may assign roles can link it to an employee.',
     ],
 ];

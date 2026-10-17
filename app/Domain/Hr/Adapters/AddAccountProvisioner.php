@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Throwable;
 
 /**
  * Every ADD employee is an ADD ID (config hr.require_user).
@@ -26,6 +27,29 @@ use Illuminate\Support\Str;
  */
 class AddAccountProvisioner implements AccountProvisioner
 {
+    /**
+     * Roles an employment ending never takes away: `member` is the person's
+     * own, and removing an administrator or a provider account is an
+     * admin's deliberate act, never a side effect of an HR record.
+     */
+    private const KEPT_ROLES = ['member', 'admin', 'provider'];
+
+    /**
+     * Linking hands HR the power to strip the account's roles when the
+     * employment ends. So an account holding any staff role may be linked
+     * only by someone who could change its roles anyway (users.assign_role);
+     * a plain member account may be linked by anyone hiring. System
+     * contexts (console, seeders) have no actor and are trusted.
+     */
+    public function authorizeLink(int|string $userId): void
+    {
+        $user = User::withTrashed()->find($userId);
+
+        if ($user !== null) {
+            $this->assertActorMayLink($user);
+        }
+    }
+
     public function provision(Employee $employee): int|string|null
     {
         $byPhone = $employee->phone ? User::withTrashed()->where('phone', $employee->phone)->first() : null;
@@ -43,6 +67,8 @@ class AddAccountProvisioner implements AccountProvisioner
             if ($existing->trashed()) {
                 HrException::fail('api.hr.account_conflict');
             }
+
+            $this->assertActorMayLink($existing);
 
             return $existing->id;
         }
@@ -74,7 +100,16 @@ class AddAccountProvisioner implements AccountProvisioner
             ->withProperties(['employee_id' => $employee->id])
             ->log('hr_account_created');
 
-        DB::afterCommit(fn () => Password::broker()->sendResetLink(['email' => $user->email]));
+        // After commit, and never fatal: the hire is saved by then, and a
+        // mail failure must not answer 500 for it. HR can resend from the
+        // dashboard's forgot-password flow.
+        DB::afterCommit(function () use ($user) {
+            try {
+                Password::broker()->sendResetLink(['email' => $user->email]);
+            } catch (Throwable $e) {
+                report($e);
+            }
+        });
 
         return $user->id;
     }
@@ -87,15 +122,32 @@ class AddAccountProvisioner implements AccountProvisioner
             return;
         }
 
-        $removed = $user->getRoleNames()->reject(fn (string $role) => $role === 'member')->values()->all();
+        $roles = $user->getRoleNames();
+        $kept = $roles->intersect(self::KEPT_ROLES)->values()->all();
+        $removed = $roles->diff(self::KEPT_ROLES)->values()->all();
 
-        $user->syncRoles($user->hasRole('member') ? ['member'] : []);
+        $user->syncRoles($kept);
 
         DB::table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
 
         activity()
             ->performedOn($user)
-            ->withProperties(['employee_id' => $employee->id, 'roles_removed' => $removed])
+            ->withProperties(['employee_id' => $employee->id, 'roles_removed' => $removed, 'roles_kept' => $kept])
             ->log('hr_access_revoked');
+    }
+
+    private function assertActorMayLink(User $user): void
+    {
+        $actor = auth()->user();
+
+        if (! $actor instanceof User) {
+            return;
+        }
+
+        $staffRoles = $user->getRoleNames()->reject(fn (string $role) => $role === 'member');
+
+        if ($staffRoles->isNotEmpty() && ! $actor->can('users.assign_role')) {
+            HrException::fail('api.hr.account_link_forbidden', [], 403);
+        }
     }
 }

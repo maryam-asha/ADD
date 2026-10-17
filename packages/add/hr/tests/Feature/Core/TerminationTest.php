@@ -149,6 +149,52 @@ class TerminationTest extends TestCase
         $this->assertSame(2, $fresh->contracts()->count());
     }
 
+    public function test_changes_after_a_recorded_termination_end_on_the_last_day(): void
+    {
+        $position = Position::factory()->create(['headcount' => 1]);
+        $employee = $this->hireEmployee([
+            'contract' => ['type' => 'fixed_term', 'ends_on' => now()->addDays(5)->toDateString()],
+        ]);
+        $lastDay = now()->addDays(30)->toDateString();
+        $this->terminate($employee->id, $lastDay)->assertCreated();
+
+        $this->postJson("/api/hr/employees/{$employee->id}/events", [
+            'type' => 'transfer',
+            'effective_on' => now()->addDays(10)->toDateString(),
+            'assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id],
+        ])->assertCreated();
+
+        $this->postJson("/api/hr/employees/{$employee->id}/events", [
+            'type' => 'contract_renewal',
+            'effective_on' => now()->addDays(6)->toDateString(),
+            'contract' => ['type' => 'open_ended'],
+        ])->assertCreated();
+
+        $this->assertSame($lastDay, $employee->assignments()->latest('effective_from')->first()->effective_to->toDateString());
+        $this->assertSame($lastDay, $employee->contracts()->latest('starts_on')->first()->ends_on->toDateString());
+
+        // The seat is free again after the last day.
+        $this->postJson('/api/hr/employees', $this->hirePayload([
+            'hired_on' => now()->addDays(31)->toDateString(),
+            'assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id],
+        ]))->assertCreated();
+    }
+
+    public function test_rehire_needs_the_termination_to_have_taken_effect(): void
+    {
+        $employee = $this->hireEmployee();
+        $this->terminate($employee->id, now()->addDays(10)->toDateString())->assertCreated();
+
+        $this->postJson("/api/hr/employees/{$employee->id}/events", [
+            'type' => 'rehire',
+            'effective_on' => now()->addDays(20)->toDateString(),
+            'contract' => ['type' => 'open_ended'],
+            'assignment' => ['org_unit_id' => OrgUnit::factory()->create()->id, 'employment_type' => 'full_time', 'work_mode' => 'on_site'],
+        ])->assertStatus(422)->assertJsonPath('message', __('hr::core.rehire_not_allowed'));
+
+        $this->assertTrue($employee->fresh()->isEmployedOn(now()));
+    }
+
     public function test_rehire_of_a_current_employee_is_rejected(): void
     {
         $employee = $this->hireEmployee();

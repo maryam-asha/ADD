@@ -221,7 +221,8 @@ class EmploymentLifecycleService
             notes: $data['notes'] ?? null,
         );
 
-        $this->openAssignment($employee, $after, $on, $event);
+        // A termination already on file ends whatever opens before it.
+        $this->openAssignment($employee, $after, $on, $event, $employee->terminated_on);
 
         return $event;
     }
@@ -240,8 +241,17 @@ class EmploymentLifecycleService
             HrException::fail('hr::core.contract_overlap');
         }
 
+        $contract = $data['contract'];
+
+        // A termination already on file ends the new contract too.
+        if ($employee->terminated_on !== null
+            && (empty($contract['ends_on'])
+                || CarbonImmutable::parse($contract['ends_on'])->toDateString() > $employee->terminated_on->toDateString())) {
+            $contract['ends_on'] = $employee->terminated_on->toDateString();
+        }
+
         $event = $this->recordEvent($employee, EmploymentEventType::ContractRenewal, $on, $actorId, notes: $data['notes'] ?? null);
-        $this->openContract($employee, $data['contract'], $on, $event);
+        $this->openContract($employee, $contract, $on, $event);
 
         return $event;
     }
@@ -335,7 +345,11 @@ class EmploymentLifecycleService
      */
     private function rehire(Employee $employee, CarbonImmutable $on, array $data, int|string|null $actorId): EmploymentEvent
     {
-        if ($employee->terminated_on === null || $on->toDateString() <= $employee->terminated_on->toDateString()) {
+        // Only once the last working day has passed: a rehire rewrites the
+        // employment's dates, which must not happen while it still runs.
+        if ($employee->terminated_on === null
+            || $employee->terminated_on->toDateString() >= CarbonImmutable::today()->toDateString()
+            || $on->toDateString() <= $employee->terminated_on->toDateString()) {
             HrException::fail('hr::core.rehire_not_allowed');
         }
 
@@ -383,6 +397,10 @@ class EmploymentLifecycleService
      */
     private function linkAccount(Employee $employee, int|string|null $userId): void
     {
+        if ($userId !== null) {
+            $this->accounts->authorizeLink($userId);
+        }
+
         $userId ??= $this->accounts->provision($employee);
 
         if ($userId === null) {
@@ -412,7 +430,8 @@ class EmploymentLifecycleService
     private function assertAssignable(array $assignment, CarbonInterface $on, ?Employee $employee): void
     {
         if (! empty($assignment['position_id'])) {
-            $position = Position::query()->findOrFail($assignment['position_id']);
+            // Locked so two hires into the last seat cannot both see it free.
+            $position = Position::query()->lockForUpdate()->findOrFail($assignment['position_id']);
 
             if ((int) $position->org_unit_id !== (int) $assignment['org_unit_id']) {
                 HrException::fail('hr::core.position_unit_mismatch');
@@ -475,11 +494,12 @@ class EmploymentLifecycleService
     /**
      * @param  array<string, mixed>  $assignment
      */
-    private function openAssignment(Employee $employee, array $assignment, CarbonInterface $from, EmploymentEvent $event): Assignment
+    private function openAssignment(Employee $employee, array $assignment, CarbonInterface $from, EmploymentEvent $event, ?CarbonInterface $to = null): Assignment
     {
         return $employee->assignments()->create([
             ...$assignment,
             'effective_from' => $from,
+            'effective_to' => $to,
             'event_id' => $event->id,
         ]);
     }

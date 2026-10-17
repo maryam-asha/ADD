@@ -4,6 +4,8 @@ namespace Add\Hr\Core\Models;
 
 use Add\Hr\Database\Factories\PositionFactory;
 use Add\Hr\Support\Concerns\HasTranslations;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -45,6 +47,15 @@ class Position extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(Assignment::class);
+    }
+
+    /**
+     * Seats taken from that day on — by holders today and by anyone already
+     * assigned to start later. The same count hiring checks against.
+     */
+    public function occupiedCount(?CarbonInterface $on = null): int
+    {
+        return $this->assignments()->openFrom($on ?? CarbonImmutable::today())->count();
     }
 
     protected static function newFactory(): PositionFactory

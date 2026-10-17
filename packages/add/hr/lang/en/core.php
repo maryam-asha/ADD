@@ -9,6 +9,8 @@ return [
     'position_updated' => 'Position updated.',
     'work_location_updated' => 'Work location updated.',
     'position_in_use' => 'This position has been held by an employee and stays in their job history.',
+    'position_held' => 'Employees hold this position; move them before moving the position to another unit.',
+    'headcount_below_occupancy' => ':count seats of this position are taken; the headcount cannot go below that.',
 
     // Employees
     'employee_updated' => 'Employee updated.',

@@ -12,6 +12,15 @@ use Add\Hr\Core\Models\Employee;
 interface AccountProvisioner
 {
     /**
+     * Called before linking a user the request named explicitly. Linking an
+     * account gives HR power over it — deprovision() runs when the
+     * employment ends — so refuse (throw) when the acting user may not
+     * hold that power over this account. provision() must apply the same
+     * check to any existing account it returns.
+     */
+    public function authorizeLink(int|string $userId): void;
+
+    /**
      * Called inside the hire (or rehire) transaction when the request named
      * no user. Return the id of the user to link — an existing account or a
      * new one — or null for none. Throwing aborts the hire.
