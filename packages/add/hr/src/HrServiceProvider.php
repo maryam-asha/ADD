@@ -14,6 +14,13 @@ use Add\Hr\Core\Listeners\CreateChecklistTasks;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
 use Add\Hr\Integrations\LogHrNotifier;
 use Add\Hr\Integrations\NullAccountProvisioner;
+use Add\Hr\Leave\Console\AccrueLeave;
+use Add\Hr\Leave\Console\CloseLeaveYear;
+use Add\Hr\Leave\Listeners\CancelLeaveAfterTermination;
+use Add\Hr\Leave\Models\LeaveRequest;
+use Add\Hr\Leave\Services\LeaveApprovalHandler;
+use Add\Hr\Leave\Services\LeaveService;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
@@ -29,7 +36,10 @@ class HrServiceProvider extends ServiceProvider
         $this->app->singletonIf(AccountProvisioner::class, NullAccountProvisioner::class);
         $this->app->singletonIf(HrNotifier::class, LogHrNotifier::class);
 
-        $this->app->singleton(ApprovalTypes::class);
+        // Each module's request types; a host may register more on the same
+        // singleton.
+        $this->app->singleton(ApprovalTypes::class, fn () => tap(new ApprovalTypes)
+            ->register(LeaveService::APPROVAL_TYPE, LeaveApprovalHandler::class));
     }
 
     public function boot(): void
@@ -41,12 +51,19 @@ class HrServiceProvider extends ServiceProvider
 
         Event::listen(EmployeeHired::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CreateChecklistTasks::class);
+        Event::listen(EmployeeTerminated::class, CancelLeaveAfterTermination::class);
+
+        // Approval subjects, by name rather than class. Not enforced, so the
+        // host's own morph map is unaffected.
+        Relation::morphMap(['hr_leave_request' => LeaveRequest::class]);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RefreshStatuses::class,
                 SendAlerts::class,
                 ProcessTimeouts::class,
+                AccrueLeave::class,
+                CloseLeaveYear::class,
             ]);
         }
 

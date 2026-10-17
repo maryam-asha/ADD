@@ -7,6 +7,7 @@ use Add\Hr\Core\Enums\Gender;
 use Add\Hr\Core\Enums\MaritalStatus;
 use Add\Hr\Core\Enums\TerminationReason;
 use Add\Hr\Hr;
+use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Support\Casts\DateOnly;
 use Add\Hr\Support\Concerns\HasTranslations;
 use Carbon\CarbonImmutable;
@@ -131,5 +132,10 @@ class Employee extends Model
     public function checklistTasks(): HasMany
     {
         return $this->hasMany(ChecklistTask::class);
+    }
+
+    public function leaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class);
     }
 }

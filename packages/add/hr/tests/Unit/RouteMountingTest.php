@@ -33,6 +33,15 @@ class RouteMountingTest extends TestCase
         $this->assertFalse($this->mountAdminRoutesFresh());
     }
 
+    public function test_each_module_is_switched_on_its_own(): void
+    {
+        config(['hr.modules.leave' => false]);
+        $this->mountAdminRoutesFresh();
+
+        $this->assertFalse(Route::has('hr.leave-types.index'));
+        $this->assertTrue(Route::has('hr.approval-flows.index'));
+    }
+
     public function test_users_table_comes_from_the_configured_model(): void
     {
         $this->assertSame('users', Hr::usersTable());
