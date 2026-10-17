@@ -37,6 +37,7 @@ return [
         'payroll' => true,
         'benefits' => true,
         'recruitment' => true,
+        'performance' => true,
     ],
 
     'documents' => [

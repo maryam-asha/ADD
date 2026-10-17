@@ -92,6 +92,12 @@ final class Abilities
     /** Running recruitment; hiring a candidate also needs hr.employees.create. */
     public const RECRUITMENT_MANAGE = 'hr.recruitment.manage';
 
+    /** Review templates, cycles, every review and goal, read-only. */
+    public const PERFORMANCE_VIEW = 'hr.performance.view';
+
+    /** Running review cycles, calibrating, reassigning reviewers, any employee's goals. */
+    public const PERFORMANCE_MANAGE = 'hr.performance.manage';
+
     /**
      * @return list<string>
      */
