@@ -36,6 +36,13 @@ use Add\Hr\Payroll\Events\PayrollRunApproved;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Payroll\Services\LoanApprovalHandler;
 use Add\Hr\Payroll\Services\LoanService;
+use Add\Hr\Recruitment\Console\PurgeCandidates;
+use Add\Hr\Recruitment\Models\Offer;
+use Add\Hr\Recruitment\Models\Requisition;
+use Add\Hr\Recruitment\Services\OfferApprovalHandler;
+use Add\Hr\Recruitment\Services\OfferService;
+use Add\Hr\Recruitment\Services\RequisitionApprovalHandler;
+use Add\Hr\Recruitment\Services\RequisitionService;
 use Add\Hr\Time\Console\ProcessAttendance;
 use Add\Hr\Time\Models\AttendanceEntry;
 use Add\Hr\Time\Models\OvertimeRequest;
@@ -76,6 +83,8 @@ class HrServiceProvider extends ServiceProvider
             $types->register(OvertimeService::APPROVAL_TYPE, OvertimeApprovalHandler::class);
             $types->register(TimesheetService::APPROVAL_TYPE, TimesheetApprovalHandler::class);
             $types->register(LoanService::APPROVAL_TYPE, LoanApprovalHandler::class);
+            $types->register(RequisitionService::APPROVAL_TYPE, RequisitionApprovalHandler::class);
+            $types->register(OfferService::APPROVAL_TYPE, OfferApprovalHandler::class);
 
             return $types;
         });
@@ -101,6 +110,8 @@ class HrServiceProvider extends ServiceProvider
             'hr_overtime_request' => OvertimeRequest::class,
             'hr_timesheet' => Timesheet::class,
             'hr_loan' => Loan::class,
+            'hr_requisition' => Requisition::class,
+            'hr_offer' => Offer::class,
         ]);
 
         if ($this->app->runningInConsole()) {
@@ -112,6 +123,7 @@ class HrServiceProvider extends ServiceProvider
                 CloseLeaveYear::class,
                 ProcessAttendance::class,
                 GrantBenefits::class,
+                PurgeCandidates::class,
             ]);
         }
 

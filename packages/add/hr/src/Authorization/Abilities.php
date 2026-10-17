@@ -86,6 +86,12 @@ final class Abilities
     /** Defining and assigning benefits, granting, retrying and cancelling grants. */
     public const BENEFITS_MANAGE = 'hr.benefits.manage';
 
+    /** Requisitions, openings, candidates, applications, interviews and offers, read-only. */
+    public const RECRUITMENT_VIEW = 'hr.recruitment.view';
+
+    /** Running recruitment; hiring a candidate also needs hr.employees.create. */
+    public const RECRUITMENT_MANAGE = 'hr.recruitment.manage';
+
     /**
      * @return list<string>
      */

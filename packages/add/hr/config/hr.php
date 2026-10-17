@@ -36,6 +36,7 @@ return [
         'timesheets' => true,
         'payroll' => true,
         'benefits' => true,
+        'recruitment' => true,
     ],
 
     'documents' => [
@@ -144,6 +145,17 @@ return [
         'min_overtime_minutes' => 30,
         'overtime_requires_pre_approval' => false,
         'entry_tolerance_minutes' => 15,
+    ],
+
+    'recruitment' => [
+        // A candidate never hired and not heard from for this long is
+        // deleted with their CVs (hr:recruitment-purge). Null: kept.
+        'retention_months' => 24,
+
+        // CVs are stored encrypted on documents.disk, under this directory.
+        'cv_directory' => 'hr/cvs',
+        'cv_max_kb' => 5120,
+        'cv_mimes' => ['pdf', 'doc', 'docx'],
     ],
 
 ];

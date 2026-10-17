@@ -43,6 +43,7 @@ abstract class TestCase extends Orchestra
         });
 
         $router->middleware('api')->prefix('api/hr')->group(fn () => Hr::signedRoutes());
+        $router->middleware('api')->prefix('api/hr')->group(fn () => Hr::publicRoutes());
     }
 
     protected function defineDatabaseMigrations(): void

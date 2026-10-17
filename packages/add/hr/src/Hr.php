@@ -39,6 +39,15 @@ final class Hr
     }
 
     /**
+     * Routes anyone may call (the careers page). Mount without
+     * authentication, rate-limited.
+     */
+    public static function publicRoutes(): void
+    {
+        Route::name('hr.')->group(fn () => self::loadModuleRoutes('public'));
+    }
+
+    /**
      * Registers the enabled modules' scheduled commands. Call from the
      * host's routes/console.php.
      */
