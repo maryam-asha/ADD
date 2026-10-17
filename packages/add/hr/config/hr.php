@@ -38,6 +38,7 @@ return [
         'benefits' => true,
         'recruitment' => true,
         'performance' => true,
+        'training' => true,
     ],
 
     'documents' => [
@@ -57,6 +58,7 @@ return [
         'contract_days' => 30,
         'probation_days' => 21,
         'document_days' => 45,
+        'certification_days' => 45,
     ],
 
     'approvals' => [
@@ -157,6 +159,11 @@ return [
         'cv_directory' => 'hr/cvs',
         'cv_max_kb' => 5120,
         'cv_mimes' => ['pdf', 'doc', 'docx'],
+    ],
+
+    'training' => [
+        // The currency learning budgets and learning requests are kept in.
+        'currency' => 'USD',
     ],
 
 ];

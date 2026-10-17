@@ -1,0 +1,24 @@
+<?php
+
+return [
+    'course_updated' => 'تم تحديث الدورة التدريبية.',
+    'session_updated' => 'تم تحديث الجلسة.',
+    'session_cancelled' => 'أُلغيت الجلسة وأُلغي التسجيل فيها.',
+    'session_completed' => 'اكتملت الجلسة.',
+    'session_not_scheduled' => 'هذه الجلسة لم تعد مجدولة.',
+    'session_not_ended' => 'تُستكمل الجلسة بعد حلول يومها الأخير فقط.',
+    'session_full' => 'لا مقاعد متبقية في هذه الجلسة.',
+    'session_started' => 'بدأت الجلسة، اطلب من الموارد البشرية إلغاء تسجيلك.',
+    'self_enrollment_closed' => 'هذه الجلسة غير متاحة للتسجيل الذاتي.',
+    'not_employed' => 'لا يُسجَّل إلا موظف على رأس عمله.',
+    'already_enrolled' => 'مسجّل في هذه الجلسة مسبقاً.',
+    'enrollment_not_active' => 'هذا التسجيل لم يعد فعالاً.',
+    'enrollment_cancelled' => 'تم إلغاء التسجيل.',
+    'not_your_enrollment' => 'هذا ليس تسجيلك.',
+    'certification_updated' => 'تم تحديث الشهادة.',
+    'budget_allocated' => 'خُصصت ميزانية التعلّم لـ :count موظفاً.',
+    'budget_adjusted' => 'تم تعديل ميزانية التعلّم.',
+    'budget_insufficient' => 'ميزانية التعلّم لا تكفي، المتاح :available :currency.',
+    'not_your_request' => 'هذا ليس طلبك.',
+    'request_cancelled' => 'تم إلغاء الطلب.',
+];

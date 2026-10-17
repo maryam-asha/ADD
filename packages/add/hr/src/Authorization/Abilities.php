@@ -98,6 +98,12 @@ final class Abilities
     /** Running review cycles, calibrating, reassigning reviewers, any employee's goals. */
     public const PERFORMANCE_MANAGE = 'hr.performance.manage';
 
+    /** Courses, sessions, enrollments, certifications, learning budgets and requests, read-only. */
+    public const TRAINING_VIEW = 'hr.training.view';
+
+    /** Running training: catalogue, sessions, enrollments, certifications, budget allocation. */
+    public const TRAINING_MANAGE = 'hr.training.manage';
+
     /**
      * @return list<string>
      */

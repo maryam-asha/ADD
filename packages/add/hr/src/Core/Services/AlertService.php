@@ -6,6 +6,7 @@ use Add\Hr\Core\Data\Alert;
 use Add\Hr\Core\Enums\AlertType;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\EmployeeDocument;
+use Add\Hr\Training\Models\Certification;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -40,6 +41,7 @@ class AlertService
                 ...$this->contractAlerts($employee, $today),
                 ...$this->probationAlerts($employee, $today),
                 ...$this->documentAlerts($employee, $today),
+                ...$this->certificationAlerts($employee, $today),
             );
         }
 
@@ -119,6 +121,34 @@ class AlertService
         }
 
         return $alerts;
+    }
+
+    /**
+     * The latest certification of each name: expired, or expiring within
+     * alerts.certification_days. A renewed one replaces the old.
+     *
+     * @return list<Alert>
+     */
+    private function certificationAlerts(Employee $employee, CarbonImmutable $today): array
+    {
+        if (! config('hr.modules.training', false)) {
+            return [];
+        }
+
+        $horizon = $today->addDays((int) config('hr.alerts.certification_days', 45));
+
+        return Certification::query()->where('employee_id', $employee->id)->orderBy('issued_on')->orderBy('id')->get()
+            ->keyBy(fn (Certification $certification) => json_encode($certification->name))
+            ->filter(fn (Certification $certification) => $certification->expires_on !== null && $certification->expires_on->lte($horizon))
+            ->map(fn (Certification $certification) => $this->alert(
+                $certification->expires_on->lt($today) ? AlertType::CertificationExpired : AlertType::CertificationExpiring,
+                $employee,
+                $certification->expires_on,
+                $today,
+                ['certification_id' => $certification->id],
+            ))
+            ->values()
+            ->all();
     }
 
     /**

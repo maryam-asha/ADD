@@ -53,6 +53,9 @@ use Add\Hr\Time\Services\OvertimeService;
 use Add\Hr\Timesheets\Models\Timesheet;
 use Add\Hr\Timesheets\Services\TimesheetApprovalHandler;
 use Add\Hr\Timesheets\Services\TimesheetService;
+use Add\Hr\Training\Models\LearningRequest;
+use Add\Hr\Training\Services\LearningApprovalHandler;
+use Add\Hr\Training\Services\LearningRequestService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
@@ -85,6 +88,7 @@ class HrServiceProvider extends ServiceProvider
             $types->register(LoanService::APPROVAL_TYPE, LoanApprovalHandler::class);
             $types->register(RequisitionService::APPROVAL_TYPE, RequisitionApprovalHandler::class);
             $types->register(OfferService::APPROVAL_TYPE, OfferApprovalHandler::class);
+            $types->register(LearningRequestService::APPROVAL_TYPE, LearningApprovalHandler::class);
 
             return $types;
         });
@@ -112,6 +116,7 @@ class HrServiceProvider extends ServiceProvider
             'hr_loan' => Loan::class,
             'hr_requisition' => Requisition::class,
             'hr_offer' => Offer::class,
+            'hr_learning_request' => LearningRequest::class,
         ]);
 
         if ($this->app->runningInConsole()) {
