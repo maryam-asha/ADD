@@ -17,7 +17,19 @@ class Loan extends Model
 {
     protected $table = 'hr_loans';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'amount',
+        'currency',
+        'installments',
+        'installment_amount',
+        'first_year',
+        'first_month',
+        'reason',
+        'status',
+        'approval_request_id',
+        'submitted_by',
+    ];
 
     protected $casts = [
         'amount' => DecimalString::class,

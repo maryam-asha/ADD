@@ -19,7 +19,13 @@ class WorkLocation extends Model
 
     protected $table = 'hr_work_locations';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'address',
+        'locatable_type',
+        'locatable_id',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

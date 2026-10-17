@@ -16,7 +16,11 @@ class RateTable extends Model
 {
     protected $table = 'hr_rate_tables';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'kind',
+    ];
 
     protected $casts = [
         'name' => 'array',

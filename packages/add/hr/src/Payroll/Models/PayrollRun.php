@@ -15,7 +15,30 @@ class PayrollRun extends Model
 {
     protected $table = 'hr_payroll_runs';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'year',
+        'month',
+        'kind',
+        'currency',
+        'status',
+        'employee_ids',
+        'exchange_rates',
+        'parallel_run',
+        'reconciled_at',
+        'reconciled_by',
+        'notes',
+        'opened_by',
+        'calculated_at',
+        'calculated_by',
+        'reviewed_at',
+        'reviewed_by',
+        'approved_at',
+        'approved_by',
+        'paid_at',
+        'paid_by',
+        'payment_reference',
+        'posted_at',
+    ];
 
     protected $casts = [
         'year' => 'integer',

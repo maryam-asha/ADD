@@ -20,7 +20,13 @@ class OrgUnit extends Model
 
     protected $table = 'hr_org_units';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'parent_id',
+        'code',
+        'name',
+        'head_employee_id',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

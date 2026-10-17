@@ -13,7 +13,13 @@ class TimePeriod extends Model
 {
     protected $table = 'hr_time_periods';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'year',
+        'month',
+        'status',
+        'locked_at',
+        'locked_by',
+    ];
 
     protected $casts = [
         'year' => 'integer',

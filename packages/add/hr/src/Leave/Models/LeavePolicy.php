@@ -19,7 +19,21 @@ class LeavePolicy extends Model
 {
     protected $table = 'hr_leave_policies';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'leave_type_id',
+        'name',
+        'effective_from',
+        'effective_to',
+        'accrual_method',
+        'annual_entitlement',
+        'service_tiers',
+        'carry_over_max',
+        'carry_over_expiry_months',
+        'max_negative',
+        'contract_types',
+        'job_grade_ids',
+        'org_unit_ids',
+    ];
 
     protected $casts = [
         'name' => 'array',

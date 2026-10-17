@@ -14,7 +14,17 @@ class ChecklistTask extends Model
 {
     protected $table = 'hr_checklist_tasks';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'kind',
+        'event_id',
+        'title',
+        'due_on',
+        'completed_at',
+        'completed_by',
+        'notes',
+        'sort',
+    ];
 
     protected $casts = [
         'kind' => ChecklistKind::class,

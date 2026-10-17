@@ -17,5 +17,10 @@ class DocumentAccess extends Model
 
     protected $table = 'hr_document_accesses';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'document_id',
+        'user_id',
+        'action',
+        'ip',
+    ];
 }

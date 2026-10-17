@@ -17,7 +17,22 @@ class ApprovalStep extends Model
 {
     protected $table = 'hr_approval_steps';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'approval_request_id',
+        'sort',
+        'approver_type',
+        'approver_employee_id',
+        'approver_ability',
+        'status',
+        'decided_by',
+        'decided_via',
+        'comment',
+        'timeout_hours',
+        'on_timeout',
+        'due_at',
+        'escalated_at',
+        'decided_at',
+    ];
 
     protected $casts = [
         'sort' => 'integer',

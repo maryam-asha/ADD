@@ -18,7 +18,19 @@ class EmployeeDocument extends Model
 
     protected $table = 'hr_employee_documents';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'document_type_id',
+        'path',
+        'original_name',
+        'mime',
+        'size_bytes',
+        'checksum',
+        'issued_on',
+        'expires_on',
+        'notes',
+        'uploaded_by',
+    ];
 
     protected $casts = [
         'issued_on' => DateOnly::class,

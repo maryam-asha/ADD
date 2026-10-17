@@ -21,7 +21,14 @@ class Position extends Model
 
     protected $table = 'hr_positions';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'org_unit_id',
+        'job_grade_id',
+        'code',
+        'title',
+        'headcount',
+        'is_active',
+    ];
 
     protected $casts = [
         'title' => 'array',

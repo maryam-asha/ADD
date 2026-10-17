@@ -19,7 +19,21 @@ class Assignment extends Model
 {
     protected $table = 'hr_assignments';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'effective_from',
+        'effective_to',
+        'org_unit_id',
+        'position_id',
+        'job_grade_id',
+        'manager_id',
+        'work_location_id',
+        'job_title',
+        'employment_type',
+        'work_mode',
+        'event_id',
+        'work_pattern_id',
+    ];
 
     protected $casts = [
         'effective_from' => DateOnly::class,

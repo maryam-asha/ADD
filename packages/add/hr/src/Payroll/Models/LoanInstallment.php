@@ -14,7 +14,15 @@ class LoanInstallment extends Model
 {
     protected $table = 'hr_loan_installments';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'loan_id',
+        'year',
+        'month',
+        'amount',
+        'status',
+        'payslip_id',
+        'note',
+    ];
 
     protected $casts = [
         'year' => 'integer',

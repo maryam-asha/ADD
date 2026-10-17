@@ -11,7 +11,13 @@ class TimesheetEntry extends Model
 {
     protected $table = 'hr_timesheet_entries';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'timesheet_id',
+        'cost_center_id',
+        'work_date',
+        'hours',
+        'note',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

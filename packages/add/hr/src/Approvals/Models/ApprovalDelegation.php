@@ -17,7 +17,14 @@ class ApprovalDelegation extends Model
 {
     protected $table = 'hr_approval_delegations';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'delegator_employee_id',
+        'delegate_employee_id',
+        'starts_on',
+        'ends_on',
+        'request_type',
+        'created_by',
+    ];
 
     protected $casts = [
         'starts_on' => DateOnly::class,

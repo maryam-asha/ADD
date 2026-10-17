@@ -18,7 +18,16 @@ class Interview extends Model
 {
     protected $table = 'hr_interviews';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'application_id',
+        'scheduled_at',
+        'duration_minutes',
+        'mode',
+        'location',
+        'notes',
+        'status',
+        'created_by',
+    ];
 
     protected $casts = [
         'scheduled_at' => 'datetime',

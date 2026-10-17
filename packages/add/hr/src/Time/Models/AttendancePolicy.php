@@ -13,7 +13,15 @@ class AttendancePolicy extends Model
 {
     protected $table = 'hr_attendance_policies';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'effective_from',
+        'effective_to',
+        'grace_minutes',
+        'early_leave_grace_minutes',
+        'min_overtime_minutes',
+        'overtime_requires_pre_approval',
+        'entry_tolerance_minutes',
+    ];
 
     protected $casts = [
         'effective_from' => DateOnly::class,

@@ -15,7 +15,16 @@ class EmploymentEvent extends Model
 {
     protected $table = 'hr_employment_events';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'type',
+        'effective_on',
+        'effective_to',
+        'reason',
+        'notes',
+        'payload',
+        'recorded_by',
+    ];
 
     protected $casts = [
         'type' => EmploymentEventType::class,

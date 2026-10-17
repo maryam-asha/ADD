@@ -15,7 +15,13 @@ class PipelineStage extends Model
 
     protected $table = 'hr_pipeline_stages';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'sort',
+        'type',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

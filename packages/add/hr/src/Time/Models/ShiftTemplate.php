@@ -15,7 +15,14 @@ class ShiftTemplate extends Model
 
     protected $table = 'hr_shift_templates';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'starts_at',
+        'ends_at',
+        'break_minutes',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

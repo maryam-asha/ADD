@@ -19,7 +19,22 @@ class Application extends Model
 {
     protected $table = 'hr_applications';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'job_opening_id',
+        'candidate_id',
+        'stage',
+        'stage_changed_at',
+        'source',
+        'cover_letter',
+        'referred_by_employee_id',
+        'rejection_reason',
+        'employee_id',
+        'cv_path',
+        'cv_name',
+        'cv_mime',
+        'cv_size',
+        'created_by',
+    ];
 
     protected $hidden = ['cv_path'];
 

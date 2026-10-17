@@ -16,7 +16,12 @@ class ChecklistTemplate extends Model
 
     protected $table = 'hr_checklist_templates';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'kind',
+        'name',
+        'items',
+        'is_active',
+    ];
 
     protected $casts = [
         'kind' => ChecklistKind::class,

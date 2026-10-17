@@ -17,7 +17,21 @@ class AttendanceDay extends Model
 {
     protected $table = 'hr_attendance_days';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'work_date',
+        'status',
+        'shift_template_id',
+        'scheduled_start',
+        'scheduled_end',
+        'first_in',
+        'last_out',
+        'punch_count',
+        'worked_minutes',
+        'late_minutes',
+        'early_leave_minutes',
+        'overtime_minutes',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

@@ -29,7 +29,28 @@ class Employee extends Model
 
     protected $table = 'hr_employees';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'user_id',
+        'employee_number',
+        'name',
+        'gender',
+        'date_of_birth',
+        'nationality',
+        'marital_status',
+        'phone',
+        'personal_email',
+        'work_email',
+        'address',
+        'national_id',
+        'bank_account',
+        'hired_on',
+        'probation_ends_on',
+        'confirmed_on',
+        'terminated_on',
+        'termination_reason',
+        'status',
+        'access_revoked_at',
+    ];
 
     protected $casts = [
         'name' => 'array',

@@ -16,7 +16,18 @@ class Offer extends Model
 {
     protected $table = 'hr_offers';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'application_id',
+        'start_on',
+        'expires_on',
+        'compensation',
+        'terms',
+        'status',
+        'approval_request_id',
+        'responded_at',
+        'response_note',
+        'created_by',
+    ];
 
     protected $casts = [
         'compensation' => 'array',

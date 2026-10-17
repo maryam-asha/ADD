@@ -20,7 +20,14 @@ class DocumentType extends Model
 
     protected $table = 'hr_document_types';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'is_required',
+        'contract_types',
+        'has_expiry',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

@@ -16,7 +16,20 @@ class Payslip extends Model
 {
     protected $table = 'hr_payslips';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'payroll_run_id',
+        'employee_id',
+        'currency',
+        'gross',
+        'deductions',
+        'net',
+        'employer_cost',
+        'employed_days',
+        'days_in_month',
+        'snapshot',
+        'warnings',
+        'published_at',
+    ];
 
     protected $casts = [
         'gross' => DecimalString::class,

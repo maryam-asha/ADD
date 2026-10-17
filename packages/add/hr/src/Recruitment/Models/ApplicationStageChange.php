@@ -13,7 +13,13 @@ class ApplicationStageChange extends Model
 {
     protected $table = 'hr_application_stage_changes';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'application_id',
+        'from_stage',
+        'to_stage',
+        'note',
+        'changed_by',
+    ];
 
     public function application(): BelongsTo
     {

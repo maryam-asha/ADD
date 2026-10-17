@@ -20,7 +20,15 @@ class Timesheet extends Model
 {
     protected $table = 'hr_timesheets';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'week_start',
+        'status',
+        'total_hours',
+        'approval_request_id',
+        'submitted_at',
+        'submitted_by',
+    ];
 
     protected $casts = [
         'week_start' => DateOnly::class,

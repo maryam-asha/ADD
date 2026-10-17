@@ -19,7 +19,18 @@ class LeaveType extends Model
 
     protected $table = 'hr_leave_types';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'unit',
+        'is_paid',
+        'tracks_balance',
+        'allows_half_day',
+        'counts_calendar_days',
+        'hide_reason',
+        'attachment_document_type_id',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

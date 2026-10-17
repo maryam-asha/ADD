@@ -14,7 +14,15 @@ class PayrollAdjustment extends Model
 {
     protected $table = 'hr_payroll_adjustments';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'payroll_run_id',
+        'employee_id',
+        'pay_component_id',
+        'amount',
+        'currency',
+        'note',
+        'created_by',
+    ];
 
     protected $casts = [
         'amount' => DecimalString::class,

@@ -19,7 +19,18 @@ class LedgerEntry extends Model
 
     protected $table = 'hr_leave_ledger';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'leave_type_id',
+        'kind',
+        'amount',
+        'effective_on',
+        'period_year',
+        'leave_request_id',
+        'reference',
+        'notes',
+        'created_by',
+    ];
 
     protected $casts = [
         'kind' => LedgerKind::class,

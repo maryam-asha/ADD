@@ -19,7 +19,16 @@ class ApprovalRequest extends Model
 {
     protected $table = 'hr_approval_requests';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'request_type',
+        'subject_type',
+        'subject_id',
+        'employee_id',
+        'submitted_by',
+        'status',
+        'current_step',
+        'decided_at',
+    ];
 
     protected $casts = [
         'status' => ApprovalStatus::class,

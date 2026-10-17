@@ -20,7 +20,18 @@ class BenefitAssignment extends Model
 {
     protected $table = 'hr_benefit_assignments';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'benefit_id',
+        'employee_id',
+        'job_grade_id',
+        'org_unit_id',
+        'amount',
+        'employer_cost',
+        'excluded',
+        'effective_from',
+        'effective_to',
+        'created_by',
+    ];
 
     protected $casts = [
         'amount' => DecimalString::class,

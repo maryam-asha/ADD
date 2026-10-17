@@ -15,7 +15,12 @@ class CoverageRule extends Model
 {
     protected $table = 'hr_coverage_rules';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'org_unit_id',
+        'position_id',
+        'min_present',
+        'is_active',
+    ];
 
     protected $casts = [
         'min_present' => 'integer',

@@ -17,7 +17,15 @@ class Contract extends Model
 {
     protected $table = 'hr_contracts';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'type',
+        'starts_on',
+        'ends_on',
+        'notice_period_days',
+        'reference',
+        'event_id',
+    ];
 
     protected $casts = [
         'type' => ContractType::class,

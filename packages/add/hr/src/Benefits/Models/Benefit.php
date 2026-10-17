@@ -21,7 +21,23 @@ class Benefit extends Model
 
     protected $table = 'hr_benefits';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'description',
+        'kind',
+        'frequency',
+        'grant_month',
+        'amount',
+        'currency',
+        'unit',
+        'employer_cost',
+        'cost_currency',
+        'pay_component_id',
+        'fulfillment',
+        'eligible_after_days',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

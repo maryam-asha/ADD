@@ -15,7 +15,13 @@ class AuditEntry extends Model
 
     protected $table = 'hr_audit_entries';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'actor_id',
+        'action',
+        'subject_type',
+        'subject_id',
+        'properties',
+    ];
 
     protected $casts = [
         'properties' => 'array',

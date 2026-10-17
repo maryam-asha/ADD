@@ -15,7 +15,13 @@ class RosterEntry extends Model
 {
     protected $table = 'hr_roster_entries';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'work_date',
+        'shift_template_id',
+        'note',
+        'created_by',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

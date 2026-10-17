@@ -5,6 +5,7 @@ namespace Add\Hr\Tests;
 use Add\Hr\Hr;
 use Add\Hr\HrServiceProvider;
 use Add\Hr\Tests\Fixtures\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Gate;
 use Orchestra\Testbench\TestCase as Orchestra;
@@ -16,6 +17,10 @@ abstract class TestCase extends Orchestra
     protected function setUp(): void
     {
         parent::setUp();
+
+        // A column missing from a model's $fillable fails loudly instead of
+        // being dropped without a trace.
+        Model::preventSilentlyDiscardingAttributes();
 
         Gate::before(fn ($user, string $ability) => in_array($ability, $user->abilities ?? [], true) ? true : null);
     }

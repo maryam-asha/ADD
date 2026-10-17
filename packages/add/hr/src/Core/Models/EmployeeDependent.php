@@ -13,7 +13,12 @@ class EmployeeDependent extends Model
 {
     protected $table = 'hr_employee_dependents';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'name',
+        'relation',
+        'date_of_birth',
+    ];
 
     protected $casts = [
         'date_of_birth' => DateOnly::class,

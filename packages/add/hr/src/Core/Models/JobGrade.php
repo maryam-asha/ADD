@@ -17,7 +17,11 @@ class JobGrade extends Model
 
     protected $table = 'hr_job_grades';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'rank',
+    ];
 
     protected $casts = [
         'name' => 'array',

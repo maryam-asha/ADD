@@ -15,7 +15,12 @@ class Holiday extends Model
 
     protected $table = 'hr_holidays';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'starts_on',
+        'ends_on',
+        'recurs_annually',
+    ];
 
     protected $casts = [
         'name' => 'array',

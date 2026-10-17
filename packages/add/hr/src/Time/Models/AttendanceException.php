@@ -17,7 +17,17 @@ class AttendanceException extends Model
 {
     protected $table = 'hr_attendance_exceptions';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'attendance_day_id',
+        'employee_id',
+        'work_date',
+        'type',
+        'status',
+        'resolution',
+        'note',
+        'resolved_by',
+        'resolved_at',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

@@ -16,7 +16,18 @@ class PayComponent extends Model
 
     protected $table = 'hr_pay_components';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'kind',
+        'calculator',
+        'config',
+        'applies_to_all',
+        'taxable',
+        'insurable',
+        'sort',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

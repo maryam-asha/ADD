@@ -14,7 +14,16 @@ class RateTableVersion extends Model
 {
     protected $table = 'hr_rate_table_versions';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'rate_table_id',
+        'effective_from',
+        'effective_to',
+        'rate',
+        'max_base',
+        'brackets',
+        'currency',
+        'note',
+    ];
 
     protected $casts = [
         'effective_from' => DateOnly::class,

@@ -15,7 +15,14 @@ class InterviewScorecard extends Model
 {
     protected $table = 'hr_interview_scorecards';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'interview_id',
+        'employee_id',
+        'recommendation',
+        'ratings',
+        'notes',
+        'submitted_at',
+    ];
 
     protected $casts = [
         'recommendation' => Recommendation::class,

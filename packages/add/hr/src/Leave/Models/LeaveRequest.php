@@ -23,7 +23,22 @@ class LeaveRequest extends Model
 {
     protected $table = 'hr_leave_requests';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'leave_type_id',
+        'starts_on',
+        'ends_on',
+        'half_day',
+        'hours',
+        'amount',
+        'reason',
+        'document_id',
+        'status',
+        'approval_request_id',
+        'submitted_by',
+        'cancelled_at',
+        'cancelled_by',
+    ];
 
     protected $casts = [
         'starts_on' => DateOnly::class,

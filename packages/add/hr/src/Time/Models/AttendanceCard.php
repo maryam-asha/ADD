@@ -13,7 +13,12 @@ class AttendanceCard extends Model
 {
     protected $table = 'hr_attendance_cards';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'token_hash',
+        'issued_by',
+        'revoked_at',
+    ];
 
     protected $hidden = ['token_hash'];
 

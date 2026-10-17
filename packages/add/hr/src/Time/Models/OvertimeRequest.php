@@ -18,7 +18,16 @@ class OvertimeRequest extends Model
 {
     protected $table = 'hr_overtime_requests';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'work_date',
+        'minutes',
+        'kind',
+        'reason',
+        'status',
+        'approval_request_id',
+        'submitted_by',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

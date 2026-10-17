@@ -19,7 +19,14 @@ class CostAllocation extends Model
 {
     protected $table = 'hr_cost_allocations';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'cost_center_id',
+        'percent',
+        'effective_from',
+        'effective_to',
+        'created_by',
+    ];
 
     protected $casts = [
         'percent' => PlainDecimal::class,

@@ -17,7 +17,16 @@ class Punch extends Model
 
     protected $table = 'hr_attendance_punches';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'punched_at',
+        'source',
+        'device_type',
+        'device_id',
+        'idempotency_key',
+        'reason',
+        'recorded_by',
+    ];
 
     protected $casts = [
         'punched_at' => 'immutable_datetime',

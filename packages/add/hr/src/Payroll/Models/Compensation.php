@@ -19,7 +19,16 @@ class Compensation extends Model
 {
     protected $table = 'hr_compensations';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'pay_component_id',
+        'amount',
+        'currency',
+        'effective_from',
+        'effective_to',
+        'event_id',
+        'created_by',
+    ];
 
     protected $casts = [
         'amount' => DecimalString::class,

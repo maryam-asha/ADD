@@ -11,5 +11,10 @@ class EmployeeContact extends Model
 {
     protected $table = 'hr_employee_contacts';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'name',
+        'relation',
+        'phone',
+    ];
 }

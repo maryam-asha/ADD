@@ -24,7 +24,19 @@ class JobOpening extends Model
 
     protected $table = 'hr_job_openings';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'requisition_id',
+        'title',
+        'description',
+        'employment_type',
+        'work_location_id',
+        'visibility',
+        'status',
+        'closes_on',
+        'opened_at',
+        'closed_at',
+        'created_by',
+    ];
 
     protected $casts = [
         'title' => 'array',

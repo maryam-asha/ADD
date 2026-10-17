@@ -19,7 +19,25 @@ class BenefitGrant extends Model
 {
     protected $table = 'hr_benefit_grants';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'benefit_id',
+        'employee_id',
+        'benefit_assignment_id',
+        'period',
+        'granted_on',
+        'amount',
+        'currency',
+        'unit',
+        'employer_cost',
+        'cost_currency',
+        'status',
+        'reference',
+        'failure',
+        'attempts',
+        'fulfilled_at',
+        'payslip_id',
+        'cancelled_by',
+    ];
 
     protected $casts = [
         'granted_on' => DateOnly::class,

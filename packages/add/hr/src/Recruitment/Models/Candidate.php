@@ -16,7 +16,16 @@ class Candidate extends Model
 {
     protected $table = 'hr_candidates';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'name',
+        'email',
+        'phone',
+        'source',
+        'employee_id',
+        'consent_at',
+        'last_activity_at',
+        'notes',
+    ];
 
     protected $casts = [
         'source' => CandidateSource::class,

@@ -27,7 +27,26 @@ class Requisition extends Model
 
     protected $table = 'hr_requisitions';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'org_unit_id',
+        'position_id',
+        'job_grade_id',
+        'title',
+        'headcount',
+        'employment_type',
+        'reason',
+        'replaces_employee_id',
+        'hiring_manager_id',
+        'budget_min',
+        'budget_max',
+        'budget_currency',
+        'justification',
+        'status',
+        'approval_request_id',
+        'requested_by',
+        'approved_at',
+        'filled_at',
+    ];
 
     protected $casts = [
         'title' => 'array',

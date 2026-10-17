@@ -17,7 +17,16 @@ class AttendanceEntry extends Model
 {
     protected $table = 'hr_attendance_entries';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'employee_id',
+        'work_date',
+        'check_in_at',
+        'check_out_at',
+        'note',
+        'status',
+        'approval_request_id',
+        'submitted_by',
+    ];
 
     protected $casts = [
         'work_date' => DateOnly::class,

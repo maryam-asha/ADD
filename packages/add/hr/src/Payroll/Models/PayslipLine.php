@@ -14,7 +14,22 @@ class PayslipLine extends Model
 {
     protected $table = 'hr_payslip_lines';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'payslip_id',
+        'pay_component_id',
+        'code',
+        'name',
+        'kind',
+        'basis',
+        'quantity',
+        'rate',
+        'amount',
+        'original_amount',
+        'original_currency',
+        'taxable',
+        'insurable',
+        'sort',
+    ];
 
     protected $casts = [
         'name' => 'array',

@@ -12,7 +12,12 @@ class ApprovalFlow extends Model
 {
     protected $table = 'hr_approval_flows';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'request_type',
+        'name',
+        'steps',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

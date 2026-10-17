@@ -15,7 +15,14 @@ class WorkPattern extends Model
 
     protected $table = 'hr_work_patterns';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'kind',
+        'weekly',
+        'weekly_hours',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',

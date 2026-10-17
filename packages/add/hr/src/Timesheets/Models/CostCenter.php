@@ -16,7 +16,13 @@ class CostCenter extends Model
 
     protected $table = 'hr_cost_centers';
 
-    protected $guarded = [];
+    protected $fillable = [
+        'code',
+        'name',
+        'costable_type',
+        'costable_id',
+        'is_active',
+    ];
 
     protected $casts = [
         'name' => 'array',
