@@ -2,7 +2,11 @@
 
 namespace Add\Hr\Tests\Feature\Time;
 
+use Add\Hr\Approvals\Services\ApprovalEngine;
+use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\Employee;
+use Add\Hr\Leave\Models\LeaveType;
+use Add\Hr\Leave\Services\LeaveService;
 use Add\Hr\Support\HrException;
 use Add\Hr\Tests\Concerns\BuildsSchedules;
 use Add\Hr\Tests\Concerns\HiresStaff;
@@ -110,6 +114,22 @@ class AttendanceProcessingTest extends TestCase
         // Rebuilding keeps the reviewer's decision.
         $this->artisan('hr:attendance-process')->assertSuccessful();
         $this->assertSame('absent', $this->dayOf($this->employee, '2026-03-02')->status->value);
+    }
+
+    public function test_leave_approved_after_the_fact_turns_missing_days_into_leave(): void
+    {
+        $this->artisan('hr:attendance-process')->assertSuccessful();
+        $this->assertSame('no_record', $this->dayOf($this->employee, '2026-03-02')->status->value);
+
+        $sick = LeaveType::query()->create(['code' => 'sick', 'name' => ['ar' => 'مرضية'], 'tracks_balance' => false]);
+        $request = app(LeaveService::class)->submit($this->employee, [
+            'leave_type_id' => $sick->id, 'starts_on' => '2026-03-02', 'ends_on' => '2026-03-02',
+        ], null, $this->employee->user_id);
+        app(ApprovalEngine::class)->approve($request->approval, $this->actingAsWith([Abilities::APPROVALS_MANAGE]), override: true);
+
+        $day = $this->dayOf($this->employee, '2026-03-02');
+        $this->assertSame('leave', $day->status->value);
+        $this->assertSame([], $this->exceptionTypes($day));
     }
 
     public function test_a_night_shift_keeps_its_morning_punch(): void

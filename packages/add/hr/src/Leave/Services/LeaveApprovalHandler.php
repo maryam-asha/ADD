@@ -8,6 +8,8 @@ use Add\Hr\Leave\Enums\LeaveRequestStatus;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Support\HrException;
 use Add\Hr\Support\PlainNumber;
+use Add\Hr\Time\Services\AttendanceProcessor;
+use Add\Hr\Time\Services\ScheduleResolver;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 
@@ -23,6 +25,8 @@ class LeaveApprovalHandler implements ApprovalHandler
         private readonly LeaveService $leave,
         private readonly LeaveLedger $ledger,
         private readonly CoverageChecker $coverage,
+        private readonly AttendanceProcessor $attendance,
+        private readonly ScheduleResolver $schedule,
     ) {}
 
     /**
@@ -54,6 +58,14 @@ class LeaveApprovalHandler implements ApprovalHandler
 
         if ($subject->leaveType->tracks_balance) {
             $this->ledger->consume($subject);
+        }
+
+        // Leave approved after the fact (sick leave, ...) or covering today:
+        // those days are rebuilt as leave.
+        $last = min($subject->ends_on, $this->schedule->today());
+
+        for ($day = $subject->starts_on; $day->lte($last); $day = $day->addDay()) {
+            $this->attendance->process($subject->employee, $day);
         }
     }
 
