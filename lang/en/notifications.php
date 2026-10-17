@@ -250,6 +250,14 @@ return [
             'title' => 'Your review is ready',
             'body' => 'The result of :cycle_en is available.',
         ],
+        'training_enrolled' => [
+            'title' => 'You are enrolled in a training',
+            'body' => ':course_en starts on :starts_on.',
+        ],
+        'training_cancelled' => [
+            'title' => 'Training cancelled',
+            'body' => 'The :course_en session on :starts_on has been cancelled.',
+        ],
     ],
 
 ];

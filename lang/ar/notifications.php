@@ -250,6 +250,14 @@ return [
             'title' => 'نتيجة تقييمك جاهزة',
             'body' => 'صدرت نتيجة :cycle_ar.',
         ],
+        'training_enrolled' => [
+            'title' => 'سُجّلت في تدريب',
+            'body' => 'يبدأ :course_ar في :starts_on.',
+        ],
+        'training_cancelled' => [
+            'title' => 'أُلغي تدريب',
+            'body' => 'أُلغيت جلسة :course_ar المقررة في :starts_on.',
+        ],
     ],
 
 ];

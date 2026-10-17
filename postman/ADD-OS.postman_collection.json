@@ -37662,6 +37662,1024 @@
                     ]
                 },
                 {
+                    "name": "Training",
+                    "description": "Courses, sessions and enrollments, certifications (expiry in HR alerts), and learning budgets spent through approvals. Abilities: hr.training.view | manage.",
+                    "item": [
+                        {
+                            "name": "Courses",
+                            "item": [
+                                {
+                                    "name": "List courses",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/courses?is_active=1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "courses"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "is_active",
+                                                    "value": "1"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filter: is_active."
+                                    }
+                                },
+                                {
+                                    "name": "Create course",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/courses",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "courses"
+                                            ]
+                                        },
+                                        "description": "certification_name and certification_valid_months: completing the course grants that certification (null months: never expires).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"code\": \"barista-101\",\n  \"title\": {\n    \"ar\": \"\u0623\u0633\u0627\u0633\u064a\u0627\u062a \u0627\u0644\u0628\u0627\u0631\u064a\u0633\u062a\u0627\",\n    \"en\": \"Barista basics\"\n  },\n  \"description\": {\n    \"ar\": \"\u0627\u0644\u062a\u062d\u0636\u064a\u0631 \u0648\u0627\u0644\u0646\u0638\u0627\u0641\u0629 \u0648\u062e\u062f\u0645\u0629 \u0627\u0644\u0632\u0628\u0627\u0626\u0646.\",\n    \"en\": \"Preparation, hygiene and service.\"\n  },\n  \"provider\": \"Coffee Lab\",\n  \"delivery\": \"in_person\",\n  \"duration_hours\": 12,\n  \"cost\": 50,\n  \"currency\": \"USD\",\n  \"certification_name\": {\n    \"ar\": \"\u0634\u0647\u0627\u062f\u0629 \u0628\u0627\u0631\u064a\u0633\u062a\u0627\",\n    \"en\": \"Barista certificate\"\n  },\n  \"certification_valid_months\": 12\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show course",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/courses/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "courses",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Update course",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/courses/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "courses",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"cost\": 60,\n  \"is_active\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Sessions",
+                            "item": [
+                                {
+                                    "name": "List sessions",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions?status=scheduled",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "scheduled"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, course_id, from (ending on or after). With seats_taken."
+                                    }
+                                },
+                                {
+                                    "name": "Schedule session",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions"
+                                            ]
+                                        },
+                                        "description": "self_enrollment lets employees enroll themselves before it starts.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"course_id\": 1,\n  \"starts_on\": \"2026-11-10\",\n  \"ends_on\": \"2026-11-11\",\n  \"location\": \"Branch 1, training room\",\n  \"trainer\": \"Lina Haddad\",\n  \"capacity\": 12,\n  \"self_enrollment\": true\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Show session",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Update session",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "Scheduled sessions only.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"capacity\": 15\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Session enrollments",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1/enrollments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1",
+                                                "enrollments"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Enroll employees",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1/enrollments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1",
+                                                "enrollments"
+                                            ]
+                                        },
+                                        "description": "Within capacity; all or none. Each is notified (hr.training_enrolled).",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"employee_ids\": [\n    12,\n    15\n  ]\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Cancel enrollment",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/enrollments/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "enrollments",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "While the session is scheduled."
+                                    }
+                                },
+                                {
+                                    "name": "Complete session",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1/complete",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1",
+                                                "complete"
+                                            ]
+                                        },
+                                        "description": "Once its last day has come: every enrollment still enrolled is completed (granting the course's certification) except no_show_ids.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"no_show_ids\": [\n    3\n  ],\n  \"scores\": [\n    {\n      \"enrollment_id\": 1,\n      \"score\": 92\n    }\n  ]\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Cancel session",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/training-sessions/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "training-sessions",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Cancels its enrollments; those enrolled are notified (hr.training_cancelled)."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Certifications",
+                            "item": [
+                                {
+                                    "name": "List certifications",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/certifications?expires_before=2026-12-31",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "certifications"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "expires_before",
+                                                    "value": "2026-12-31"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: employee_id, expires_before. Expiry also appears in HR alerts."
+                                    }
+                                },
+                                {
+                                    "name": "Record certification",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/12/certifications",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "12",
+                                                "certifications"
+                                            ]
+                                        },
+                                        "description": "One earned outside, for example.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u0633\u0644\u0627\u0645\u0629 \u0627\u0644\u063a\u0630\u0627\u0621\",\n    \"en\": \"Food safety\"\n  },\n  \"issuer\": \"Ministry of Health\",\n  \"issued_on\": \"2026-01-15\",\n  \"expires_on\": \"2028-01-15\",\n  \"reference\": \"FS-2291\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Update certification",
+                                    "request": {
+                                        "method": "PATCH",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/certifications/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "certifications",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"expires_on\": \"2028-06-15\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Delete certification",
+                                    "request": {
+                                        "method": "DELETE",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/certifications/1",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "certifications",
+                                                "1"
+                                            ]
+                                        },
+                                        "description": "204."
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Learning budget",
+                            "item": [
+                                {
+                                    "name": "Balances",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/learning-budgets?year=2026",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "learning-budgets"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "year",
+                                                    "value": "2026"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Each employee's balance and available amount (pending requests held back) for a year."
+                                    }
+                                },
+                                {
+                                    "name": "Employee ledger",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/12/learning-budget?year=2026",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "12",
+                                                "learning-budget"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "year",
+                                                    "value": "2026"
+                                                }
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Allocate year",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/learning-budgets/allocate",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "learning-budgets",
+                                                "allocate"
+                                            ]
+                                        },
+                                        "description": "To the listed employees, or to everyone employed today; anyone already allocated that year is skipped. In hr.training.currency.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"year\": 2026,\n  \"amount\": 300,\n  \"employee_ids\": null\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Adjust budget",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees/12/learning-budget/adjust",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees",
+                                                "12",
+                                                "learning-budget",
+                                                "adjust"
+                                            ]
+                                        },
+                                        "description": "Signed amount.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"year\": 2026,\n  \"amount\": -50,\n  \"note\": \"Shared course paid by the company\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Learning requests",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/learning-requests?status=pending",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "learning-requests"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "status",
+                                                    "value": "pending"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Filters: status, employee_id. Decided in the approvals inbox (type learning)."
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
                     "name": "My HR (hr/me)",
                     "item": [
                         {
@@ -40286,6 +41304,370 @@
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Training",
+                            "item": [
+                                {
+                                    "name": "Open sessions",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/training-sessions",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "training-sessions"
+                                            ]
+                                        },
+                                        "description": "Scheduled sessions open to self-enrollment, not started yet."
+                                    }
+                                },
+                                {
+                                    "name": "Enroll",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/training-sessions/1/enroll",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "training-sessions",
+                                                "1",
+                                                "enroll"
+                                            ]
+                                        },
+                                        "description": "Within capacity."
+                                    }
+                                },
+                                {
+                                    "name": "My enrollments",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/enrollments",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "enrollments"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Cancel my enrollment",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/enrollments/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "enrollments",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "Before the session starts."
+                                    }
+                                },
+                                {
+                                    "name": "My certifications",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/certifications",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "certifications"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "My learning budget",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/learning-budget?year=2026",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "learning-budget"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "year",
+                                                    "value": "2026"
+                                                }
+                                            ]
+                                        },
+                                        "description": "balance, and available after pending requests."
+                                    }
+                                },
+                                {
+                                    "name": "My learning requests",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/learning-requests",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "learning-requests"
+                                            ]
+                                        },
+                                        "description": ""
+                                    }
+                                },
+                                {
+                                    "name": "Request learning",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/learning-requests",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "learning-requests"
+                                            ]
+                                        },
+                                        "description": "Spends my learning budget of the start date's year once approved (my approval chain). Refused when more than available.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"title\": \"Latte art course\",\n  \"provider\": \"Coffee Lab\",\n  \"starts_on\": \"2026-11-20\",\n  \"amount\": 120,\n  \"justification\": \"Needed for the new menu.\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    }
+                                },
+                                {
+                                    "name": "Cancel learning request",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/learning-requests/1/cancel",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "learning-requests",
+                                                "1",
+                                                "cancel"
+                                            ]
+                                        },
+                                        "description": "While pending."
                                     }
                                 }
                             ]
