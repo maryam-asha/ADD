@@ -21,6 +21,10 @@ return [
     'manager_cycle' => 'An employee cannot report to themselves or to someone who reports to them.',
     'manager_not_employed' => 'The manager is not employed on that date.',
 
+    // Documents
+    'document_type_updated' => 'Document type updated.',
+    'document_type_in_use' => 'Documents of this type are on file; deactivate the type instead.',
+
     // Employment events
     'not_employed_on_date' => 'The employee is not employed on that date.',
     'not_on_probation' => 'This employee is not on probation.',

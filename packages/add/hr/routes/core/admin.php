@@ -1,7 +1,9 @@
 <?php
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Http\Controllers\Admin\DocumentTypeController;
 use Add\Hr\Core\Http\Controllers\Admin\EmployeeController;
+use Add\Hr\Core\Http\Controllers\Admin\EmployeeDocumentController;
 use Add\Hr\Core\Http\Controllers\Admin\EmployeeRelationsController;
 use Add\Hr\Core\Http\Controllers\Admin\EmployeeSensitiveController;
 use Add\Hr\Core\Http\Controllers\Admin\EmploymentEventController;
@@ -50,6 +52,20 @@ Route::put('employees/{employee}/contacts', [EmployeeRelationsController::class,
     ->middleware('can:'.Abilities::EMPLOYEES_UPDATE)->name('employees.contacts');
 Route::put('employees/{employee}/dependents', [EmployeeRelationsController::class, 'dependents'])
     ->middleware('can:'.Abilities::EMPLOYEES_UPDATE)->name('employees.dependents');
+
+// Documents
+Route::middleware('can:'.Abilities::DOCUMENTS_VIEW)->group(function () {
+    Route::apiResource('document-types', DocumentTypeController::class)->only(['index', 'show'])->parameters(['document-types' => 'documentType']);
+    Route::get('employees/{employee}/documents', [EmployeeDocumentController::class, 'index'])->name('employees.documents.index');
+    Route::post('documents/{document}/link', [EmployeeDocumentController::class, 'link'])->name('documents.link');
+});
+Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
+    Route::apiResource('document-types', DocumentTypeController::class)->only(['store', 'update', 'destroy'])->parameters(['document-types' => 'documentType']);
+});
+Route::middleware('can:'.Abilities::DOCUMENTS_MANAGE)->group(function () {
+    Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
+    Route::delete('documents/{document}', [EmployeeDocumentController::class, 'destroy'])->name('documents.destroy');
+});
 
 // Career: events change the employment; the history reads are views of it.
 Route::post('employees/{employee}/events', [EmploymentEventController::class, 'store'])
