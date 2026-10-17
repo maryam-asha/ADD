@@ -39,6 +39,7 @@ return [
         'recruitment' => true,
         'performance' => true,
         'training' => true,
+        'reports' => true,
     ],
 
     'documents' => [

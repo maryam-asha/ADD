@@ -104,6 +104,9 @@ final class Abilities
     /** Running training: catalogue, sessions, enrollments, certifications, budget allocation. */
     public const TRAINING_MANAGE = 'hr.training.manage';
 
+    /** The HR dashboard and combined reports; money in them also needs hr.payroll.view. */
+    public const REPORTS_VIEW = 'hr.reports.view';
+
     /**
      * @return list<string>
      */
