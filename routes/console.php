@@ -1,5 +1,6 @@
 <?php
 
+use Add\Hr\Hr;
 use App\Domain\Forms\Models\Form;
 use App\Domain\Forms\Models\FormSubmission;
 use App\Domain\Identity\Models\PendingRegistration;
@@ -128,3 +129,11 @@ Schedule::command('leases:run-daily')->hourly()->withoutOverlapping();
  * renewals their plan balances once they start.
  */
 Schedule::command('renewals:run')->hourly()->withoutOverlapping();
+
+/*
+ * HR (packages/add/hr): each enabled module's daily jobs — refreshing
+ * employee statuses and revoking access once a termination's last day has
+ * passed, and the HR alerts digest. The package lists them itself
+ * (routes/<module>/schedule.php) so a module brings its jobs with it.
+ */
+Hr::schedule();
