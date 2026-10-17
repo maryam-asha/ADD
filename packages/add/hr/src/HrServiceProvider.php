@@ -5,15 +5,21 @@ namespace Add\Hr;
 use Add\Hr\Approvals\Console\ProcessTimeouts;
 use Add\Hr\Approvals\Services\ApprovalTypes;
 use Add\Hr\Contracts\AccountProvisioner;
+use Add\Hr\Contracts\EndOfServiceCalculator;
+use Add\Hr\Contracts\ExchangeRateProvider;
 use Add\Hr\Contracts\HrClock;
 use Add\Hr\Contracts\HrNotifier;
+use Add\Hr\Contracts\PayrollAccountingExporter;
 use Add\Hr\Core\Console\RefreshStatuses;
 use Add\Hr\Core\Console\SendAlerts;
 use Add\Hr\Core\Events\EmployeeHired;
 use Add\Hr\Core\Events\EmployeeTerminated;
 use Add\Hr\Core\Listeners\CreateChecklistTasks;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
+use Add\Hr\Integrations\ConfigExchangeRateProvider;
 use Add\Hr\Integrations\ConfigHrClock;
+use Add\Hr\Integrations\CostCenterJournal;
+use Add\Hr\Integrations\DaysPerYearEndOfService;
 use Add\Hr\Integrations\LogHrNotifier;
 use Add\Hr\Integrations\NullAccountProvisioner;
 use Add\Hr\Leave\Console\AccrueLeave;
@@ -22,6 +28,9 @@ use Add\Hr\Leave\Listeners\CancelLeaveAfterTermination;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Services\LeaveApprovalHandler;
 use Add\Hr\Leave\Services\LeaveService;
+use Add\Hr\Payroll\Models\Loan;
+use Add\Hr\Payroll\Services\LoanApprovalHandler;
+use Add\Hr\Payroll\Services\LoanService;
 use Add\Hr\Time\Console\ProcessAttendance;
 use Add\Hr\Time\Models\AttendanceEntry;
 use Add\Hr\Time\Models\OvertimeRequest;
@@ -48,6 +57,9 @@ class HrServiceProvider extends ServiceProvider
         $this->app->singletonIf(AccountProvisioner::class, NullAccountProvisioner::class);
         $this->app->singletonIf(HrNotifier::class, LogHrNotifier::class);
         $this->app->singletonIf(HrClock::class, ConfigHrClock::class);
+        $this->app->singletonIf(ExchangeRateProvider::class, ConfigExchangeRateProvider::class);
+        $this->app->singletonIf(EndOfServiceCalculator::class, DaysPerYearEndOfService::class);
+        $this->app->singletonIf(PayrollAccountingExporter::class, CostCenterJournal::class);
 
         // Each module's request types; a host may register more on the same
         // singleton.
@@ -57,6 +69,7 @@ class HrServiceProvider extends ServiceProvider
             $types->register(AttendanceEntryService::APPROVAL_TYPE, AttendanceEntryApprovalHandler::class);
             $types->register(OvertimeService::APPROVAL_TYPE, OvertimeApprovalHandler::class);
             $types->register(TimesheetService::APPROVAL_TYPE, TimesheetApprovalHandler::class);
+            $types->register(LoanService::APPROVAL_TYPE, LoanApprovalHandler::class);
 
             return $types;
         });
@@ -80,6 +93,7 @@ class HrServiceProvider extends ServiceProvider
             'hr_attendance_entry' => AttendanceEntry::class,
             'hr_overtime_request' => OvertimeRequest::class,
             'hr_timesheet' => Timesheet::class,
+            'hr_loan' => Loan::class,
         ]);
 
         if ($this->app->runningInConsole()) {

@@ -19,4 +19,7 @@ enum EmploymentEventType: string
     case Reinstatement = 'reinstatement';
     case Termination = 'termination';
     case Rehire = 'rehire';
+
+    /** Recorded by CompensationService when pay changes, not posted as an event. */
+    case CompensationChange = 'compensation_change';
 }

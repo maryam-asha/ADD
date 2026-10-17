@@ -115,7 +115,8 @@ class EmploymentLifecycleService
                 EmploymentEventType::Reinstatement => $this->reinstate($employee, $on, $data, $actorId),
                 EmploymentEventType::Termination => $this->terminate($employee, $on, $data, $actorId),
                 EmploymentEventType::Rehire => $this->rehire($employee, $on, $data, $actorId),
-                EmploymentEventType::Hire => HrException::fail('hr::core.event_date_invalid'),
+                EmploymentEventType::Hire,
+                EmploymentEventType::CompensationChange => HrException::fail('hr::core.event_date_invalid'),
             };
 
             $this->refreshStatus($employee);

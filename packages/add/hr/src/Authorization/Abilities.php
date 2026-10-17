@@ -63,6 +63,23 @@ final class Abilities
     /** Employees' planned cost splits. */
     public const TIMESHEETS_MANAGE = 'hr.timesheets.manage';
 
+    /** Pay, payroll runs, payslips, end-of-service figures, read-only. */
+    public const PAYROLL_VIEW = 'hr.payroll.view';
+
+    /** Opening, calculating, reviewing and adjusting payroll runs. */
+    public const PAYROLL_MANAGE = 'hr.payroll.manage';
+
+    /** The final approval of a run (never by who calculated it). */
+    public const PAYROLL_APPROVE = 'hr.payroll.approve';
+
+    /** Marking a run paid, exporting and posting its journal. */
+    public const PAYROLL_PAY = 'hr.payroll.pay';
+
+    /** Changing an employee's pay. */
+    public const COMPENSATION_MANAGE = 'hr.compensation.manage';
+
+    public const LOANS_MANAGE = 'hr.loans.manage';
+
     /**
      * @return list<string>
      */

@@ -34,6 +34,7 @@ return [
         'leave' => true,
         'time' => true,
         'timesheets' => true,
+        'payroll' => true,
     ],
 
     'documents' => [
@@ -77,6 +78,40 @@ return [
      * binds its own Add\Hr\Contracts\HrClock.
      */
     'timezone' => null,
+
+    'payroll' => [
+        // The default currency of a run.
+        'currency' => 'USD',
+
+        // Decimals money is rounded to, line by line.
+        'decimals' => 2,
+
+        // A regular run reads only a locked attendance month.
+        'require_locked_attendance' => true,
+
+        // The variance report flags a net pay that moved more than this.
+        'variance_threshold_percent' => 10,
+
+        // Rates for ConfigExchangeRateProvider: "FROM:TO" => units of TO
+        // per one FROM. A host with its own rates binds its own provider.
+        'exchange_rates' => [],
+
+        // Extra calculators: key => class implementing
+        // Add\Hr\Payroll\Contracts\ComponentCalculator.
+        'calculators' => [],
+
+        'loans' => [
+            'max_installments' => 24,
+            'max_salary_multiple' => 2,
+            'base_components' => ['basic'],
+        ],
+
+        // DaysPerYearEndOfService: days of monthly basis per year of service.
+        'end_of_service' => [
+            'days_per_year' => 30,
+            'base_components' => ['basic'],
+        ],
+    ],
 
     'timesheets' => [
         // ISO weekday a timesheet week starts on (1 = Monday).

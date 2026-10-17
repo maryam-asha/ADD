@@ -11,7 +11,7 @@ class AbilitiesTest extends TestCase
     {
         $all = Abilities::all();
 
-        $this->assertCount(22, $all);
+        $this->assertCount(28, $all);
         $this->assertSame($all, array_values(array_unique($all)));
     }
 

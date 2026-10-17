@@ -36,7 +36,7 @@ class RecordEmploymentEventRequest extends FormRequest
         $needsContract = $rehire || $type === EmploymentEventType::ContractRenewal->value;
 
         return [
-            'type' => ['required', Rule::enum(EmploymentEventType::class)->except([EmploymentEventType::Hire])],
+            'type' => ['required', Rule::enum(EmploymentEventType::class)->except([EmploymentEventType::Hire, EmploymentEventType::CompensationChange])],
             'effective_on' => ['required', 'date'],
             'effective_to' => ['nullable', 'date', 'after_or_equal:effective_on'],
             'reason' => $type === EmploymentEventType::Termination->value
