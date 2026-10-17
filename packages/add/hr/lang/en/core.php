@@ -25,6 +25,10 @@ return [
     'document_type_updated' => 'Document type updated.',
     'document_type_in_use' => 'Documents of this type are on file; deactivate the type instead.',
 
+    // Checklists
+    'checklist_template_updated' => 'Checklist template updated.',
+    'checklist_task_updated' => 'Task updated.',
+
     // Employment events
     'not_employed_on_date' => 'The employee is not employed on that date.',
     'not_on_probation' => 'This employee is not on probation.',

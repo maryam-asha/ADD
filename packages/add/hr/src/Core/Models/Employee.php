@@ -127,4 +127,9 @@ class Employee extends Model
     {
         return $this->hasMany(EmployeeDocument::class);
     }
+
+    public function checklistTasks(): HasMany
+    {
+        return $this->hasMany(ChecklistTask::class);
+    }
 }

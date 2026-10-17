@@ -1,6 +1,8 @@
 <?php
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Http\Controllers\Admin\ChecklistTaskController;
+use Add\Hr\Core\Http\Controllers\Admin\ChecklistTemplateController;
 use Add\Hr\Core\Http\Controllers\Admin\DocumentTypeController;
 use Add\Hr\Core\Http\Controllers\Admin\EmployeeController;
 use Add\Hr\Core\Http\Controllers\Admin\EmployeeDocumentController;
@@ -65,6 +67,15 @@ Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
 Route::middleware('can:'.Abilities::DOCUMENTS_MANAGE)->group(function () {
     Route::post('employees/{employee}/documents', [EmployeeDocumentController::class, 'store'])->name('employees.documents.store');
     Route::delete('documents/{document}', [EmployeeDocumentController::class, 'destroy'])->name('documents.destroy');
+});
+
+// Onboarding / offboarding
+Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
+    Route::apiResource('checklist-templates', ChecklistTemplateController::class)->parameters(['checklist-templates' => 'checklistTemplate']);
+});
+Route::middleware('can:'.Abilities::CHECKLISTS_MANAGE)->group(function () {
+    Route::get('employees/{employee}/checklist', [ChecklistTaskController::class, 'index'])->name('employees.checklist.index');
+    Route::patch('checklist-tasks/{task}', [ChecklistTaskController::class, 'update'])->name('checklist-tasks.update');
 });
 
 // Career: events change the employment; the history reads are views of it.

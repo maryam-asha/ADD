@@ -4,9 +4,13 @@ namespace Add\Hr;
 
 use Add\Hr\Contracts\AccountProvisioner;
 use Add\Hr\Core\Console\RefreshStatuses;
+use Add\Hr\Core\Events\EmployeeHired;
+use Add\Hr\Core\Events\EmployeeTerminated;
+use Add\Hr\Core\Listeners\CreateChecklistTasks;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
 use Add\Hr\Integrations\NullAccountProvisioner;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class HrServiceProvider extends ServiceProvider
@@ -26,6 +30,9 @@ class HrServiceProvider extends ServiceProvider
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'hr');
 
         $this->app->make(Router::class)->aliasMiddleware('hr.employee', EnsureActiveEmployee::class);
+
+        Event::listen(EmployeeHired::class, CreateChecklistTasks::class);
+        Event::listen(EmployeeTerminated::class, CreateChecklistTasks::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
