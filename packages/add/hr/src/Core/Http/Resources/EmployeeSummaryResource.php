@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * An employee in a list. Eager-load `activeAssignment.orgUnit` and
  * `activeAssignment.position` to keep lists to a few queries.
  *
- * @mixin \Add\Hr\Core\Models\Employee
+ * @mixin Employee
  */
 class EmployeeSummaryResource extends JsonResource
 {

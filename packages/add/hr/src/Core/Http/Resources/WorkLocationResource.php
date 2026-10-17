@@ -2,11 +2,12 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\WorkLocation;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \Add\Hr\Core\Models\WorkLocation
+ * @mixin WorkLocation
  */
 class WorkLocationResource extends JsonResource
 {

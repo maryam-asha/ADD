@@ -2,11 +2,12 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\OrgUnit;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
- * @mixin \Add\Hr\Core\Models\OrgUnit
+ * @mixin OrgUnit
  */
 class OrgUnitResource extends JsonResource
 {

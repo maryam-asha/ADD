@@ -3,6 +3,7 @@
 namespace Add\Hr\Core\Http\Resources;
 
 use Add\Hr\Core\Models\DocumentType;
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * The employee's own file as they see it: no sensitive values, no HR-only
  * fields, plus a summary of what their document file is missing.
  *
- * @mixin \Add\Hr\Core\Models\Employee
+ * @mixin Employee
  */
 class MyProfileResource extends JsonResource
 {

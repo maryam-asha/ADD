@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\EmployeeDocument;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * A document's metadata. Never the storage path: the file is reached only
  * through a signed link.
  *
- * @mixin \Add\Hr\Core\Models\EmployeeDocument
+ * @mixin EmployeeDocument
  */
 class EmployeeDocumentResource extends JsonResource
 {

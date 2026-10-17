@@ -2,13 +2,14 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * A direct report as their manager sees them: who and what, nothing personal.
  *
- * @mixin \Add\Hr\Core\Models\Employee
+ * @mixin Employee
  */
 class TeamMemberResource extends JsonResource
 {

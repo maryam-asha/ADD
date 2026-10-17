@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -9,7 +10,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * The decrypted sensitive fields. Returned only behind
  * hr.employees.view_sensitive, and every read is audited.
  *
- * @mixin \Add\Hr\Core\Models\Employee
+ * @mixin Employee
  */
 class EmployeeSensitiveResource extends JsonResource
 {

@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Models\Employee;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -10,7 +11,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * account — only whether they are on file; EmployeeSensitiveResource, behind
  * its own ability and an audit entry, is the one place they are read.
  *
- * @mixin \Add\Hr\Core\Models\Employee
+ * @mixin Employee
  */
 class EmployeeResource extends JsonResource
 {

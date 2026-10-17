@@ -3,6 +3,7 @@
 namespace Add\Hr\Tests\Unit;
 
 use Add\Hr\Hr;
+use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Routing\RouteCollection;
 use Illuminate\Support\Facades\Route;
@@ -39,6 +40,6 @@ class RouteMountingTest extends TestCase
 
     public function test_user_model_comes_from_config(): void
     {
-        $this->assertSame(\Add\Hr\Tests\Fixtures\User::class, Hr::userModel());
+        $this->assertSame(User::class, Hr::userModel());
     }
 }
