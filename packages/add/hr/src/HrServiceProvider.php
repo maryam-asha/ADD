@@ -29,6 +29,9 @@ use Add\Hr\Time\Services\AttendanceEntryApprovalHandler;
 use Add\Hr\Time\Services\AttendanceEntryService;
 use Add\Hr\Time\Services\OvertimeApprovalHandler;
 use Add\Hr\Time\Services\OvertimeService;
+use Add\Hr\Timesheets\Models\Timesheet;
+use Add\Hr\Timesheets\Services\TimesheetApprovalHandler;
+use Add\Hr\Timesheets\Services\TimesheetService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Routing\Router;
 use Illuminate\Support\Facades\Event;
@@ -53,6 +56,7 @@ class HrServiceProvider extends ServiceProvider
             $types->register(LeaveService::APPROVAL_TYPE, LeaveApprovalHandler::class);
             $types->register(AttendanceEntryService::APPROVAL_TYPE, AttendanceEntryApprovalHandler::class);
             $types->register(OvertimeService::APPROVAL_TYPE, OvertimeApprovalHandler::class);
+            $types->register(TimesheetService::APPROVAL_TYPE, TimesheetApprovalHandler::class);
 
             return $types;
         });
@@ -75,6 +79,7 @@ class HrServiceProvider extends ServiceProvider
             'hr_leave_request' => LeaveRequest::class,
             'hr_attendance_entry' => AttendanceEntry::class,
             'hr_overtime_request' => OvertimeRequest::class,
+            'hr_timesheet' => Timesheet::class,
         ]);
 
         if ($this->app->runningInConsole()) {

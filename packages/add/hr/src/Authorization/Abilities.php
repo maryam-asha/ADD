@@ -57,6 +57,12 @@ final class Abilities
 
     public const ROSTER_MANAGE = 'hr.roster.manage';
 
+    /** Timesheets, cost splits and the time-by-cost-center report, read-only. */
+    public const TIMESHEETS_VIEW = 'hr.timesheets.view';
+
+    /** Employees' planned cost splits. */
+    public const TIMESHEETS_MANAGE = 'hr.timesheets.manage';
+
     /**
      * @return list<string>
      */

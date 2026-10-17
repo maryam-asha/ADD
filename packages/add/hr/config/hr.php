@@ -33,6 +33,7 @@ return [
         'approvals' => true,
         'leave' => true,
         'time' => true,
+        'timesheets' => true,
     ],
 
     'documents' => [
@@ -76,6 +77,18 @@ return [
      * binds its own Add\Hr\Contracts\HrClock.
      */
     'timezone' => null,
+
+    'timesheets' => [
+        // ISO weekday a timesheet week starts on (1 = Monday).
+        'week_starts_on' => 1,
+
+        // Hours are entered in steps of this size.
+        'increment_hours' => 0.5,
+
+        // Null: a gap between a week's timesheet and its attendance is
+        // only shown. A number: submitting a week further off is refused.
+        'max_variance_hours' => null,
+    ],
 
     'attendance' => [
         // A card's QR value is "{card_prefix}:{token}".
