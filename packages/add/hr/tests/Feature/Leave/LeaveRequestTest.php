@@ -135,6 +135,8 @@ class LeaveRequestTest extends TestCase
         $permission = $this->leaveType(['unit' => 'hour', 'tracks_balance' => false]);
         $this->submit(['leave_type_id' => $permission->id, 'starts_on' => '2026-03-12', 'ends_on' => '2026-03-12', 'hours' => 2.5])
             ->assertCreated()->assertJsonPath('data.amount', '2.5')->assertJsonPath('data.hours', '2.5');
+        $this->submit(['leave_type_id' => $permission->id, 'starts_on' => '2026-03-13', 'ends_on' => '2026-03-13', 'hours' => 2, 'half_day' => 'first_half'])
+            ->assertUnprocessable()->assertJsonPath('message', __('hr::leave.hours_on_one_day'));
         $this->submit(['leave_type_id' => $permission->id, 'starts_on' => '2026-03-14', 'ends_on' => '2026-03-14', 'hours' => 2])
             ->assertUnprocessable()->assertJsonPath('message', __('hr::leave.no_working_days'));
     }

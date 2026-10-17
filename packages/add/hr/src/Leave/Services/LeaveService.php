@@ -54,7 +54,7 @@ class LeaveService
         }
 
         if ($type->unit === LeaveUnit::Hour) {
-            if (! $singleDay || $hours === null || $hours <= 0) {
+            if (! $singleDay || $hours === null || $hours <= 0 || $halfDay !== null) {
                 HrException::fail('hr::leave.hours_on_one_day');
             }
 
