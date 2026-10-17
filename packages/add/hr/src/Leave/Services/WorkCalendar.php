@@ -49,7 +49,7 @@ class WorkCalendar
      */
     private function isWorkingDayGiven(CarbonImmutable $day, array $holidays): bool
     {
-        return ! in_array($day->isoWeekday(), array_map('intval', (array) config('hr.leave.weekend_days', [])), true)
+        return ! in_array($day->isoWeekday(), array_map('intval', (array) config('hr.leave.weekend_days', [6, 7])), true)
             && ! isset($holidays[$day->toDateString()]);
     }
 

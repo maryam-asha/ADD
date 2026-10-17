@@ -19,4 +19,10 @@ return [
         'pad' => 4,
     ],
 
+    'leave' => [
+        // Friday and Saturday (ISO 5, 6) are ADD's weekend: never counted
+        // as leave days.
+        'weekend_days' => [5, 6],
+    ],
+
 ];

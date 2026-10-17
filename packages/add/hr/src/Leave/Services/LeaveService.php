@@ -49,8 +49,8 @@ class LeaveService
         $hours = isset($data['hours']) ? (float) $data['hours'] : null;
         $singleDay = $from->isSameDay($to);
 
-        if ($from->diffInDays($to) + 1 > (int) config('hr.leave.max_request_days')) {
-            HrException::fail('hr::leave.too_long', ['days' => (int) config('hr.leave.max_request_days')]);
+        if ($from->diffInDays($to) + 1 > (int) config('hr.leave.max_request_days', 366)) {
+            HrException::fail('hr::leave.too_long', ['days' => (int) config('hr.leave.max_request_days', 366)]);
         }
 
         if ($type->unit === LeaveUnit::Hour) {

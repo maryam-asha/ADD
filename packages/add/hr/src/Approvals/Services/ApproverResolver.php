@@ -5,6 +5,7 @@ namespace Add\Hr\Approvals\Services;
 use Add\Hr\Approvals\Enums\ApproverType;
 use Add\Hr\Approvals\Models\ApprovalRequest;
 use Add\Hr\Approvals\Models\ApprovalStep;
+use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\OrgUnit;
 use Carbon\CarbonImmutable;
@@ -54,7 +55,7 @@ class ApproverResolver
 
     public static function fallbackAbility(): string
     {
-        return (string) config('hr.approvals.fallback_ability');
+        return (string) config('hr.approvals.fallback_ability', Abilities::APPROVALS_MANAGE);
     }
 
     private function assign(ApprovalStep $step, ?Employee $approver): void
