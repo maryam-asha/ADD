@@ -18,6 +18,12 @@ class UserPersonalProfile extends Model
         'city',
         'avatar_url',
         'gender',
+        // Filled by HR for employees; not on the member surface.
+        'date_of_birth',
+        'nationality',
+        'marital_status',
+        'personal_email',
+        'address',
     ];
 
     protected function casts(): array
@@ -25,6 +31,7 @@ class UserPersonalProfile extends Model
         return [
             'gender' => Gender::class,
             'avatar_url' => AsMediaUrl::class,
+            'date_of_birth' => 'date',
         ];
     }
 

@@ -28486,57 +28486,7 @@
                                                 "work-locations"
                                             ]
                                         },
-                                        "description": ""
-                                    }
-                                },
-                                {
-                                    "name": "Create work location",
-                                    "request": {
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "Accept",
-                                                "value": "application/json",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/hr/work-locations",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "hr",
-                                                "work-locations"
-                                            ]
-                                        },
-                                        "description": "",
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u062d\u0644\u0628 \u2014 \u0627\u0644\u0633\u0643\u0643 \u0627\u0644\u062d\u062f\u064a\u062f\u064a\u0629\",\n    \"en\": \"Aleppo \u2014 Railway\"\n  },\n  \"address\": \"Aleppo\"\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        }
+                                        "description": "hr.org.view. In ADD these are the branches (config hr.work_locations.model): {id, name} only, for picking an assignment's or a job opening's work_location_id. Branches are managed under Branches; HR has no create/update/delete here."
                                     }
                                 }
                             ]
@@ -28588,11 +28538,53 @@
                                                 }
                                             ]
                                         },
-                                        "description": "hr.employees.view. Filters: status (upcoming|probation|active|suspended|terminated), org_unit_id (today's assignment), q (number or name in either language). Paginated by 25."
+                                        "description": "hr.employees.view. Filters: status, org_unit_id (today's assignment), user_id, and q - the employee number, or the name, phone or email on the person's account."
                                     }
                                 },
                                 {
-                                    "name": "Hire",
+                                    "name": "Find accounts (hire step 1)",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/accounts?q=0933",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "accounts"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "q",
+                                                    "value": "0933"
+                                                }
+                                            ]
+                                        },
+                                        "description": "hr.employees.create. The hire form's first step: up to 10 accounts whose name, phone or email contains q (at least 3 characters). Each row: {id, name, phone, email, employee_id} - employee_id is set when that account is already an employee. Provider accounts are never listed."
+                                    }
+                                },
+                                {
+                                    "name": "Hire (existing account)",
                                     "request": {
                                         "method": "POST",
                                         "header": [
@@ -28629,10 +28621,76 @@
                                                 "employees"
                                             ]
                                         },
-                                        "description": "hr.employees.create. The person, the first contract and the first assignment in one call. New account: needs work_email and an E.164 phone. 422 when the position is full, belongs to another unit, or the manager is not employed.",
+                                        "description": "hr.employees.create. Hire someone who already has an account (from Find accounts): user_id plus the job. name, phone and work_email are the account's and are refused here (422). Personal details and the sensitive fields are optional and saved on the account's profiles. 422 when the position is full, belongs to another unit, or the manager is not employed.",
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u0639\u0645\u0631 \u0627\u0644\u0634\u0627\u0645\u064a\",\n    \"en\": \"Omar Shami\"\n  },\n  \"gender\": \"male\",\n  \"date_of_birth\": \"1998-04-02\",\n  \"phone\": \"+963933190664\",\n  \"work_email\": \"omar@add.sy\",\n  \"national_id\": \"01020304050\",\n  \"hired_on\": \"2026-10-01\",\n  \"contract\": {\n    \"type\": \"fixed_term\",\n    \"ends_on\": \"2027-09-30\",\n    \"probation_ends_on\": \"2026-12-31\",\n    \"notice_period_days\": 30,\n    \"reference\": \"CT-2026-031\"\n  },\n  \"assignment\": {\n    \"org_unit_id\": \"{{hr_org_unit_id}}\",\n    \"position_id\": \"{{hr_position_id}}\",\n    \"job_grade_id\": \"{{hr_job_grade_id}}\",\n    \"manager_id\": 4,\n    \"work_location_id\": \"{{hr_work_location_id}}\",\n    \"employment_type\": \"full_time\",\n    \"work_mode\": \"on_site\"\n  }\n}",
+                                            "raw": "{\n  \"user_id\": 12,\n  \"gender\": \"male\",\n  \"date_of_birth\": \"1998-04-02\",\n  \"nationality\": \"SY\",\n  \"marital_status\": \"single\",\n  \"address\": \"\u062d\u0644\u0628 - \u0627\u0644\u0641\u0631\u0642\u0627\u0646\",\n  \"national_id\": \"01020304050\",\n  \"bank_account\": \"SY21-0001-2345\",\n  \"hired_on\": \"2026-10-01\",\n  \"contract\": {\n    \"type\": \"fixed_term\",\n    \"ends_on\": \"2027-09-30\",\n    \"probation_ends_on\": \"2026-12-31\",\n    \"notice_period_days\": 30,\n    \"reference\": \"CT-2026-031\"\n  },\n  \"assignment\": {\n    \"org_unit_id\": \"{{hr_org_unit_id}}\",\n    \"position_id\": \"{{hr_position_id}}\",\n    \"job_grade_id\": \"{{hr_job_grade_id}}\",\n    \"manager_id\": 4,\n    \"work_location_id\": \"{{branch_id}}\",\n    \"employment_type\": \"full_time\",\n    \"work_mode\": \"on_site\"\n  }\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "Hired",
+                                            "status": "Created",
+                                            "code": 201,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"data\": {\n    \"id\": 12,\n    \"employee_number\": \"ADD-0012\",\n    \"user_id\": 341,\n    \"name\": {\n      \"ar\": \"\u0639\u0645\u0631 \u0627\u0644\u0634\u0627\u0645\u064a\",\n      \"en\": \"Omar Shami\"\n    },\n    \"gender\": \"male\",\n    \"date_of_birth\": \"1998-04-02\",\n    \"nationality\": null,\n    \"marital_status\": null,\n    \"phone\": \"+963933190664\",\n    \"personal_email\": null,\n    \"work_email\": \"omar@add.sy\",\n    \"address\": null,\n    \"has_national_id\": true,\n    \"has_bank_account\": false,\n    \"status\": \"probation\",\n    \"hired_on\": \"2026-10-01\",\n    \"probation_ends_on\": \"2026-12-31\",\n    \"confirmed_on\": null,\n    \"terminated_on\": null,\n    \"termination_reason\": null,\n    \"current_assignment\": {\n      \"id\": 12,\n      \"effective_from\": \"2026-10-01\",\n      \"effective_to\": null,\n      \"org_unit\": {\n        \"id\": 3,\n        \"name\": {\n          \"ar\": \"\u0627\u0644\u0645\u0642\u0647\u0649\",\n          \"en\": \"Caf\u00e9\"\n        }\n      },\n      \"position\": {\n        \"id\": 7,\n        \"title\": {\n          \"ar\": \"\u0628\u0627\u0631\u064a\u0633\u062a\u0627 \u0623\u0648\u0644\",\n          \"en\": \"Senior barista\"\n        }\n      },\n      \"job_grade\": {\n        \"id\": 2,\n        \"code\": \"G2\",\n        \"name\": {\n          \"ar\": \"\u0627\u0644\u062f\u0631\u062c\u0629 \u0627\u0644\u062b\u0627\u0646\u064a\u0629\",\n          \"en\": \"Grade 2\"\n        }\n      },\n      \"manager\": {\n        \"id\": 4,\n        \"employee_number\": \"ADD-0004\",\n        \"name\": {\n          \"ar\": \"\u0641\u0627\u062f\u064a \u0645\u0631\u0639\u064a\",\n          \"en\": \"Fadi Marai\"\n        }\n      },\n      \"work_location\": {\n        \"id\": 1,\n        \"name\": {\n          \"ar\": \"\u062d\u0644\u0628 \u2014 \u0627\u0644\u0633\u0643\u0643 \u0627\u0644\u062d\u062f\u064a\u062f\u064a\u0629\",\n          \"en\": \"Aleppo \u2014 Railway\"\n        }\n      },\n      \"job_title\": {\n        \"ar\": \"\u0628\u0627\u0631\u064a\u0633\u062a\u0627 \u0623\u0648\u0644\",\n        \"en\": \"Senior barista\"\n      },\n      \"employment_type\": \"full_time\",\n      \"work_mode\": \"on_site\"\n    },\n    \"current_contract\": {\n      \"id\": 9,\n      \"type\": \"fixed_term\",\n      \"starts_on\": \"2026-10-01\",\n      \"ends_on\": \"2027-09-30\",\n      \"notice_period_days\": 30,\n      \"reference\": \"CT-2026-031\"\n    },\n    \"contacts\": [],\n    \"dependents\": []\n  }\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Hire (new person)",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/employees",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "employees"
+                                            ]
+                                        },
+                                        "description": "hr.employees.create. Someone with no account: name, phone (E.164) and work_email make one, with no role and a link sent to choose a password. An account already holding that phone or email is linked instead. 422 with api.hr.work_email_required / phone_required / phone_invalid when a new account lacks one.",
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"name\": {\n    \"ar\": \"\u0639\u0645\u0631 \u0627\u0644\u0634\u0627\u0645\u064a\",\n    \"en\": \"Omar Shami\"\n  },\n  \"phone\": \"+963933190664\",\n  \"work_email\": \"omar@add.sy\",\n  \"gender\": \"male\",\n  \"date_of_birth\": \"1998-04-02\",\n  \"hired_on\": \"2026-10-01\",\n  \"contract\": {\n    \"type\": \"open_ended\",\n    \"probation_ends_on\": \"2026-12-31\"\n  },\n  \"assignment\": {\n    \"org_unit_id\": \"{{hr_org_unit_id}}\",\n    \"position_id\": \"{{hr_position_id}}\",\n    \"work_location_id\": \"{{branch_id}}\",\n    \"employment_type\": \"full_time\",\n    \"work_mode\": \"on_site\"\n  }\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -28733,10 +28791,10 @@
                                                 "{{hr_employee_id}}"
                                             ]
                                         },
-                                        "description": "hr.employees.update. Personal fields only; job, contract and dates change through career events.",
+                                        "description": "hr.employees.update. Personal details and the sensitive fields, saved on the person's account profiles. name, phone and work_email belong to the account and are refused (422, hr::core.person_field_on_account); job, contract and dates change through career events.",
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"phone\": \"+963933000000\",\n  \"marital_status\": \"married\"\n}",
+                                            "raw": "{\n  \"marital_status\": \"married\",\n  \"address\": \"\u062d\u0644\u0628 - \u0627\u0644\u062d\u0645\u062f\u0627\u0646\u064a\u0629\",\n  \"bank_account\": \"SY21-0001-9999\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"

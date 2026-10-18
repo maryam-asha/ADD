@@ -5,7 +5,6 @@ namespace Add\Hr\Core\Http\Requests;
 use Add\Hr\Core\Enums\ContractType;
 use Add\Hr\Core\Enums\EmploymentType;
 use Add\Hr\Core\Enums\WorkMode;
-use Add\Hr\Core\Http\Requests\Concerns\PersonalFieldRules;
 use Add\Hr\Hr;
 use Add\Hr\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
@@ -17,8 +16,6 @@ use Illuminate\Validation\Rule;
  */
 class HireEmployeeRequest extends FormRequest
 {
-    use PersonalFieldRules;
-
     public function authorize(): bool
     {
         return true;
@@ -30,8 +27,8 @@ class HireEmployeeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            ...TranslatableField::rules('name'),
-            ...$this->personalFieldRules(),
+            // The person: what the PersonStore keeps, and lets HR set.
+            ...Hr::people()->hireRules($this->filled('user_id')),
             'employee_number' => ['nullable', 'string', 'max:32', 'unique:hr_employees,employee_number'],
             'user_id' => ['nullable', Rule::exists(Hr::usersTable(), 'id'), Rule::unique('hr_employees', 'user_id')],
             'hired_on' => ['required', 'date'],
@@ -48,11 +45,19 @@ class HireEmployeeRequest extends FormRequest
             'assignment.position_id' => ['nullable', 'integer', 'exists:hr_positions,id'],
             'assignment.job_grade_id' => ['nullable', 'integer', 'exists:hr_job_grades,id'],
             'assignment.manager_id' => ['nullable', 'integer', 'exists:hr_employees,id'],
-            'assignment.work_location_id' => ['nullable', 'integer', 'exists:hr_work_locations,id'],
+            'assignment.work_location_id' => ['nullable', 'integer', Rule::exists(Hr::workLocationsTable(), 'id')],
             ...TranslatableField::rules('assignment.job_title', required: false),
             'assignment.employment_type' => ['required', Rule::enum(EmploymentType::class)],
             'assignment.work_mode' => ['required', Rule::enum(WorkMode::class)],
             'assignment.work_pattern_id' => ['nullable', 'integer', 'exists:hr_work_patterns,id'],
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['prohibited' => __('hr::core.person_field_on_account')];
     }
 }

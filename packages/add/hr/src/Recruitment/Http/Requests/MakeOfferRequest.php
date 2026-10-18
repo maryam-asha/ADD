@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Recruitment\Http\Requests;
 
+use Add\Hr\Hr;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,7 +27,7 @@ class MakeOfferRequest extends FormRequest
             'compensation' => ['nullable', 'array', 'max:30'],
             'compensation.*.pay_component_id' => ['required', 'integer', 'distinct', Rule::exists('hr_pay_components', 'id')->where('is_active', true)],
             'compensation.*.amount' => ['required', 'numeric', 'min:0', 'max:9999999999'],
-            'compensation.*.currency' => ['required', 'string', 'size:3'],
+            'compensation.*.currency' => ['required', ...Hr::currencyRules()],
             'terms' => ['nullable', 'string', 'max:5000'],
         ];
     }

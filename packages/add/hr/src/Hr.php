@@ -2,7 +2,11 @@
 
 namespace Add\Hr;
 
+use Add\Hr\Contracts\PersonStore;
+use Add\Hr\Core\Models\WorkLocation;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Validation\Rule;
 
 /**
  * The host-facing entry points. The package mounts no route and schedules
@@ -75,6 +79,55 @@ final class Hr
         $model = self::userModel();
 
         return (new $model)->getTable();
+    }
+
+    public static function people(): PersonStore
+    {
+        return app(PersonStore::class);
+    }
+
+    /**
+     * Where employees work: the package's hr_work_locations, or the host's
+     * own model (config hr.work_locations.model, e.g. ADD's Branch).
+     *
+     * @return class-string<Model>
+     */
+    public static function workLocationModel(): string
+    {
+        return config('hr.work_locations.model') ?? WorkLocation::class;
+    }
+
+    public static function workLocationsTable(): string
+    {
+        $model = self::workLocationModel();
+
+        return (new $model)->getTable();
+    }
+
+    /**
+     * Whether HR manages the locations itself (its CRUD routes are mounted
+     * only then).
+     */
+    public static function ownsWorkLocations(): bool
+    {
+        return self::workLocationModel() === WorkLocation::class;
+    }
+
+    /**
+     * Rules for a currency code: three letters, and one of the host's
+     * currencies when config hr.currencies.table names its table.
+     *
+     * @return list<mixed>
+     */
+    public static function currencyRules(): array
+    {
+        $table = config('hr.currencies.table');
+
+        return [
+            'string',
+            'size:3',
+            ...($table ? [Rule::exists($table, config('hr.currencies.column', 'code'))] : []),
+        ];
     }
 
     private static function loadModuleRoutes(string $surface): void

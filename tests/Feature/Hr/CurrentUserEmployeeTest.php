@@ -31,8 +31,8 @@ class CurrentUserEmployeeTest extends TestCase
 
     public function test_employee_summary_for_an_employee(): void
     {
-        $user = User::factory()->create();
-        $employee = $this->hireFor($user, ['name' => ['ar' => 'نور', 'en' => 'Nour']]);
+        $user = User::factory()->create(['name' => 'Nour']);
+        $employee = $this->hireFor($user);
         Sanctum::actingAs($user, ['*']);
 
         $this->getJson('/api/v1/auth/me')

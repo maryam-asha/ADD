@@ -7,6 +7,7 @@ use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Enums\EmploymentType;
 use Add\Hr\Core\Enums\TerminationReason;
 use Add\Hr\Core\Enums\WorkMode;
+use Add\Hr\Hr;
 use Add\Hr\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -56,7 +57,7 @@ class RecordEmploymentEventRequest extends FormRequest
             'assignment.position_id' => ['nullable', 'integer', 'exists:hr_positions,id'],
             'assignment.job_grade_id' => ['nullable', 'integer', 'exists:hr_job_grades,id'],
             'assignment.manager_id' => ['nullable', 'integer', 'exists:hr_employees,id'],
-            'assignment.work_location_id' => ['nullable', 'integer', 'exists:hr_work_locations,id'],
+            'assignment.work_location_id' => ['nullable', 'integer', Rule::exists(Hr::workLocationsTable(), 'id')],
             ...TranslatableField::rules('assignment.job_title', required: false),
             'assignment.employment_type' => [Rule::requiredIf($rehire), Rule::enum(EmploymentType::class)],
             'assignment.work_mode' => [Rule::requiredIf($rehire), Rule::enum(WorkMode::class)],

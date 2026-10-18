@@ -17,6 +17,7 @@ return [
     'contacts_updated' => 'Emergency contacts updated.',
     'dependents_updated' => 'Dependents updated.',
     'user_required' => 'Every employee needs an account: choose a user or provide what is needed to create one.',
+    'person_field_on_account' => 'This field belongs to the user account; change it there, not on the employee file.',
     'user_already_employee' => 'This account already belongs to another employee.',
     'position_full' => 'This position has no free seat from that date.',
     'position_unit_mismatch' => 'The position does not belong to the chosen unit.',

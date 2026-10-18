@@ -31,9 +31,14 @@ class RecordingProvisioner implements AccountProvisioner
         $this->authorized[] = $userId;
     }
 
-    public function provision(Employee $employee): int|string|null
+    public function provision(Employee $employee, array $person): int|string|null
     {
         return $this->provisionAs;
+    }
+
+    public function search(string $term, int $limit): array
+    {
+        return [];
     }
 
     public function deprovision(Employee $employee): void

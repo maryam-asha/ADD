@@ -1,6 +1,7 @@
 <?php
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Http\Controllers\Admin\AccountLookupController;
 use Add\Hr\Core\Http\Controllers\Admin\AlertController;
 use Add\Hr\Core\Http\Controllers\Admin\ChecklistTaskController;
 use Add\Hr\Core\Http\Controllers\Admin\ChecklistTemplateController;
@@ -14,6 +15,7 @@ use Add\Hr\Core\Http\Controllers\Admin\JobGradeController;
 use Add\Hr\Core\Http\Controllers\Admin\OrgUnitController;
 use Add\Hr\Core\Http\Controllers\Admin\PositionController;
 use Add\Hr\Core\Http\Controllers\Admin\WorkLocationController;
+use Add\Hr\Hr;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -25,8 +27,16 @@ $organization = [
     'org-units' => [OrgUnitController::class, 'orgUnit'],
     'job-grades' => [JobGradeController::class, 'jobGrade'],
     'positions' => [PositionController::class, 'position'],
-    'work-locations' => [WorkLocationController::class, 'workLocation'],
 ];
+
+// Locations HR keeps itself are managed here; a host's own (its branches)
+// are only listed, for picking one.
+if (Hr::ownsWorkLocations()) {
+    $organization['work-locations'] = [WorkLocationController::class, 'workLocation'];
+} else {
+    Route::get('work-locations', [WorkLocationController::class, 'index'])
+        ->middleware('can:'.Abilities::ORG_VIEW)->name('work-locations.index');
+}
 
 Route::middleware('can:'.Abilities::ORG_VIEW)->group(function () use ($organization) {
     foreach ($organization as $uri => [$controller, $parameter]) {
@@ -41,6 +51,8 @@ Route::middleware('can:'.Abilities::ORG_MANAGE)->group(function () use ($organiz
 });
 
 // Employees
+Route::get('accounts', [AccountLookupController::class, 'index'])
+    ->middleware('can:'.Abilities::EMPLOYEES_CREATE)->name('accounts.index');
 Route::get('employees', [EmployeeController::class, 'index'])
     ->middleware('can:'.Abilities::EMPLOYEES_VIEW)->name('employees.index');
 Route::post('employees', [EmployeeController::class, 'store'])

@@ -18,8 +18,11 @@ trait HiresAddEmployees
      */
     protected function hirePayload(array $overrides = []): array
     {
+        // An existing account brings its own name (AddPersonStore).
+        $person = isset($overrides['user_id']) ? [] : ['name' => ['ar' => 'موظف', 'en' => 'Employee']];
+
         return array_replace_recursive([
-            'name' => ['ar' => 'موظف', 'en' => 'Employee'],
+            ...$person,
             'hired_on' => now()->subMonth()->toDateString(),
             'contract' => ['type' => 'open_ended'],
             'assignment' => [

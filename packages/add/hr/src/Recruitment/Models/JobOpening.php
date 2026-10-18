@@ -3,7 +3,7 @@
 namespace Add\Hr\Recruitment\Models;
 
 use Add\Hr\Core\Enums\EmploymentType;
-use Add\Hr\Core\Models\WorkLocation;
+use Add\Hr\Hr;
 use Add\Hr\Recruitment\Enums\OpeningStatus;
 use Add\Hr\Recruitment\Enums\OpeningVisibility;
 use Add\Hr\Support\Casts\DateOnly;
@@ -73,7 +73,7 @@ class JobOpening extends Model
 
     public function workLocation(): BelongsTo
     {
-        return $this->belongsTo(WorkLocation::class);
+        return $this->belongsTo(Hr::workLocationModel(), 'work_location_id');
     }
 
     public function applications(): HasMany

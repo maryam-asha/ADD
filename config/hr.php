@@ -1,10 +1,11 @@
 <?php
 
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
 
 /*
  * ADD's settings for the HR package (packages/add/hr). Anything not set here
- * falls back to the package's own config/hr.php.
+ * falls back to the package's own config/hr.php, option by option.
  */
 return [
 
@@ -17,6 +18,17 @@ return [
     'employee_number' => [
         'prefix' => 'ADD-',
         'pad' => 4,
+    ],
+
+    // Staff work at ADD's branches; HR keeps no list of its own.
+    'work_locations' => [
+        'model' => Branch::class,
+    ],
+
+    // Every money amount HR records is in one of ADD's currencies.
+    'currencies' => [
+        'table' => 'currencies',
+        'column' => 'code',
     ],
 
     'leave' => [

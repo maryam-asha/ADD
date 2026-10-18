@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Payroll\Http\Requests;
 
+use Add\Hr\Hr;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -26,7 +27,7 @@ class ChangeCompensationRequest extends FormRequest
             'lines' => ['present', 'array', 'max:30'],
             'lines.*.pay_component_id' => ['required', 'integer', 'distinct', Rule::exists('hr_pay_components', 'id')->where('is_active', true)],
             'lines.*.amount' => ['required', 'numeric', 'min:0', 'max:9999999999'],
-            'lines.*.currency' => ['required', 'string', 'size:3'],
+            'lines.*.currency' => ['required', ...Hr::currencyRules()],
         ];
     }
 }

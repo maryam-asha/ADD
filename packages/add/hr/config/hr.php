@@ -25,6 +25,26 @@ return [
     ],
 
     /*
+     * Where employees work. Null: HR keeps its own list (hr_work_locations,
+     * managed under hr/work-locations). A model class: the host's own
+     * records (with a `name`), which HR only lists and links to;
+     * assignments and job openings then reference that model's table. Set
+     * it before migrating — a migration points their keys at that table.
+     */
+    'work_locations' => [
+        'model' => null,
+    ],
+
+    /*
+     * Currency codes are three letters; when `table` is set, also one of
+     * the host's currencies there (`column`).
+     */
+    'currencies' => [
+        'table' => null,
+        'column' => 'code',
+    ],
+
+    /*
      * Each module's routes and scheduled commands are mounted only while it
      * is enabled here. Migrations always load.
      */

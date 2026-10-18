@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Payroll\Http\Requests;
 
+use Add\Hr\Hr;
 use Add\Hr\Payroll\Enums\RateTableKind;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -32,7 +33,7 @@ class StoreRateVersionRequest extends FormRequest
             'brackets' => [$brackets ? 'required' : 'prohibited', 'array', 'min:1', 'max:30'],
             'brackets.*.up_to' => ['nullable', 'numeric', 'gt:0'],
             'brackets.*.rate' => ['required', 'numeric', 'min:0', 'max:100'],
-            'currency' => ['nullable', 'string', 'size:3'],
+            'currency' => ['nullable', ...Hr::currencyRules()],
             'note' => ['nullable', 'string', 'max:255'],
         ];
     }

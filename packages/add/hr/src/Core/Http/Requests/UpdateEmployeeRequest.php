@@ -2,8 +2,7 @@
 
 namespace Add\Hr\Core\Http\Requests;
 
-use Add\Hr\Core\Http\Requests\Concerns\PersonalFieldRules;
-use Add\Hr\Support\TranslatableField;
+use Add\Hr\Hr;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -12,8 +11,6 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class UpdateEmployeeRequest extends FormRequest
 {
-    use PersonalFieldRules;
-
     public function authorize(): bool
     {
         return true;
@@ -24,9 +21,14 @@ class UpdateEmployeeRequest extends FormRequest
      */
     public function rules(): array
     {
-        return [
-            ...TranslatableField::sometimes('name'),
-            ...$this->personalFieldRules($this->route('employee')?->id),
-        ];
+        return Hr::people()->updateRules($this->route('employee'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['prohibited' => __('hr::core.person_field_on_account')];
     }
 }

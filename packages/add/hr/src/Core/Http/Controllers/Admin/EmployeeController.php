@@ -9,18 +9,21 @@ use Add\Hr\Core\Http\Resources\EmployeeResource;
 use Add\Hr\Core\Http\Resources\EmployeeSummaryResource;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
+use Add\Hr\Hr;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 class EmployeeController extends Controller
 {
     /**
-     * Filters: `status`, `org_unit_id` (today's assignment), and `q` — the
-     * employee number or either language of the name.
+     * Filters: `status`, `org_unit_id` (today's assignment), `user_id`, and
+     * `q` — the employee number, or the person's name, phone or email
+     * wherever the PersonStore keeps them.
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -28,6 +31,7 @@ class EmployeeController extends Controller
             'status' => ['nullable', Rule::enum(EmployeeStatus::class)],
             'org_unit_id' => ['nullable', 'integer'],
             'q' => ['nullable', 'string', 'max:100'],
+            'user_id' => ['nullable', 'integer'],
         ]);
 
         $employees = Employee::query()
@@ -37,15 +41,11 @@ class EmployeeController extends Controller
                 'assignments',
                 fn ($a) => $a->activeOn(CarbonImmutable::today())->where('org_unit_id', $unitId),
             ))
-            ->when($request->query('q'), function ($q, string $term) {
-                // JSON columns hold non-ASCII text \u-escaped on SQLite and
-                // as-is on MySQL, so search both spellings of the name.
-                $escaped = trim(json_encode($term), '"');
-
-                $q->where(fn ($w) => $w->where('employee_number', 'like', "%{$term}%")
-                    ->orWhere('name', 'like', "%{$term}%")
-                    ->orWhere('name', 'like', "%{$escaped}%"));
-            })
+            ->when($request->query('q'), fn ($q, string $term) => $q->where(
+                fn ($w) => $w->where('employee_number', 'like', "%{$term}%")
+                    ->orWhere(fn ($person) => Hr::people()->search($person, $term)),
+            ))
+            ->when($request->query('user_id'), fn ($q, $userId) => $q->where('user_id', $userId))
             ->orderBy('id')
             ->paginate(25);
 
@@ -66,7 +66,7 @@ class EmployeeController extends Controller
 
     public function update(UpdateEmployeeRequest $request, Employee $employee): JsonResponse
     {
-        $employee->update($request->validated());
+        DB::transaction(fn () => Hr::people()->put($employee, $request->validated()));
 
         return response()->json(['message' => __('hr::core.employee_updated')]);
     }

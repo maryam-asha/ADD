@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Payroll\Http\Requests;
 
+use Add\Hr\Hr;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -21,7 +22,7 @@ class AddAdjustmentRequest extends FormRequest
             'employee_id' => ['required', 'integer', Rule::exists('hr_employees', 'id')],
             'pay_component_id' => ['required', 'integer', Rule::exists('hr_pay_components', 'id')],
             'amount' => ['required', 'numeric', 'not_in:0', 'between:-9999999999,9999999999'],
-            'currency' => ['required', 'string', 'size:3'],
+            'currency' => ['required', ...Hr::currencyRules()],
             'note' => ['required', 'string', 'max:500'],
         ];
     }

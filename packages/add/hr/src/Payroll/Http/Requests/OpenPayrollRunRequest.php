@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Payroll\Http\Requests;
 
+use Add\Hr\Hr;
 use Add\Hr\Payroll\Enums\PayrollRunKind;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,7 @@ class OpenPayrollRunRequest extends FormRequest
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'month' => ['required', 'integer', 'min:1', 'max:12'],
             'kind' => ['required', Rule::enum(PayrollRunKind::class)],
-            'currency' => ['nullable', 'string', 'size:3'],
+            'currency' => ['nullable', ...Hr::currencyRules()],
             'parallel_run' => ['sometimes', 'boolean'],
             'employee_ids' => ['nullable', 'array', 'max:500'],
             'employee_ids.*' => ['integer', Rule::exists('hr_employees', 'id')],

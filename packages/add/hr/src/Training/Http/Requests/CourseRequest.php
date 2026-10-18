@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Training\Http\Requests;
 
+use Add\Hr\Hr;
 use Add\Hr\Support\TranslatableField;
 use Add\Hr\Training\Enums\Delivery;
 use Illuminate\Foundation\Http\FormRequest;
@@ -34,7 +35,7 @@ class CourseRequest extends FormRequest
             'delivery' => [$creating ? 'required' : 'sometimes', Rule::enum(Delivery::class)],
             'duration_hours' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'cost' => ['nullable', 'numeric', 'min:0'],
-            'currency' => ['nullable', 'required_with:cost', 'string', 'size:3'],
+            'currency' => ['nullable', 'required_with:cost', ...Hr::currencyRules()],
             ...TranslatableField::rules('certification_name', false),
             'certification_valid_months' => ['nullable', 'integer', 'min:1', 'max:240'],
             'is_active' => ['sometimes', 'boolean'],

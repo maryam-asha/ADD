@@ -12,9 +12,14 @@ class NullAccountProvisioner implements AccountProvisioner
 {
     public function authorizeLink(int|string $userId): void {}
 
-    public function provision(Employee $employee): int|string|null
+    public function provision(Employee $employee, array $person): int|string|null
     {
         return null;
+    }
+
+    public function search(string $term, int $limit): array
+    {
+        return [];
     }
 
     public function deprovision(Employee $employee): void {}

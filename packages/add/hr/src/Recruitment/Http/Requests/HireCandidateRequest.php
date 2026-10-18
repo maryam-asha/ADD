@@ -19,10 +19,16 @@ class HireCandidateRequest extends HireEmployeeRequest
         $application = $this->route('application')->loadMissing(['candidate', 'liveOffer', 'opening.requisition']);
         $requisition = $application->opening->requisition;
 
-        $this->merge(array_replace_recursive([
+        // The candidate's details make a new person; an existing account
+        // brings its own (the PersonStore may refuse them as overrides).
+        $person = $this->filled('user_id') ? [] : [
             'name' => ['ar' => $application->candidate->name],
             'phone' => $application->candidate->phone,
             'personal_email' => $application->candidate->email,
+        ];
+
+        $this->merge(array_replace_recursive([
+            ...$person,
             'hired_on' => $application->liveOffer?->start_on?->toDateString(),
             'contract' => ['type' => 'open_ended'],
             'assignment' => array_filter([

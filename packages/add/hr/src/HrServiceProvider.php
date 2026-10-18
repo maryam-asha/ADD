@@ -13,12 +13,14 @@ use Add\Hr\Contracts\ExchangeRateProvider;
 use Add\Hr\Contracts\HrClock;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Contracts\PayrollAccountingExporter;
+use Add\Hr\Contracts\PersonStore;
 use Add\Hr\Core\Console\RefreshStatuses;
 use Add\Hr\Core\Console\SendAlerts;
 use Add\Hr\Core\Events\EmployeeHired;
 use Add\Hr\Core\Events\EmployeeTerminated;
 use Add\Hr\Core\Listeners\CreateChecklistTasks;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
+use Add\Hr\Integrations\ColumnPersonStore;
 use Add\Hr\Integrations\ConfigExchangeRateProvider;
 use Add\Hr\Integrations\ConfigHrClock;
 use Add\Hr\Integrations\CostCenterJournal;
@@ -67,11 +69,12 @@ class HrServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__.'/../config/hr.php', 'hr');
+        $this->mergeConfigDeep(__DIR__.'/../config/hr.php', 'hr');
 
         // Neutral defaults; the host binds its own in its provider, which
         // registers after package providers and so wins.
         $this->app->singletonIf(AccountProvisioner::class, NullAccountProvisioner::class);
+        $this->app->singletonIf(PersonStore::class, ColumnPersonStore::class);
         $this->app->singletonIf(HrNotifier::class, LogHrNotifier::class);
         $this->app->singletonIf(HrClock::class, ConfigHrClock::class);
         $this->app->singletonIf(ExchangeRateProvider::class, ConfigExchangeRateProvider::class);
@@ -137,5 +140,40 @@ class HrServiceProvider extends ServiceProvider
         }
 
         $this->publishes([__DIR__.'/../config/hr.php' => config_path('hr.php')], 'hr-config');
+    }
+
+    /**
+     * Laravel's mergeConfigFrom() merges only the top level, so a host
+     * config/hr.php that sets one option of a group (leave.weekend_days)
+     * would drop the group's other defaults. Here the host's values win
+     * key by key at every level; a list (weekend_days, mimes) is replaced
+     * whole.
+     */
+    private function mergeConfigDeep(string $path, string $key): void
+    {
+        if ($this->app->configurationIsCached()) {
+            return;
+        }
+
+        $config = $this->app->make('config');
+        $config->set($key, self::mergeOptions(require $path, $config->get($key, [])));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $defaults
+     * @param  array<array-key, mixed>  $host
+     * @return array<array-key, mixed>
+     */
+    private static function mergeOptions(array $defaults, array $host): array
+    {
+        foreach ($host as $option => $value) {
+            $default = $defaults[$option] ?? null;
+
+            $defaults[$option] = is_array($value) && ! array_is_list($value) && is_array($default) && ! array_is_list($default)
+                ? self::mergeOptions($default, $value)
+                : $value;
+        }
+
+        return $defaults;
     }
 }

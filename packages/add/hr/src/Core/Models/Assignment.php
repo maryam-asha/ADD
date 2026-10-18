@@ -4,6 +4,7 @@ namespace Add\Hr\Core\Models;
 
 use Add\Hr\Core\Enums\EmploymentType;
 use Add\Hr\Core\Enums\WorkMode;
+use Add\Hr\Hr;
 use Add\Hr\Support\Casts\DateOnly;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -92,7 +93,7 @@ class Assignment extends Model
 
     public function workLocation(): BelongsTo
     {
-        return $this->belongsTo(WorkLocation::class);
+        return $this->belongsTo(Hr::workLocationModel(), 'work_location_id');
     }
 
     /**

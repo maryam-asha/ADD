@@ -3,6 +3,7 @@
 namespace Add\Hr\Recruitment\Http\Requests;
 
 use Add\Hr\Core\Enums\EmploymentType;
+use Add\Hr\Hr;
 use Add\Hr\Recruitment\Enums\RequisitionReason;
 use Add\Hr\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
@@ -34,7 +35,7 @@ class FileRequisitionRequest extends FormRequest
             'replaces_employee_id' => ['nullable', 'required_if:reason,'.RequisitionReason::Replacement->value, 'integer', Rule::exists('hr_employees', 'id')],
             'budget_min' => ['nullable', 'numeric', 'min:0', 'max:9999999999'],
             'budget_max' => ['nullable', 'numeric', 'min:0', 'max:9999999999', 'gte:budget_min'],
-            'budget_currency' => ['nullable', 'required_with:budget_min,budget_max', 'string', 'size:3'],
+            'budget_currency' => ['nullable', 'required_with:budget_min,budget_max', ...Hr::currencyRules()],
             'justification' => ['nullable', 'string', 'max:2000'],
         ];
     }

@@ -57,7 +57,7 @@ class HrKioskAttendanceTest extends TestCase
 
     public function test_a_scanned_staff_card_becomes_a_punch_and_greets_the_employee(): void
     {
-        $employee = $this->hireFor(User::factory()->create(), ['name' => ['ar' => 'لينا', 'en' => 'Lina']]);
+        $employee = $this->hireFor(User::factory()->create(['name' => 'لينا']));
         $card = app(AttendanceCards::class)->issue($employee, null);
         $this->assertStringStartsWith('add-staff:v1:', $card);
 

@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
-use App\Domain\Finance\Models\Currency;
 use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\AccountCreationService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignRoleRequest;
 use App\Http\Requests\Admin\StoreUserRequest;
@@ -14,7 +14,6 @@ use App\Http\Resources\UserResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
-use Illuminate\Support\Facades\Hash;
 
 /**
  * Deliberately not extending AdminResourceController: users don't have an
@@ -36,17 +35,13 @@ class UserController extends Controller
         return UserResource::collection($query->get());
     }
 
-    public function store(StoreUserRequest $request): UserResource
+    public function store(StoreUserRequest $request, AccountCreationService $accounts): UserResource
     {
-        $user = User::create([
-            ...$request->safe()->except(['password', 'role']),
-            'password' => Hash::make($request->validated('password')),
-            'preferred_language' => 'ar',
-            'preferred_currency' => Currency::query()->where('is_base', true)->value('code'),
-            'status' => 'active',
-        ]);
-
-        $user->assignRole($request->validated('role'));
+        $user = $accounts->create(
+            $request->safe()->only(['name', 'phone', 'email']),
+            $request->validated('role'),
+            $request->validated('password'),
+        );
 
         $this->logSensitiveAction('user_created', $user, ['role' => $request->validated('role')]);
 

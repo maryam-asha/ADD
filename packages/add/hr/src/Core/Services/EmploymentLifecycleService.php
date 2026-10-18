@@ -13,6 +13,8 @@ use Add\Hr\Core\Models\Contract;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\EmploymentEvent;
 use Add\Hr\Core\Models\Position;
+use Add\Hr\Core\PersonFields;
+use Add\Hr\Hr;
 use Add\Hr\Support\HrException;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -27,12 +29,6 @@ use Illuminate\Support\Facades\DB;
  */
 class EmploymentLifecycleService
 {
-    /** Personal fields a hire request may set on the employee row. */
-    private const PERSONAL_FIELDS = [
-        'employee_number', 'name', 'gender', 'date_of_birth', 'nationality', 'marital_status',
-        'phone', 'personal_email', 'work_email', 'address', 'national_id', 'bank_account',
-    ];
-
     /** Assignment fields, in a hire, a change or a rehire. */
     private const ASSIGNMENT_FIELDS = [
         'org_unit_id', 'position_id', 'job_grade_id', 'manager_id', 'work_location_id',
@@ -56,8 +52,10 @@ class EmploymentLifecycleService
 
             $this->assertAssignable($assignment, $on, null);
 
+            $person = Arr::only($data, PersonFields::all());
+
             $employee = Employee::query()->create([
-                ...Arr::only($data, self::PERSONAL_FIELDS),
+                'employee_number' => $data['employee_number'] ?? null,
                 'hired_on' => $on,
                 'probation_ends_on' => $data['contract']['probation_ends_on'] ?? null,
                 // Placeholder for the NOT NULL column; refreshStatus() below
@@ -70,7 +68,8 @@ class EmploymentLifecycleService
                     .str_pad((string) $employee->id, (int) config('hr.employee_number.pad'), '0', STR_PAD_LEFT);
             }
 
-            $this->linkAccount($employee, $data['user_id'] ?? null);
+            $this->linkAccount($employee, $data['user_id'] ?? null, $person);
+            Hr::people()->put($employee, $person);
 
             $event = $this->recordEvent($employee, EmploymentEventType::Hire, $on, $actorId);
             $this->openContract($employee, $data['contract'], $on, $event);
@@ -367,7 +366,7 @@ class EmploymentLifecycleService
         ]);
 
         if ($employee->user_id === null) {
-            $this->linkAccount($employee, null);
+            $this->linkAccount($employee, null, collect(PersonFields::IDENTITY)->mapWithKeys(fn (string $field) => [$field => $employee->{$field}])->all());
         }
 
         $event = $this->recordEvent($employee, EmploymentEventType::Rehire, $on, $actorId, notes: $data['notes'] ?? null);
@@ -396,13 +395,16 @@ class EmploymentLifecycleService
      * A user given explicitly wins; otherwise the host may provision one.
      * With hr.require_user, an employee without an account is refused.
      */
-    private function linkAccount(Employee $employee, int|string|null $userId): void
+    /**
+     * @param  array<string, mixed>  $person  the hire's person fields, for provision()
+     */
+    private function linkAccount(Employee $employee, int|string|null $userId, array $person): void
     {
         if ($userId !== null) {
             $this->accounts->authorizeLink($userId);
         }
 
-        $userId ??= $this->accounts->provision($employee);
+        $userId ??= $this->accounts->provision($employee, $person);
 
         if ($userId === null) {
             if (config('hr.require_user')) {
