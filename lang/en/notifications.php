@@ -200,4 +200,64 @@ return [
         ],
     ],
 
+    // HR (packages/add/hr), sent through App\Domain\Hr\Adapters\AddHrNotifier.
+    'hr' => [
+        'alerts_digest' => [
+            'title' => 'HR alerts',
+            'body' => ':count HR alerts need attention (contracts, probations, documents).',
+        ],
+        'approval_pending' => [
+            'title' => 'Approval needed',
+            'body' => 'A request is waiting for your approval.',
+        ],
+        'approval_escalated' => [
+            'title' => 'Overdue request',
+            'body' => 'A request passed its approval deadline and was escalated to you.',
+        ],
+        'request_approved' => [
+            'title' => 'Request approved',
+            'body' => 'Your request has been approved.',
+        ],
+        'request_rejected' => [
+            'title' => 'Request rejected',
+            'body' => 'Your request has been rejected.',
+        ],
+        'payslip_issued' => [
+            'title' => 'Your payslip is ready',
+            'body' => 'Your payslip for :month has been issued.',
+        ],
+        'benefit_granted' => [
+            'title' => 'You received a benefit',
+            'body' => ':amount points from :benefit_en were added to your wallet.',
+        ],
+        'benefit_grants_failed' => [
+            'title' => 'Benefits not delivered',
+            'body' => ':count benefit grants for :month could not be delivered. Review them and retry.',
+        ],
+        'interview_scheduled' => [
+            'title' => 'You have an interview to conduct',
+            'body' => 'Interview with :candidate for :opening_en on :at.',
+        ],
+        'review_self_open' => [
+            'title' => 'Your self review is open',
+            'body' => 'Rate yourself on your goals and competencies for :cycle_en.',
+        ],
+        'review_manager_open' => [
+            'title' => 'Reviews are waiting for you',
+            'body' => 'Rate the employees you review in :cycle_en.',
+        ],
+        'review_finalized' => [
+            'title' => 'Your review is ready',
+            'body' => 'The result of :cycle_en is available.',
+        ],
+        'training_enrolled' => [
+            'title' => 'You are enrolled in a training',
+            'body' => ':course_en starts on :starts_on.',
+        ],
+        'training_cancelled' => [
+            'title' => 'Training cancelled',
+            'body' => 'The :course_en session on :starts_on has been cancelled.',
+        ],
+    ],
+
 ];

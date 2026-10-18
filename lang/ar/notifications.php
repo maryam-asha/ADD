@@ -200,4 +200,64 @@ return [
         ],
     ],
 
+    // الموارد البشرية (packages/add/hr)، عبر App\Domain\Hr\Adapters\AddHrNotifier.
+    'hr' => [
+        'alerts_digest' => [
+            'title' => 'تنبيهات الموارد البشرية',
+            'body' => ':count تنبيهات تحتاج متابعة (عقود، فترات تجربة، وثائق).',
+        ],
+        'approval_pending' => [
+            'title' => 'طلب بانتظار موافقتك',
+            'body' => 'يوجد طلب بانتظار قرارك.',
+        ],
+        'approval_escalated' => [
+            'title' => 'طلب متأخر',
+            'body' => 'تجاوز طلبٌ مهلة الموافقة وأُحيل إليك.',
+        ],
+        'request_approved' => [
+            'title' => 'تمت الموافقة على طلبك',
+            'body' => 'تمت الموافقة على طلبك.',
+        ],
+        'request_rejected' => [
+            'title' => 'رُفض طلبك',
+            'body' => 'تم رفض طلبك.',
+        ],
+        'payslip_issued' => [
+            'title' => 'قسيمة راتبك جاهزة',
+            'body' => 'صدرت قسيمة راتبك لشهر :month.',
+        ],
+        'benefit_granted' => [
+            'title' => 'وصلتك ميزة',
+            'body' => 'أُضيفت إلى محفظتك :amount نقطة من ميزة :benefit_ar.',
+        ],
+        'benefit_grants_failed' => [
+            'title' => 'مزايا لم تُنفَّذ',
+            'body' => 'تعذّر تنفيذ :count من منح المزايا لشهر :month. راجعها وأعد المحاولة.',
+        ],
+        'interview_scheduled' => [
+            'title' => 'لديك مقابلة توظيف',
+            'body' => 'مقابلة مع :candidate على وظيفة :opening_ar في :at.',
+        ],
+        'review_self_open' => [
+            'title' => 'بدأ تقييمك الذاتي',
+            'body' => 'قيّم نفسك على أهدافك وكفاءاتك في :cycle_ar.',
+        ],
+        'review_manager_open' => [
+            'title' => 'تقييمات بانتظارك',
+            'body' => 'قيّم الموظفين الذين تقيّمهم في :cycle_ar.',
+        ],
+        'review_finalized' => [
+            'title' => 'نتيجة تقييمك جاهزة',
+            'body' => 'صدرت نتيجة :cycle_ar.',
+        ],
+        'training_enrolled' => [
+            'title' => 'سُجّلت في تدريب',
+            'body' => 'يبدأ :course_ar في :starts_on.',
+        ],
+        'training_cancelled' => [
+            'title' => 'أُلغي تدريب',
+            'body' => 'أُلغيت جلسة :course_ar المقررة في :starts_on.',
+        ],
+    ],
+
 ];

@@ -1,5 +1,6 @@
 <?php
 
+use Add\Hr\Hr;
 use App\Http\Controllers\Api\V1\Paymera\PaymeraCallbackController;
 use Illuminate\Support\Facades\Route;
 
@@ -41,6 +42,22 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['auth:sanctum', 'abilities:dashboard', 'role:provider', 'provider.active'])
         ->prefix('provider')
         ->group(base_path('routes/api/v1/provider.php'));
+
+    /*
+     * HR (packages/add/hr). Dashboard accounts, so the same
+     * 'abilities:dashboard' boundary — but no 'role:' check: being an
+     * employee is an HR record, not a role. Anyone with an active employee
+     * record reaches hr/me (operations, sales, the café, ...), and every
+     * admin route carries its own can:hr.* permission, so a custom HR role
+     * works without admin|operations.
+     */
+    Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('hr')->group(function () {
+        Route::middleware('hr.employee')->prefix('me')->group(fn () => Hr::selfServiceRoutes());
+        Hr::adminRoutes();
+    });
+
+    // A document file's only credential is its temporary signature.
+    Route::prefix('hr')->middleware('throttle:60,1')->group(fn () => Hr::signedRoutes());
 
     /*
      * Paymera's two return paths. Unauthenticated by necessity: the gateway

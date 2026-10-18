@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\Kiosk\KioskAttendanceController;
 use App\Http\Controllers\Api\V1\Kiosk\KioskPairController;
 use Illuminate\Support\Facades\Route;
 
@@ -10,3 +11,9 @@ use Illuminate\Support\Facades\Route;
 // throttle argument is a key prefix: without it every plain `throttle:` on an
 // unauthenticated route shares one per-IP bucket.
 Route::post('kiosk/pair', [KioskPairController::class, 'pair'])->middleware('throttle:5,1,kiosk-pair');
+
+// Staff card scans for HR attendance (packages/add/hr): the kiosk signs the
+// request with its pairing secret instead of holding a token
+// (App\Domain\Hr\Kiosk\KioskRequestSignature). A batch carries a kiosk's
+// offline queue, so the limit is per kiosk IP, not per scan.
+Route::post('kiosk/attendance/punches', [KioskAttendanceController::class, 'store'])->middleware('throttle:60,1,kiosk-attendance');

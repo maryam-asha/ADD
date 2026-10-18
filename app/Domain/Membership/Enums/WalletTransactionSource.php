@@ -15,4 +15,5 @@ enum WalletTransactionSource: string
     case Gift = 'gift';
     case CompanyAdminAllocation = 'company_admin_allocation';
     case Refund = 'refund';
+    case EmployeeBenefit = 'employee_benefit';
 }

@@ -73,6 +73,9 @@ class UserSuppliedTimesAreInterpretedLocallyTest extends TestCase
         'app/Http/Requests/Admin/StoreExchangeRateRequest.php',
         // Client crash telemetry: the device's own clock, already an instant.
         'app/Http/Requests/Mobile/StoreErrorLogRequest.php',
+        // Staff card scans: the kiosk's own clock, sent with its UTC offset
+        // (the rule requires one), so already an instant.
+        'app/Http/Requests/Kiosk/StoreKioskPunchesRequest.php',
         // A settings value, not a moment.
         'app/Http/Requests/Admin/UpdateSettingRequest.php',
         // Business hours are stored as times of day (H:i) against a weekday,

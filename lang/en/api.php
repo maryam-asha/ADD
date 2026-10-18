@@ -772,4 +772,19 @@ return [
             'with_name' => ':greeting, :name',
         ],
     ],
+
+    // HR (packages/add/hr) — ADD's account adapter (App\Domain\Hr\Adapters).
+    'hr' => [
+        'account_conflict' => 'The phone number and the work email belong to two different accounts (or to a deleted one).',
+        'work_email_required' => 'A new employee account needs a work email: it is how they sign in to the dashboard.',
+        'phone_required' => 'A new employee account needs a phone number.',
+        'phone_invalid' => 'The phone number must be in international format, e.g. +963944123456.',
+        'account_link_forbidden' => 'This account holds staff roles; only someone who may assign roles can link it to an employee.',
+        'kiosk_unauthorized' => 'This kiosk is not recognised. Pair it again from the dashboard.',
+        'kiosk_unknown_card' => 'This card is not a valid staff card.',
+        'kiosk_scan_out_of_window' => 'The scan time is too old or in the future; check the kiosk clock.',
+        'benefit_no_wallet' => 'The employee has no wallet: their account is not registered as a member.',
+        'benefit_points_whole' => 'Wallet points are whole numbers; :amount is not.',
+        'benefit_wallet_description' => 'Employee benefit: :benefit',
+    ],
 ];

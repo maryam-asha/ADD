@@ -200,6 +200,13 @@ class PermissionSyncService
             }
         }
 
+        /** @var PermissionSource $source */
+        foreach (app()->tagged('permissions.sources') as $source) {
+            foreach ($source->names() as $name) {
+                $names[$name] = true;
+            }
+        }
+
         return array_keys($names);
     }
 
