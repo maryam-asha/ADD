@@ -73,7 +73,7 @@ return new class extends Migration
             $table->unsignedBigInteger('created_by')->nullable();
             $table->timestamps();
 
-            $table->index(['delegate_employee_id', 'starts_on', 'ends_on']);
+            $table->index(['delegate_employee_id', 'starts_on', 'ends_on'], 'hr_approval_delegations_delegate_dates_index');
         });
     }
 
