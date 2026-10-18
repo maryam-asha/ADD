@@ -113,6 +113,52 @@ class PayrollRunTest extends TestCase
             ->assertForbidden()->assertJsonPath('message', __('hr::payroll.sod_compensation'));
     }
 
+    public function test_whoever_added_an_adjustment_to_the_run_cannot_approve_it(): void
+    {
+        $author = $this->user([Abilities::PAYROLL_VIEW, Abilities::PAYROLL_MANAGE, Abilities::PAYROLL_APPROVE]);
+        $id = $this->openAndCalculate();
+
+        $this->actingAs($author);
+        $this->postJson("/api/hr/payroll-runs/{$id}/adjustments", [
+            'employee_id' => $this->employee->id, 'pay_component_id' => $this->components['basic']->id,
+            'amount' => 10000, 'currency' => 'USD', 'note' => 'Bonus',
+        ])->assertCreated();
+        $this->actingAs($this->officer);
+        $this->postJson("/api/hr/payroll-runs/{$id}/calculate")->assertOk();
+        $this->postJson("/api/hr/payroll-runs/{$id}/review")->assertOk();
+
+        $this->actingAs($author);
+        $this->postJson("/api/hr/payroll-runs/{$id}/approve")
+            ->assertForbidden()->assertJsonPath('message', __('hr::payroll.sod_adjustment'));
+    }
+
+    public function test_pay_set_in_an_earlier_month_does_not_bar_approval(): void
+    {
+        $this->pay($this->manager, ['basic' => 2000], '2025-06-01', by: $this->approver->id);
+        $id = $this->openAndCalculate();
+        $this->postJson("/api/hr/payroll-runs/{$id}/review")->assertOk();
+
+        $this->actingAs($this->approver);
+        $this->postJson("/api/hr/payroll-runs/{$id}/approve")->assertOk();
+    }
+
+    public function test_a_loan_cannot_start_in_a_month_whose_payroll_is_closed(): void
+    {
+        $this->actingAsEmployee($this->employee);
+        $this->postJson('/api/hr/me/loans', ['amount' => 300, 'currency' => 'USD', 'installments' => 3, 'first_month' => '2026-01'])
+            ->assertUnprocessable()->assertJsonPath('message', __('hr::payroll.loan_month_closed'));
+
+        $id = $this->openAndCalculate();
+        $this->postJson("/api/hr/payroll-runs/{$id}/review")->assertOk();
+        $this->actingAs($this->approver);
+        $this->postJson("/api/hr/payroll-runs/{$id}/approve")->assertOk();
+
+        $this->actingAsEmployee($this->employee);
+        $this->postJson('/api/hr/me/loans', ['amount' => 300, 'currency' => 'USD', 'installments' => 3, 'first_month' => '2026-03'])
+            ->assertUnprocessable()->assertJsonPath('message', __('hr::payroll.loan_month_closed'));
+        $this->postJson('/api/hr/me/loans', ['amount' => 300, 'currency' => 'USD', 'installments' => 3, 'first_month' => '2026-04'])->assertCreated();
+    }
+
     public function test_a_parallel_run_is_confirmed_before_approval(): void
     {
         $id = $this->openAndCalculate(['parallel_run' => true]);

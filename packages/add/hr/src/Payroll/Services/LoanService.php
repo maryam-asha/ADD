@@ -8,9 +8,12 @@ use Add\Hr\Contracts\ExchangeRateProvider;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Payroll\Enums\InstallmentStatus;
 use Add\Hr\Payroll\Enums\LoanStatus;
+use Add\Hr\Payroll\Enums\PayrollRunKind;
+use Add\Hr\Payroll\Enums\PayrollRunStatus;
 use Add\Hr\Payroll\Models\Compensation;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Payroll\Models\PayComponent;
+use Add\Hr\Payroll\Models\PayrollRun;
 use Add\Hr\Support\Decimal;
 use Add\Hr\Support\HrException;
 use Carbon\CarbonImmutable;
@@ -60,6 +63,7 @@ class LoanService
             $first = isset($data['first_month'])
                 ? CarbonImmutable::createFromFormat('Y-m', $data['first_month'])->startOfMonth()
                 : CarbonImmutable::today()->addMonthNoOverflow()->startOfMonth();
+            $this->assertMonthOpen($first);
 
             $loan = Loan::query()->create([
                 'employee_id' => $employee->id,
@@ -81,6 +85,23 @@ class LoanService
 
             return $loan;
         });
+    }
+
+    /**
+     * A first installment month payroll can still deduct: not before last
+     * month (paid after it ends), and not one whose regular run is approved.
+     */
+    public function assertMonthOpen(CarbonImmutable $first): void
+    {
+        $closed = $first->lt(CarbonImmutable::today()->startOfMonth()->subMonthNoOverflow())
+            || PayrollRun::query()->where('year', $first->year)->where('month', $first->month)
+                ->where('kind', PayrollRunKind::Regular->value)
+                ->whereIn('status', [PayrollRunStatus::Approved->value, PayrollRunStatus::Paid->value])
+                ->exists();
+
+        if ($closed) {
+            HrException::fail('hr::payroll.loan_month_closed');
+        }
     }
 
     /**

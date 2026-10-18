@@ -9,7 +9,7 @@ return [
     'assignment_in_use' => 'Grants were made under this assignment; end it instead.',
     'end_before_start' => 'An assignment cannot end before it starts.',
     'end_after_current' => 'An assignment can only be ended earlier; add a new one to extend it.',
-    'grant_not_failed' => 'Only a failed grant can be retried.',
+    'grant_not_failed' => 'Only a failed grant, or an in-kind grant left undelivered, can be retried.',
     'grant_not_cancellable' => 'Only a grant not yet delivered can be cancelled.',
     'grant_cancelled' => 'The grant has been cancelled.',
 ];

@@ -21,4 +21,5 @@ return [
     'budget_insufficient' => 'ميزانية التعلّم لا تكفي، المتاح :available :currency.',
     'not_your_request' => 'هذا ليس طلبك.',
     'request_cancelled' => 'تم إلغاء الطلب.',
+    'employee_leaving' => 'هذا الموظف مغادر، فلا يُعتمد له صرف من ميزانية التعلّم.',
 ];

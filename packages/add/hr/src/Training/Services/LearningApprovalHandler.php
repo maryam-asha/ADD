@@ -21,6 +21,9 @@ class LearningApprovalHandler implements ApprovalHandler
         if ($subject->status !== LearningRequestStatus::Pending) {
             HrException::fail('hr::approvals.not_pending');
         }
+        if ($final && $subject->employee->terminated_on !== null) {
+            HrException::fail('hr::training.employee_leaving');
+        }
         if ($final) {
             // An adjustment may have lowered the balance since it was asked.
             $this->budget->assertAvailable($subject->employee_id, $subject->year, $subject->amount, $subject->id);

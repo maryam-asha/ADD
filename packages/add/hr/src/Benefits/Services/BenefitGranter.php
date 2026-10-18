@@ -121,7 +121,10 @@ class BenefitGranter
 
     public function retry(BenefitGrant $grant): BenefitGrant
     {
-        if ($grant->status !== BenefitGrantStatus::Failed) {
+        // A pending in-kind grant was left by a run that stopped before
+        // delivering it; a pending cash allowance waits for payroll instead.
+        $stuck = $grant->status === BenefitGrantStatus::Pending && $grant->benefit->kind === BenefitKind::InKindCredit;
+        if ($grant->status !== BenefitGrantStatus::Failed && ! $stuck) {
             HrException::fail('hr::benefits.grant_not_failed');
         }
 

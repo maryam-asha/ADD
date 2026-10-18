@@ -33,6 +33,7 @@ use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Services\LeaveApprovalHandler;
 use Add\Hr\Leave\Services\LeaveService;
 use Add\Hr\Payroll\Events\PayrollRunApproved;
+use Add\Hr\Payroll\Listeners\CancelLoansAfterTermination;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Payroll\Services\LoanApprovalHandler;
 use Add\Hr\Payroll\Services\LoanService;
@@ -53,6 +54,7 @@ use Add\Hr\Time\Services\OvertimeService;
 use Add\Hr\Timesheets\Models\Timesheet;
 use Add\Hr\Timesheets\Services\TimesheetApprovalHandler;
 use Add\Hr\Timesheets\Services\TimesheetService;
+use Add\Hr\Training\Listeners\CancelLearningAfterTermination;
 use Add\Hr\Training\Models\LearningRequest;
 use Add\Hr\Training\Services\LearningApprovalHandler;
 use Add\Hr\Training\Services\LearningRequestService;
@@ -104,6 +106,8 @@ class HrServiceProvider extends ServiceProvider
         Event::listen(EmployeeHired::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CreateChecklistTasks::class);
         Event::listen(EmployeeTerminated::class, CancelLeaveAfterTermination::class);
+        Event::listen(EmployeeTerminated::class, CancelLoansAfterTermination::class);
+        Event::listen(EmployeeTerminated::class, CancelLearningAfterTermination::class);
         Event::listen(PayrollRunApproved::class, SettleBenefitAllowances::class);
 
         // Approval subjects, by name rather than class. Not enforced, so the

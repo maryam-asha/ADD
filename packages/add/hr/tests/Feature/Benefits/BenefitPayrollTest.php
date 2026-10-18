@@ -12,6 +12,7 @@ use Add\Hr\Payroll\Models\PayrollRun;
 use Add\Hr\Payroll\Models\Payslip;
 use Add\Hr\Payroll\Services\PayrollCalculator;
 use Add\Hr\Payroll\Services\PayrollRunService;
+use Add\Hr\Support\HrException;
 use Add\Hr\Tests\Concerns\BuildsPayroll;
 use Add\Hr\Tests\Concerns\HiresStaff;
 use Add\Hr\Tests\TestCase;
@@ -100,5 +101,32 @@ class BenefitPayrollTest extends TestCase
         $lines = Payslip::query()->where('payroll_run_id', $april->id)->with('lines')->sole()->lines->where('code', 'allowances');
         $this->assertSame(['benefit grant #1', 'benefit grant #2'], $lines->pluck('basis')->values()->all());
         $this->assertSame(0, BenefitGrant::query()->where('status', 'pending')->count());
+    }
+
+    public function test_a_grant_paid_by_another_run_meanwhile_blocks_approval_until_recalculated(): void
+    {
+        $calculator = $this->user();
+        $approver = $this->user();
+        $runs = app(PayrollRunService::class);
+        $payroll = app(PayrollCalculator::class);
+
+        // April is calculated while March is still unapproved, so it carries March's grant too.
+        $march = $payroll->calculate($runs->open(['year' => 2026, 'month' => 3, 'kind' => 'regular'], $calculator->id), $calculator->id);
+        $april = $payroll->calculate($runs->open(['year' => 2026, 'month' => 4, 'kind' => 'regular'], $calculator->id), $calculator->id);
+        $runs->approve($runs->review($march, $calculator->id), $approver);
+        $april = $runs->review($april, $calculator->id);
+
+        try {
+            $runs->approve($april, $approver);
+            $this->fail('April paid March\'s grant a second time.');
+        } catch (HrException $e) {
+            $this->assertSame(__('hr::payroll.allowance_already_settled'), $e->getMessage());
+        }
+        $this->assertSame('reviewed', $april->fresh()->status->value);
+
+        $april = $runs->review($payroll->calculate($april->fresh(), $calculator->id), $calculator->id);
+        $runs->approve($april, $approver);
+        $lines = Payslip::query()->where('payroll_run_id', $april->id)->with('lines')->sole()->lines->where('code', 'allowances');
+        $this->assertSame(['benefit grant #2'], $lines->pluck('basis')->values()->all());
     }
 }

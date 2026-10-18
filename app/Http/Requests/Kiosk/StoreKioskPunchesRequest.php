@@ -38,6 +38,19 @@ class StoreKioskPunchesRequest extends FormRequest
         ];
     }
 
+    /**
+     * Only what the signature covers: the raw JSON body, never the query
+     * string or a body Laravel parsed some other way.
+     *
+     * @return array<string, mixed>
+     */
+    public function validationData(): array
+    {
+        $body = json_decode($this->getContent(), true);
+
+        return is_array($body) ? $body : [];
+    }
+
     public function kiosk(): Kiosk
     {
         return $this->kiosk;

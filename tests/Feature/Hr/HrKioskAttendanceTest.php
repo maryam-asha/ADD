@@ -115,4 +115,23 @@ class HrKioskAttendanceTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonValidationErrors(['punches.0.id', 'punches.0.scanned_at']);
     }
+
+    public function test_only_the_signed_body_is_read_never_the_query_string(): void
+    {
+        $owner = $this->hireFor(User::factory()->create());
+        $signed = app(AttendanceCards::class)->issue($owner, null);
+        $injected = app(AttendanceCards::class)->issue($this->hireFor(User::factory()->create()), null);
+
+        // A captured request replayed as text/plain with punches added in the URL.
+        $body = json_encode(['punches' => [$this->scan($signed)]]);
+        $query = http_build_query(['punches' => [$this->scan($injected)]]);
+        $this->call('POST', "/api/v1/kiosk/attendance/punches?{$query}", [], [], [], [
+            'CONTENT_TYPE' => 'text/plain',
+            'HTTP_ACCEPT' => 'application/json',
+            ...collect(KioskRequestSignature::headersFor($this->kiosk, self::SECRET, $body))
+                ->mapWithKeys(fn ($value, $name) => ['HTTP_'.strtoupper(str_replace('-', '_', $name)) => $value])->all(),
+        ], $body)->assertOk();
+
+        $this->assertSame([$owner->id], Punch::query()->pluck('employee_id')->all());
+    }
 }

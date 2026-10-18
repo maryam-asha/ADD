@@ -153,6 +153,20 @@ class BenefitGrantingTest extends TestCase
         $this->assertSame(2, $retried->attempts);
     }
 
+    public function test_an_in_kind_grant_left_pending_by_a_crash_can_be_retried(): void
+    {
+        $this->assign($this->benefit(), ['employee_id' => $this->hireInTeam()->id]);
+        $this->fulfiller->failWith = 'Database went away';
+        $this->grant('2026-04-01');
+
+        // A crash mid-run, rather than a reported failure, leaves it pending.
+        $grant = BenefitGrant::query()->sole();
+        $grant->update(['status' => 'pending', 'failure' => null]);
+
+        $this->fulfiller->failWith = null;
+        $this->assertSame('fulfilled', app(BenefitGranter::class)->retry($grant)->status->value);
+    }
+
     public function test_frequency_eligibility_and_employment_decide_who_is_granted(): void
     {
         $quarterly = $this->benefit(['frequency' => 'quarterly']);

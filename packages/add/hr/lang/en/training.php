@@ -21,4 +21,5 @@ return [
     'budget_insufficient' => 'Not enough learning budget: :available :currency available.',
     'not_your_request' => 'This is not your request.',
     'request_cancelled' => 'The request has been cancelled.',
+    'employee_leaving' => 'This employee is leaving; their learning spend cannot be approved.',
 ];

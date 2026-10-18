@@ -7,6 +7,7 @@ use Add\Hr\Approvals\Models\ApprovalRequest;
 use Add\Hr\Payroll\Enums\LoanStatus;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Support\HrException;
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Model;
 
 class LoanApprovalHandler implements ApprovalHandler
@@ -20,6 +21,13 @@ class LoanApprovalHandler implements ApprovalHandler
     {
         if ($subject->status !== LoanStatus::Pending) {
             HrException::fail('hr::approvals.not_pending');
+        }
+        if ($final && $subject->employee->terminated_on !== null) {
+            HrException::fail('hr::payroll.employee_leaving');
+        }
+        if ($final) {
+            // Its first month may have been paid while it waited.
+            $this->loans->assertMonthOpen(CarbonImmutable::create($subject->first_year, $subject->first_month, 1));
         }
     }
 

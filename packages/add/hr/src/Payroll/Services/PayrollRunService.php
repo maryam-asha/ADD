@@ -4,12 +4,13 @@ namespace Add\Hr\Payroll\Services;
 
 use Add\Hr\Audit\HrAudit;
 use Add\Hr\Contracts\HrNotifier;
+use Add\Hr\Core\Enums\EmploymentEventType;
+use Add\Hr\Core\Models\EmploymentEvent;
 use Add\Hr\Payroll\Enums\InstallmentStatus;
 use Add\Hr\Payroll\Enums\LoanStatus;
 use Add\Hr\Payroll\Enums\PayrollRunKind;
 use Add\Hr\Payroll\Enums\PayrollRunStatus;
 use Add\Hr\Payroll\Events\PayrollRunApproved;
-use Add\Hr\Payroll\Models\Compensation;
 use Add\Hr\Payroll\Models\LoanInstallment;
 use Add\Hr\Payroll\Models\PayrollAdjustment;
 use Add\Hr\Payroll\Models\PayrollRun;
@@ -134,10 +135,18 @@ class PayrollRunService
                 HrException::fail('hr::payroll.sod_calculated', [], 403);
             }
 
-            $employeeIds = $run->payslips()->pluck('employee_id');
+            if ($run->adjustments()->where('created_by', $userId)->exists()) {
+                HrException::fail('hr::payroll.sod_adjustment', [], 403);
+            }
 
-            if (Compensation::query()->whereIn('employee_id', $employeeIds)->where('created_by', $userId)
-                ->overlapping($run->monthStart(), $run->monthEnd())->exists()) {
+            // A pay change taking effect in the run's month, ending pay included
+            // (every change records its event, even one with no lines left).
+            if (EmploymentEvent::query()
+                ->whereIn('employee_id', $run->payslips()->select('employee_id'))
+                ->where('type', EmploymentEventType::CompensationChange->value)
+                ->where('recorded_by', $userId)
+                ->whereBetween('effective_on', [$run->monthStart()->toDateString(), $run->monthEnd()->toDateString()])
+                ->exists()) {
                 HrException::fail('hr::payroll.sod_compensation', [], 403);
             }
 

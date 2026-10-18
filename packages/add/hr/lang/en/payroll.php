@@ -21,6 +21,7 @@ return [
     'not_reconciled' => 'This parallel payroll must be confirmed against the current one before approval.',
     'sod_calculated' => 'The person who calculated a payroll cannot approve it.',
     'sod_compensation' => 'You changed the pay of an employee in this payroll, so you cannot approve it.',
+    'sod_adjustment' => 'You added an adjustment to this payroll, so you cannot approve it.',
     'not_postable' => 'Only an approved payroll can be exported or posted, once.',
     'calculated' => 'The payroll has been calculated.',
     'reviewed' => 'The payroll has been reviewed.',
@@ -33,4 +34,7 @@ return [
     'loan_over_cap' => 'The loan can be at most :max :currency.',
     'loan_not_active' => 'Only an active loan can be settled.',
     'loan_settled' => 'The loan has been settled.',
+    'employee_leaving' => 'This employee is leaving; a loan cannot be approved for them.',
+    'allowance_already_settled' => 'A benefit allowance in this payroll was paid or cancelled since it was calculated; recalculate it first.',
+    'loan_month_closed' => 'A loan cannot start in a month whose payroll is already closed.',
 ];
