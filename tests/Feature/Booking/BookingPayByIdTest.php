@@ -114,13 +114,13 @@ class BookingPayByIdTest extends TestCase
 
         $first = $this->book($this->confirmScreen($space, ['payment_method' => 'paymera']))
             ->assertCreated()
-            ->assertJsonPath('payment', null);
+            ->assertJsonPath('data.payment', null);
 
         $this->book($this->confirmScreen($space, ['payment_method' => 'cash', 'booking_id' => $first->json('data.id')]))
             ->assertOk()
             ->assertJsonPath('data.id', $first->json('data.id'))
-            ->assertJsonPath('next', 'pay_at_reception')
-            ->assertJsonPath('payment', null);
+            ->assertJsonPath('data.next', 'pay_at_reception')
+            ->assertJsonPath('data.payment', null);
 
         $this->assertSame(1, Booking::count());
     }
@@ -134,10 +134,10 @@ class BookingPayByIdTest extends TestCase
 
         $this->book($this->confirmScreen($space, ['payment_method' => 'wallet', 'booking_id' => $id]))
             ->assertOk()
-            ->assertJsonPath('next', 'done')
-            ->assertJsonPath('payment.status', 'accepted')
+            ->assertJsonPath('data.next', 'done')
+            ->assertJsonPath('data.payment.status', 'accepted')
             // Points never went through a gateway.
-            ->assertJsonPath('payment.gateway_payment_id', null);
+            ->assertJsonPath('data.payment.gateway_payment_id', null);
 
         $this->assertSame(PaymentState::Paid, Booking::findOrFail($id)->payment_state);
         $this->assertSame(200, app(WalletService::class)->generalBalance(
@@ -168,8 +168,8 @@ class BookingPayByIdTest extends TestCase
 
         $this->book(['booking_id' => $id, 'payment_method' => 'paymera'])
             ->assertOk()
-            ->assertJsonPath('next', 'redirect')
-            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
+            ->assertJsonPath('data.next', 'redirect')
+            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
 
         $this->assertSame($id, Payment::sole()->payable_id);
     }
@@ -191,7 +191,7 @@ class BookingPayByIdTest extends TestCase
 
         $this->book($this->confirmScreen($space, ['payment_method' => 'wallet', 'booking_id' => $id]))
             ->assertOk()
-            ->assertJsonPath('next', 'done');
+            ->assertJsonPath('data.next', 'done');
     }
 
     /**
@@ -277,7 +277,7 @@ class BookingPayByIdTest extends TestCase
         ])
             ->assertOk()
             ->assertJsonPath('data.id', $id)
-            ->assertJsonPath('next', 'pay_at_reception');
+            ->assertJsonPath('data.next', 'pay_at_reception');
     }
 
     public function test_creating_without_a_booking_id_still_needs_the_space_and_the_times(): void

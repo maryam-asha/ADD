@@ -284,7 +284,7 @@ class BookingController extends Controller
             ? ['coupon' => app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->couponFor($booking))]
             : [];
 
-        return response()->json(['data' => new BookingResource($booking)] + $card + $coupon, 201);
+        return response()->json(['data' => (new BookingResource($booking))->resolve($request) + $card] + $coupon, 201);
     }
 
     /**
@@ -312,8 +312,7 @@ class BookingController extends Controller
         }
 
         return response()->json(
-            ['data' => new BookingResource($booking->refresh())]
-                + $this->checkoutFields($outcome)
+            ['data' => (new BookingResource($booking->refresh()))->resolve($request) + $this->checkoutFields($outcome)]
                 + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : [])
         );
     }

@@ -180,7 +180,7 @@ class PayNowWalletOwnerTest extends TestCase
             'payment_method' => 'paymera',
             'wallet_owner_type' => 'company',
             'wallet_owner_id' => $stranger->id,
-        ])->assertOk()->assertJsonPath('next', 'redirect');
+        ])->assertOk()->assertJsonPath('data.next', 'redirect');
 
         $personal = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->value('id');
         $this->assertSame($personal, Payment::sole()->wallet_id);
@@ -228,7 +228,7 @@ class PayNowWalletOwnerTest extends TestCase
             'payment_method' => 'wallet',
             'wallet_owner_type' => 'company',
             'wallet_owner_id' => $company->id,
-        ])->assertOk()->assertJsonPath('next', 'done');
+        ])->assertOk()->assertJsonPath('data.next', 'done');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame($companyWallet->id, Payment::sole()->wallet_id);

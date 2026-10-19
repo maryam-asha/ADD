@@ -145,9 +145,9 @@ class BookingCardChargeMatchesPreviewTest extends TestCase
         // And the same money: stored, answered and sent to Paymera.
         $this->assertSame('SYP', $payment->currency);
         $this->assertSame($charge, $payment->charged_amount);
-        $response->assertJsonPath('payment.charged_amount', $charge)
-            ->assertJsonPath('payment.amount_points', $shown)
-            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-1/en');
+        $response->assertJsonPath('data.payment.charged_amount', $charge)
+            ->assertJsonPath('data.payment.amount_points', $shown)
+            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-1/en');
 
         Http::assertSent(fn ($request) => str_contains($request->url(), 'create-payment')
             && $request['amount'] === $charge);

@@ -113,9 +113,9 @@ class CardStartFailureTest extends TestCase
 
         $this->bookByCard($this->space(0))
             ->assertCreated()
-            ->assertJsonPath('payment', null)
-            ->assertJsonPath('redirect_url', null)
-            ->assertJsonPath('payment_error', __('api.payment.nothing_due', [], 'en'));
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.redirect_url', null)
+            ->assertJsonPath('data.payment_error', __('api.payment.nothing_due', [], 'en'));
 
         $this->assertSame(1, Booking::count());
         $this->assertSame(0, Payment::count());
@@ -152,8 +152,8 @@ class CardStartFailureTest extends TestCase
 
         $this->bookByCard($this->space(100))
             ->assertCreated()
-            ->assertJsonPath('payment', null)
-            ->assertJsonPath('payment_error', __('api.payment.gateway_unavailable', [], 'en'));
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.payment_error', __('api.payment.gateway_unavailable', [], 'en'));
 
         $this->assertSame(PaymentState::Unpaid, Booking::sole()->payment_state);
         $this->assertNoPaymentIsPending();

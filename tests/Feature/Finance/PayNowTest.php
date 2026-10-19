@@ -153,9 +153,9 @@ class PayNowTest extends TestCase
 
         $this->payBooking($booking, ['payment_method' => 'wallet'])
             ->assertOk()
-            ->assertJsonPath('next', 'done')
-            ->assertJsonPath('redirect_url', null)
-            ->assertJsonPath('payment.status', 'accepted');
+            ->assertJsonPath('data.next', 'done')
+            ->assertJsonPath('data.redirect_url', null)
+            ->assertJsonPath('data.payment.status', 'accepted');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame(200, app(WalletService::class)->generalBalance($this->walletOf($member)));
@@ -170,8 +170,8 @@ class PayNowTest extends TestCase
 
         $this->payBooking($booking, ['payment_method' => 'paymera'])
             ->assertOk()
-            ->assertJsonPath('next', 'redirect')
-            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
+            ->assertJsonPath('data.next', 'redirect')
+            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en');
 
         $payment = Payment::sole();
         $this->assertSame(100, $payment->points_to_credit);
@@ -288,8 +288,8 @@ class PayNowTest extends TestCase
             'payment_method' => 'paymera',
         ])
             ->assertCreated()
-            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-9/en')
-            ->assertJsonPath('payment.method', 'paymera');
+            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-9/en')
+            ->assertJsonPath('data.payment.method', 'paymera');
 
         $this->assertSame(PaymentState::Unpaid, Booking::sole()->payment_state);
         $this->assertSame('booking', Payment::sole()->payable_type);
@@ -309,8 +309,8 @@ class PayNowTest extends TestCase
             'payment_method' => 'paymera',
         ])
             ->assertCreated()
-            ->assertJsonPath('payment', null)
-            ->assertJsonPath('payment_error', __('api.payment.could_not_start', [], 'en'));
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.payment_error', __('api.payment.could_not_start', [], 'en'));
 
         $this->assertSame(PaymentState::Unpaid, Booking::sole()->payment_state);
     }

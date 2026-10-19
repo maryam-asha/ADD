@@ -281,8 +281,8 @@ class BookingCouponCreationTest extends TestCase
             'coupon_code' => 'FREE',
         ])
             ->assertCreated()
-            ->assertJsonPath('payment', null)
-            ->assertJsonPath('payment_error', __('api.payment.nothing_due', [], 'en'))
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.payment_error', __('api.payment.nothing_due', [], 'en'))
             ->assertJsonPath('coupon.points_discounted', 100);
 
         $this->assertSame(0, Booking::firstOrFail()->price_points);

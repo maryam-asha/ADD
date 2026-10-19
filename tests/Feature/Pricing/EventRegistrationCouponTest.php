@@ -75,7 +75,11 @@ class EventRegistrationCouponTest extends TestCase
     {
         $coupon = Coupon::factory()->percentage(30)->forEvents()->create(['code' => 'EARLY']);
 
-        $this->register($this->event(), 'early')->assertCreated();
+        $this->register($this->event(), 'early')
+            ->assertCreated()
+            ->assertJsonPath('data.coupon.applied', true)
+            ->assertJsonPath('data.coupon.points_discounted', 30)
+            ->assertJsonMissingPath('coupon');
 
         $attendee = EventAttendee::sole();
         $this->assertSame(70, $attendee->price_points);
@@ -91,7 +95,9 @@ class EventRegistrationCouponTest extends TestCase
         $offer = Coupon::factory()->automatic()->percentage(20)->create();
         $offer->targets()->create(['purpose' => PricingPurpose::EventRegistration, 'event_id' => $event->id]);
 
-        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register")->assertCreated();
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register")
+            ->assertCreated()
+            ->assertJsonMissingPath('data.coupon');
 
         $attendee = EventAttendee::sole();
         $this->assertSame(40, $attendee->price_points);

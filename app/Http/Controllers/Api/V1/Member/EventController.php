@@ -11,6 +11,7 @@ use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Pricing\Services\CouponLedger;
 use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Experience\RegisterForEventRequest;
@@ -18,6 +19,7 @@ use App\Http\Requests\Public\BrowseEventsRequest;
 use App\Services\Experience\EventRegistrationService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
@@ -118,6 +120,12 @@ class EventController extends Controller
             && in_array($attendee?->status, [EventRegistrationStatus::Approved, EventRegistrationStatus::AwaitingPayment], true)
             && $attendee->payment_state === EventPaymentState::Unpaid) {
             $result += $this->payBesideNewRecord($checkout, PaymentPurpose::EventRegistration, $attendee, $request->user(), $method);
+        }
+
+        $code = $request->validated('coupon_code');
+
+        if ($code !== null && $attendee !== null) {
+            $result['coupon'] = app(CouponOutcomePresenter::class)->present($code, app(CouponLedger::class)->couponFor($attendee));
         }
 
         return response()->json(['data' => $result], 201);
