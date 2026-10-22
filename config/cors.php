@@ -38,7 +38,10 @@ return [
 
     'allowed_headers' => ['*'],
 
-    'exposed_headers' => [],
+    // A browser hides from a cross-origin page every response header not
+    // listed here; the dashboard reads a download's file name (HR reports,
+    // the payroll journal, any CSV) from Content-Disposition.
+    'exposed_headers' => ['Content-Disposition'],
 
     'max_age' => 0,
 
