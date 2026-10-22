@@ -31,6 +31,7 @@ return [
     // Checklists
     'checklist_template_updated' => 'Checklist template updated.',
     'checklist_task_updated' => 'Task updated.',
+    'employee_task_after_last_day' => 'A task for the employee must be due on or before their last working day: after it they can no longer reach My HR.',
 
     // Employment events
     'not_employed_on_date' => 'The employee is not employed on that date.',

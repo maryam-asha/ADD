@@ -19,6 +19,7 @@ class ChecklistTaskResource extends JsonResource
         return [
             'id' => $this->id,
             'kind' => $this->kind->value,
+            'assignee' => $this->assignee->value,
             'event_id' => $this->event_id,
             'title' => $this->title,
             'due_on' => $this->due_on?->toDateString(),
