@@ -7,6 +7,7 @@ use Add\Hr\Core\Http\Resources\MyTaskResource;
 use Add\Hr\Core\Models\ChecklistTask;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\HrException;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -21,8 +22,7 @@ class MyTasksController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         return MyTaskResource::collection(
-            Employee::forUser($request->user())->checklistTasks()
-                ->where('assignee', ChecklistAssignee::Employee->value)
+            $this->tasksOf(Employee::forUser($request->user()))
                 ->orderByRaw('completed_at is not null')
                 ->orderByRaw('due_on is null')
                 ->orderBy('due_on')
@@ -58,8 +58,22 @@ class MyTasksController extends Controller
 
     private function assertMine(Request $request, ChecklistTask $task): void
     {
-        if ((int) $task->employee_id !== (int) Employee::forUser($request->user())->id || $task->assignee !== ChecklistAssignee::Employee) {
+        if (! $this->tasksOf(Employee::forUser($request->user()))->whereKey($task->id)->exists()) {
             HrException::fail('hr::core.not_your_task', [], 403);
         }
+    }
+
+    /**
+     * The tasks given to the employee in this employment. A rehire keeps
+     * the record, so the last employment's joining and leaving tasks —
+     * their events dated before the new hire — stay with HR.
+     *
+     * @return HasMany<ChecklistTask, Employee>
+     */
+    private function tasksOf(Employee $employee): HasMany
+    {
+        return $employee->checklistTasks()
+            ->where('assignee', ChecklistAssignee::Employee->value)
+            ->whereIn('event_id', $employee->events()->where('effective_on', '>=', $employee->hired_on->toDateString())->select('id'));
     }
 }
