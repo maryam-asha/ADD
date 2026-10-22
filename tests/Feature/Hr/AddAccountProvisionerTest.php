@@ -92,18 +92,22 @@ class AddAccountProvisionerTest extends TestCase
 
     public function test_a_new_account_needs_a_work_email_and_a_phone(): void
     {
+        // Each on its field, so the hire form can show it there.
         $this->postJson('/api/v1/hr/employees', $this->hirePayload(['phone' => '+963933000000']))
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.hr.work_email_required'));
+            ->assertJsonPath('message', __('api.validation.failed'))
+            ->assertJsonPath('errors.work_email.0', __('api.hr.work_email_required'));
 
         $this->postJson('/api/v1/hr/employees', $this->hirePayload(['work_email' => 'nophone@add.sy']))
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.hr.phone_required'));
+            ->assertJsonPath('message', __('api.validation.failed'))
+            ->assertJsonPath('errors.phone.0', __('api.hr.phone_required'));
 
         // Member sign-in is by phone, so a new ADD ID needs the E.164 form.
         $this->postJson('/api/v1/hr/employees', $this->hirePayload(['work_email' => 'local@add.sy', 'phone' => '0944 210 118']))
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.hr.phone_invalid'));
+            ->assertJsonPath('message', __('api.validation.failed'))
+            ->assertJsonPath('errors.phone.0', __('api.hr.phone_invalid'));
 
         $this->assertDatabaseCount('hr_employees', 0);
     }

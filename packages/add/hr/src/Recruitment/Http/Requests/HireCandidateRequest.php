@@ -10,6 +10,10 @@ use Add\Hr\Recruitment\Models\Application;
  * application: the candidate's name and contacts, the offer's start date,
  * and the requisition's unit, position, grade, employment type and hiring
  * manager. Anything sent wins.
+ *
+ * The candidate's email is a personal one. A host that makes accounts may
+ * need what no application holds — ADD needs a `work_email` for a new
+ * account — and its AccountProvisioner answers 422 on that field.
  */
 class HireCandidateRequest extends HireEmployeeRequest
 {
