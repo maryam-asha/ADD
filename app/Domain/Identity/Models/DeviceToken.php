@@ -12,8 +12,14 @@ class DeviceToken extends Model
 
     protected $fillable = [
         'user_id',
+        'access_token_id',
         'token',
+        'device_id',
         'platform',
+        'app_version',
+        'build_number',
+        'os_version',
+        'device_model',
         'last_used_at',
     ];
 

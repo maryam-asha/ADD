@@ -9,6 +9,7 @@ use App\Http\Requests\Auth\ReactivateAccountRequest;
 use App\Http\Requests\Auth\ReactivateAccountVerifyRequest;
 use App\Http\Resources\AuthenticatedUserResource;
 use App\Services\Auth\TokenPairService;
+use App\Services\Notification\DeviceTokenService;
 use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
@@ -34,6 +35,7 @@ class AccountReactivationController extends Controller
     public function __construct(
         private readonly OtpService $otp,
         private readonly TokenPairService $tokens,
+        private readonly DeviceTokenService $devices,
     ) {}
 
     /**
@@ -104,6 +106,8 @@ class AccountReactivationController extends Controller
 
             return $this->tokens->issue($user);
         });
+
+        $this->devices->registerOnSession($pair, $request->validated('fcm_token'), $request->deviceDetails());
 
         return response()->json([
             ...$pair->toArray(),

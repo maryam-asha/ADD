@@ -4,26 +4,28 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateDeviceTokenRequest;
+use App\Services\Notification\DeviceTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class MemberDeviceTokenController extends Controller
 {
+    public function __construct(
+        private readonly DeviceTokenService $devices,
+    ) {}
+
     public function update(UpdateDeviceTokenRequest $request): JsonResponse
     {
         $user = $request->user();
-        $token = $request->input('fcm_token') ?? $request->input('token');
-        $platform = $request->input('platform');
+        $accessToken = $user->currentAccessToken();
 
-        $user->deviceTokens()->updateOrCreate(
-            ['token' => $token],
-            [
-                'platform' => $platform,
-                'last_used_at' => now(),
-            ]
+        $this->devices->register(
+            $user,
+            $request->input('fcm_token') ?? $request->input('token'),
+            $request->deviceDetails(),
+            $accessToken instanceof PersonalAccessToken && $accessToken->exists ? $accessToken->getKey() : null,
         );
-
-        $user->update(['fcm_token' => $token]);
 
         return response()->json(['message' => __('api.notification.device_token_updated')]);
     }
@@ -34,13 +36,9 @@ class MemberDeviceTokenController extends Controller
         $token = $request->input('fcm_token') ?? $request->input('token');
 
         if ($token) {
-            $user->deviceTokens()->where('token', $token)->delete();
-            if ($user->fcm_token === $token) {
-                $user->update(['fcm_token' => $user->deviceTokens()->latest('id')->value('token')]);
-            }
+            $this->devices->forget($user, $token);
         } else {
-            $user->deviceTokens()->delete();
-            $user->update(['fcm_token' => null]);
+            $this->devices->forgetAll($user);
         }
 
         return response()->json(['message' => __('api.notification.device_token_removed')]);

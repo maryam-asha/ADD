@@ -18,6 +18,7 @@ final readonly class TokenPair
         public string $refreshToken,
         public DateTimeInterface $accessTokenExpiresAt,
         public User $user,
+        public int $accessTokenId,
     ) {}
 
     /**

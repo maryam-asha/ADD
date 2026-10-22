@@ -324,6 +324,14 @@
         {
             "key": "hr_checklist_task_id",
             "value": ""
+        },
+        {
+            "key": "member_fcm_token",
+            "value": "fcm_token_sample_123456"
+        },
+        {
+            "key": "member_device_id",
+            "value": "3f2c9a4e-7b1d-4c2a-9e8f-0a1b2c3d4e5f"
         }
     ],
     "event": [
@@ -428,7 +436,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
+                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\",\n  \"fcm_token\": \"{{member_fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_id\": \"{{member_device_id}}\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"os_version\": \"14\",\n  \"device_model\": \"SM-S918B\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -448,7 +456,7 @@
                                         "verify"
                                     ]
                                 },
-                                "description": "Step 2 of sign-up, and ACCOUNT CREATION ONLY \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the 'member' role, provisions an empty wallet, and discards the parked row \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c a race, not the normal \"already registered\" answer, which step 1 gives you as a 422."
+                                "description": "Step 2 of sign-up, and ACCOUNT CREATION ONLY \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c this is no longer the repeat login the old otp/verify was. Returning members use Login.\n\nJust the phone and the code. The profile was validated and parked at step 1, so nothing is re-typed and the password crosses the wire only once. Creates the account, assigns the 'member' role, provisions an empty wallet, and discards the parked row \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c all in one transaction.\n\nReturns an access_token + refresh_token pair, both captured automatically. The access token carries the ability `member-app` and nothing more, so it cannot reach /api/v1/admin/* even if the same person is also an operator.\n\n422 \"please start signing up again\" means there is no parked profile \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c step 1 was never run, or it expired along with its code (both last 5 minutes). Re-run step 1.\n\n409 means the number or email was free at step 1 and got claimed in between \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c a race, not the normal \"already registered\" answer, which step 1 gives you as a 422.\n\nPush notifications (optional): send `fcm_token` (the device's Firebase Cloud Messaging token, max 500) and `platform` (`ios` | `android` | `web`) to register this device for push in the same call -- no separate PUT member/device-token needed afterwards. The token is tied to the session issued here: Logout, a password reset, changing the password (other devices), deactivation, a block or deleting the account stop its pushes. An FCM token belongs to one account at a time -- signing into another account on the same phone moves it.\n\nDevice details (optional, sent with `fcm_token`): `device_id` -- an id the app generates once per install (a UUID, never IMEI/serial), max 100; it keeps one row per install, so a token Firebase rotates replaces the old one, and the install leaves any other account it was signed into. `app_version` (max 50), `build_number` (max 50), `os_version` (max 50), `device_model` (max 100). A field left out keeps its stored value. Shown to admins under the member profile's `devices`."
                             }
                         },
                         {
@@ -520,7 +528,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"password\": \"{{member_password}}\"\n}",
+                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"password\": \"{{member_password}}\",\n  \"fcm_token\": \"{{member_fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_id\": \"{{member_device_id}}\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"os_version\": \"14\",\n  \"device_model\": \"SM-S918B\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -539,7 +547,7 @@
                                         "login"
                                     ]
                                 },
-                                "description": "The everyday sign-in, for MEMBERS ONLY. Returns the same access_token + refresh_token pair sign-up does, both captured automatically. The token carries the ability `member-app`, which /api/v1/admin/* rejects.\n\n401 is deliberately identical for three different failures \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c wrong password, unregistered number, and an account that holds no `member` role (an operations or admin account). Operators sign in at Admin/Auth/Login, behind Fortify's second factor; if this endpoint issued them a token, phone + password alone would reach the operations API and the second factor would be worth nothing. The wording is shared so the response can't be used to work out which numbers have accounts, or which of those belong to staff.\n\n403 means the account is deactivated or blocked; no token is issued and the body names the state.\n\n429 after 5 attempts per minute for this phone+IP combination, with retry_after in the body."
+                                "description": "The everyday sign-in, for MEMBERS ONLY. Returns the same access_token + refresh_token pair sign-up does, both captured automatically. The token carries the ability `member-app`, which /api/v1/admin/* rejects.\n\n401 is deliberately identical for three different failures \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c wrong password, unregistered number, and an account that holds no `member` role (an operations or admin account). Operators sign in at Admin/Auth/Login, behind Fortify's second factor; if this endpoint issued them a token, phone + password alone would reach the operations API and the second factor would be worth nothing. The wording is shared so the response can't be used to work out which numbers have accounts, or which of those belong to staff.\n\n403 means the account is deactivated or blocked; no token is issued and the body names the state.\n\n429 after 5 attempts per minute for this phone+IP combination, with retry_after in the body.\n\nPush notifications (optional): send `fcm_token` (the device's Firebase Cloud Messaging token, max 500) and `platform` (`ios` | `android` | `web`) to register this device for push in the same call -- no separate PUT member/device-token needed afterwards. The token is tied to the session issued here: Logout, a password reset, changing the password (other devices), deactivation, a block or deleting the account stop its pushes. An FCM token belongs to one account at a time -- signing into another account on the same phone moves it.\n\nDevice details (optional, sent with `fcm_token`): `device_id` -- an id the app generates once per install (a UUID, never IMEI/serial), max 100; it keeps one row per install, so a token Firebase rotates replaces the old one, and the install leaves any other account it was signed into. `app_version` (max 50), `build_number` (max 50), `os_version` (max 50), `device_model` (max 100). A field left out keeps its stored value. Shown to admins under the member profile's `devices`."
                             }
                         },
                         {
@@ -580,7 +588,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"refresh_token\": \"{{member_refresh_token}}\"\n}",
+                                    "raw": "{\n  \"refresh_token\": \"{{member_refresh_token}}\",\n  \"fcm_token\": \"{{member_fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_id\": \"{{member_device_id}}\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"os_version\": \"14\",\n  \"device_model\": \"SM-S918B\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -599,7 +607,7 @@
                                         "refresh"
                                     ]
                                 },
-                                "description": "Renews an expired access token without the password. Unauthenticated \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c the refresh token in the body IS the credential.\n\nSingle use: the token sent here is revoked and the previous access token deleted, so both variables are overwritten with the replacements. Sending the same refresh token twice returns 401.\n\nAlso 401 if the refresh token has expired (30 days) or the account was deactivated/blocked in the meantime."
+                                "description": "Renews an expired access token without the password. Unauthenticated \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c the refresh token in the body IS the credential.\n\nSingle use: the token sent here is revoked and the previous access token deleted, so both variables are overwritten with the replacements. Sending the same refresh token twice returns 401.\n\nAlso 401 if the refresh token has expired (30 days) or the account was deactivated/blocked in the meantime.\n\nPush notifications: a device registered on the old session moves to the new one automatically. `fcm_token` + `platform` are optional here -- send them only when Firebase has rotated the device's token.\n\nDevice details (optional, sent with `fcm_token`): `device_id` -- an id the app generates once per install (a UUID, never IMEI/serial), max 100; it keeps one row per install, so a token Firebase rotates replaces the old one, and the install leaves any other account it was signed into. `app_version` (max 50), `build_number` (max 50), `os_version` (max 50), `device_model` (max 100). A field left out keeps its stored value. Shown to admins under the member profile's `devices`."
                             }
                         },
                         {
@@ -820,7 +828,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\"\n}",
+                                    "raw": "{\n  \"phone\": \"{{member_phone}}\",\n  \"code\": \"REPLACE_WITH_CODE_FROM_LOG\",\n  \"fcm_token\": \"{{member_fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_id\": \"{{member_device_id}}\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"os_version\": \"14\",\n  \"device_model\": \"SM-S918B\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -841,7 +849,7 @@
                                         "verify"
                                     ]
                                 },
-                                "description": "Restores the account to `active` and signs it straight back in -- unlike Reset Password, this issues a fresh access_token + refresh_token pair (captured automatically), because a deactivated account has no live session to fall back on; there is no separate Login step afterwards.\n\nThe code must have been issued by Account Reactivation -- Request Code. A registration or password-reset code sent here is refused with 422 and a message saying so."
+                                "description": "Restores the account to `active` and signs it straight back in -- unlike Reset Password, this issues a fresh access_token + refresh_token pair (captured automatically), because a deactivated account has no live session to fall back on; there is no separate Login step afterwards.\n\nThe code must have been issued by Account Reactivation -- Request Code. A registration or password-reset code sent here is refused with 422 and a message saying so.\n\nPush notifications (optional): send `fcm_token` (the device's Firebase Cloud Messaging token, max 500) and `platform` (`ios` | `android` | `web`) to register this device for push in the same call -- no separate PUT member/device-token needed afterwards. The token is tied to the session issued here: Logout, a password reset, changing the password (other devices), deactivation, a block or deleting the account stop its pushes. An FCM token belongs to one account at a time -- signing into another account on the same phone moves it.\n\nDevice details (optional, sent with `fcm_token`): `device_id` -- an id the app generates once per install (a UUID, never IMEI/serial), max 100; it keeps one row per install, so a token Firebase rotates replaces the old one, and the install leaves any other account it was signed into. `app_version` (max 50), `build_number` (max 50), `os_version` (max 50), `device_model` (max 100). A field left out keeps its stored value. Shown to admins under the member profile's `devices`."
                             }
                         },
                         {
@@ -900,6 +908,10 @@
                                 "method": "POST",
                                 "header": [
                                     {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
                                         "key": "lang",
                                         "value": "{{lang}}",
                                         "type": "text"
@@ -922,7 +934,16 @@
                                         "logout"
                                     ]
                                 },
-                                "description": "Revokes the current access token. Calling Account/Get Me again afterwards should return 401."
+                                "description": "Revokes the current access token. Calling Account/Get Me again afterwards should return 401.\n\nAlso stops push notifications to this device: the FCM token registered on this session is removed. `fcm_token` in the body is optional -- send it to also remove a token registered before tokens were tied to a session (older app builds). The body can be omitted entirely.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"fcm_token\": \"{{member_fcm_token}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             }
                         }
                     ]
@@ -8294,7 +8315,7 @@
                                         "device-token"
                                     ]
                                 },
-                                "description": "Registers or refreshes the device FCM push token for multi-device push delivery (PRD 5.10).",
+                                "description": "Registers or refreshes this device's FCM push token (PRD 5.10). Call it whenever Firebase rotates the token (onTokenRefresh); at sign-in, prefer sending `fcm_token` with Login / Register Verify / Account Reactivation Verify instead.\n\n`fcm_token` (or the older alias `token`) is required, max 500; `platform` is optional: `ios` | `android` | `web`. The token is tied to the calling session, so Logout removes it, and it is taken away from any other account that had it (one account per device).\n\nDevice details (optional, sent with `fcm_token`): `device_id` -- an id the app generates once per install (a UUID, never IMEI/serial), max 100; it keeps one row per install, so a token Firebase rotates replaces the old one, and the install leaves any other account it was signed into. `app_version` (max 50), `build_number` (max 50), `os_version` (max 50), `device_model` (max 100). A field left out keeps its stored value. Shown to admins under the member profile's `devices`.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -8307,7 +8328,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"token\": \"fcm_token_sample_123456\",\n  \"platform\": \"ios\"\n}",
+                                    "raw": "{\n  \"fcm_token\": \"{{member_fcm_token}}\",\n  \"platform\": \"android\",\n  \"device_id\": \"{{member_device_id}}\",\n  \"app_version\": \"1.4.2\",\n  \"build_number\": \"142\",\n  \"os_version\": \"14\",\n  \"device_model\": \"SM-S918B\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -8348,7 +8369,7 @@
                                         "device-token"
                                     ]
                                 },
-                                "description": "Removes the device token upon logout. If body token is omitted, all tokens for the user are revoked.",
+                                "description": "Removes a device token -- e.g. when the member turns push notifications off. `fcm_token` (or `token`) removes that one; omit the body to remove every device of the account. Logout already removes the device of the session it ends, so the app does not need to call this before logging out.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -8361,7 +8382,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"token\": \"fcm_token_sample_123456\"\n}",
+                                    "raw": "{\n  \"fcm_token\": \"{{member_fcm_token}}\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"

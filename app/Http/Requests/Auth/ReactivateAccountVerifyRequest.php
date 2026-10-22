@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Http\Requests\Auth\Concerns\AcceptsDeviceToken;
 use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -11,6 +12,8 @@ use Illuminate\Foundation\Http\FormRequest;
  */
 class ReactivateAccountVerifyRequest extends FormRequest
 {
+    use AcceptsDeviceToken;
+
     public function authorize(): bool
     {
         return true;
@@ -24,6 +27,6 @@ class ReactivateAccountVerifyRequest extends FormRequest
         return [
             'phone' => ['required', 'string', new PhoneNumber],
             'code' => ['required', 'string', 'size:'.config('otp.code_length')],
-        ];
+        ] + $this->deviceTokenRules();
     }
 }

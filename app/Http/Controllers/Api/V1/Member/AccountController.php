@@ -6,6 +6,7 @@ use App\Concerns\LogsSensitiveActions;
 use App\Http\Controllers\Controller;
 use App\Services\Auth\TokenPairService;
 use App\Services\Media\ImageService;
+use App\Services\Notification\DeviceTokenService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,9 +20,12 @@ class AccountController extends Controller
         private readonly TokenPairService $tokens,
     ) {}
 
-    public function delete(): JsonResponse
+    public function delete(DeviceTokenService $devices): JsonResponse
     {
         $user = auth()->user();
+
+        // A soft delete leaves the rows behind; a deleted account gets no pushes.
+        $devices->forgetAll($user);
         $user->delete();
 
         return response()->json(['message' => __('api.auth.account_deleted')]);

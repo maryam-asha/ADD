@@ -18,6 +18,7 @@ use App\Http\Requests\Auth\RegisterVerifyRequest;
 use App\Http\Resources\AuthenticatedUserResource;
 use App\Services\Auth\Exceptions\InvalidRefreshTokenException;
 use App\Services\Auth\TokenPairService;
+use App\Services\Notification\DeviceTokenService;
 use App\Services\Otp\Exceptions\OtpDeliveryFailedException;
 use App\Services\Otp\Exceptions\OtpThrottledException;
 use App\Services\Otp\OtpResult;
@@ -37,6 +38,7 @@ class MemberAuthController extends Controller
     public function __construct(
         private readonly OtpService $otp,
         private readonly TokenPairService $tokens,
+        private readonly DeviceTokenService $devices,
     ) {}
 
     /**
@@ -204,8 +206,11 @@ class MemberAuthController extends Controller
             return $user;
         });
 
+        $pair = $this->tokens->issue($user);
+        $this->devices->registerOnSession($pair, $request->validated('fcm_token'), $request->deviceDetails());
+
         return response()->json([
-            ...$this->tokens->issue($user)->toArray(),
+            ...$pair->toArray(),
             'user' => new AuthenticatedUserResource($user),
         ]);
     }
@@ -254,8 +259,11 @@ class MemberAuthController extends Controller
             ], 403);
         }
 
+        $pair = $this->tokens->issue($user);
+        $this->devices->registerOnSession($pair, $request->validated('fcm_token'), $request->deviceDetails());
+
         return response()->json([
-            ...$this->tokens->issue($user)->toArray(),
+            ...$pair->toArray(),
             'user' => new AuthenticatedUserResource($user),
         ]);
     }
@@ -327,6 +335,10 @@ class MemberAuthController extends Controller
             return response()->json(['message' => __('api.auth.refresh_token_invalid')], 401);
         }
 
+        // The device already moved to the new session in rotate(); a token
+        // sent here is only a refreshed FCM token for it.
+        $this->devices->registerOnSession($pair, $request->validated('fcm_token'), $request->deviceDetails());
+
         return response()->json([
             ...$pair->toArray(),
             'user' => new AuthenticatedUserResource($pair->user),
@@ -345,9 +357,21 @@ class MemberAuthController extends Controller
      * Their session is ended rather than the request being refused. Anyone who
      * asks to be logged out should be, and answering 200 while leaving a live
      * cookie behind would be the more dangerous of the two lies.
+     *
+     * The device registered on this session stops receiving pushes with it
+     * (revokeSession()). `fcm_token` in the body also removes a token that was
+     * registered before tokens were tied to a session.
      */
     public function logout(Request $request): JsonResponse
     {
+        $validated = $request->validate([
+            'fcm_token' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if (! empty($validated['fcm_token'])) {
+            $this->devices->forget($request->user(), $validated['fcm_token']);
+        }
+
         $token = $request->user()->currentAccessToken();
 
         if ($token instanceof PersonalAccessToken) {

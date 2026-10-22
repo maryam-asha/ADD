@@ -182,10 +182,14 @@ class User extends Authenticatable
                 'status_reason' => $reason,
                 'status_changed_at' => now(),
                 'status_changed_by' => auth()->id(),
+                'fcm_token' => null,
             ])->save();
 
             $this->refreshTokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
             $this->tokens()->delete();
+
+            // No session left means no device should still be getting pushes.
+            $this->deviceTokens()->delete();
         });
     }
 

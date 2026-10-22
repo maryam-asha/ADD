@@ -5,6 +5,7 @@ namespace App\Services\Auth;
 use App\Domain\Identity\Models\RefreshToken;
 use App\Domain\Identity\Models\User;
 use App\Services\Auth\Exceptions\InvalidRefreshTokenException;
+use App\Services\Notification\DeviceTokenService;
 use Illuminate\Support\Facades\DB;
 use Laravel\Sanctum\PersonalAccessToken;
 
@@ -37,6 +38,10 @@ class TokenPairService
      */
     public const MEMBER_APP_ABILITY = 'member-app';
 
+    public function __construct(
+        private readonly DeviceTokenService $devices,
+    ) {}
+
     /**
      * Mint a fresh access token and the refresh token that renews it.
      */
@@ -56,7 +61,7 @@ class TokenPairService
                 'expires_at' => now()->addDays(config('tokens.refresh_ttl_days')),
             ]);
 
-            return new TokenPair($accessToken->plainTextToken, $plainRefreshToken, $expiresAt, $user);
+            return new TokenPair($accessToken->plainTextToken, $plainRefreshToken, $expiresAt, $user, $accessToken->accessToken->getKey());
         });
     }
 
@@ -88,11 +93,17 @@ class TokenPairService
 
             $refreshToken->revoke();
 
+            $pair = $this->issue($user);
+
+            // The device carries over to the new access token before the old
+            // one goes — its FK is nullOnDelete, so the other order loses it.
             if ($refreshToken->access_token_id) {
+                $this->devices->moveSession($refreshToken->access_token_id, $pair->accessTokenId);
+
                 PersonalAccessToken::whereKey($refreshToken->access_token_id)->delete();
             }
 
-            return $this->issue($user);
+            return $pair;
         });
     }
 
@@ -109,6 +120,8 @@ class TokenPairService
                 ->whereNull('revoked_at')
                 ->update(['revoked_at' => now()]);
 
+            $this->devices->forgetSession($accessToken->getKey());
+
             $accessToken->delete();
         });
     }
@@ -122,6 +135,7 @@ class TokenPairService
     {
         DB::transaction(function () use ($user) {
             $user->refreshTokens()->whereNull('revoked_at')->update(['revoked_at' => now()]);
+            $this->devices->forgetAll($user);
             $user->tokens()->delete();
         });
     }
@@ -140,6 +154,8 @@ class TokenPairService
                 ->whereNull('revoked_at')
                 ->where('access_token_id', '!=', $currentAccessToken->getKey())
                 ->update(['revoked_at' => now()]);
+
+            $this->devices->forgetAllExcept($user, $currentAccessToken->getKey());
 
             $user->tokens()->whereKeyNot($currentAccessToken->getKey())->delete();
         });

@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Member;
 
+use App\Http\Requests\Auth\Concerns\AcceptsDeviceToken;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateDeviceTokenRequest extends FormRequest
 {
+    use AcceptsDeviceToken;
+
     public function authorize(): bool
     {
         return true;
@@ -16,7 +19,6 @@ class UpdateDeviceTokenRequest extends FormRequest
         return [
             'fcm_token' => ['required_without:token', 'string', 'max:500'],
             'token' => ['required_without:fcm_token', 'string', 'max:500'],
-            'platform' => ['nullable', 'string', 'in:ios,android,web'],
-        ];
+        ] + $this->deviceTokenRules();
     }
 }

@@ -308,6 +308,10 @@ class MemberProfileController extends Controller
             'privacy_policy_agreed_at' => $this->local($consent?->agreed_at),
             'devices' => $user->deviceTokens->sortByDesc('last_used_at')->map(fn ($device) => [
                 'platform' => $device->platform,
+                'device_model' => $device->device_model,
+                'os_version' => $device->os_version,
+                'app_version' => $device->app_version,
+                'build_number' => $device->build_number,
                 'last_used_at' => $this->local($device->last_used_at),
             ])->values(),
         ];

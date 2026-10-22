@@ -2,11 +2,14 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Http\Requests\Auth\Concerns\AcceptsDeviceToken;
 use App\Rules\PhoneNumber;
 use Illuminate\Foundation\Http\FormRequest;
 
 class LoginRequest extends FormRequest
 {
+    use AcceptsDeviceToken;
+
     public function authorize(): bool
     {
         return true;
@@ -25,6 +28,6 @@ class LoginRequest extends FormRequest
         return [
             'phone' => ['required', 'string', new PhoneNumber],
             'password' => ['required', 'string'],
-        ];
+        ] + $this->deviceTokenRules();
     }
 }
