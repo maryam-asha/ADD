@@ -31,6 +31,9 @@ return [
     // Checklists
     'checklist_template_updated' => 'Checklist template updated.',
     'checklist_task_updated' => 'Task updated.',
+    'my_task_completed' => 'Task done.',
+    'my_task_reopened' => 'Task reopened.',
+    'not_your_task' => 'This task is not yours to tick.',
     'employee_task_after_last_day' => 'A task for the employee must be due on or before their last working day: after it they can no longer reach My HR.',
 
     // Employment events

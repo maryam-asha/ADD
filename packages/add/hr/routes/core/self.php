@@ -1,5 +1,6 @@
 <?php
 
+use Add\Hr\Core\Http\Controllers\SelfService\MyTasksController;
 use Add\Hr\Core\Http\Controllers\SelfService\SelfServiceController;
 use Illuminate\Support\Facades\Route;
 
@@ -14,3 +15,7 @@ Route::get('documents', [SelfServiceController::class, 'documents'])->name('docu
 Route::post('documents/{document}/link', [SelfServiceController::class, 'documentLink'])->name('documents.link');
 Route::put('contacts', [SelfServiceController::class, 'contacts'])->name('contacts');
 Route::get('team', [SelfServiceController::class, 'team'])->name('team');
+
+Route::get('tasks', [MyTasksController::class, 'index'])->name('tasks.index');
+Route::post('tasks/{task}/complete', [MyTasksController::class, 'complete'])->name('tasks.complete');
+Route::post('tasks/{task}/reopen', [MyTasksController::class, 'reopen'])->name('tasks.reopen');
