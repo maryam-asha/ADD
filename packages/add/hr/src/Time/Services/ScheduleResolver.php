@@ -6,6 +6,7 @@ use Add\Hr\Contracts\HrClock;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Leave\Enums\LeaveRequestStatus;
 use Add\Hr\Leave\Services\WorkCalendar;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Time\Data\ScheduledDay;
 use Add\Hr\Time\Enums\DayKind;
 use Add\Hr\Time\Enums\WorkPatternKind;
@@ -94,7 +95,7 @@ class ScheduleResolver
      */
     public function today(): CarbonImmutable
     {
-        return CarbonImmutable::parse(CarbonImmutable::now($this->clock->timezone())->toDateString());
+        return LocalDay::today($this->clock);
     }
 
     /**
@@ -102,7 +103,7 @@ class ScheduleResolver
      */
     public function localDate(CarbonInterface $instant): CarbonImmutable
     {
-        return CarbonImmutable::parse(CarbonImmutable::parse($instant)->setTimezone($this->clock->timezone())->toDateString());
+        return LocalDay::of(CarbonImmutable::parse($instant)->setTimezone($this->clock->timezone()));
     }
 
     public function timezone(): string

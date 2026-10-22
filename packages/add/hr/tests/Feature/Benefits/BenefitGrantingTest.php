@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Tests\Feature\Benefits;
 
+use Add\Hr\Authorization\Abilities;
 use Add\Hr\Benefits\Models\Benefit;
 use Add\Hr\Benefits\Models\BenefitGrant;
 use Add\Hr\Benefits\Services\BenefitAssignmentService;
@@ -198,6 +199,31 @@ class BenefitGrantingTest extends TestCase
         $this->grant('2026-07-01');
         $this->assertSame(1, BenefitGrant::query()->where(['benefit_id' => $once->id, 'employee_id' => $newcomer->id])->count());
         $this->assertSame(0, BenefitGrant::query()->where('employee_id', $leaver->id)->count());
+    }
+
+    public function test_eligibility_counts_the_organisations_calendar_days(): void
+    {
+        // The application runs in UTC and the organisation at +03:00, whose
+        // midnight is 21:00 UTC the day before; 10:00 on 5 April locally.
+        config(['hr.timezone' => 'Asia/Damascus']);
+        $this->travelTo('2026-04-05 07:00:00');
+        $benefit = $this->benefit(['eligible_after_days' => 30]);
+        $this->assign($benefit, ['org_unit_id' => $this->division->id]);
+
+        // Thirty days after each hire is the 1st of the month granted.
+        $april = $this->hireInTeam(['hired_on' => '2026-03-02']);
+        $may = $this->hireInTeam(['hired_on' => '2026-04-01']);
+        $june = $this->hireInTeam(['hired_on' => '2026-05-02']);
+
+        $this->artisan('hr:benefits-grant')->assertSuccessful();
+        $this->artisan('hr:benefits-grant', ['--month' => '2026-05'])->assertSuccessful();
+        $this->actingAsWith([Abilities::BENEFITS_MANAGE]);
+        $this->postJson('/api/hr/benefit-grants/run', ['month' => '2026-06'])->assertOk();
+
+        $this->assertContains([$benefit->id, $april->id, '2026-04'], $this->grants());
+        $this->assertContains([$benefit->id, $may->id, '2026-05'], $this->grants());
+        $this->assertContains([$benefit->id, $june->id, '2026-06'], $this->grants());
+        $this->assertSame('2026-04-01', BenefitGrant::query()->where('employee_id', $april->id)->orderBy('id')->first()->granted_on->toDateString());
     }
 
     public function test_an_entitlement_is_recorded_and_the_command_grants_the_current_month(): void

@@ -89,6 +89,39 @@ class TrainingFlowTest extends TestCase
         $this->assertSame(['certification_expiring'], $types);
     }
 
+    public function test_a_sessions_days_are_the_organisations_calendar_days(): void
+    {
+        // The application runs in UTC and the organisation at +03:00, whose
+        // midnight is 21:00 UTC the day before.
+        config(['hr.timezone' => 'Asia/Damascus']);
+        $this->actingAs($this->hr);
+        $course = $this->postJson('/api/hr/courses', ['code' => 'safety-101', 'title' => ['ar' => 'السلامة'], 'delivery' => 'in_person'])
+            ->assertCreated()->json('data.id');
+        $session = $this->postJson('/api/hr/training-sessions', [
+            'course_id' => $course, 'starts_on' => '2026-03-10', 'ends_on' => '2026-03-11', 'self_enrollment' => true,
+        ])->assertCreated()->json('data.id');
+        $this->actingAsEmployee($this->learner);
+        $mine = $this->postJson("/api/hr/me/training-sessions/{$session}/enroll")->assertCreated()->json('data.id');
+
+        // 10:00 on the first day: too late to enroll or to withdraw.
+        $this->travelTo('2026-03-10 07:00:00');
+        $this->actingAsEmployee($this->other);
+        $this->postJson("/api/hr/me/training-sessions/{$session}/enroll")->assertUnprocessable()
+            ->assertJsonPath('message', __('hr::training.self_enrollment_closed'));
+        $this->actingAsEmployee($this->learner);
+        $this->postJson("/api/hr/me/enrollments/{$mine}/cancel")->assertUnprocessable()
+            ->assertJsonPath('message', __('hr::training.session_started'));
+
+        // 23:00 the day before the last is still too early; 10:00 on the last day is not.
+        $this->actingAs($this->hr);
+        $this->travelTo('2026-03-10 20:00:00');
+        $this->postJson("/api/hr/training-sessions/{$session}/complete")->assertUnprocessable()
+            ->assertJsonPath('message', __('hr::training.session_not_ended'));
+        $this->travelTo('2026-03-11 07:00:00');
+        $this->postJson("/api/hr/training-sessions/{$session}/complete")->assertOk();
+        $this->assertSame('2026-03-11', Enrollment::query()->find($mine)->completed_on->toDateString());
+    }
+
     public function test_the_learning_budget_is_spent_through_approvals(): void
     {
         $this->actingAs($this->hr);

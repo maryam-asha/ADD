@@ -8,6 +8,7 @@ use Add\Hr\Reports\Services\Dashboard;
 use Add\Hr\Reports\Services\HeadcountReport;
 use Add\Hr\Reports\Services\OperationsReports;
 use Add\Hr\Reports\Support\CsvExport;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Timesheets\Services\TimesheetWeeks;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
@@ -106,7 +107,7 @@ class ReportController extends Controller
     private function day(?string $value): CarbonImmutable
     {
         return $value === null
-            ? CarbonImmutable::now($this->clock->timezone())->startOfDay()
+            ? LocalDay::today($this->clock)
             : CarbonImmutable::parse($value)->startOfDay();
     }
 
