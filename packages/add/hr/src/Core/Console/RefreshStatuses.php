@@ -4,7 +4,7 @@ namespace Add\Hr\Core\Console;
 
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Console\Command;
 
 /**
@@ -22,7 +22,7 @@ class RefreshStatuses extends Command
     {
         Employee::query()
             ->whereNotNull('terminated_on')
-            ->where('terminated_on', '<', CarbonImmutable::today()->toDateString())
+            ->where('terminated_on', '<', LocalDay::today()->toDateString())
             ->whereNull('access_revoked_at')
             ->each(fn (Employee $employee) => $lifecycle->revokeAccess($employee));
 

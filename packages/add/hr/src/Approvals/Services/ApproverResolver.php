@@ -8,7 +8,7 @@ use Add\Hr\Approvals\Models\ApprovalStep;
 use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\OrgUnit;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 
 /**
  * Turns a step's approver type into who decides it today. A step that
@@ -68,7 +68,7 @@ class ApproverResolver
     {
         return $approver !== null
             && $approver->id !== $requester->id
-            && $approver->isEmployedOn(CarbonImmutable::today());
+            && $approver->isEmployedOn(LocalDay::today());
     }
 
     private function managerOf(Employee $employee): ?Employee

@@ -15,9 +15,14 @@ use Carbon\CarbonInterface;
  */
 final class LocalDay
 {
-    public static function today(HrClock $clock): CarbonImmutable
+    /**
+     * The organisation's today. Never `CarbonImmutable::today()`: that is
+     * the application's (UTC) day, still yesterday from local midnight
+     * until 03:00 at +03:00.
+     */
+    public static function today(?HrClock $clock = null): CarbonImmutable
     {
-        return self::of(CarbonImmutable::now($clock->timezone()));
+        return self::of(CarbonImmutable::now(($clock ?? app(HrClock::class))->timezone()));
     }
 
     /**

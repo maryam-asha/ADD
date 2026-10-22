@@ -3,7 +3,7 @@
 namespace Add\Hr\Leave\Console;
 
 use Add\Hr\Leave\Services\LeaveAccrual;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Console\Command;
 
 /**
@@ -18,7 +18,7 @@ class AccrueLeave extends Command
 
     public function handle(LeaveAccrual $accrual): int
     {
-        $count = $accrual->run(CarbonImmutable::today());
+        $count = $accrual->run(LocalDay::today());
 
         $this->info("{$count} leave credits booked.");
 

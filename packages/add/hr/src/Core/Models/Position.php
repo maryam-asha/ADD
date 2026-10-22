@@ -4,7 +4,7 @@ namespace Add\Hr\Core\Models;
 
 use Add\Hr\Database\Factories\PositionFactory;
 use Add\Hr\Support\Concerns\HasTranslations;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -67,7 +67,7 @@ class Position extends Model
      */
     public function occupiedCount(?CarbonInterface $on = null, int|string|null $exceptEmployeeId = null): int
     {
-        return $this->assignments()->openFrom($on ?? CarbonImmutable::today())
+        return $this->assignments()->openFrom($on ?? LocalDay::today())
             ->when($exceptEmployeeId !== null, fn ($q) => $q->where('employee_id', '!=', $exceptEmployeeId))
             ->distinct()
             ->count('employee_id');

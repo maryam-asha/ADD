@@ -4,15 +4,18 @@ namespace Add\Hr\Tests\Feature\Core;
 
 use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Enums\EmployeeStatus;
+use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\JobGrade;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 
 class LifecycleEventsTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -224,5 +227,23 @@ class LifecycleEventsTest extends TestCase
         $this->actingAsWith([Abilities::EMPLOYEES_VIEW]);
 
         $this->record($employee->id, ['type' => 'confirmation', 'effective_on' => now()->toDateString()])->assertForbidden();
+    }
+
+    public function test_an_employees_current_records_are_the_organisations_days(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $cafe = OrgUnit::factory()->create();
+        $employee = $this->hireEmployee(['contract' => ['type' => 'fixed_term', 'ends_on' => '2026-03-10']]);
+        $this->record($employee->id, ['type' => 'transfer', 'effective_on' => '2026-03-11', 'assignment' => ['org_unit_id' => $cafe->id]])->assertCreated();
+        $this->record($employee->id, ['type' => 'contract_renewal', 'effective_on' => '2026-03-11', 'contract' => ['type' => 'open_ended']])->assertCreated();
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $employee = Employee::query()->with(['activeAssignment', 'activeContract'])->findOrFail($employee->id);
+
+        $this->assertSame($cafe->id, $employee->currentAssignment()->org_unit_id);
+        $this->assertSame($cafe->id, $employee->activeAssignment->org_unit_id);
+        $this->assertSame('open_ended', $employee->currentContract()->type->value);
+        $this->assertSame('open_ended', $employee->activeContract->type->value);
     }
 }

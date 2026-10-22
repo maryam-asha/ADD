@@ -11,6 +11,7 @@ use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Leave\Models\LedgerEntry;
 use Add\Hr\Leave\Services\LeaveLedger;
 use Add\Hr\Leave\Services\LeaveService;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -44,7 +45,7 @@ class EmployeeLeaveController extends Controller
     public function adjust(AdjustLeaveBalanceRequest $request, Employee $employee, LeaveLedger $ledger): LedgerEntryResource
     {
         $data = $request->validated();
-        $on = CarbonImmutable::parse($data['effective_on'] ?? CarbonImmutable::today());
+        $on = CarbonImmutable::parse($data['effective_on'] ?? LocalDay::today());
 
         $entry = DB::transaction(function () use ($data, $employee, $ledger, $on, $request) {
             $entry = $ledger->record(

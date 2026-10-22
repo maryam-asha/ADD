@@ -3,7 +3,7 @@
 namespace Add\Hr\Leave\Console;
 
 use Add\Hr\Leave\Services\LeaveYearEnd;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Console\Command;
 
 /**
@@ -18,7 +18,7 @@ class CloseLeaveYear extends Command
 
     public function handle(LeaveYearEnd $yearEnd): int
     {
-        $count = $yearEnd->run(CarbonImmutable::today());
+        $count = $yearEnd->run(LocalDay::today());
 
         $this->info("{$count} leave expiries booked.");
 

@@ -5,6 +5,7 @@ namespace Add\Hr\Leave\Http\Controllers\SelfService;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
 use Add\Hr\Leave\Models\LeaveRequest;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -31,7 +32,7 @@ class TeamLeaveController extends Controller
         $leave = LeaveRequest::query()
             ->live()
             ->overlapping($from, $to)
-            ->whereHas('employee.assignments', fn ($q) => $q->activeOn(CarbonImmutable::today())->where('manager_id', $me->id))
+            ->whereHas('employee.assignments', fn ($q) => $q->activeOn(LocalDay::today())->where('manager_id', $me->id))
             ->with(['employee', 'leaveType'])
             ->orderBy('starts_on')
             ->get();

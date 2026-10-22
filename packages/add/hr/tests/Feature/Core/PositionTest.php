@@ -9,11 +9,13 @@ use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 
 class PositionTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -131,5 +133,23 @@ class PositionTest extends TestCase
         $this->patchJson("/api/hr/positions/{$position->id}", ['headcount' => 0])
             ->assertStatus(422)
             ->assertJsonValidationErrors('headcount');
+    }
+
+    public function test_a_seat_is_free_from_the_organisations_day_after_the_last(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $position = Position::factory()->create(['headcount' => 1]);
+        $holder = $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+        app(EmploymentLifecycleService::class)->record($holder, EmploymentEventType::Termination, [
+            'effective_on' => '2026-03-10',
+            'reason' => 'resignation',
+        ], null);
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+
+        $this->assertSame(0, $position->occupiedCount());
+        $this->getJson("/api/hr/positions?org_unit_id={$position->org_unit_id}")->assertOk()->assertJsonPath('data.0.occupied', 0);
+        $this->getJson("/api/hr/positions/{$position->id}")->assertOk()->assertJsonPath('data.occupied', 0);
     }
 }

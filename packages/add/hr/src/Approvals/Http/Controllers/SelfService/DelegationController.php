@@ -9,6 +9,7 @@ use Add\Hr\Audit\HrAudit;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -26,7 +27,7 @@ class DelegationController extends Controller
         return DelegationResource::collection(
             ApprovalDelegation::query()
                 ->where('delegator_employee_id', $this->employee($request)->id)
-                ->where('ends_on', '>=', CarbonImmutable::today()->toDateString())
+                ->where('ends_on', '>=', LocalDay::today()->toDateString())
                 ->with('delegate')
                 ->orderBy('starts_on')
                 ->get()

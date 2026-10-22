@@ -7,7 +7,7 @@ use Add\Hr\Core\Http\Requests\UpdatePositionRequest;
 use Add\Hr\Core\Http\Resources\PositionResource;
 use Add\Hr\Core\Models\Position;
 use Add\Hr\Support\HrException;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -19,7 +19,7 @@ class PositionController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $positions = Position::query()
-            ->withOccupied(CarbonImmutable::today())
+            ->withOccupied(LocalDay::today())
             ->when($request->integer('org_unit_id'), fn ($q, $unitId) => $q->where('org_unit_id', $unitId))
             ->orderBy('id')
             ->get();

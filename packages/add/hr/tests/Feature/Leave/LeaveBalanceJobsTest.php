@@ -11,6 +11,7 @@ use Add\Hr\Leave\Services\LeaveLedger;
 use Add\Hr\Leave\Services\LeavePolicyResolver;
 use Add\Hr\Tests\Concerns\BuildsLeave;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 use Carbon\CarbonImmutable;
 
@@ -18,6 +19,7 @@ class LeaveBalanceJobsTest extends TestCase
 {
     use BuildsLeave;
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     private function credits(int $employeeId): array
     {
@@ -145,5 +147,44 @@ class LeaveBalanceJobsTest extends TestCase
 
         $ledger->reverse($request);
         $this->assertSame([2025 => 2.0, 2026 => 21.0], $ledger->buckets($employee, $type));
+    }
+
+    public function test_the_ledger_reads_and_books_on_the_organisations_day(): void
+    {
+        $this->travelToLocal('2026-12-15 12:00');
+        $type = $this->leaveType();
+        $employee = $this->hireEmployee(['hired_on' => '2024-01-01']);
+        $this->giveBalance($employee, $type, 21, '2027-01-01');
+        $request = LeaveRequest::query()->create([
+            'employee_id' => $employee->id, 'leave_type_id' => $type->id,
+            'starts_on' => '2027-01-04', 'ends_on' => '2027-01-05', 'amount' => 2,
+            'status' => LeaveRequestStatus::Approved,
+        ]);
+
+        // 01:00 on 1 January locally, still 31 December in UTC.
+        $this->travelToLocal('2027-01-01 01:00');
+        $this->assertSame(21.0, $this->balanceOf($employee, $type));
+
+        app(LeaveLedger::class)->consume($request);
+        $usage = LedgerEntry::query()->where('kind', LedgerKind::Usage->value)->sole();
+        $this->assertSame(2027, $usage->period_year);
+        $this->assertSame('2027-01-01', $usage->effective_on->toDateString());
+    }
+
+    public function test_the_daily_jobs_run_on_the_organisations_day(): void
+    {
+        $this->travelToLocal('2026-12-15 12:00');
+        $type = $this->leaveType();
+        $this->policy($type, ['accrual_method' => 'annual_grant', 'annual_entitlement' => 21, 'carry_over_max' => 5]);
+        $employee = $this->hireEmployee(['hired_on' => '2024-01-01']);
+        $this->giveBalance($employee, $type, 15, '2026-01-01');
+
+        // 01:00 on 1 January locally, still 31 December in UTC.
+        $this->travelToLocal('2027-01-01 01:00');
+        $this->artisan('hr:leave-accrue')->assertSuccessful();
+        $this->artisan('hr:leave-year-end')->assertSuccessful();
+
+        $this->assertContains(['grant:2027', '21'], $this->credits($employee->id));
+        $this->assertTrue(LedgerEntry::query()->where('employee_id', $employee->id)->where('kind', LedgerKind::Expiry->value)->exists());
     }
 }

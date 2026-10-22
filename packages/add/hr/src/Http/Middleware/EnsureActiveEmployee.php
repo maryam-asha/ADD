@@ -3,7 +3,7 @@
 namespace Add\Hr\Http\Middleware;
 
 use Add\Hr\Core\Models\Employee;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Closure;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -22,7 +22,7 @@ class EnsureActiveEmployee
         $user = $request->user();
         $employee = $user === null ? null : Employee::forUser($user);
 
-        if ($employee === null || ! $employee->isEmployedOn(CarbonImmutable::today())) {
+        if ($employee === null || ! $employee->isEmployedOn(LocalDay::today())) {
             return response()->json(['message' => __('hr::system.not_an_employee')], 403);
         }
 

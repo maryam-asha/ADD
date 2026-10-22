@@ -16,6 +16,7 @@ use Add\Hr\Payroll\Models\PayComponent;
 use Add\Hr\Payroll\Models\PayrollRun;
 use Add\Hr\Support\Decimal;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -62,7 +63,7 @@ class LoanService
 
             $first = isset($data['first_month'])
                 ? CarbonImmutable::createFromFormat('Y-m', $data['first_month'])->startOfMonth()
-                : CarbonImmutable::today()->addMonthNoOverflow()->startOfMonth();
+                : LocalDay::today()->addMonthNoOverflow()->startOfMonth();
             $this->assertMonthOpen($first);
 
             $loan = Loan::query()->create([
@@ -93,7 +94,7 @@ class LoanService
      */
     public function assertMonthOpen(CarbonImmutable $first): void
     {
-        $closed = $first->lt(CarbonImmutable::today()->startOfMonth()->subMonthNoOverflow())
+        $closed = $first->lt(LocalDay::today()->startOfMonth()->subMonthNoOverflow())
             || PayrollRun::query()->where('year', $first->year)->where('month', $first->month)
                 ->where('kind', PayrollRunKind::Regular->value)
                 ->whereIn('status', [PayrollRunStatus::Approved->value, PayrollRunStatus::Paid->value])
@@ -164,7 +165,7 @@ class LoanService
      */
     private function monthlyPay(Employee $employee, array $codes, string $currency): string
     {
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
         $ids = PayComponent::query()->whereIn('code', $codes)->pluck('id');
         $total = '0';
 

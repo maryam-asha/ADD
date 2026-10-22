@@ -6,6 +6,7 @@ use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Services\DocumentCompliance;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 class DocumentComplianceTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -78,5 +80,20 @@ class DocumentComplianceTest extends TestCase
             ->assertOk()
             ->assertJsonPath('compliance.complete', false)
             ->assertJsonPath('compliance.missing.0.code', 'id_card');
+    }
+
+    public function test_a_document_has_expired_from_the_organisations_day_after_its_last(): void
+    {
+        $this->travelToLocal('2026-03-10 12:00');
+        $permit = DocumentType::factory()->create(['code' => 'permit', 'has_expiry' => true]);
+        $employee = $this->hireEmployee();
+        $this->upload($employee->id, $permit, '2026-03-10');
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+
+        $this->getJson("/api/hr/employees/{$employee->id}/documents")->assertOk()
+            ->assertJsonPath('compliance.complete', false)
+            ->assertJsonCount(1, 'compliance.expired');
     }
 }

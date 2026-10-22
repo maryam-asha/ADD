@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Requests;
 
+use Add\Hr\Support\LocalDay;
 use Illuminate\Foundation\Http\FormRequest;
 
 /**
@@ -23,7 +24,7 @@ class ReplaceDependentsRequest extends FormRequest
             'dependents' => ['present', 'array', 'max:20'],
             'dependents.*.name' => ['required', 'string', 'max:255'],
             'dependents.*.relation' => ['required', 'string', 'max:50'],
-            'dependents.*.date_of_birth' => ['nullable', 'date', 'before_or_equal:today'],
+            'dependents.*.date_of_birth' => ['nullable', 'date', 'before_or_equal:'.LocalDay::today()->toDateString()],
         ];
     }
 }

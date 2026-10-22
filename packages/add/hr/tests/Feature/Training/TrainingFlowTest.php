@@ -8,6 +8,7 @@ use Add\Hr\Core\Data\Alert;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\AlertService;
 use Add\Hr\Tests\Concerns\HiresStaff;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\RecordingNotifier;
 use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
@@ -21,6 +22,7 @@ use Add\Hr\Training\Models\Enrollment;
 class TrainingFlowTest extends TestCase
 {
     use HiresStaff;
+    use TravelsOnTheOrganisationsClock;
 
     private RecordingNotifier $notifier;
 
@@ -163,5 +165,24 @@ class TrainingFlowTest extends TestCase
         $this->getJson('/api/hr/learning-budgets')->assertOk();
         $this->postJson('/api/hr/courses', [])->assertForbidden();
         $this->postJson('/api/hr/learning-budgets/allocate', [])->assertForbidden();
+    }
+
+    public function test_the_learning_budget_defaults_to_the_organisations_year(): void
+    {
+        // 01:00 on 1 January locally, still 31 December in UTC.
+        $this->travelToLocal('2027-01-01 01:00');
+        $this->actingAs($this->hr);
+        $this->postJson('/api/hr/learning-budgets/allocate', ['year' => 2027, 'amount' => 300])->assertOk();
+
+        $this->getJson('/api/hr/learning-budgets')->assertOk()
+            ->assertJsonCount(3, 'data')
+            ->assertJsonPath('data.0.year', 2027);
+        $this->getJson("/api/hr/employees/{$this->learner->id}/learning-budget")->assertOk()
+            ->assertJsonPath('data.year', 2027)
+            ->assertJsonPath('data.balance', '300');
+        $this->actingAsEmployee($this->learner);
+        $this->getJson('/api/hr/me/learning-budget')->assertOk()
+            ->assertJsonPath('data.year', 2027)
+            ->assertJsonPath('data.balance', '300');
     }
 }

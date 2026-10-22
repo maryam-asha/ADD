@@ -10,7 +10,7 @@ use Add\Hr\Hr;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Support\Casts\DateOnly;
 use Add\Hr\Support\Concerns\HasTranslations;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonInterface;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
@@ -168,12 +168,12 @@ class Employee extends Model
 
     public function currentAssignment(?CarbonInterface $on = null): ?Assignment
     {
-        return $this->assignments()->activeOn($on ?? CarbonImmutable::today())->latest('effective_from')->first();
+        return $this->assignments()->activeOn($on ?? LocalDay::today())->latest('effective_from')->first();
     }
 
     public function currentContract(?CarbonInterface $on = null): ?Contract
     {
-        return $this->contracts()->activeOn($on ?? CarbonImmutable::today())->latest('starts_on')->first();
+        return $this->contracts()->activeOn($on ?? LocalDay::today())->latest('starts_on')->first();
     }
 
     public function user(): BelongsTo
@@ -193,7 +193,7 @@ class Employee extends Model
     {
         return $this->hasOne(Assignment::class)->ofMany(
             ['effective_from' => 'max'],
-            fn ($query) => $query->activeOn(CarbonImmutable::today()),
+            fn ($query) => $query->activeOn(LocalDay::today()),
         );
     }
 
@@ -201,7 +201,7 @@ class Employee extends Model
     {
         return $this->hasOne(Contract::class)->ofMany(
             ['starts_on' => 'max'],
-            fn ($query) => $query->activeOn(CarbonImmutable::today()),
+            fn ($query) => $query->activeOn(LocalDay::today()),
         );
     }
 

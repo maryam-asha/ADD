@@ -26,9 +26,9 @@ class AlertService
      */
     public function current(?CarbonInterface $today = null): array
     {
-        // The day the caller means, read as DateOnly reads the dates it is
-        // compared with.
-        $today = LocalDay::of($today ?? CarbonImmutable::today());
+        // The day the caller means (by default the organisation's), read as
+        // DateOnly reads the dates it is compared with.
+        $today = $today === null ? LocalDay::today() : LocalDay::of($today);
         $day = $today->toDateString();
         $alerts = [];
 

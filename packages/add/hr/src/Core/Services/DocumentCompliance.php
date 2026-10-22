@@ -5,7 +5,7 @@ namespace Add\Hr\Core\Services;
 use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\EmployeeDocument;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 
 /**
  * Whether an employee's file is complete: every required document type for
@@ -19,7 +19,7 @@ class DocumentCompliance
      */
     public function for(Employee $employee): array
     {
-        $today = CarbonImmutable::today()->toDateString();
+        $today = LocalDay::today()->toDateString();
         $contractType = ($employee->currentContract() ?? $employee->contracts()->latest('starts_on')->first())?->type->value;
 
         $current = $employee->documents()

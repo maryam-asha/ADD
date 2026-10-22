@@ -10,7 +10,7 @@ use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\DocumentCompliance;
 use Add\Hr\Core\Services\DocumentVault;
 use Add\Hr\Http\Middleware\EnsureActiveEmployee;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -90,7 +90,7 @@ class SelfServiceController extends Controller
      */
     public function team(Request $request): AnonymousResourceCollection
     {
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
         $me = $this->employee($request);
 
         $team = Employee::query()
