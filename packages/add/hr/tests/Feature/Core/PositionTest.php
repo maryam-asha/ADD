@@ -3,9 +3,11 @@
 namespace Add\Hr\Tests\Feature\Core;
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Models\JobGrade;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
+use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
 use Add\Hr\Tests\TestCase;
 
@@ -81,6 +83,28 @@ class PositionTest extends TestCase
         $this->getJson("/api/hr/positions/{$position->id}")->assertOk()->assertJsonPath('data.occupied', 1);
         $this->getJson("/api/hr/positions?org_unit_id={$position->org_unit_id}")->assertOk()->assertJsonPath('data.0.occupied', 1);
         $this->assertSame(1, $position->occupiedCount());
+    }
+
+    public function test_a_holder_with_a_later_change_in_the_same_position_takes_one_seat(): void
+    {
+        $position = Position::factory()->create(['headcount' => 2]);
+        $holder = $this->hireEmployee(['assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+        // A promotion scheduled next month keeps her in the same seat: two
+        // assignment rows open from today, one person.
+        app(EmploymentLifecycleService::class)->record($holder, EmploymentEventType::Promotion, [
+            'effective_on' => now()->addMonth()->toDateString(),
+            'assignment' => ['job_grade_id' => JobGrade::factory()->create()->id],
+        ], null);
+        $this->assertSame(2, $position->assignments()->openFrom(now())->count());
+
+        $this->assertSame(1, $position->occupiedCount());
+        $this->getJson("/api/hr/positions/{$position->id}")->assertOk()->assertJsonPath('data.occupied', 1);
+        $this->getJson("/api/hr/positions?org_unit_id={$position->org_unit_id}")->assertOk()->assertJsonPath('data.0.occupied', 1);
+        $this->patchJson("/api/hr/positions/{$position->id}", ['headcount' => 1])->assertOk();
+        $this->patchJson("/api/hr/positions/{$position->id}", ['headcount' => 2])->assertOk();
+
+        $this->hireEmployee(['hired_on' => now()->toDateString(), 'assignment' => ['org_unit_id' => $position->org_unit_id, 'position_id' => $position->id]]);
+        $this->assertSame(2, $position->occupiedCount());
     }
 
     public function test_a_held_position_cannot_move_to_another_unit_or_shrink_below_its_holders(): void

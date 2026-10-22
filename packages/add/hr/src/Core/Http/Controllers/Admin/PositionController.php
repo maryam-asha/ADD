@@ -19,7 +19,7 @@ class PositionController extends Controller
     public function index(Request $request): AnonymousResourceCollection
     {
         $positions = Position::query()
-            ->withCount(['assignments as occupied' => fn ($q) => $q->openFrom(CarbonImmutable::today())])
+            ->withOccupied(CarbonImmutable::today())
             ->when($request->integer('org_unit_id'), fn ($q, $unitId) => $q->where('org_unit_id', $unitId))
             ->orderBy('id')
             ->get();

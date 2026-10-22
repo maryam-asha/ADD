@@ -440,13 +440,7 @@ class EmploymentLifecycleService
                 HrException::fail('hr::core.position_unit_mismatch');
             }
 
-            $taken = Assignment::query()
-                ->where('position_id', $position->id)
-                ->openFrom($on)
-                ->when($employee, fn ($q) => $q->where('employee_id', '!=', $employee->id))
-                ->count();
-
-            if ($taken >= $position->headcount) {
+            if ($position->occupiedCount($on, $employee?->id) >= $position->headcount) {
                 HrException::fail('hr::core.position_full');
             }
         }
