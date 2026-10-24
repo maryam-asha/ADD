@@ -77,11 +77,6 @@
             "type": "string"
         },
         {
-            "key": "resource_id",
-            "value": "",
-            "type": "string"
-        },
-        {
             "key": "seat_desk_id",
             "value": "",
             "type": "string"
@@ -332,6 +327,50 @@
         {
             "key": "member_device_id",
             "value": "3f2c9a4e-7b1d-4c2a-9e8f-0a1b2c3d4e5f"
+        },
+        {
+            "key": "amenity_id",
+            "value": "1"
+        },
+        {
+            "key": "inv_category_id",
+            "value": "1"
+        },
+        {
+            "key": "inv_field_id",
+            "value": "1"
+        },
+        {
+            "key": "inv_unit_id",
+            "value": "1"
+        },
+        {
+            "key": "inv_item_id",
+            "value": "1"
+        },
+        {
+            "key": "asset_id",
+            "value": "1"
+        },
+        {
+            "key": "asset_qr_token",
+            "value": ""
+        },
+        {
+            "key": "maintenance_id",
+            "value": "1"
+        },
+        {
+            "key": "maintenance_schedule_id",
+            "value": "1"
+        },
+        {
+            "key": "sale_item_id",
+            "value": "1"
+        },
+        {
+            "key": "item_sale_id",
+            "value": "1"
         }
     ],
     "event": [
@@ -17601,14 +17640,14 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"user_id\": 2,\n  \"resource_type_id\": 1,\n  \"quantity\": 10,\n  \"note\": \"Printing at reception\"\n}",
+                                    "raw": "{\n  \"user_id\": 2,\n  \"resource_type_id\": 1,\n  \"quantity\": 10,\n  \"note\": \"Printing at reception\",\n  \"stock_location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  }\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 },
-                                "description": "Draws down a member's or company's natural-unit resource quota (printing pages, meeting-room hours). Exactly one of user_id / company_id. Refused with 422 when the remaining quota cannot cover the quantity."
+                                "description": "Draws down a member's or company's natural-unit resource quota (printing pages, meeting-room hours). Exactly one of user_id / company_id. Refused with 422 when the remaining quota cannot cover the quantity. A type linked to stock issues it in the same transaction, from `stock_location` (optional, an inventory place) or else the branch of the operator's open cash register (422 when there is neither); a shelf that cannot cover it refuses the consumption (422)."
                             }
                         },
                         {
@@ -17833,6 +17872,52 @@
                                     "body": "{\n    \"data\": {\n        \"items\": [\n            {\n                \"purpose\": \"booking\",\n                \"payable_id\": 19,\n                \"title\": \"\u063a\u0631\u0641\u0629 1\",\n                \"starts_at\": \"2026-10-01T09:00:00+00:00\",\n                \"amount_points\": 120,\n                \"amount\": {\n                    \"value\": \"12.00\",\n                    \"currency\": \"USD\"\n                }\n            },\n            {\n                \"purpose\": \"event_registration\",\n                \"payable_id\": 5,\n                \"title\": \"\u0641\u0639\u0627\u0644\u064a\u0629 \u0627\u062e\u062a\u0628\u0627\u0631 \u0627\u0644\u062f\u0641\u0639\",\n                \"starts_at\": \"2026-10-05T15:36:26+00:00\",\n                \"amount_points\": 80,\n                \"amount\": {\n                    \"value\": \"8.00\",\n                    \"currency\": \"USD\"\n                }\n            }\n        ],\n        \"total_points\": 200,\n        \"total_amount\": {\n            \"value\": \"20.00\",\n            \"currency\": \"USD\"\n        }\n    }\n}"
                                 }
                             ]
+                        },
+                        {
+                            "name": "Sell Items (Cash or Points)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/reception/item-sales",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "reception",
+                                        "item-sales"
+                                    ]
+                                },
+                                "description": "Sells sale items to a member at today's price in points. `payment_method`: a desk method (`cash`) \u2014 the exact price in `currency` (default: base) becomes points in the member's wallet and is spent at once \u2014 or `wallet` (the member's own points). Stock leaves `stock_location` (optional) or the branch of the operator's open cash register, in the same transaction: points short answer 422 {message, current, required, shortage}; a shelf short answers 422 with what is left; either way nothing is recorded. Answers 201 with the sale, its `payment` inside `data`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"user_id\": 2,\n  \"lines\": [\n    {\n      \"sale_item_id\": 1,\n      \"quantity\": 2\n    }\n  ],\n  \"payment_method\": \"cash\",\n  \"currency\": \"USD\",\n  \"stock_location\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     ]
                 },
@@ -18920,261 +19005,6 @@
                                             ]
                                         },
                                         "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Resource/SeatDesk under this space."
-                                    }
-                                }
-                            ]
-                        },
-                        {
-                            "name": "Resources",
-                            "description": "A space's equipment (projector, mic, screen, ...) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c never booked or requested independently (PRD decision #3). Not to be confused with 'admin resource' in the general sense; this is the App\\Domain\\Foundation\\Models\\Resource model specifically.",
-                            "item": [
-                                {
-                                    "name": "List Resources",
-                                    "request": {
-                                        "method": "GET",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources"
-                                            ],
-                                            "query": [
-                                                {
-                                                    "key": "space_id",
-                                                    "value": "{{space_id}}",
-                                                    "disabled": true
-                                                }
-                                            ]
-                                        },
-                                        "description": "Optional ?space_id= filter."
-                                    }
-                                },
-                                {
-                                    "name": "Create Resource",
-                                    "event": [
-                                        {
-                                            "listen": "test",
-                                            "script": {
-                                                "type": "text/javascript",
-                                                "exec": [
-                                                    "if (pm.response.code === 201 || pm.response.code === 200) {",
-                                                    "    pm.collectionVariables.set('resource_id', pm.response.json().data.id);",
-                                                    "}"
-                                                ]
-                                            }
-                                        }
-                                    ],
-                                    "request": {
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"name\": \"Projector\",\n  \"category\": \"projector\",\n  \"quantity\": 1\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources"
-                                            ]
-                                        },
-                                        "description": "quantity defaults to 1 and status defaults to active \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c set status via the separate Update Resource Status request, never through this one."
-                                    }
-                                },
-                                {
-                                    "name": "Get Resource",
-                                    "request": {
-                                        "method": "GET",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources",
-                                                "{{resource_id}}"
-                                            ]
-                                        }
-                                    }
-                                },
-                                {
-                                    "name": "Update Resource",
-                                    "request": {
-                                        "method": "PUT",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"space_id\": {{space_id}},\n  \"name\": \"Projector\",\n  \"category\": \"projector\",\n  \"quantity\": 2\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources",
-                                                "{{resource_id}}"
-                                            ]
-                                        },
-                                        "description": "Structural fields only \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c status/status_reason/status_from/status_until are rejected here even if sent; use Update Resource Status. Returns `{\"message\": \"...\"}` on success."
-                                    }
-                                },
-                                {
-                                    "name": "Update Resource Status",
-                                    "request": {
-                                        "method": "PATCH",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"status\": \"maintenance\",\n  \"status_reason\": \"Bulb replacement\"\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}/status",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources",
-                                                "{{resource_id}}",
-                                                "status"
-                                            ]
-                                        },
-                                        "description": "status: active | maintenance | retired. Logged to activity_log (before/after) via LogsSensitiveActions. Returns `{\"message\": \"...\"}` on success."
-                                    }
-                                },
-                                {
-                                    "name": "Delete Resource",
-                                    "request": {
-                                        "method": "DELETE",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/admin/resources/{{resource_id}}",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "admin",
-                                                "resources",
-                                                "{{resource_id}}"
-                                            ]
-                                        },
-                                        "description": "Admin-only (not operations)."
                                     }
                                 }
                             ]
@@ -24464,14 +24294,14 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"\u0637\u0628\u0627\u0639\u0629\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"\u0635\u0641\u062d\u0629\"\n  },\n  \"slug\": \"printing\",\n  \"icon\": \"printer\",\n  \"order\": 1,\n  \"is_active\": true\n}",
+                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"\u0637\u0628\u0627\u0639\u0629\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"\u0635\u0641\u062d\u0629\"\n  },\n  \"slug\": \"printing\",\n  \"icon\": \"printer\",\n  \"order\": 1,\n  \"is_active\": true,\n  \"inventory_item_id\": 12,\n  \"stock_units_per_unit\": 1\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 },
-                                "description": "`name` and `unit_label` are translatable JSON columns \u2014 send both en and ar. `slug` is optional and must be unique; `unit_label` is the natural unit a grant is counted in, which is what keeps quotas explicit about what they measure."
+                                "description": "`name` and `unit_label` are translatable JSON columns \u2014 send both en and ar. `slug` is optional and must be unique; `unit_label` is the natural unit a grant is counted in, which is what keeps quotas explicit about what they measure. `inventory_item_id` (optional, a stock item) is what one unit consumed uses up \u2014 printing: paper \u2014 `stock_units_per_unit` of it per unit (default 1); recording consumption at reception then issues it."
                             }
                         },
                         {
@@ -24500,14 +24330,14 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"\u0637\u0628\u0627\u0639\u0629\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"\u0635\u0641\u062d\u0629\"\n  },\n  \"is_active\": true\n}",
+                                    "raw": "{\n  \"name\": {\n    \"en\": \"Printing\",\n    \"ar\": \"\u0637\u0628\u0627\u0639\u0629\"\n  },\n  \"unit_label\": {\n    \"en\": \"pages\",\n    \"ar\": \"\u0635\u0641\u062d\u0629\"\n  },\n  \"is_active\": true,\n  \"inventory_item_id\": 12,\n  \"stock_units_per_unit\": 1\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 },
-                                "description": "PATCH works identically. Returns a message, not the resource, per this repo's update-endpoint convention."
+                                "description": "PATCH works identically. Returns a message, not the resource, per this repo's update-endpoint convention. `inventory_item_id` (optional, a stock item) is what one unit consumed uses up \u2014 printing: paper \u2014 `stock_units_per_unit` of it per unit (default 1); recording consumption at reception then issues it."
                             }
                         },
                         {
@@ -24541,8 +24371,194 @@
                 },
                 {
                     "name": "Amenities",
-                    "description": "Amenities are a fixed enum (AmenityType), not free text: wifi, power_outlet, printing, ergonomic_chairs, locker, cafe_access, ac, stage.",
+                    "description": "The amenity catalog (Wi-Fi, caf\u00e9 access, a stage \u2014 what a space offers without being equipment to track; equipment is an inventory asset). Admin-managed: `key` is fixed once created and is what spaces and space types store; deleting an amenity turns it off everywhere. Only active amenities can be selected or are shown to members.",
                     "item": [
+                        {
+                            "name": "List Amenities",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/amenities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "amenities"
+                                    ]
+                                },
+                                "description": "The catalog, by `order`. Each: `id`, `key`, `name` {ar, en}, `icon`, `order`, `is_active`."
+                            }
+                        },
+                        {
+                            "name": "Create Amenity",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/amenities",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "amenities"
+                                    ]
+                                },
+                                "description": "`key` (lowercase letters, digits, `_`) is derived from the English name when left out, made unique. Answers the amenity (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u0645\u0648\u0642\u0641 \u0633\u064a\u0627\u0631\u0627\u062a\",\n    \"en\": \"Parking\"\n  },\n  \"key\": \"parking\",\n  \"icon\": \"car\",\n  \"order\": 9,\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Amenity",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/amenities/{{amenity_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "amenities",
+                                        "{{amenity_id}}"
+                                    ]
+                                },
+                                "description": "One amenity."
+                            }
+                        },
+                        {
+                            "name": "Update Amenity",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/amenities/{{amenity_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "amenities",
+                                        "{{amenity_id}}"
+                                    ]
+                                },
+                                "description": "Name, icon, order, is_active \u2014 never `key`. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u0648\u0627\u064a \u0641\u0627\u064a \u0633\u0631\u064a\u0639\",\n    \"en\": \"Fast Wi-Fi\"\n  },\n  \"icon\": \"wifi\",\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Amenity",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/amenities/{{amenity_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "amenities",
+                                        "{{amenity_id}}"
+                                    ]
+                                },
+                                "description": "Turns it off for every space type and space that had it. 204."
+                            }
+                        },
                         {
                             "name": "List Space Type Amenities",
                             "request": {
@@ -25836,6 +25852,275 @@
                                         }
                                     }
                                 }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Sales (Reception)",
+                    "description": "What reception may sell (a stock item and its price in points \u2014 the stock itself is the inventory's) and the sales made. Sell from Reception Operations \u203a Sell Items.",
+                    "item": [
+                        {
+                            "name": "List Sale Items",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/sale-items",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "sale-items"
+                                    ]
+                                },
+                                "description": "Every sale item with its inventory item. `active=1|0` filters."
+                            }
+                        },
+                        {
+                            "name": "Create Sale Item",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/sale-items",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "sale-items"
+                                    ]
+                                },
+                                "description": "Only a stock item; one sale item per inventory item. Answers it (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"inventory_item_id\": 12,\n  \"price_points\": 20,\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Sale Item",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/sale-items/{{sale_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "sale-items",
+                                        "{{sale_item_id}}"
+                                    ]
+                                },
+                                "description": "One sale item."
+                            }
+                        },
+                        {
+                            "name": "Update Sale Item",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/sale-items/{{sale_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "sale-items",
+                                        "{{sale_item_id}}"
+                                    ]
+                                },
+                                "description": "Price or active flag. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"price_points\": 25,\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Sale Item",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/sale-items/{{sale_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "sale-items",
+                                        "{{sale_item_id}}"
+                                    ]
+                                },
+                                "description": "204."
+                            }
+                        },
+                        {
+                            "name": "List Item Sales",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/item-sales?user_id=&from=&to=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "item-sales"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "user_id",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "from",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "to",
+                                            "value": ""
+                                        }
+                                    ]
+                                },
+                                "description": "Newest first, paginated. Filters: `user_id`, `from`, `to` (days)."
+                            }
+                        },
+                        {
+                            "name": "Get Item Sale",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/admin/item-sales/{{item_sale_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "admin",
+                                        "item-sales",
+                                        "{{item_sale_id}}"
+                                    ]
+                                },
+                                "description": "One sale: member, lines, total, stock location, who sold it, its payment."
                             }
                         }
                     ]
@@ -41986,6 +42271,1873 @@
                         }
                     ],
                     "description": "Self-service for any account with an active employee record \u2014 operations, sales, the caf\u00e9: no role or permission needed, and nothing but the caller's own data. 403 when the account has no employee record or is past its last working day."
+                }
+            ]
+        },
+        {
+            "name": "Inventory (Dashboard)",
+            "description": "Inventory package (packages/add/inventory) mounted at /api/v1/inventory: dashboard credentials (abilities:dashboard), no role check \u2014 every route checks its own inventory.* permission (assignable to any role from the roles screen; admin holds all). Places are ADD's branches, buildings, floors, zones and spaces; labels come in the request's language. Updates answer {message}.",
+            "item": [
+                {
+                    "name": "Catalog",
+                    "description": "Categories form a tree; a branch shares one `kind` (`asset` \u2014 tracked one by one \u2014 or `stock` \u2014 counted per location), set on its root. Each category defines fields its items, and the items of categories below it, answer in `properties`. Reads: inventory.catalog.view; writes: inventory.catalog.manage. Updates answer {message}.",
+                    "item": [
+                        {
+                            "name": "List Categories",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories?kind=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "kind",
+                                            "value": ""
+                                        }
+                                    ]
+                                },
+                                "description": "A flat list (build the tree from `parent_id`) with `items_count`. `kind` filters."
+                            }
+                        },
+                        {
+                            "name": "Create Category",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories"
+                                    ]
+                                },
+                                "description": "A root names its `kind`; a child takes its parent's. `show_to_members` lets members see the assets of this category in the space they sit in.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u0645\u0639\u062f\u0627\u062a \u0627\u0644\u0639\u0631\u0636\",\n    \"en\": \"Presentation equipment\"\n  },\n  \"kind\": \"asset\",\n  \"parent_id\": null,\n  \"icon\": \"projector\",\n  \"show_to_members\": true,\n  \"order\": 0\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Category",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories/{{inv_category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories",
+                                        "{{inv_category_id}}"
+                                    ]
+                                },
+                                "description": "With `fields`: every field its items answer, inherited ones marked `inherited: true`."
+                            }
+                        },
+                        {
+                            "name": "Update Category",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories/{{inv_category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories",
+                                        "{{inv_category_id}}"
+                                    ]
+                                },
+                                "description": "Moving it (`parent_id`) keeps its kind and never under its own branch; a root's `kind` changes its whole branch while it holds no items.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u0634\u0627\u0634\u0627\u062a\",\n    \"en\": \"Displays\"\n  },\n  \"show_to_members\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Category",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories/{{inv_category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories",
+                                        "{{inv_category_id}}"
+                                    ]
+                                },
+                                "description": "Only an empty one (no subcategories, no items). 204."
+                            }
+                        },
+                        {
+                            "name": "Add Field",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/categories/{{inv_category_id}}/fields",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "categories",
+                                        "{{inv_category_id}}",
+                                        "fields"
+                                    ]
+                                },
+                                "description": "`type`: text, number, boolean, date, select (`options` required). The key may not repeat along the branch. `key` and `type` are fixed once created.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"key\": \"resolution\",\n  \"label\": {\n    \"ar\": \"\u0627\u0644\u062f\u0642\u0629\",\n    \"en\": \"Resolution\"\n  },\n  \"type\": \"select\",\n  \"options\": [\n    \"1080p\",\n    \"4k\"\n  ],\n  \"is_required\": true,\n  \"order\": 1\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Field",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/fields/{{inv_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "fields",
+                                        "{{inv_field_id}}"
+                                    ]
+                                },
+                                "description": "Label, options, unit, is_required, order.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"label\": {\n    \"ar\": \"\u062f\u0642\u0629 \u0627\u0644\u0639\u0631\u0636\",\n    \"en\": \"Display resolution\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Field",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/fields/{{inv_field_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "fields",
+                                        "{{inv_field_id}}"
+                                    ]
+                                },
+                                "description": "Answers items already gave stay stored, unread. 204."
+                            }
+                        },
+                        {
+                            "name": "List Units",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "units"
+                                    ]
+                                },
+                                "description": "What items are counted in."
+                            }
+                        },
+                        {
+                            "name": "Create Unit",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "units"
+                                    ]
+                                },
+                                "description": "A unit that does not allow fractions takes whole quantities only.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"code\": \"ream\",\n  \"name\": {\n    \"ar\": \"\u0631\u0632\u0645\u0629\",\n    \"en\": \"Ream\"\n  },\n  \"allows_fractions\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Unit",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/units/{{inv_unit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "units",
+                                        "{{inv_unit_id}}"
+                                    ]
+                                },
+                                "description": "",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"allows_fractions\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Unit",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/units/{{inv_unit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "units",
+                                        "{{inv_unit_id}}"
+                                    ]
+                                },
+                                "description": "Only one no item uses. 204."
+                            }
+                        },
+                        {
+                            "name": "List Items",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/items?category_id=&kind=&search=&active=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "items"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "category_id",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "kind",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "search",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "active",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Paginated. Filters: `category_id` (with every category below it), `kind`, `search` (name or SKU), `active`. Stock items carry `on_hand` (every location), assets `assets_count`."
+                            }
+                        },
+                        {
+                            "name": "Create Item",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/items",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "items"
+                                    ]
+                                },
+                                "description": "`properties` answer the category's fields (its own and inherited): required ones must be there, nothing else is accepted. `sku` is generated when left out.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"name\": {\n    \"ar\": \"\u062c\u0647\u0627\u0632 \u0639\u0631\u0636 \u0644\u064a\u0632\u0631\",\n    \"en\": \"Laser projector\"\n  },\n  \"category_id\": 3,\n  \"unit_id\": 1,\n  \"sku\": null,\n  \"description\": null,\n  \"properties\": {\n    \"resolution\": \"4k\"\n  }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Item",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/items/{{inv_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "items",
+                                        "{{inv_item_id}}"
+                                    ]
+                                },
+                                "description": "One item."
+                            }
+                        },
+                        {
+                            "name": "Update Item",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/items/{{inv_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "items",
+                                        "{{inv_item_id}}"
+                                    ]
+                                },
+                                "description": "`properties`, when sent, replace the stored ones. An item with assets or stock history keeps its kind (and, with stock history, its unit).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"is_active\": false\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Item",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/items/{{inv_item_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "items",
+                                        "{{inv_item_id}}"
+                                    ]
+                                },
+                                "description": "Only one with no history; otherwise deactivate it. 204."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Assets",
+                    "description": "One physical thing each, with a readable `code` and a random `qr_token` for its label. A place is `{type, id}` with type branch, building, floor, zone or space; a custodian `{type, id}` with type hr_employee, member or company. Reads: inventory.assets.view; register/edit/move/status: inventory.assets.manage; custody: inventory.assets.custody; disposal: inventory.assets.dispose.",
+                    "item": [
+                        {
+                            "name": "List Assets",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets?location[type]=branch&location[id]={{branch_id}}&status=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "location[type]",
+                                            "value": "branch"
+                                        },
+                                        {
+                                            "key": "location[id]",
+                                            "value": "{{branch_id}}"
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": ""
+                                        }
+                                    ]
+                                },
+                                "description": "Paginated. Filters: `item_id`, `category_id`, `status`, `location[type]`+`location[id]` (with every place inside unless `within=0`), `custodian[type]`+`custodian[id]` (held now), `search` (code or serial)."
+                            }
+                        },
+                        {
+                            "name": "Register Assets",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets"
+                                    ]
+                                },
+                                "description": "`count` identical assets of an asset item at one place, each with its own code and QR (a given `code` only for one). A cost needs its `currency`; salvage cannot exceed cost. Answers the list (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_id\": 4,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"count\": 2,\n  \"serial_number\": null,\n  \"purchased_on\": \"2026-10-01\",\n  \"purchase_cost\": 450,\n  \"currency\": \"USD\",\n  \"supplier\": \"Tech Co\",\n  \"useful_life_months\": 36,\n  \"salvage_value\": 50,\n  \"warranty_until\": \"2027-10-01\",\n  \"notes\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Get Asset",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}"
+                                    ]
+                                },
+                                "description": "With `depreciation` (straight line by whole months, computed), custodian, open maintenance, its movements, custody history, maintenance and schedules."
+                            }
+                        },
+                        {
+                            "name": "Scan QR",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/qr/{{asset_qr_token}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "qr",
+                                        "{{asset_qr_token}}"
+                                    ]
+                                },
+                                "description": "What a scanned label opens: the asset, as Get Asset."
+                            }
+                        },
+                        {
+                            "name": "Update Asset",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}"
+                                    ]
+                                },
+                                "description": "Details and financials only; where it is, who holds it and its status have their own actions.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"serial_number\": \"SN-123\",\n  \"warranty_until\": \"2028-01-01\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Set Status",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/status",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "status"
+                                    ]
+                                },
+                                "description": "`in_service`, `retired` or `lost`. `in_maintenance` comes with a maintenance record, `disposed` with disposal. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"status\": \"retired\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Move",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/move",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "move"
+                                    ]
+                                },
+                                "description": "Records where it came from. Answers the movement (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 9\n  },\n  \"note\": \"Moved to the event hall\",\n  \"moved_at\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Hand Over",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/assign",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "assign"
+                                    ]
+                                },
+                                "description": "Only an asset in service, held by no one. Answers the custody (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"custodian\": {\n    \"type\": \"hr_employee\",\n    \"id\": 3\n  },\n  \"note\": \"Laptop for work\",\n  \"assigned_at\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Take Back",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/return",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "return"
+                                    ]
+                                },
+                                "description": "Closes the open custody. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"note\": \"Returned on leaving\",\n  \"returned_at\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Dispose",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/dispose",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "dispose"
+                                    ]
+                                },
+                                "description": "Once back from custody and out of repair; stops its schedules. `proceeds` only when `sold`. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"method\": \"sold\",\n  \"disposed_on\": \"2026-10-24\",\n  \"proceeds\": 80,\n  \"note\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Custody",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/custody?custodian[type]=hr_employee&custodian[id]=3&open=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "custody"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "custodian[type]",
+                                            "value": "hr_employee"
+                                        },
+                                        {
+                                            "key": "custodian[id]",
+                                            "value": "3"
+                                        },
+                                        {
+                                            "key": "open",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "What someone holds (an employee leaving hands back everything listed). `open=0` adds what was returned."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Maintenance",
+                    "description": "An open record keeps its asset `in_maintenance`; closing it puts it back in service and moves a schedule's next date on from the day the work was done. inventory:run-daily announces servicing due and warranties ending to holders of inventory.assets.maintenance. Reads: inventory.assets.view; writes: inventory.assets.maintenance.",
+                    "item": [
+                        {
+                            "name": "List Maintenance",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/maintenance?open=1",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "maintenance"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "open",
+                                            "value": "1"
+                                        }
+                                    ]
+                                },
+                                "description": "Newest first. Filters: `asset_id`, `open=1`."
+                            }
+                        },
+                        {
+                            "name": "Open Maintenance",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/maintenance",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "maintenance"
+                                    ]
+                                },
+                                "description": "`type`: corrective (a repair) or preventive (`schedule_id` from its schedule). Only an asset in service. Answers the record (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"type\": \"corrective\",\n  \"description\": \"Lamp broken\",\n  \"vendor\": \"Projector Service Co\",\n  \"schedule_id\": null,\n  \"opened_at\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Close Maintenance",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/maintenance/{{maintenance_id}}/close",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "maintenance",
+                                        "{{maintenance_id}}",
+                                        "close"
+                                    ]
+                                },
+                                "description": "A cost needs its currency. Answers {message}.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"cost\": 40,\n  \"currency\": \"USD\",\n  \"resolution\": \"Lamp replaced\",\n  \"closed_at\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "List Schedules",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/maintenance-schedules",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "maintenance-schedules"
+                                    ]
+                                },
+                                "description": "An asset's routine servicing."
+                            }
+                        },
+                        {
+                            "name": "Due Schedules",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/maintenance-schedules/due?days=7",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "maintenance-schedules",
+                                        "due"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "days",
+                                            "value": "7"
+                                        }
+                                    ]
+                                },
+                                "description": "Everything due within `days` (default: the lead time), overdue first."
+                            }
+                        },
+                        {
+                            "name": "Create Schedule",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/assets/{{asset_id}}/maintenance-schedules",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "assets",
+                                        "{{asset_id}}",
+                                        "maintenance-schedules"
+                                    ]
+                                },
+                                "description": "",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"title\": \"Filter cleaning\",\n  \"interval_months\": 3,\n  \"next_due_on\": \"2026-12-01\",\n  \"is_active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Update Schedule",
+                            "request": {
+                                "method": "PATCH",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/maintenance-schedules/{{maintenance_schedule_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "maintenance-schedules",
+                                        "{{maintenance_schedule_id}}"
+                                    ]
+                                },
+                                "description": "A new `next_due_on` is announced again when due.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"next_due_on\": \"2027-01-15\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete Schedule",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/maintenance-schedules/{{maintenance_schedule_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "maintenance-schedules",
+                                        "{{maintenance_schedule_id}}"
+                                    ]
+                                },
+                                "description": "204."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Stock",
+                    "description": "Quantities per item and place, kept from an append-only ledger at weighted average cost (in the stock currency). Stock never goes below zero: asking more than is there answers 422 with what is left. Reads: inventory.stock.view; each action its own inventory.stock.* permission.",
+                    "item": [
+                        {
+                            "name": "Balances",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/balances?location[type]=branch&location[id]={{branch_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "balances"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "location[type]",
+                                            "value": "branch"
+                                        },
+                                        {
+                                            "key": "location[id]",
+                                            "value": "{{branch_id}}"
+                                        }
+                                    ]
+                                },
+                                "description": "What is on hand, with its value. Filters: `item_id`, `category_id`, `location` (+ `within`), `include_empty=1`."
+                            }
+                        },
+                        {
+                            "name": "Movements",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/movements?item_id=&type=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "movements"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "item_id",
+                                            "value": ""
+                                        },
+                                        {
+                                            "key": "type",
+                                            "value": ""
+                                        }
+                                    ]
+                                },
+                                "description": "The ledger, newest first. Filters: `item_id`, `location` (+ `within`), `type`, `source[type]`+`source[id]` (item_sale, resource_consumption), `from`, `to`."
+                            }
+                        },
+                        {
+                            "name": "Receive",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/receive",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "receive"
+                                    ]
+                                },
+                                "description": "Stock in; a `unit_cost` re-averages the cost. Answers the movement (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_id\": 12,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"quantity\": 20,\n  \"unit_cost\": 3.5,\n  \"note\": \"Supplier delivery\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Issue",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/issue",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "issue"
+                                    ]
+                                },
+                                "description": "`reason`: internal_use, damaged, expired, other (sales and consumption issue their own).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_id\": 12,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"quantity\": 2,\n  \"reason\": \"damaged\",\n  \"note\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Transfer",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/transfer",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "transfer"
+                                    ]
+                                },
+                                "description": "Two linked halves sharing a `transfer_id`; what arrives keeps its cost. Answers both (201).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_id\": 12,\n  \"from\": {\n    \"type\": \"branch\",\n    \"id\": 1\n  },\n  \"to\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"quantity\": 5,\n  \"note\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Count",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/stock/adjust",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "stock",
+                                        "adjust"
+                                    ]
+                                },
+                                "description": "A physical count: the ledger takes the difference. A count that matches answers {message}; extra stock comes in at `unit_cost` or the average.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"item_id\": 12,\n  \"location\": {\n    \"type\": \"space\",\n    \"id\": 7\n  },\n  \"counted\": 17,\n  \"unit_cost\": null,\n  \"note\": \"Monthly count\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Reports",
+                    "description": "Exact sums (bcmath), never across currencies. inventory.reports.view.",
+                    "item": [
+                        {
+                            "name": "Stock Valuation",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/reports/stock-valuation?location[type]=branch&location[id]={{branch_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "reports",
+                                        "stock-valuation"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "location[type]",
+                                            "value": "branch"
+                                        },
+                                        {
+                                            "key": "location[id]",
+                                            "value": "{{branch_id}}"
+                                        }
+                                    ]
+                                },
+                                "description": "Stock on hand at its average cost, per place, and the total. Optional `location` (+ `within`)."
+                            }
+                        },
+                        {
+                            "name": "Asset Register",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/inventory/reports/asset-register?include_disposed=0",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "inventory",
+                                        "reports",
+                                        "asset-register"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "include_disposed",
+                                            "value": "0"
+                                        }
+                                    ]
+                                },
+                                "description": "Every asset still owned with cost, accumulated depreciation and book value, totalled per currency. `include_disposed=1` adds the rest."
+                            }
+                        }
+                    ]
                 }
             ]
         }
