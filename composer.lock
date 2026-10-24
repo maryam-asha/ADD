@@ -4,17 +4,18 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "edaba091b78120a495be7388eb1d786b",
+    "content-hash": "80efa4074043245eb53e4552d3f6eee6",
     "packages": [
         {
             "name": "add/hr",
-            "version": "dev-feat/hr-package",
+            "version": "dev-feat/inventory-package",
             "dist": {
                 "type": "path",
                 "url": "packages/add/hr",
-                "reference": "16f77ec7da4fcb91b16187df5e3f225d55fc05db"
+                "reference": "1da1d07967e411d57413f6f7b355eaa93aeddb21"
             },
             "require": {
+                "ext-bcmath": "*",
                 "illuminate/console": "^12.0",
                 "illuminate/contracts": "^12.0",
                 "illuminate/database": "^12.0",
@@ -51,6 +52,56 @@
                 "proprietary"
             ],
             "description": "Human resources for Laravel: organization, employees, lifecycle, documents and self-service, exposed as a JSON API the host mounts.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "add/inventory",
+            "version": "dev-feat/inventory-package",
+            "dist": {
+                "type": "path",
+                "url": "packages/add/inventory",
+                "reference": "8696460f8c6ee11c4b059f049689f947c34304c2"
+            },
+            "require": {
+                "ext-bcmath": "*",
+                "illuminate/console": "^12.0",
+                "illuminate/contracts": "^12.0",
+                "illuminate/database": "^12.0",
+                "illuminate/http": "^12.0",
+                "illuminate/routing": "^12.0",
+                "illuminate/support": "^12.0",
+                "illuminate/validation": "^12.0",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Add\\Inventory\\InventoryServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Add\\Inventory\\": "src/",
+                    "Add\\Inventory\\Database\\Factories\\": "database/factories/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Add\\Inventory\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Inventory for Laravel: a catalog of items in nested categories with their own fields, fixed assets tracked one by one (location, custody, maintenance, depreciation, disposal) and consumable stock kept per location (receipts, issues, transfers, counts at weighted average cost), exposed as a JSON API the host mounts.",
             "transport-options": {
                 "symlink": true,
                 "relative": true
@@ -12266,7 +12317,8 @@
     "aliases": [],
     "minimum-stability": "stable",
     "stability-flags": {
-        "add/hr": 20
+        "add/hr": 20,
+        "add/inventory": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
