@@ -140,6 +140,7 @@ return [
         'space_status_updated' => 'تم تحديث حالة المساحة.',
         'space_amenities_updated' => 'تم تحديث مرافق المساحة.',
         'space_type_amenities_updated' => 'تم تحديث وسائل الراحة.',
+        'amenity_updated' => 'تم تحديث الميزة.',
         'resource_updated' => 'تم تحديث المورد.',
         'resource_status_updated' => 'تم تحديث حالة المورد.',
         'seat_desk_updated' => 'تم تحديث المقعد/المكتب.',

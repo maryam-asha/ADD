@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceTypeController;
+use App\Http\Controllers\Api\V1\Admin\AmenityController;
 use App\Http\Controllers\Api\V1\Admin\AnnouncementController;
 use App\Http\Controllers\Api\V1\Admin\BookingCalendarController;
 use App\Http\Controllers\Api\V1\Admin\BookingController;
@@ -140,7 +141,11 @@ Route::patch('spaces/{space}/amenities', [SpaceController::class, 'updateAmeniti
 Route::apiResource('resources', ResourceController::class)->except('destroy');
 Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
 
-// The type -> amenity config matrix (which AmenityType values are even
+// The amenity catalog (Wi-Fi, café access, a stage — what a space offers
+// without being equipment to track; equipment is an inventory asset).
+Route::apiResource('amenities', AmenityController::class);
+
+// The type -> amenity config matrix (which catalog amenities are even
 // selectable for a given SpaceType) — a fixed 4-row config, not a
 // paginated CRUD resource, so it isn't a Route::apiResource line. Same
 // role:admin|operations tier as the rest of this file — no

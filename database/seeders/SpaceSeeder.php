@@ -3,7 +3,6 @@
 namespace Database\Seeders;
 
 use App\Domain\Foundation\Enums\AllocationModel;
-use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
@@ -202,25 +201,25 @@ class SpaceSeeder extends Seeder
         ]);
 
         // 7. Type -> amenity config matrix (admin-editable default starting
-        // point — see AmenityType/SpaceTypeAmenity), then turn on every
+        // point — see Amenity/SpaceTypeAmenity), then turn on every
         // amenity applicable to each demo space's own type. Keyed by the
         // enum's string value, not the enum case itself — PHP array keys
         // can't be enum instances.
         $amenityMatrix = [
             SpaceType::CoSpace->value => [
-                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::ErgonomicChairs,
-                AmenityType::Printing, AmenityType::Locker, AmenityType::CafeAccess,
+                'wifi', 'power_outlet', 'ergonomic_chairs',
+                'printing', 'locker', 'cafe_access',
             ],
             SpaceType::Room->value => [
-                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac, AmenityType::CafeAccess,
+                'wifi', 'power_outlet', 'ac', 'cafe_access',
             ],
             SpaceType::Business->value => [
-                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac,
-                AmenityType::Locker, AmenityType::CafeAccess,
+                'wifi', 'power_outlet', 'ac',
+                'locker', 'cafe_access',
             ],
             SpaceType::EventHall->value => [
-                AmenityType::Wifi, AmenityType::PowerOutlet, AmenityType::Ac,
-                AmenityType::CafeAccess, AmenityType::Stage,
+                'wifi', 'power_outlet', 'ac',
+                'cafe_access', 'stage',
             ],
         ];
 

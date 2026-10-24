@@ -3,10 +3,10 @@
 namespace App\Domain\Foundation\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
-use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Amenity;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
@@ -86,7 +86,7 @@ class SpaceBrowseService
         $spacesQuery = Space::query()
             ->active()
             ->whereDoesntHave('officeLeases', fn ($q) => $q->holdingOn(now()->toDateString()))
-            ->with(['resources', 'amenities', 'building', 'zone.floor'])
+            ->with(['resources', 'amenities.definition', 'building', 'zone.floor'])
             ->whereHas('building', fn ($q) => $q->where('branch_id', $branch->id));
 
         $requestedType = strtolower((string) ($filters['space_type'] ?? 'all'));
@@ -299,10 +299,9 @@ class SpaceBrowseService
 
         // Two genuinely different sources merge here: the fixed facility
         // amenities toggled on for this space (SpaceAmenity) and its active
-        // equipment (Resource — projectors, mics, ...). See AmenityType's
-        // own doc comment for why these no longer live on the same model.
-        foreach ($space->amenities as $amenity) {
-            $amenities[] = $this->resolveAmenityType($amenity->amenity);
+        // equipment (Resource — projectors, mics, ...).
+        foreach ($this->activeAmenities($space) as $amenity) {
+            $amenities[] = $this->resolveAmenity($amenity);
         }
 
         // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
@@ -327,30 +326,30 @@ class SpaceBrowseService
     }
 
     /**
-     * Icon mapping carried over unchanged from when these 8 values were
-     * (briefly) ResourceCategory cases — same icons, now resolved off
-     * AmenityType/SpaceAmenity instead. Labels are translated per-locale,
-     * unlike a Resource's free-text admin-authored name.
+     * The catalog amenities turned on for this space, minus any the admin
+     * has since switched off in the catalog itself.
      *
+     * @return list<Amenity>
+     */
+    private function activeAmenities(Space $space): array
+    {
+        return $space->amenities
+            ->map(fn ($toggle) => $toggle->definition)
+            ->filter(fn (?Amenity $amenity) => $amenity?->is_active)
+            ->sortBy('order')
+            ->values()
+            ->all();
+    }
+
+    /**
      * @return array{key: string, label: string, icon: string}
      */
-    private function resolveAmenityType(AmenityType $amenity): array
+    private function resolveAmenity(Amenity $amenity): array
     {
-        $icon = match ($amenity) {
-            AmenityType::Wifi => 'wifi',
-            AmenityType::PowerOutlet => 'zap',
-            AmenityType::Printing => 'printer',
-            AmenityType::ErgonomicChairs => 'check-circle',
-            AmenityType::Locker => 'lock',
-            AmenityType::CafeAccess => 'coffee',
-            AmenityType::Ac => 'snowflake',
-            AmenityType::Stage => 'stage',
-        };
-
         return [
-            'key' => $amenity->value,
-            'label' => __('api.space.amenities.'.$amenity->value),
-            'icon' => $icon,
+            'key' => $amenity->key,
+            'label' => (string) $amenity->translate('name'),
+            'icon' => $amenity->icon ?? 'check-circle',
         ];
     }
 
@@ -434,7 +433,7 @@ class SpaceBrowseService
             abort(404);
         }
 
-        $space->loadMissing(['resources', 'amenities', 'building.branch', 'zone.floor']);
+        $space->loadMissing(['resources', 'amenities.definition', 'building.branch', 'zone.floor']);
 
         $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
         $branch = $space->building->branch;
@@ -547,8 +546,8 @@ class SpaceBrowseService
     {
         $checklist = [];
 
-        foreach ($space->amenities as $amenity) {
-            $resolved = $this->resolveAmenityType($amenity->amenity);
+        foreach ($this->activeAmenities($space) as $amenity) {
+            $resolved = $this->resolveAmenity($amenity);
             $checklist[] = [
                 'key' => $resolved['key'],
                 'name' => $resolved['label'],

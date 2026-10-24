@@ -140,6 +140,7 @@ return [
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
+        'amenity_updated' => 'Amenity updated.',
         'resource_updated' => 'Resource updated.',
         'resource_status_updated' => 'Resource status updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
