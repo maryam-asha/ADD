@@ -18,6 +18,9 @@ class ResourceConsumption extends Model
 {
     use HasFactory;
 
+    /** How the stock it used up names it (inv_stock_movements.source_type). */
+    public const SOURCE = 'resource_consumption';
+
     protected $fillable = [
         'plan_resource_grant_id',
         'membership_id',

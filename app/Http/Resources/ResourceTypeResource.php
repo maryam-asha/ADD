@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Support\PlainAmount;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -18,6 +19,9 @@ class ResourceTypeResource extends JsonResource
             'slug' => $this->slug,
             'unit_label' => $this->unit_label,
             'icon' => $this->icon,
+            // The stock one unit consumed uses up, if any.
+            'inventory_item_id' => $this->inventory_item_id,
+            'stock_units_per_unit' => $this->stock_units_per_unit === null ? null : PlainAmount::of((string) $this->stock_units_per_unit),
             'order' => $this->order,
             'is_active' => (bool) $this->is_active,
             'created_at' => $this->created_at?->toISOString(),

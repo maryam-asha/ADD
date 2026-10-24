@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Api\V1\Admin\Reception;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Inventory\ReceptionStockLocation;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\InsufficientResourceQuotaException;
 use App\Domain\Membership\Models\ResourceType;
@@ -19,6 +21,9 @@ use Illuminate\Http\JsonResponse;
  * (Printing, Internet, ...) against a member/company's active membership —
  * the missing reception-facing endpoint over ResourceQuotaService, same
  * shape as WalletTopUpController (docs/decisions/resource-quota-design.md).
+ * A type that uses up stock (printing: paper) issues it in the same
+ * transaction, from `stock_location` or the branch of the operator's open
+ * cash register; a shelf that cannot cover it refuses the consumption.
  */
 class ResourceConsumptionController extends Controller
 {
@@ -29,6 +34,7 @@ class ResourceConsumptionController extends Controller
         MembershipResolver $resolver,
         ResourceQuotaService $quota,
         CoworkingSessionService $sessions,
+        ReceptionStockLocation $stockLocations,
     ): JsonResponse {
         [$ownerType, $ownerId] = $request->validated('company_id')
             ? [OwnerType::Company, (int) $request->validated('company_id')]
@@ -51,12 +57,21 @@ class ResourceConsumptionController extends Controller
         }
 
         try {
+            $stockFrom = $resourceType->inventory_item_id === null
+                ? null
+                : $stockLocations->resolve($request->validated('stock_location'), $request->user());
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        try {
             $consumption = $quota->consume(
                 $grant,
                 $membership,
                 (float) $request->validated('quantity'),
                 $request->user(),
-                $request->validated('note')
+                $request->validated('note'),
+                $stockFrom,
             );
         } catch (InsufficientResourceQuotaException) {
             abort(422, __('api.reception.resource_quota_insufficient'));

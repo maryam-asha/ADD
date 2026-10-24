@@ -179,6 +179,7 @@ return [
             'event_registration' => 'تسجيل في فعالية',
             'coworking_session' => 'جلسة عمل مشترك',
             'booking_extension' => 'تمديد حجز',
+            'item_sale' => 'مشتريات من الاستقبال',
         ],
     ],
 

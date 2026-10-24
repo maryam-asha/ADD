@@ -8,6 +8,7 @@ use App\Domain\Finance\Payments\FulfillerRegistry;
 use App\Domain\Finance\Payments\Fulfillers\BookingExtensionFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\BookingFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\EventRegistrationFulfiller;
+use App\Domain\Finance\Payments\Fulfillers\ItemSaleFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\PlanPurchaseFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalkinSessionFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalletTopUpFulfiller;
@@ -39,6 +40,7 @@ class PaymentServiceProvider extends ServiceProvider
         PaymentPurpose::CoworkingSession->value => WalkinSessionFulfiller::class,
         PaymentPurpose::BookingExtension->value => BookingExtensionFulfiller::class,
         PaymentPurpose::EventRegistration->value => EventRegistrationFulfiller::class,
+        PaymentPurpose::ItemSale->value => ItemSaleFulfiller::class,
     ];
 
     public function register(): void

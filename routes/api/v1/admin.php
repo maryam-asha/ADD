@@ -39,6 +39,7 @@ use App\Http\Controllers\Api\V1\Admin\FounderController;
 use App\Http\Controllers\Api\V1\Admin\HelpSupportController;
 use App\Http\Controllers\Api\V1\Admin\InvoiceController;
 use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
+use App\Http\Controllers\Api\V1\Admin\ItemSaleController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
 use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
@@ -60,6 +61,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\CashRegisterSessionController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ItemSaleController as ReceptionItemSaleController;
 use App\Http\Controllers\Api\V1\Admin\Reception\PlanPurchaseController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
@@ -72,6 +74,7 @@ use App\Http\Controllers\Api\V1\Admin\RenewalController;
 use App\Http\Controllers\Api\V1\Admin\ReportController;
 use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
+use App\Http\Controllers\Api\V1\Admin\SaleItemController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
 use App\Http\Controllers\Api\V1\Admin\SettingController;
 use App\Http\Controllers\Api\V1\Admin\SiteInquiryController;
@@ -199,11 +202,18 @@ Route::get('reports/discounts', [DiscountReportController::class, 'index']);
 // (CouponHistory), so a changed or deleted offer still shows where it ran.
 Route::get('reports/offers', [OfferReportController::class, 'index']);
 
-// Resource-quota catalog (docs/decisions/resource-quota-design.md). Route
-// segment is `resource-types`, not `resources` — that name is already taken
-// by the physical Resource model's admin route above.
+// Resource-quota catalog (docs/decisions/resource-quota-design.md). A type
+// may name the inventory stock it uses up (printing: paper), issued when
+// reception records consumption.
 Route::apiResource('resource-types', ResourceTypeController::class)
     ->parameters(['resource-types' => 'resourceType']);
+
+// Selling stock at reception: what may be sold and its price in points
+// (the stock itself is the inventory's), and the sales made.
+Route::apiResource('sale-items', SaleItemController::class)
+    ->parameters(['sale-items' => 'saleItem']);
+Route::get('item-sales', [ItemSaleController::class, 'index']);
+Route::get('item-sales/{itemSale}', [ItemSaleController::class, 'show']);
 
 // Contact Links — public org content (social/app-store/website/phone
 // links), admin-managed. Same permission tier as Founders/Partners (no
@@ -403,6 +413,7 @@ Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionC
 // Settle anything a member owes with the money handed over (overpayment
 // stays as points), and list everything they owe (docs/decisions/unified-payments.md).
 Route::post('reception/payments/settle', [ReceptionPaymentController::class, 'settle']);
+Route::post('reception/item-sales', [ReceptionItemSaleController::class, 'store']);
 Route::get('reception/outstanding', [ReceptionPaymentController::class, 'outstanding']);
 
 // The desk's day at a glance: counts and what needs it next

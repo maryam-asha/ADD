@@ -44,6 +44,7 @@ return [
         // The member's wallet history (WalletTransactionPresenter): what
         // each row was, and the pool it moved.
         'kinds' => [
+            'item_sale' => 'Purchase at reception',
             'booking' => 'Booking',
             'booking_extension' => 'Booking extension',
             'coworking_session' => 'Coworking session',
@@ -218,6 +219,7 @@ return [
     ],
 
     'reception' => [
+        'stock_location_required' => 'Choose where the stock is taken from, or open a cash register at your branch.',
         'checked_in' => 'Checked in.',
         'checked_out' => 'Checked out.',
         'cancelled' => 'Booking cancelled.',
@@ -776,4 +778,12 @@ return [
         'benefit_points_whole' => 'Wallet points are whole numbers; :amount is not.',
         'benefit_wallet_description' => 'Employee benefit: :benefit',
     ],
+
+    // Selling stock at reception (App\Domain\Retail).
+    'item_sale' => [
+        'description' => 'Purchase #:id at reception',
+        'not_stock' => 'Only stock items can be sold.',
+        'sale_item_updated' => 'Sale item updated.',
+    ],
+
 ];

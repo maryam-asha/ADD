@@ -44,6 +44,7 @@ return [
         // The member's wallet history (WalletTransactionPresenter): what
         // each row was, and the pool it moved.
         'kinds' => [
+            'item_sale' => 'مشتريات من الاستقبال',
             'booking' => 'حجز',
             'booking_extension' => 'تمديد حجز',
             'coworking_session' => 'جلسة عمل مشترك',
@@ -218,6 +219,7 @@ return [
     ],
 
     'reception' => [
+        'stock_location_required' => 'اختر الموقع الذي تُصرف منه المادة، أو افتح صندوقاً في فرعك.',
         'checked_in' => 'تم تسجيل الدخول.',
         'checked_out' => 'تم تسجيل الخروج.',
         'cancelled' => 'تم إلغاء الحجز.',
@@ -763,4 +765,12 @@ return [
         'benefit_points_whole' => 'نقاط المحفظة أعداد صحيحة، و:amount ليس كذلك.',
         'benefit_wallet_description' => 'ميزة موظف: :benefit',
     ],
+
+    // Selling stock at reception (App\Domain\Retail).
+    'item_sale' => [
+        'description' => 'مشتريات رقم :id من الاستقبال',
+        'not_stock' => 'لا يُباع إلا ما هو من المخزون.',
+        'sale_item_updated' => 'تم تحديث مادة البيع.',
+    ],
+
 ];

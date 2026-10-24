@@ -179,6 +179,7 @@ return [
             'event_registration' => 'an event registration',
             'coworking_session' => 'a coworking session',
             'booking_extension' => 'a booking extension',
+            'item_sale' => 'a purchase at reception',
         ],
     ],
 

@@ -23,6 +23,9 @@ namespace App\Domain\Finance\Enums;
  * made longer. Its payable is the booking itself, which is already paid,
  * so it cannot share `Booking`'s "not already paid" check; refunds for a
  * booking return every payment made for it, whatever its purpose.
+ *
+ * `ItemSale` pays for stock sold at the reception desk (App\Domain\Retail):
+ * its payable is the sale, and paying it issues the stock.
  */
 enum PaymentPurpose: string
 {
@@ -32,4 +35,5 @@ enum PaymentPurpose: string
     case EventRegistration = 'event_registration';
     case CoworkingSession = 'coworking_session';
     case BookingExtension = 'booking_extension';
+    case ItemSale = 'item_sale';
 }
