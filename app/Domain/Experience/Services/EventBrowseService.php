@@ -7,6 +7,7 @@ use App\Domain\Experience\Models\EventCategory;
 use App\Domain\Identity\Models\User;
 use App\Http\Resources\Forms\FormFieldResource;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\EventDatePresenter;
 use App\Support\Presenters\EventPricePresenter;
 use App\Support\Presenters\EventSalePresenter;
@@ -259,6 +260,9 @@ class EventBrowseService
 
         $perPage = isset($filters['per_page']) ? (int) $filters['per_page'] : 20;
         $paginator = $query->paginate($perPage);
+
+        // Every registration's discounts in one query, not one per card.
+        app(AppliedDiscountPresenter::class)->preload(collect($paginator->items())->map(fn (Event $event) => $event->attendees->first())->filter());
 
         $events = collect($paginator->items())->map(fn (Event $event) => $this->formatMyEventCard($event, $user));
 
@@ -518,10 +522,9 @@ class EventBrowseService
             ? $this->translateRegistrationStatus($rawRegistrationStatus, $locale)
             : null;
 
-        // Member-facing: the two display labels only. The raw point count
-        // and the unformatted currency figures stay server-side —
-        // registration debits the wallet and checks the balance there, so
-        // a client has nothing to compute.
+        // Member-facing: points and price as numbers beside the currency
+        // symbol, no labels — registration debits the wallet and checks the
+        // balance server-side, so a client has nothing to compute.
         $price = app(EventPricePresenter::class)->presentForDisplay($event, $user, $locale);
 
         // The hours a card can honestly state are one sitting's, not the
@@ -649,6 +652,7 @@ class EventBrowseService
             'rejection_reason' => $mine?->rejection_reason,
             'registered_at' => $mine?->created_at?->toISOString(),
             'payment' => $this->paymentBlock($mine, $user),
+            'discounts' => $this->discountsFor($mine),
         ]);
     }
 
@@ -746,6 +750,7 @@ class EventBrowseService
                 'rejection_reason' => $attendee?->rejection_reason,
                 'registered_at' => $attendee?->created_at?->toISOString(),
                 'payment' => $this->paymentBlock($attendee, $user),
+                'discounts' => $this->discountsFor($attendee),
             ],
             'time_status' => [
                 'type' => $timeStatusType,
@@ -904,6 +909,18 @@ class EventBrowseService
     private function paymentBlock(?Model $attendee, ?User $user): ?array
     {
         return $attendee === null ? null : app(PaymentStatePresenter::class)->for($attendee, $user);
+    }
+
+    /**
+     * What was taken off this member's registration — offer, coupon — as it
+     * was when the price was locked (AppliedDiscountPresenter). Empty when
+     * there is no registration.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function discountsFor(?Model $attendee): array
+    {
+        return $attendee === null ? [] : app(AppliedDiscountPresenter::class)->for($attendee);
     }
 
     /**

@@ -58,7 +58,7 @@ class EventRegistrationCouponTest extends TestCase
         ], $attributes));
     }
 
-    private function register(Event $event, string $code, ?string $method = null)
+    private function register(Event $event, string $code, ?string $method = 'wallet')
     {
         return $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register", array_filter([
             'coupon_code' => $code,
@@ -95,7 +95,7 @@ class EventRegistrationCouponTest extends TestCase
         $offer = Coupon::factory()->automatic()->percentage(20)->create();
         $offer->targets()->create(['purpose' => PricingPurpose::EventRegistration, 'event_id' => $event->id]);
 
-        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register")
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet'])
             ->assertCreated()
             ->assertJsonMissingPath('data.coupon');
 
@@ -113,6 +113,17 @@ class EventRegistrationCouponTest extends TestCase
         $attendee = EventAttendee::sole();
         $this->assertSame(0, $attendee->price_points);
         $this->assertSame(EventPaymentState::Paid, $attendee->payment_state);
+        $this->assertSame(500, $this->balance());
+    }
+
+    /** A paid event asks for a method only while something is owed: one a coupon makes free does not. */
+    public function test_a_registration_made_free_asks_for_no_method(): void
+    {
+        Coupon::factory()->percentage(100)->forEvents()->create(['code' => 'GUEST']);
+
+        $this->register($this->event(), 'GUEST', null)->assertCreated();
+
+        $this->assertSame(EventPaymentState::Paid, EventAttendee::sole()->payment_state);
         $this->assertSame(500, $this->balance());
     }
 
@@ -186,7 +197,7 @@ class EventRegistrationCouponTest extends TestCase
     {
         Coupon::factory()->automatic()->percentage(20)->create();
 
-        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$this->event(['price_points' => 50])->id}/register")->assertCreated();
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/events/{$this->event(['price_points' => 50])->id}/register", ['payment_method' => 'wallet'])->assertCreated();
 
         $attendee = EventAttendee::sole();
         $this->assertSame(50, $attendee->price_points);

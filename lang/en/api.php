@@ -479,6 +479,15 @@ return [
         'received_description' => 'Payment received',
     ],
 
+    // What a price is per (`unit_label` beside a space's, a package's,
+    // a sale's or a saving's labels, which carry no unit).
+    'price_unit' => [
+        'hour' => 'hour',
+        'day' => 'day',
+        'week' => 'week',
+        'month' => 'month',
+    ],
+
     'space' => [
         'browse_title' => 'Browse Spaces',
         'browse_subtitle' => 'Find and book the right workspace for your day.',
@@ -495,7 +504,6 @@ return [
             'space' => 'Space',
         ],
         'price_points' => ':points pts',
-        'per_hour' => 'hour',
         'sale_ends' => 'Offer ends :date',
         'sale_discount_percent' => ':percent% off',
         'sale_discount_amount' => 'Save :amount',
@@ -543,7 +551,6 @@ return [
         'sale_discount_amount' => 'Save :amount',
         'saving_percent' => 'Save :percent%',
         'saving_amount' => 'Save :amount',
-        'per_unit' => ':amount per :unit',
         // The saving spelled out (saving_description): what you get, for
         // what, against what, and what one unit comes to.
         'saving_description' => "Get :quantity for :price (regular price :regular) — save :saving (:points). That's :per_unit:per.",
@@ -576,7 +583,6 @@ return [
         'view_details' => 'View details',
         'benefits_title' => 'Plan Benefits',
         'expires_on' => 'Expires :date',
-        'per_month' => 'mo',
         'points_unit' => 'pts',
         'billing_cycle' => 'Current cycle: :start – :end',
         'usage_title' => 'Your Usage This Cycle',
@@ -641,6 +647,7 @@ return [
         'not_yet_open' => 'Registration for this event opens on :date.',
         'already_registered' => 'You are already registered for this event.',
         'full' => 'Sorry, this event is full. All seats are completely booked.',
+        'payment_method_required' => 'Choose a payment method for this paid event.',
         'insufficient_points' => 'Insufficient points. :required points required, you have :current points (short :shortage).',
         'registration_success' => 'Successfully registered for the event.',
         'registration_success_points' => 'Successfully registered for the event. :points points deducted from your wallet.',

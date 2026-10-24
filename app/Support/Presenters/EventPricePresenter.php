@@ -50,15 +50,17 @@ class EventPricePresenter
     }
 
     /**
-     * The member-facing view: the formatted price and points as numbers
-     * along with their display-ready labels in a single pricing object.
+     * The member-facing view: points and price as numbers, `currency` the
+     * symbol beside the price — shaped like a space's or a package's
+     * pricing, its unit null: a ticket is not per anything. A free event is
+     * `is_free` beside it.
      *
      * @return array{
      *     points: int,
-     *     points_label: string,
      *     price: int|float,
-     *     price_label: string,
-     *     currency: string
+     *     currency: string,
+     *     unit: null,
+     *     unit_label: null
      * }
      */
     public function presentForDisplay(Event $event, ?User $user, string $locale): array
@@ -69,10 +71,10 @@ class EventPricePresenter
 
         return [
             'points' => $price['price_points'],
-            'points_label' => $price['price_label'],
             'price' => $numericPrice,
-            'price_label' => $price['price_display_label'],
-            'currency' => $price['currency'],
+            'currency' => $this->labels->currencySymbol($price['currency'], $locale),
+            'unit' => null,
+            'unit_label' => null,
         ];
     }
 

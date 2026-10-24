@@ -99,7 +99,7 @@ class EventRegistrationTest extends TestCase
 
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->postJson("/api/v1/member/events/{$event->id}/register");
+        $response = $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet']);
         $response->assertCreated();
         $response->assertJsonPath('data.event.id', $event->id);
         $response->assertJsonMissingPath('data.payment');
@@ -135,7 +135,7 @@ class EventRegistrationTest extends TestCase
 
         Sanctum::actingAs($user, ['*']);
 
-        $response = $this->postJson("/api/v1/member/events/{$event->id}/register");
+        $response = $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet']);
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['points']);
 
@@ -166,7 +166,7 @@ class EventRegistrationTest extends TestCase
         Sanctum::actingAs($user, ['*']);
 
         // First registration succeeds
-        $response = $this->postJson("/api/v1/member/events/{$event->id}/register");
+        $response = $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet']);
         $response->assertCreated();
 
         // Second registration fails with clear translated message

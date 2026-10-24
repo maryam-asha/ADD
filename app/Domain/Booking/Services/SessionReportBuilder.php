@@ -7,6 +7,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Membership\Models\ResourceConsumption;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Membership\Services\ResourceQuotaService;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
 
 /**
@@ -54,6 +55,9 @@ class SessionReportBuilder
                 'payment_method' => $session->payment_method?->value,
                 'paid_at' => $session->paid_at?->toIso8601String(),
                 'payment' => app(PaymentStatePresenter::class)->for($session, $session->user),
+                // What was taken off it — offer, coupon, plan discount — as
+                // closure locked it (AppliedDiscountPresenter).
+                'discounts' => app(AppliedDiscountPresenter::class)->for($session),
             ] : null,
         ];
     }

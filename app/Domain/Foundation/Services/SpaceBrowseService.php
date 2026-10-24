@@ -280,7 +280,7 @@ class SpaceBrowseService
             'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
             // The best offer live now for this member: the rate struck
             // through, the offer rate, when it ends.
-            'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
+            'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, 'hour', 'api.space'),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
@@ -480,7 +480,7 @@ class SpaceBrowseService
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
                 'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
-                'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, true, 'api.space'),
+                'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, 'hour', 'api.space'),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

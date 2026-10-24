@@ -68,6 +68,40 @@ class EventTest extends TestCase
         ]);
     }
 
+    public function test_explicit_nulls_for_not_null_columns_fall_back_to_their_defaults(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/events', [
+            'title' => ['en' => 'Flutter Course', 'ar' => 'كورس فلاتر'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->toDateTimeString(),
+            'order' => null,
+            'status' => null,
+            'is_free' => null,
+            'price_points' => null,
+            'requires_approval' => null,
+        ]);
+
+        $response->assertCreated();
+        $event = Event::findOrFail($response->json('data.id'));
+        $this->assertSame(0, $event->order);
+        $this->assertSame('draft', $event->status);
+
+        $event->update(['order' => 5, 'status' => 'published']);
+
+        $this->putJson("/api/v1/admin/events/{$event->id}", [
+            'title' => ['en' => 'Flutter Course', 'ar' => 'كورس فلاتر'],
+            'start_at' => now()->addDays(2)->toDateTimeString(),
+            'end_at' => now()->addDays(4)->toDateTimeString(),
+            'order' => null,
+            'status' => null,
+        ])->assertOk();
+
+        $this->assertSame(5, $event->fresh()->order);
+        $this->assertSame('published', $event->fresh()->status);
+    }
+
     public function test_admin_cannot_create_event_with_non_existent_category_id(): void
     {
         $this->actingAsAdmin();
@@ -250,17 +284,17 @@ class EventTest extends TestCase
         // the member spends them, and the same price in their chosen
         // currency. 100 pts =  .00 = 100,000 SYP at the seeded rate.
         $this->assertSame(100, $item['pricing']['points']);
-        $this->assertSame('100 pts', $item['pricing']['points_label']);
         $this->assertSame(100000, $item['pricing']['price']);
-        $this->assertSame('100,000 SYP', $item['pricing']['price_label']);
+        // The symbol beside the amount, as the old label had it; no labels.
         $this->assertSame('SYP', $item['pricing']['currency']);
+        $this->assertArrayNotHasKey('price_label', $item['pricing']);
 
-        // In Arabic, price label uses the localized symbol 'ل.س'
+        // In Arabic, the currency is the localized symbol 'ل.س'
         $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/events');
         $responseAr->assertOk();
         $itemAr = collect($responseAr->json('data'))->firstWhere('id', $event->id);
-        $this->assertSame('100,000 ل.س', $itemAr['pricing']['price_label']);
-        $this->assertSame('100 نقطة', $itemAr['pricing']['points_label']);
+        $this->assertSame(100000, $itemAr['pricing']['price']);
+        $this->assertSame('ل.س', $itemAr['pricing']['currency']);
     }
 
     public function test_admin_can_fetch_available_rooms_and_create_event_with_space_id(): void

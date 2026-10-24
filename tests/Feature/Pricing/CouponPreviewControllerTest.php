@@ -74,7 +74,7 @@ class CouponPreviewControllerTest extends TestCase
 
         $this->preview(['code' => 'FLAT30'])
             ->assertOk()
-            ->assertJsonPath('data.discount_amount', ['amount' => '3', 'label' => '3 $', 'currency' => 'USD']);
+            ->assertJsonPath('data.discount_amount', ['amount' => 3, 'label' => '3 $', 'currency' => '$']);
 
         $this->preview(['code' => 'HALF'])
             ->assertOk()

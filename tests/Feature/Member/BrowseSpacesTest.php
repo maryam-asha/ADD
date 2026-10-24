@@ -84,10 +84,10 @@ class BrowseSpacesTest extends TestCase
                     'capacity_label',
                     'pricing' => [
                         'points',
-                        'points_label',
                         'price',
-                        'price_label',
                         'currency',
+                        'unit',
+                        'unit_label',
                     ],
                     'amenities' => [
                         '*' => ['key', 'label', 'icon'],
@@ -255,19 +255,18 @@ class BrowseSpacesTest extends TestCase
             ->firstWhere('id', $space->id);
         $this->assertSame([
             'points' => 30,
-            'points_label' => '30 pts / hour',
             'price' => 3,
-            'price_label' => '3 $ / hour',
-            'currency' => 'USD',
+            'currency' => '$',
+            'unit' => 'hour',
+            'unit_label' => 'hour',
         ], $card['pricing']);
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
             ->assertJsonPath('data.details.pricing.points', 30)
-            ->assertJsonPath('data.details.pricing.points_label', '30 pts / hour')
             ->assertJsonPath('data.details.pricing.price', 3)
-            ->assertJsonPath('data.details.pricing.price_label', '3 $ / hour')
-            ->assertJsonPath('data.details.pricing.currency', 'USD');
+            ->assertJsonPath('data.details.pricing.currency', '$')
+            ->assertJsonPath('data.details.pricing.unit', 'hour');
     }
 
     /** The currency header (or the member's preference) picks the currency; points never change. */
@@ -281,17 +280,15 @@ class BrowseSpacesTest extends TestCase
         $this->withHeaders(['lang' => 'ar', 'currency' => 'SYP'])->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
             ->assertJsonPath('data.details.pricing.points', 30)
-            ->assertJsonPath('data.details.pricing.points_label', '30 نقطة / ساعة')
             ->assertJsonPath('data.details.pricing.price', 30000)
-            ->assertJsonPath('data.details.pricing.price_label', '30,000 ل.س / ساعة')
-            ->assertJsonPath('data.details.pricing.currency', 'SYP');
+            ->assertJsonPath('data.details.pricing.currency', 'ل.س')
+            ->assertJsonPath('data.details.pricing.unit', 'hour')
+            ->assertJsonPath('data.details.pricing.unit_label', 'ساعة');
 
         $this->withHeaders(['lang' => 'en', 'currency' => 'SYP'])->getJson("/api/v1/member/spaces/{$space->id}")
             ->assertOk()
             ->assertJsonPath('data.details.pricing.points', 30)
-            ->assertJsonPath('data.details.pricing.points_label', '30 pts / hour')
             ->assertJsonPath('data.details.pricing.price', 30000)
-            ->assertJsonPath('data.details.pricing.price_label', '30,000 SYP / hour')
             ->assertJsonPath('data.details.pricing.currency', 'SYP');
     }
 
@@ -320,10 +317,10 @@ class BrowseSpacesTest extends TestCase
                     'status_label',
                     'pricing' => [
                         'points',
-                        'points_label',
                         'price',
-                        'price_label',
                         'currency',
+                        'unit',
+                        'unit_label',
                     ],
                     'capacity' => [
                         'count',
@@ -359,8 +356,8 @@ class BrowseSpacesTest extends TestCase
         $response->assertJsonMissingPath('data.status');
         $response->assertJsonPath('data.badge', 'OPEN SPACE');
         $response->assertJsonPath('data.subtitle', 'Open Workspace');
-        $response->assertJsonPath('data.details.pricing.price_label', '1.50 $ / hour');
-        $response->assertJsonPath('data.details.pricing.points_label', '15 pts / hour');
+        $response->assertJsonPath('data.details.pricing.price', 1.5);
+        $response->assertJsonPath('data.details.pricing.points', 15);
         $response->assertJsonPath('data.cta.button_text', 'Book This Space');
         $response->assertJsonPath('data.cta.can_book', true);
     }

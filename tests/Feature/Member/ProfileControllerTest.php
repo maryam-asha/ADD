@@ -257,7 +257,9 @@ class ProfileControllerTest extends TestCase
 
     public function test_has_active_membership_is_false_without_a_plan(): void
     {
-        $this->showAsMember($this->member())->assertJsonPath('data.has_active_membership', false);
+        $this->showAsMember($this->member())
+            ->assertJsonPath('data.user.has_active_membership', false)
+            ->assertJsonMissingPath('data.has_active_membership');
     }
 
     public function test_has_active_membership_is_true_with_a_live_personal_plan(): void
@@ -265,7 +267,7 @@ class ProfileControllerTest extends TestCase
         $member = $this->member();
         Membership::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
 
-        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', true);
+        $this->showAsMember($member)->assertJsonPath('data.user.has_active_membership', true);
     }
 
     public function test_has_active_membership_is_true_with_a_live_company_plan(): void
@@ -275,7 +277,7 @@ class ProfileControllerTest extends TestCase
         $member->companies()->attach($company->id);
         Membership::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
 
-        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', true);
+        $this->showAsMember($member)->assertJsonPath('data.user.has_active_membership', true);
     }
 
     public function test_has_active_membership_is_false_for_an_ended_or_upcoming_plan(): void
@@ -294,6 +296,6 @@ class ProfileControllerTest extends TestCase
             'current_period_end' => now()->addDays(31),
         ]);
 
-        $this->showAsMember($member)->assertJsonPath('data.has_active_membership', false);
+        $this->showAsMember($member)->assertJsonPath('data.user.has_active_membership', false);
     }
 }

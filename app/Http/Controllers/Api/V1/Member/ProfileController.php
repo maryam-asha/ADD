@@ -19,7 +19,7 @@ use Illuminate\Support\Facades\DB;
 class ProfileController extends Controller
 {
     /**
-     * `has_active_membership` is true while the member holds a live plan,
+     * `user.has_active_membership` is true while the member holds a live plan,
      * their own or a company's — exactly when memberships/current returns one.
      */
     public function show(Request $request, ProfileCompletionService $completion, SettingService $settings, WalletService $wallets, PriceLabelPresenter $prices, MembershipResolver $memberships): JsonResponse
@@ -28,9 +28,10 @@ class ProfileController extends Controller
 
         return response()->json([
             'data' => [
-                'user' => new MemberProfileResource($user),
+                'user' => (new MemberProfileResource($user))->resolve($request) + [
+                    'has_active_membership' => $memberships->hasActiveFor($user),
+                ],
                 'points_label' => $prices->pointsLabel($wallets->personalGeneralBalance($user)),
-                'has_active_membership' => $memberships->hasActiveFor($user),
                 'completion' => [
                     'score' => $completion->score($user),
                     'threshold' => $settings->get('profile.completion_threshold', 80),

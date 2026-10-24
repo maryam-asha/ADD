@@ -97,10 +97,10 @@ class PackageBrowseTest extends TestCase
                     'subtitle',
                     'pricing' => [
                         'points',
-                        'points_label',
                         'price',
-                        'price_label',
                         'currency',
+                        'unit',
+                        'unit_label',
                     ],
                     'features' => [
                         '*' => ['id', 'name', 'value', 'icon', 'is_included'],
@@ -131,10 +131,12 @@ class PackageBrowseTest extends TestCase
         $response->assertJsonPath('data.1.is_current', true);
         // price_points 750, point.rate_usd 0.10 (SettingSeeder) -> 75 USD.
         $response->assertJsonPath('data.1.pricing.points', 750);
-        $response->assertJsonPath('data.1.pricing.points_label', '750 pts / mo');
         $response->assertJsonPath('data.1.pricing.price', 75);
-        $response->assertJsonPath('data.1.pricing.price_label', '75 $ / mo');
-        $response->assertJsonPath('data.1.pricing.currency', 'USD');
+        $response->assertJsonPath('data.1.pricing.currency', '$');
+        $response->assertJsonMissingPath('data.1.pricing.price_label');
+        $response->assertJsonMissingPath('data.1.pricing.points_label');
+        $response->assertJsonPath('data.1.pricing.unit', 'month');
+        $response->assertJsonPath('data.1.pricing.unit_label', 'month');
 
         $response->assertJsonPath('data.2.name', 'The Happy Committer');
         $response->assertJsonPath('data.2.is_current', false);
@@ -452,26 +454,24 @@ class PackageBrowseTest extends TestCase
         $responseAr = $this->withHeader('lang', 'ar')->getJson('/api/v1/member/packages/2');
         $responseAr->assertOk();
         $responseAr->assertJsonPath('data.pricing.points', 750);
-        $responseAr->assertJsonPath('data.pricing.points_label', '750 نقطة / شهرياً');
         $responseAr->assertJsonPath('data.pricing.price', 75);
-        $responseAr->assertJsonPath('data.pricing.price_label', '75 $ / شهرياً');
-        $responseAr->assertJsonPath('data.pricing.currency', 'USD');
+        $responseAr->assertJsonPath('data.pricing.currency', '$');
+        $responseAr->assertJsonPath('data.pricing.unit', 'month');
+        $responseAr->assertJsonPath('data.pricing.unit_label', 'شهر');
 
         // In Arabic with SYP currency
         $responseArSyp = $this->withHeaders(['lang' => 'ar', 'currency' => 'SYP'])->getJson('/api/v1/member/packages/2');
         $responseArSyp->assertOk();
         $responseArSyp->assertJsonPath('data.pricing.points', 750);
         $responseArSyp->assertJsonPath('data.pricing.price', 750000);
-        $responseArSyp->assertJsonPath('data.pricing.price_label', '750,000 ل.س / شهرياً');
-        $responseArSyp->assertJsonPath('data.pricing.currency', 'SYP');
+        // The symbol beside the amount, as the old label had it.
+        $responseArSyp->assertJsonPath('data.pricing.currency', 'ل.س');
 
         // In English with SYP currency
         $responseEnSyp = $this->withHeaders(['lang' => 'en', 'currency' => 'SYP'])->getJson('/api/v1/member/packages/2');
         $responseEnSyp->assertOk();
         $responseEnSyp->assertJsonPath('data.pricing.points', 750);
-        $responseEnSyp->assertJsonPath('data.pricing.points_label', '750 pts / mo');
         $responseEnSyp->assertJsonPath('data.pricing.price', 750000);
-        $responseEnSyp->assertJsonPath('data.pricing.price_label', '750,000 SYP / mo');
         $responseEnSyp->assertJsonPath('data.pricing.currency', 'SYP');
     }
 }

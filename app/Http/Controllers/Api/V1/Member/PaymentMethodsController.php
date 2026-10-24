@@ -18,8 +18,8 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 /**
- * GET member/payment-methods — the payment methods the member may use, in
- * config/payments.php order, so a gateway added in config appears here with
+ * GET member/payment-methods — the payment methods the member may use, the
+ * unavailable ones first, then in config/payments.php order, so a gateway added in config appears here with
  * no app change. The `wallet` method carries the member's points: `balance`
  * (the most they can spend from any wallet they may use) and `wallets`
  * (personal and company, each with its usable balance); with nothing to

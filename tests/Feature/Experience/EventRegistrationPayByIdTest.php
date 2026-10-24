@@ -6,7 +6,6 @@ use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Forms\Enums\FormPurpose;
 use App\Domain\Forms\Models\FormField;
-use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -131,45 +130,30 @@ class EventRegistrationPayByIdTest extends TestCase
         $this->assertSame(420, app(WalletService::class)->generalBalance($this->personalWallet($member)));
     }
 
-    /**
-     * Sent without a method, the ticket is paid from the member's own
-     * wallet — as registering without one is — never a question of which
-     * wallet when they also belong to a company that has points.
-     */
-    public function test_a_ticket_sent_without_a_method_is_paid_from_the_members_own_wallet(): void
+    /** A ticket that still owes is never paid from the wallet for want of a method. */
+    public function test_a_ticket_that_owes_sent_without_a_method_is_refused(): void
     {
         $member = $this->member(500);
-        $company = Company::factory()->create();
-        $companyWallet = Wallet::create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
-        app(WalletService::class)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
-        $company->members()->attach($member->id, ['is_admin' => false]);
         $event = $this->paidEvent(80);
         $ticket = $this->register($event->id, ['payment_method' => 'cash'])->json('data.ticket_id');
 
         $this->register($event->id, ['ticket_id' => $ticket])
-            ->assertOk()
-            ->assertJsonPath('data.next', 'done')
-            ->assertJsonMissingPath('wallet_options');
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.payment_method.0', 'Choose a payment method for this paid event.');
 
-        $this->assertSame(EventPaymentState::Paid, EventAttendee::findOrFail($ticket)->payment_state);
-        $this->assertSame(420, app(WalletService::class)->generalBalance($this->personalWallet($member)));
-        $this->assertSame(500, app(WalletService::class)->generalBalance($companyWallet->fresh()));
+        $this->assertSame(EventPaymentState::Unpaid, EventAttendee::findOrFail($ticket)->payment_state);
+        $this->assertSame(500, app(WalletService::class)->generalBalance($this->personalWallet($member)));
     }
 
-    public function test_a_pending_ticket_sent_without_a_method_stores_the_members_own_wallet(): void
+    public function test_a_pending_ticket_sent_without_a_method_keeps_its_stored_choice(): void
     {
-        $member = $this->member(500);
+        $this->member(500);
         $event = $this->paidEvent(80, requiresApproval: true);
         $ticket = $this->register($event->id, ['payment_method' => 'cash'])->json('data.ticket_id');
 
-        $this->register($event->id, ['ticket_id' => $ticket])
-            ->assertOk()
-            ->assertJsonPath('data.next', 'pay_at_reception');
+        $this->register($event->id, ['ticket_id' => $ticket])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
 
-        $attendee = EventAttendee::findOrFail($ticket);
-        $this->assertSame('wallet', $attendee->payment_method);
-        $this->assertSame('user', $attendee->payment_wallet_owner_type);
-        $this->assertSame($member->id, $attendee->payment_wallet_owner_id);
+        $this->assertSame('cash', EventAttendee::findOrFail($ticket)->payment_method);
     }
 
     public function test_the_form_is_not_asked_for_again(): void

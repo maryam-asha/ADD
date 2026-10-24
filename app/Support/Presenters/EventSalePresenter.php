@@ -29,6 +29,6 @@ class EventSalePresenter
      */
     public function for(Event $event, ?User $user, string $locale): ?array
     {
-        return $this->labels->sale($this->offers->eventNow($event, $user), (int) ($event->price_points ?? 0), $user, false, 'api.event', $locale);
+        return $this->labels->sale($this->offers->eventNow($event, $user), (int) ($event->price_points ?? 0), $user, null, 'api.event', $locale);
     }
 }

@@ -22,6 +22,7 @@ use App\Support\Enums\EventRegistrationStatus;
 use App\Support\Presenters\CouponOutcomePresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Throwable;
 
 class EventController extends Controller
@@ -147,9 +148,18 @@ class EventController extends Controller
             ->seatHolding()
             ->findOrFail($request->validated('ticket_id'));
 
-        // No method sent: the member's own wallet, as registering without one
-        // is — never a question of which wallet when they belong to a company.
+        // A seat that still owes is paid by the method the member chose, never
+        // by the wallet for want of one. One that owes nothing (a free event's,
+        // or one a coupon already paid) needs none: it reaches the checkout as
+        // the member's own wallet, which has nothing to take.
         $method = $request->validated('payment_method');
+
+        if ($method === null && $attendee->payment_state === EventPaymentState::Unpaid) {
+            throw ValidationException::withMessages([
+                'payment_method' => [__('api.event.payment_method_required')],
+            ]);
+        }
+
         $walletOwnerType = $method === null ? OwnerType::User->value : $request->validated('wallet_owner_type');
         $walletOwnerId = $method === null ? $member->id : $request->validated('wallet_owner_id');
         $method ??= WalletMethod::KEY;

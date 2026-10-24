@@ -120,6 +120,21 @@ class AdminFormFieldApiTest extends TestCase
             ]]]);
     }
 
+    /** An empty PHP array encodes as `[]`; the client reads an object either way. */
+    #[DataProvider('owners')]
+    public function test_validation_is_always_a_json_object(string $kind): void
+    {
+        $this->actingAsRole('admin');
+        [$owner, $url, $purpose] = $this->owner($kind);
+        FormField::factory()->forOwner($owner, $purpose)->select(['a'])->create(['key' => 'first', 'order' => 1, 'validation' => []]);
+        FormField::factory()->forOwner($owner, $purpose)->create(['key' => 'second', 'order' => 2, 'validation' => ['min' => 8, 'max' => 50]]);
+
+        $data = json_decode($this->getJson($url)->assertOk()->getContent())->data;
+
+        $this->assertEquals(new \stdClass, $data[0]->validation);
+        $this->assertEquals((object) ['min' => 8, 'max' => 50], $data[1]->validation);
+    }
+
     // ── Create ──────────────────────────────────────────────────────────
 
     #[DataProvider('owners')]

@@ -8,10 +8,7 @@
     "repositories": [
         {
             "type": "path",
-            "url": "packages/add/hr",
-            "options": {
-                "symlink": true
-            }
+            "url": "packages/add/hr"
         }
     ],
     "require": {

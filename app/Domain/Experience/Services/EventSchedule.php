@@ -100,7 +100,10 @@ class EventSchedule
      */
     public function syncEnvelope(Event $event): void
     {
+        // reorder(): the relation sorts by start_at, and MySQL refuses an
+        // ORDER BY beside an aggregate with no GROUP BY (SQLite allows it).
         $bounds = $event->sessions()
+            ->reorder()
             ->selectRaw('MIN(start_at) as first_start, MAX(end_at) as last_end')
             ->first();
 

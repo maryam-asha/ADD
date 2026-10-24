@@ -117,14 +117,29 @@ class EventPaymentTest extends TestCase
         $this->assertSame('wallet', $activity->properties['payment_method']);
     }
 
-    public function test_no_method_still_means_the_wallet(): void
+    /** A paid event is never charged to the wallet for want of a method: nothing is registered. */
+    public function test_a_paid_event_without_a_method_is_refused(): void
     {
         $member = $this->member(300);
 
-        $this->register($this->paidEvent())->assertCreated();
+        $this->register($this->paidEvent())
+            ->assertUnprocessable()
+            ->assertJsonPath('errors.payment_method.0', 'Choose a payment method for this paid event.');
 
-        $this->assertSame(EventPaymentState::Paid, EventAttendee::sole()->payment_state);
-        $this->assertSame(200, $this->balance(OwnerType::User, $member->id));
+        $this->assertSame(0, EventAttendee::count());
+        $this->assertSame(300, $this->balance(OwnerType::User, $member->id));
+    }
+
+    public function test_a_free_event_asks_for_no_method(): void
+    {
+        $member = $this->member(300);
+
+        $this->register(Event::factory()->create(['capacity' => 20]))->assertCreated();
+
+        $attendee = EventAttendee::sole();
+        $this->assertNull($attendee->payment_method);
+        $this->assertNull($attendee->payment_state);
+        $this->assertSame(300, $this->balance(OwnerType::User, $member->id));
     }
 
     public function test_a_company_wallet_can_pay(): void

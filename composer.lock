@@ -4,17 +4,18 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "edaba091b78120a495be7388eb1d786b",
+    "content-hash": "4d14d9e7ae053521b9ef8ea802413314",
     "packages": [
         {
             "name": "add/hr",
-            "version": "dev-feat/hr-package",
+            "version": "dev-feat/hr-person-linking",
             "dist": {
                 "type": "path",
                 "url": "packages/add/hr",
-                "reference": "16f77ec7da4fcb91b16187df5e3f225d55fc05db"
+                "reference": "cfc5c5e18ef061a0ef89ddd7d40ff8df3d8da906"
             },
             "require": {
+                "ext-bcmath": "*",
                 "illuminate/console": "^12.0",
                 "illuminate/contracts": "^12.0",
                 "illuminate/database": "^12.0",
@@ -52,7 +53,6 @@
             ],
             "description": "Human resources for Laravel: organization, employees, lifecycle, documents and self-service, exposed as a JSON API the host mounts.",
             "transport-options": {
-                "symlink": true,
                 "relative": true
             }
         },

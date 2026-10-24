@@ -42,9 +42,16 @@ class EventController extends AdminResourceController
         return new EventResource($event);
     }
 
+    /**
+     * NOT NULL columns whose rules are `nullable`: the dashboard sends an
+     * empty field as an explicit null, which would otherwise override the
+     * default and fail the insert.
+     */
+    private const NOT_NULL_COLUMNS = ['order', 'status', 'is_free', 'price_points', 'requires_approval'];
+
     public function store(StoreEventRequest $request): EventResource
     {
-        $validated = $this->resolvePlacement($request->validated());
+        $validated = $this->resolvePlacement($this->withoutNullDefaults($request->validated()));
         $sessions = $this->takeSessions($validated);
 
         // start_at/end_at are NOT NULL and are derived from the schedule, so
@@ -73,7 +80,7 @@ class EventController extends AdminResourceController
 
     public function update(UpdateEventRequest $request, Event $event): JsonResponse
     {
-        $validated = $this->resolvePlacement($request->validated(), $event);
+        $validated = $this->resolvePlacement($this->withoutNullDefaults($request->validated()), $event);
         $sessions = $this->takeSessions($validated);
 
         $event->update($validated);
@@ -85,6 +92,24 @@ class EventController extends AdminResourceController
         }
 
         return response()->json(['message' => __('api.admin.event_updated')]);
+    }
+
+    /**
+     * A null for a NOT NULL column means "not provided": the default on
+     * create, the stored value on update.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    private function withoutNullDefaults(array $validated): array
+    {
+        foreach (self::NOT_NULL_COLUMNS as $column) {
+            if (array_key_exists($column, $validated) && $validated[$column] === null) {
+                unset($validated[$column]);
+            }
+        }
+
+        return $validated;
     }
 
     /**

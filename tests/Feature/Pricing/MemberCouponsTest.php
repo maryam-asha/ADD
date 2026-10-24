@@ -211,11 +211,11 @@ class MemberCouponsTest extends TestCase
         $this->given(['code' => 'TENPCT', 'discount_type' => 'percentage', 'discount_value' => 10]);
 
         $usd = collect($this->mine()->assertOk()->json('data'))->keyBy('code');
-        $this->assertSame(['amount' => '3', 'label' => '3 $', 'currency' => 'USD'], $usd['FLAT30']['discount_amount']);
+        $this->assertSame(['amount' => 3, 'label' => '3 $', 'currency' => '$'], $usd['FLAT30']['discount_amount']);
         $this->assertNull($usd['TENPCT']['discount_amount']);
 
         $syp = collect($this->withHeader('currency', 'SYP')->mine()->assertOk()->json('data'))->keyBy('code');
-        $this->assertSame(['amount' => '30000', 'label' => '30,000 SYP', 'currency' => 'SYP'], $syp['FLAT30']['discount_amount']);
+        $this->assertSame(['amount' => 30000, 'label' => '30,000 SYP', 'currency' => 'SYP'], $syp['FLAT30']['discount_amount']);
     }
 
     public function test_an_item_needs_its_purpose(): void

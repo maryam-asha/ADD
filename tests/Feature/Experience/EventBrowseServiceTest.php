@@ -141,10 +141,10 @@ class EventBrowseServiceTest extends TestCase
                     'is_free',
                     'pricing' => [
                         'points',
-                        'points_label',
                         'price',
-                        'price_label',
                         'currency',
+                        'unit',
+                        'unit_label',
                     ],
                     'is_registered',
                     'can_register',
@@ -173,9 +173,10 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('Brand Building Masterclass', $paidItem['title']);
         $this->assertSame(150, $paidItem['pricing']['points']);
         $this->assertSame(15, $paidItem['pricing']['price']);
-        $this->assertSame('USD', $paidItem['pricing']['currency']);
-        $this->assertEquals('150 pts', $paidItem['pricing']['points_label']);
-        $this->assertEquals('15 $', $paidItem['pricing']['price_label']);
+        // The symbol beside the price, as the old label had it; no labels, and no unit for a ticket.
+        $this->assertSame('$', $paidItem['pricing']['currency']);
+        $this->assertNull($paidItem['pricing']['unit']);
+        $this->assertArrayNotHasKey('price_label', $paidItem['pricing']);
 
         // Check Full Event
         $fullItem = $data->firstWhere('id', $fullEvent->id);
@@ -188,8 +189,8 @@ class EventBrowseServiceTest extends TestCase
         $freeItemAr = collect($resAr->json('data'))->firstWhere('id', $freeEvent->id);
         $this->assertSame('أساسيات الشركات الناشئة', $freeItemAr['title']);
         $this->assertEquals(['id' => $category->id, 'name' => 'ورش عمل'], $freeItemAr['category']);
-        $this->assertSame('مجاني', $freeItemAr['pricing']['points_label']);
-        $this->assertSame('مجاني', $freeItemAr['pricing']['price_label']);
+        $this->assertTrue($freeItemAr['is_free']);
+        $this->assertSame(0, $freeItemAr['pricing']['price']);
     }
 
     public function test_translatable_fields_return_string_based_on_header_lang_and_not_both_languages(): void
@@ -449,7 +450,8 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('Startup Essentials Workshop', $guestRes->json('data.title'));
         $this->assertIsString($guestRes->json('data.description'));
         $this->assertSame('Join us for an interactive session covering the key steps to launch and grow your startup.', $guestRes->json('data.description'));
-        $this->assertSame('Free', $guestRes->json('data.pricing.points_label'));
+        $this->assertTrue($guestRes->json('data.is_free'));
+        $this->assertSame(0, $guestRes->json('data.pricing.points'));
         $this->assertTrue($guestRes->json('data.can_register'));
         $this->assertFalse($guestRes->json('data.is_registered'));
 
@@ -468,7 +470,7 @@ class EventBrowseServiceTest extends TestCase
         $this->assertSame('ورشة أساسيات الشركات الناشئة', $memberRes->json('data.title'));
         $this->assertIsString($memberRes->json('data.description'));
         $this->assertSame('انضم إلينا في جلسة تفاعلية تغطي الخطوات الرئيسية لإطلاق وتنمية شركتك الناشئة.', $memberRes->json('data.description'));
-        $this->assertSame('مجاني', $memberRes->json('data.pricing.points_label'));
+        $this->assertSame(0, $memberRes->json('data.pricing.points'));
         $this->assertTrue($memberRes->json('data.is_registered'));
     }
 

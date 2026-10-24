@@ -168,15 +168,16 @@ class MemberPaymentMethodsTest extends TestCase
         $response = $this->methods(['purpose' => 'plan_purchase', 'plan_id' => $plan->id])
             ->assertOk()
             ->assertJsonPath('data.amount_points', 1200)
-            ->assertJsonPath('data.methods.0.available', true);
+            ->assertJsonPath('data.methods.1.available', true);
 
         // Points or a card: there is no subscription without payment, so cash
-        // is shown only to send the member to reception.
-        $this->assertSame(['wallet', 'cash', 'paymera'], array_column($response->json('data.methods'), 'key'));
-        $response->assertJsonPath('data.methods.1.available', false)
-            ->assertJsonPath('data.methods.1.hint', __('api.payment.reception_only_hints.plan_purchase'));
+        // is shown only to send the member to reception — and, unavailable,
+        // first.
+        $this->assertSame(['cash', 'wallet', 'paymera'], array_column($response->json('data.methods'), 'key'));
+        $response->assertJsonPath('data.methods.0.available', false)
+            ->assertJsonPath('data.methods.0.hint', __('api.payment.reception_only_hints.plan_purchase'));
         // A plan bought here is the member's own: only their wallet pays.
-        $this->assertSame(['user'], array_column($response->json('data.methods.0.wallets'), 'owner_type'));
+        $this->assertSame(['user'], array_column($response->json('data.methods.1.wallets'), 'owner_type'));
     }
 
     public function test_a_gateway_added_in_config_appears_with_nothing_else_changed(): void

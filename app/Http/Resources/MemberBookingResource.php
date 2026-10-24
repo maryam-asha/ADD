@@ -4,6 +4,8 @@ namespace App\Http\Resources;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Time\LocalTime;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -11,7 +13,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /**
  * One card in the member's bookings list: what the card shows and nothing
  * more — the space's title and picture, the day and time lines, the status
- * badge, and whether it is paid.
+ * badge, whether it is paid, and the offer or coupon it was booked with
+ * (`discounts`).
  *
  * Everything else (the breakdown, the payment details, `status_note`,
  * cancel and extend) is MemberBookingDetailResource's. The list renders
@@ -25,6 +28,8 @@ use Illuminate\Http\Resources\Json\JsonResource;
  */
 class MemberBookingResource extends JsonResource
 {
+    use PreloadsAppliedDiscounts;
+
     /**
      * @return array<string, mixed>
      */
@@ -51,6 +56,9 @@ class MemberBookingResource extends JsonResource
             // district's offset like the detail's times.
             'payment_due_at' => app(LocalTime::class)->toLocal($booking->payment_due_at)?->toIso8601String(),
             'payment_state' => $booking->payment_state->value,
+            // What was taken off it — offer, coupon, plan discount — as it
+            // was when the price was locked (AppliedDiscountPresenter).
+            'discounts' => app(AppliedDiscountPresenter::class)->for($booking),
         ];
     }
 }

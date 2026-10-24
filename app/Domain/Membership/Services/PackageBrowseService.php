@@ -349,7 +349,7 @@ class PackageBrowseService
     private function formatPackage(Plan $plan, bool $isCurrent, ?User $user): array
     {
         $pricePoints = (int) $plan->price_points;
-        $pricing = $this->prices->plan($pricePoints, $user);
+        $pricing = $this->prices->plan($pricePoints, $plan->duration_days, $user);
 
         $name = $plan->translate('name') ?? 'Plan';
         $subtitle = $plan->translate('subtitle');
@@ -405,7 +405,7 @@ class PackageBrowseService
             'pricing' => $pricing,
             // The best offer live now for this member: what a purchase
             // opened now would cost them.
-            'sale' => $this->prices->sale($this->offers->planNow($plan, $user), $pricePoints, $user, false, 'api.package'),
+            'sale' => $this->prices->sale($this->offers->planNow($plan, $user), $pricePoints, $user, $pricing['unit'], 'api.package'),
             // What it saves against its reference plan or hourly rate — its
             // own price, not a discount; shown beside any offer.
             'saving' => $this->prices->saving($this->savings->for($plan), $user),

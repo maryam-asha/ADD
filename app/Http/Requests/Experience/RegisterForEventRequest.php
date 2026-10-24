@@ -37,8 +37,10 @@ class RegisterForEventRequest extends FormRequest
 
         return array_merge($form, [
             'ticket_id' => ['nullable', 'integer'],
-            // Omitted: the member's own wallet, as before payment methods.
-            // A card is paid after the seat is confirmed, like a booking.
+            // Required for a paid event — refused by the registration itself,
+            // once the price is known, so a coupon that makes it free asks for
+            // none; a free event never does. A card is paid after the seat is
+            // confirmed, like a booking.
             'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
             'wallet_owner_type' => ['nullable', 'string', Rule::in(['user', 'company']), 'required_with:wallet_owner_id'],
             'wallet_owner_id' => ['nullable', 'integer', 'required_with:wallet_owner_type'],

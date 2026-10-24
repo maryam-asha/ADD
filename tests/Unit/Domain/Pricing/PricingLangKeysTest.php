@@ -28,6 +28,10 @@ class PricingLangKeysTest extends TestCase
             'api.space.sale_discount_amount',
             'api.package.sale_discount_percent',
             'api.package.sale_discount_amount',
+            'api.price_unit.hour',
+            'api.price_unit.day',
+            'api.price_unit.week',
+            'api.price_unit.month',
             'api.admin.coupon_updated',
             'api.admin.coupon_target_invalid',
         ];

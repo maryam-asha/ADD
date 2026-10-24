@@ -469,6 +469,14 @@ return [
         'received_description' => 'دفعة مستلمة',
     ],
 
+    // ما يُحسب السعر عليه (unit_label بجانب أسعار المساحة والباقة والعرض والتوفير، الخالية من الوحدة).
+    'price_unit' => [
+        'hour' => 'ساعة',
+        'day' => 'يوم',
+        'week' => 'أسبوع',
+        'month' => 'شهر',
+    ],
+
     'space' => [
         'browse_title' => 'تصفح المساحات',
         'browse_subtitle' => 'ابحث واحجز مساحة العمل المناسبة ليومك.',
@@ -485,7 +493,6 @@ return [
             'space' => 'مساحة',
         ],
         'price_points' => ':points نقطة',
-        'per_hour' => 'ساعة',
         'sale_ends' => 'ينتهي العرض في :date',
         'sale_discount_percent' => 'خصم :percent%',
         'sale_discount_amount' => 'وفّر :amount',
@@ -533,7 +540,6 @@ return [
         'sale_discount_amount' => 'وفّر :amount',
         'saving_percent' => 'وفّر :percent%',
         'saving_amount' => 'وفّر :amount',
-        'per_unit' => ':amount لكل :unit',
         // التوفير بجملة كاملة (saving_description).
         'saving_description' => 'احصل على :quantity بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit :per.',
         'saving_description_plain' => 'احصل عليها بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit لكل :unit.',
@@ -565,7 +571,6 @@ return [
         'view_details' => 'عرض التفاصيل',
         'benefits_title' => 'مزايا الباقة',
         'expires_on' => 'ينتهي في :date',
-        'per_month' => 'شهرياً',
         'points_unit' => 'نقطة',
         'billing_cycle' => 'الدورة الحالية: :start – :end',
         'usage_title' => 'استخدامك خلال هذه الدورة',
@@ -630,6 +635,7 @@ return [
         'not_yet_open' => 'يبدأ التسجيل في هذه الفعالية بتاريخ :date.',
         'already_registered' => 'أنت مسجل بالفعل في هذه الفعالية.',
         'full' => 'عذراً، هذه الفعالية ممتلئة وجميع المقاعد محجوزة بالكامل.',
+        'payment_method_required' => 'اختر طريقة الدفع لهذه الفعالية المدفوعة.',
         'insufficient_points' => 'رصيدك الحالي :current نقطة، بينما تكلفة التسجيل هي :required نقطة (ينقصك :shortage نقطة).',
         'registration_success' => 'تم التسجيل في الفعالية بنجاح.',
         'registration_success_points' => 'تم التسجيل في الفعالية بنجاح وتم خصم :points نقطة من محفظتك.',

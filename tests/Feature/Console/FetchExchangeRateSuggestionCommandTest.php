@@ -20,11 +20,11 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
         Http::preventStrayRequests();
     }
 
-    private function fakeBody(int $sell, int $buy): array
+    private function fakeBody(float $sell, float $buy): array
     {
         return [
             'ok' => true,
-            'data' => ['currencies' => [
+            'data' => ['unit' => 'new', 'currencies' => [
                 ['code' => 'USD', 'cities' => ['damascus' => ['buy' => $buy, 'sell' => $sell]]],
             ]],
         ];
@@ -32,12 +32,12 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
     public function test_a_successful_response_creates_a_pending_suggestion_with_the_exact_sell_price(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(13275, 13225), 200)]);
+        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(132.75, 132.25), 200)]);
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
 
         $this->assertDatabaseHas('exchange_rate_suggestions', [
-            'rate_usd_to_syp' => '13275.0000000000',
+            'rate_usd_to_syp' => '132.7500000000',
             'status' => ExchangeRateSuggestionStatus::Pending->value,
             'source' => 'sp_today',
         ]);
@@ -45,7 +45,7 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
     public function test_sell_below_buy_creates_no_suggestion_and_logs_an_error(): void
     {
-        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(13000, 13225), 200)]);
+        Http::fake(['api-v2.sp-today.com/*' => Http::response($this->fakeBody(130, 132.25), 200)]);
         Log::spy();
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
@@ -58,7 +58,7 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
     {
         Http::fake(['api-v2.sp-today.com/*' => Http::response([
             'ok' => true,
-            'data' => ['currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['buy' => 13225]]]]],
+            'data' => ['unit' => 'new', 'currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['buy' => 132.25]]]]],
         ], 200)]);
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
@@ -70,7 +70,7 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
     {
         Http::fake(['api-v2.sp-today.com/*' => Http::response([
             'ok' => true,
-            'data' => ['currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['buy' => 13225, 'sell' => 'not-a-number']]]]],
+            'data' => ['unit' => 'new', 'currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['buy' => 132.25, 'sell' => 'not-a-number']]]]],
         ], 200)]);
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
@@ -91,7 +91,7 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
     {
         Http::fake(['api-v2.sp-today.com/*' => Http::response([
             'ok' => true,
-            'data' => ['currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['sell' => 13275, 'buy' => 'not-a-number']]]]],
+            'data' => ['unit' => 'new', 'currencies' => [['code' => 'USD', 'cities' => ['damascus' => ['sell' => 132.75, 'buy' => 'not-a-number']]]]],
         ], 200)]);
 
         $this->artisan('finance:fetch-exchange-rate-suggestion')->assertExitCode(0);
@@ -123,9 +123,9 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
         Http::fake(['api-v2.sp-today.com/*' => function () use (&$callCount) {
             $callCount++;
             if ($callCount === 1) {
-                return Http::response($this->fakeBody(13275, 13225), 200);
+                return Http::response($this->fakeBody(132.75, 132.25), 200);
             } else {
-                return Http::response($this->fakeBody(13400, 13350), 200);
+                return Http::response($this->fakeBody(134, 133.5), 200);
             }
         }]);
 
@@ -136,6 +136,6 @@ class FetchExchangeRateSuggestionCommandTest extends TestCase
 
         $this->assertSame(ExchangeRateSuggestionStatus::Superseded, $first->refresh()->status);
         $this->assertSame(1, ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)->count());
-        $this->assertSame('13400.0000000000', ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)->sole()->rate_usd_to_syp);
+        $this->assertSame('134.0000000000', ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)->sole()->rate_usd_to_syp);
     }
 }

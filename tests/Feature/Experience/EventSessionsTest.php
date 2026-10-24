@@ -10,6 +10,7 @@ use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -166,6 +167,24 @@ class EventSessionsTest extends TestCase
             ->pluck('id');
 
         $this->assertTrue($ids->contains($event->id));
+    }
+
+    /**
+     * MySQL (ONLY_FULL_GROUP_BY) refuses an ORDER BY beside MIN()/MAX() with
+     * no GROUP BY; SQLite does not, so the SQL itself is checked.
+     */
+    public function test_deriving_the_envelope_does_not_order_its_aggregate(): void
+    {
+        $event = Event::factory()->create();
+        EventSession::factory()->for($event)->on('2027-03-01', '09:00', '17:00')->create();
+
+        DB::enableQueryLog();
+        app(EventSchedule::class)->syncEnvelope($event);
+
+        $aggregate = collect(DB::getQueryLog())->pluck('query')->first(fn (string $sql) => str_contains($sql, 'MIN(start_at)'));
+
+        $this->assertNotNull($aggregate);
+        $this->assertStringNotContainsStringIgnoringCase('order by', $aggregate);
     }
 
     // ── Editing semantics ────────────────────────────────────────────────

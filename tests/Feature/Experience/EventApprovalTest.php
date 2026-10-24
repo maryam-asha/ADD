@@ -62,7 +62,7 @@ class EventApprovalTest extends TestCase
         $event = Event::factory()->requiresApproval()->paid(150)->create();
 
         Sanctum::actingAs($user, ['*']);
-        $response = $this->postJson("/api/v1/member/events/{$event->id}/register");
+        $response = $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet']);
 
         $response->assertCreated();
         $this->assertSame('pending', $response->json('data.status'));
@@ -84,7 +84,7 @@ class EventApprovalTest extends TestCase
         $event = Event::factory()->requiresApproval()->paid(150)->create();
 
         Sanctum::actingAs($user, ['*']);
-        $this->postJson("/api/v1/member/events/{$event->id}/register")->assertCreated();
+        $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet'])->assertCreated();
         $attendee = EventAttendee::firstOrFail();
 
         Sanctum::actingAs($this->admin(), ['*']);
@@ -108,7 +108,7 @@ class EventApprovalTest extends TestCase
         $event = Event::factory()->requiresApproval()->paid(150)->create();
 
         Sanctum::actingAs($user, ['*']);
-        $this->postJson("/api/v1/member/events/{$event->id}/register")->assertCreated();
+        $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet'])->assertCreated();
         $attendee = EventAttendee::firstOrFail();
 
         // They spend it elsewhere before anyone reviews the request.
@@ -131,7 +131,7 @@ class EventApprovalTest extends TestCase
         $event = Event::factory()->requiresApproval()->paid(150)->create();
 
         Sanctum::actingAs($user, ['*']);
-        $this->postJson("/api/v1/member/events/{$event->id}/register")->assertCreated();
+        $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet'])->assertCreated();
         $attendee = EventAttendee::firstOrFail();
 
         Sanctum::actingAs($this->admin(), ['*']);
@@ -247,7 +247,7 @@ class EventApprovalTest extends TestCase
         $event = Event::factory()->paid(150)->create();
 
         Sanctum::actingAs($user, ['*']);
-        $response = $this->postJson("/api/v1/member/events/{$event->id}/register");
+        $response = $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'wallet']);
 
         $response->assertCreated();
         $this->assertSame('approved', $response->json('data.status'));

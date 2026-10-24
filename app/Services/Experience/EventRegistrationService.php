@@ -183,6 +183,16 @@ class EventRegistrationService
             $quote = $this->quotes->forEvent($lockedEvent, $user, $coupon);
             $pricePoints = $quote->finalPoints;
             $madeFree = $isPaidEvent && $pricePoints === 0;
+
+            // A paid event is paid by the method the member chose, never by
+            // the wallet for want of one. Only a free event, or one a coupon
+            // made free, asks for none.
+            if ($isPaidEvent && ! $madeFree && $paymentMethod === null) {
+                throw ValidationException::withMessages([
+                    'payment_method' => [__('api.event.payment_method_required')],
+                ]);
+            }
+
             $method = $paymentMethod ?? WalletMethod::KEY;
             $pointsDeducted = 0;
 
@@ -224,7 +234,7 @@ class EventRegistrationService
             $this->recorder->record($quote, $attendee, $user, PricingPurpose::EventRegistration);
 
             if ($status === EventRegistrationStatus::Approved && $isPaidEvent && ! $madeFree && $method === WalletMethod::KEY) {
-                $pointsDeducted = $this->payFromWallet($attendee, $user, $pricePoints, $paymentMethod === null, $walletOwnerType, $walletOwnerId);
+                $pointsDeducted = $this->payFromWallet($attendee, $user, $pricePoints, $walletOwnerType, $walletOwnerId);
             }
 
             // Cash confirms the seat unpaid: the member is told they owe it.
@@ -278,9 +288,7 @@ class EventRegistrationService
      * Pays an approved registration from the wallet, now, through the one
      * payment path — a payment row naming the registration and the wallet.
      *
-     * An app that sends no method is paying the way it always did: from the
-     * member's own wallet, never asked to choose. One that says `wallet`
-     * chooses like a booking does (a company wallet among them).
+     * The wallet is chosen like a booking's (a company wallet among them).
      *
      * A wallet that falls short keeps the error this endpoint has always
      * given — the `points` validation message with the numbers.
@@ -293,7 +301,6 @@ class EventRegistrationService
         EventAttendee $attendee,
         User $user,
         int $pricePoints,
-        bool $asBefore,
         ?OwnerType $walletOwnerType,
         ?int $walletOwnerId,
     ): int {
@@ -306,11 +313,6 @@ class EventRegistrationService
             $attendee->forceFill(['payment_state' => EventPaymentState::Paid, 'paid_at' => now()])->save();
 
             return 0;
-        }
-
-        if ($asBefore) {
-            $walletOwnerType = OwnerType::User;
-            $walletOwnerId = $user->id;
         }
 
         try {

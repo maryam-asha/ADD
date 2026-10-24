@@ -33,7 +33,8 @@ class FormFieldResource extends JsonResource
                            ?? $opt['value'],
                 ])->values();
             }),
-            'validation' => $this->validation,
+            // Always an object: an empty PHP array would encode as `[]`.
+            'validation' => (object) ($this->validation ?? []),
             'is_required' => (bool) $this->is_required,
             'is_active' => (bool) $this->is_active,
             'order' => $this->order,

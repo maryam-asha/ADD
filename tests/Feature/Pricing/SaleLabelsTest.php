@@ -86,11 +86,17 @@ class SaleLabelsTest extends TestCase
         // How much the offer takes off, per hour like the rate it discounts.
         $this->assertSame(20, $sale['discount_points']);
         $this->assertSame(20, $sale['discount_percent']);
-        $this->assertStringContainsString('/', $sale['discount_amount_label']);
         $this->assertSame(__('api.space.sale_discount_percent', ['percent' => 20], 'en'), $sale['discount_label']);
-        $this->assertStringContainsString('/', $sale['original_label']);
-        $this->assertStringContainsString('/', $sale['sale_label']);
-        $this->assertNotSame($sale['original_label'], $sale['sale_label']);
+        // Numbers in the display currency (point.rate_usd 0.10), beside its symbol and the hour; no labels.
+        $this->assertSame(8, $sale['price']);
+        $this->assertSame(10, $sale['original_price']);
+        $this->assertSame(2, $sale['discount_amount']);
+        $this->assertSame('hour', $sale['unit']);
+        $this->assertSame('hour', $sale['unit_label']);
+        $this->assertNotEmpty($sale['currency']);
+        foreach (['original_label', 'sale_label', 'discount_amount_label'] as $label) {
+            $this->assertArrayNotHasKey($label, $sale);
+        }
         $this->assertSame(__('api.space.sale_ends', ['date' => '2026-10-11 10:00'], 'en'), $sale['ends_label']);
 
         $card = collect($this->fetch('/api/v1/member/spaces')->json('data.spaces'))->firstWhere('id', $space->id);
@@ -156,7 +162,9 @@ class SaleLabelsTest extends TestCase
 
         $this->assertSame(5, $sale['discount_points']);
         $this->assertSame(0, $sale['discount_percent']);
-        $this->assertSame(__('api.package.sale_discount_amount', ['amount' => $sale['discount_amount_label']], 'en'), $sale['discount_label']);
+        $this->assertSame(0.5, $sale['discount_amount']);
+        $this->assertStringContainsString($sale['currency'], $sale['discount_label']);
+        $this->assertNotSame(__('api.package.sale_discount_percent', ['percent' => 0], 'en'), $sale['discount_label']);
     }
 
     public function test_a_package_with_an_offer_shows_it(): void
@@ -174,6 +182,9 @@ class SaleLabelsTest extends TestCase
         $this->assertSame(16, $sale['discount_percent']);
         $this->assertSame(__('api.package.sale_discount_percent', ['percent' => 16], 'en'), $sale['discount_label']);
         $this->assertSame(__('api.package.sale_ends', ['date' => '2026-10-07 10:00'], 'en'), $sale['ends_label']);
+        // Per the plan's period, like its rate: a 30-day plan is per month.
+        $this->assertSame('month', $sale['unit']);
+        $this->assertSame('month', $sale['unit_label']);
     }
 
     public function test_an_event_with_an_offer_shows_it(): void
@@ -190,6 +201,9 @@ class SaleLabelsTest extends TestCase
         $this->assertSame(25, $sale['discount_percent']);
         $this->assertSame(__('api.event.sale_discount_percent', ['percent' => 25], 'en'), $sale['discount_label']);
         $this->assertSame(__('api.event.sale_ends', ['date' => '2026-10-07 10:00'], 'en'), $sale['ends_label']);
+        // A ticket is not per anything.
+        $this->assertNull($sale['unit']);
+        $this->assertNull($sale['unit_label']);
 
         $card = collect($this->fetch('/api/v1/member/events')->json('data'))->firstWhere('id', $event->id);
         $this->assertSame(75, $card['sale']['points']);

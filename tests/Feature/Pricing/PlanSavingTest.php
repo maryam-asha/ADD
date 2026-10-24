@@ -281,8 +281,14 @@ class PlanSavingTest extends TestCase
         $this->assertSame(600, $data['saving']['saving_points']);
         $this->assertSame(40, $data['saving']['saving_percent']);
         $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $data['saving']['saving_label']);
-        $this->assertNotEmpty($data['saving']['per_unit_label']);
-        $this->assertNotEmpty($data['saving']['reference_label']);
+        // Numbers beside the currency symbol and the reference plan's month; no labels.
+        $this->assertSame(1500, $data['saving']['reference_points']);
+        $this->assertSame(75, $data['saving']['per_unit_points']);
+        $this->assertNotEmpty($data['saving']['currency']);
+        $this->assertSame('month', $data['saving']['unit']);
+        $this->assertSame('month', $data['saving']['unit_label']);
+        $this->assertArrayNotHasKey('per_unit_label', $data['saving']);
+        $this->assertArrayNotHasKey('reference_label', $data['saving']);
     }
 
     public function test_a_package_without_a_reference_has_no_saving(): void

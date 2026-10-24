@@ -31,6 +31,7 @@ use App\Http\Requests\Member\ListMembershipsRequest;
 use App\Http\Requests\Member\StoreMembershipRequest;
 use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MembershipResource;
+use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\CouponOutcomePresenter;
 use App\Support\Time\LocalTime;
 use Carbon\CarbonInterface;
@@ -66,13 +67,22 @@ class MembershipController extends Controller
      * cash is not a membership, and `data` keeps its shape for old apps.
      * Plans no longer take cash; this shows a hold opened before that until
      * reception settles it or it lapses (payments:expire-pending).
+     *
+     * `applied_discounts` is what was taken off when it was bought — offer,
+     * coupon, the plan's saving — beside `discounts`, which are the plan's
+     * own discounts on bookings.
      */
-    public function current(Request $request, PackageBrowseService $service): JsonResponse
+    public function current(Request $request, PackageBrowseService $service, AppliedDiscountPresenter $discounts): JsonResponse
     {
         $pending = $this->pendingCashPurchase($request->user());
+        $data = $service->getCurrentSubscription($request->user());
+
+        if ($data !== null) {
+            $data['applied_discounts'] = $this->purchaseDiscounts([$data['membership_id']], $discounts)[$data['membership_id']];
+        }
 
         return response()->json([
-            'data' => $service->getCurrentSubscription($request->user()),
+            'data' => $data,
             'pending_purchase' => $pending === null ? null : new PaymentResource($pending),
         ]);
     }
@@ -85,9 +95,10 @@ class MembershipController extends Controller
      * ahead), `active` until `current_period_end`, then `expired`;
      * `is_current` marks the one memberships/current shows (the member's own
      * active plan first, else a company's), on no row once all have ended.
+     * `discounts` is what was taken off when it was bought.
      * Filters: `status`, `via`, `per_page`.
      */
-    public function index(ListMembershipsRequest $request, MembershipResolver $memberships): JsonResponse
+    public function index(ListMembershipsRequest $request, MembershipResolver $memberships, AppliedDiscountPresenter $discounts): JsonResponse
     {
         $member = $request->user();
         $companies = $member->companies()->get()->keyBy('id');
@@ -105,6 +116,7 @@ class MembershipController extends Controller
             ->orderByDesc('current_period_start')
             ->orderByDesc('id')
             ->paginate((int) ($request->validated('per_page') ?? 20));
+        $applied = $this->purchaseDiscounts(collect($paginator->items())->map->getKey()->all(), $discounts);
 
         return response()->json([
             'data' => collect($paginator->items())->map(fn (Membership $membership) => [
@@ -120,6 +132,7 @@ class MembershipController extends Controller
                 'desks' => $membership->seatDesks->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values(),
                 'current_period_start' => $membership->current_period_start->toIso8601String(),
                 'current_period_end' => $membership->current_period_end->toIso8601String(),
+                'discounts' => $applied[$membership->id],
             ])->values(),
             'meta' => [
                 'current_page' => $paginator->currentPage(),
@@ -128,6 +141,25 @@ class MembershipController extends Controller
                 'total' => $paginator->total(),
             ],
         ]);
+    }
+
+    /**
+     * What was taken off each membership when it was bought — offer, coupon,
+     * the plan's saving — read from the payment that bought it, in one query
+     * for the page. A membership no payment bought (a renewal, one granted by
+     * staff) has none.
+     *
+     * @param  list<int>  $membershipIds
+     * @return array<int, list<array<string, mixed>>> keyed by membership id
+     */
+    private function purchaseDiscounts(array $membershipIds, AppliedDiscountPresenter $discounts): array
+    {
+        $payments = Payment::query()->whereIn('membership_id', $membershipIds)->orderBy('id')->get()->keyBy('membership_id');
+        $discounts->preload($payments);
+
+        return collect($membershipIds)
+            ->mapWithKeys(fn (int $id) => [$id => $payments->has($id) ? $discounts->for($payments->get($id)) : []])
+            ->all();
     }
 
     public function store(

@@ -66,8 +66,9 @@ class MemberBookingDetailResource extends JsonResource
                 'main_image' => $space->main_image,
                 'branch' => $space->building?->branch?->translate('name', $locale),
                 'capacity' => $space->capacity,
+                // One string, unit included: there is no unit field beside it.
                 'hourly_price' => $space->hourly_rate_points !== null
-                    ? $prices->hourly((int) $space->hourly_rate_points, $viewer, $locale)['price_label']
+                    ? $prices->total((int) $space->hourly_rate_points, $viewer, $locale)['price'].' / '.__('api.price_unit.hour', [], $locale)
                     : null,
             ],
             // Where to go on arrival: a co-working booking may sit in a room

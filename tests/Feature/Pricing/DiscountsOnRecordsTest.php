@@ -7,6 +7,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Pricing\Enums\DiscountKind;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Models\Coupon;
@@ -22,9 +23,11 @@ use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
- * Every booking, registration and payment says what was taken off it — the
- * offer, the coupon, the plan discount — as it was when the price was
- * locked: renaming or changing the offer later does not rewrite it.
+ * Every booking, registration, subscription and payment says what was taken
+ * off it — the offer, the coupon, the plan discount — as it was when the
+ * price was locked: renaming or changing the offer later does not rewrite it.
+ * The member reads it in every list of their own: bookings, subscriptions,
+ * events, a co-working session's report, payments.
  */
 class DiscountsOnRecordsTest extends TestCase
 {
@@ -85,6 +88,69 @@ class DiscountsOnRecordsTest extends TestCase
         $this->getJson("/api/v1/member/bookings/{$booking->id}")->assertOk()->assertJsonPath('data.discounts', []);
     }
 
+    public function test_the_members_bookings_list(): void
+    {
+        $booking = Booking::factory()->create(['user_id' => $this->member->id, 'status' => BookingStatus::Confirmed]);
+        $this->applyOffer($booking, PricingPurpose::Booking);
+        Sanctum::actingAs($this->member, ['*']);
+
+        $this->getJson('/api/v1/member/bookings')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $booking->id)
+            ->assertJsonPath('data.0.discounts.0.offer_id', $this->offer->id);
+    }
+
+    /** A subscription's discounts are its purchase's: the payment that bought it. */
+    public function test_a_subscription_names_what_was_taken_off_its_purchase(): void
+    {
+        $membership = Membership::factory()->create(['owner_id' => $this->member->id]);
+        $this->applyOffer(Payment::factory()->create(['user_id' => $this->member->id, 'membership_id' => $membership->id]), PricingPurpose::PlanPurchase);
+        // One no payment bought (a renewal, one granted by staff).
+        $granted = Membership::factory()->create(['owner_id' => $this->member->id, 'current_period_start' => now()->subDays(60), 'current_period_end' => now()->subDays(30)]);
+        Sanctum::actingAs($this->member, ['*']);
+
+        $rows = collect($this->getJson('/api/v1/member/memberships')->assertOk()->json('data'))->keyBy('id');
+        $this->assertSame($this->offer->id, $rows[$membership->id]['discounts'][0]['offer_id']);
+        $this->assertSame([], $rows[$granted->id]['discounts']);
+
+        // Beside `discounts`, the plan's own discounts on bookings.
+        $this->getJson('/api/v1/member/memberships/current')
+            ->assertOk()
+            ->assertJsonPath('data.membership_id', $membership->id)
+            ->assertJsonPath('data.applied_discounts.0.offer_id', $this->offer->id);
+    }
+
+    public function test_my_events_and_the_event_name_what_was_taken_off_the_registration(): void
+    {
+        $attendee = EventAttendee::factory()->create(['user_id' => $this->member->id, 'email' => $this->member->email]);
+        $this->applyOffer($attendee, PricingPurpose::EventRegistration);
+        Sanctum::actingAs($this->member, ['*']);
+
+        $this->getJson('/api/v1/member/events/my-events')
+            ->assertOk()
+            ->assertJsonPath('data.0.registration.discounts.0.offer_id', $this->offer->id);
+        $this->getJson("/api/v1/member/events/{$attendee->event_id}")
+            ->assertOk()
+            ->assertJsonPath('data.discounts.0.offer_id', $this->offer->id);
+    }
+
+    public function test_a_coworking_session_report(): void
+    {
+        $booking = Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'start_at' => now()->subHours(2),
+            'end_at' => now(),
+            'checked_in_at' => now()->subHours(2),
+            'checked_out_at' => now()->subHour(),
+        ]);
+        $this->applyOffer($booking, PricingPurpose::Booking);
+        Sanctum::actingAs($this->member, ['*']);
+
+        $this->getJson("/api/v1/member/coworking-sessions/booking/{$booking->id}/report")
+            ->assertOk()
+            ->assertJsonPath('data.totals.discounts.0.offer_id', $this->offer->id);
+    }
+
     public function test_the_dashboard_booking_list_and_detail(): void
     {
         $booking = Booking::factory()->create(['user_id' => $this->member->id, 'status' => BookingStatus::Confirmed]);
@@ -140,7 +206,8 @@ class DiscountsOnRecordsTest extends TestCase
         $event = EventAttendee::factory()->create(['user_id' => $this->member->id])->event;
         foreach (range(1, 3) as $n) {
             $this->applyOffer(Booking::factory()->create(['user_id' => $this->member->id]), PricingPurpose::Booking);
-            $this->applyOffer(Payment::factory()->create(['user_id' => $this->member->id]), PricingPurpose::PlanPurchase);
+            $membership = Membership::factory()->create(['owner_id' => $this->member->id]);
+            $this->applyOffer(Payment::factory()->create(['user_id' => $this->member->id, 'membership_id' => $membership->id]), PricingPurpose::PlanPurchase);
             $this->applyOffer(EventAttendee::factory()->create(['event_id' => $event->id, 'user_id' => $this->member->id]), PricingPurpose::EventRegistration);
         }
 
@@ -155,11 +222,14 @@ class DiscountsOnRecordsTest extends TestCase
         }
 
         Sanctum::actingAs($this->member, ['*']);
-        $reads = 0;
-        DB::listen(function (QueryExecuted $query) use (&$reads) {
-            $reads += str_contains($query->sql, 'applied_discounts') ? 1 : 0;
-        });
-        $this->getJson('/api/v1/member/payments')->assertOk();
-        $this->assertLessThanOrEqual(1, $reads, 'member/payments');
+        foreach (['/api/v1/member/payments', '/api/v1/member/bookings', '/api/v1/member/memberships', '/api/v1/member/events/my-events'] as $url) {
+            $reads = 0;
+            DB::listen(function (QueryExecuted $query) use (&$reads) {
+                $reads += str_contains($query->sql, 'applied_discounts') ? 1 : 0;
+            });
+            $this->getJson($url)->assertOk();
+            $this->assertLessThanOrEqual(1, $reads, $url);
+            DB::getEventDispatcher()->forget(QueryExecuted::class);
+        }
     }
 }

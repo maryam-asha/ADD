@@ -15,7 +15,8 @@ use Illuminate\Support\Facades\Log;
  * docs/decisions/exchange-rate-external-suggestion.md records the Phase 0
  * findings this class implements: the real base path (api/v1, not the
  * originally-assumed api-dashboard path), and that "damascus" is sp-today's
- * nationwide rate — there is no Aleppo-specific one.
+ * nationwide rate — there is no Aleppo-specific one. Rates are asked for, and
+ * only accepted, in the new (redenominated) lira: `unit=new`.
  */
 class SpTodayRateClient
 {
@@ -37,7 +38,9 @@ class SpTodayRateClient
             // caller — including the scheduled-only usage guard's callers,
             // which only catch \Throwable but still rely on this message.
             ->retry(2, 2000, throw: false)
-            ->get('/currencies');
+            // The redenominated lira: without it sp-today answers in the old
+            // one, 100 times larger (13975 for 139.75).
+            ->get('/currencies', ['unit' => 'new']);
 
         if (! $response->successful()) {
             throw new \RuntimeException("sp-today request failed with status {$response->status()}");
@@ -51,6 +54,12 @@ class SpTodayRateClient
 
         if (($body['ok'] ?? null) !== true) {
             throw new \RuntimeException('sp-today response did not report ok=true');
+        }
+
+        // Refused rather than divided by 100: a rate in the old lira would
+        // price everything a hundred times off.
+        if (($body['data']['unit'] ?? null) !== 'new') {
+            throw new \RuntimeException('sp-today response is not in the new lira (unit='.json_encode($body['data']['unit'] ?? null).')');
         }
 
         $usd = collect($body['data']['currencies'] ?? [])->firstWhere('code', 'USD');

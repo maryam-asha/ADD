@@ -14,9 +14,9 @@ use Illuminate\Database\Eloquent\Model;
 
 /**
  * What the app shows before a member pays for something: how much it costs
- * in points, and every enabled method that can pay for it — in config order,
- * so a gateway added to config/payments.php appears here with no other
- * change — each saying whether it can pay right now and, if not, why, and
+ * in points, and every enabled method that can pay for it — the unavailable
+ * ones first, then in config order, so a gateway added to
+ * config/payments.php appears here with no other change — each saying whether it can pay right now and, if not, why, and
  * `hint`: what the member does next, when the label alone does not say.
  *
  * Cash cannot pay for a top-up or a plan from the app, but reception takes
@@ -71,6 +71,10 @@ class PaymentMethodOptions
 
             $methods[] = $option;
         }
+
+        // The unavailable ones first, each group still in config order
+        // (usort is stable).
+        usort($methods, fn (array $a, array $b) => $a['available'] <=> $b['available']);
 
         return ['amount_points' => $points, 'methods' => $methods];
     }
