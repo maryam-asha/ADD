@@ -1,6 +1,7 @@
 <?php
 
 use Add\Hr\Hr;
+use Add\Inventory\Inventory;
 use App\Domain\Forms\Models\Form;
 use App\Domain\Forms\Models\FormSubmission;
 use App\Domain\Identity\Models\PendingRegistration;
@@ -137,3 +138,10 @@ Schedule::command('renewals:run')->hourly()->withoutOverlapping();
  * (routes/<module>/schedule.php) so a module brings its jobs with it.
  */
 Hr::schedule();
+
+/*
+ * Inventory (packages/add/inventory): announces maintenance coming due and
+ * warranties about to end, each once, to holders of
+ * inventory.assets.maintenance.
+ */
+Inventory::schedule();

@@ -3,7 +3,7 @@
 namespace App\Domain\Foundation\Enums;
 
 /**
- * Shared by `spaces` and `resources` (PRD decision #8 / §5.6). Never
+ * The status of a space (PRD decision #8 / §5.6). Never
  * escalates across the hierarchy — a Floor or Zone going into maintenance
  * means setting this on every Space underneath it individually, not a
  * flag anywhere above Space.

@@ -44,6 +44,7 @@ return [
         // The member's wallet history (WalletTransactionPresenter): what
         // each row was, and the pool it moved.
         'kinds' => [
+            'item_sale' => 'مشتريات من الاستقبال',
             'booking' => 'حجز',
             'booking_extension' => 'تمديد حجز',
             'coworking_session' => 'جلسة عمل مشترك',
@@ -140,8 +141,7 @@ return [
         'space_status_updated' => 'تم تحديث حالة المساحة.',
         'space_amenities_updated' => 'تم تحديث مرافق المساحة.',
         'space_type_amenities_updated' => 'تم تحديث وسائل الراحة.',
-        'resource_updated' => 'تم تحديث المورد.',
-        'resource_status_updated' => 'تم تحديث حالة المورد.',
+        'amenity_updated' => 'تم تحديث الميزة.',
         'seat_desk_updated' => 'تم تحديث المقعد/المكتب.',
         'seat_desk_code_taken' => 'يوجد مقعد آخر في هذا الفرع بنفس الكود.',
         'seat_desk_held' => 'هذا المقعد مرتبط باشتراك مكتب مخصص فعّال.',
@@ -219,6 +219,7 @@ return [
     ],
 
     'reception' => [
+        'stock_location_required' => 'اختر الموقع الذي تُصرف منه المادة، أو افتح صندوقاً في فرعك.',
         'checked_in' => 'تم تسجيل الدخول.',
         'checked_out' => 'تم تسجيل الخروج.',
         'cancelled' => 'تم إلغاء الحجز.',
@@ -512,16 +513,6 @@ return [
             'business' => 'مكتب خاص هادئ ومخصص يوفر أقصى درجات التركيز والخصوصية والراحة والأمان.',
             'event_hall' => 'قاعة واسعة ومتعددة الاستخدامات مجهزة بأحدث التقنيات الصوتية والمرئية، مثالية للمؤتمرات وورش العمل الكبرى والفعاليات.',
         ],
-        'amenities' => [
-            'wifi' => 'واي فاي',
-            'power_outlet' => 'مقابس كهربائية',
-            'printing' => 'خدمة الطباعة',
-            'ergonomic_chairs' => 'كراسي مريحة',
-            'locker' => 'خزانة',
-            'cafe_access' => 'خدمة الكافيه',
-            'ac' => 'تكييف الهواء',
-            'stage' => 'منصة',
-        ],
     ],
 
     'membership' => [
@@ -780,4 +771,12 @@ return [
         'benefit_points_whole' => 'نقاط المحفظة أعداد صحيحة، و:amount ليس كذلك.',
         'benefit_wallet_description' => 'ميزة موظف: :benefit',
     ],
+
+    // Selling stock at reception (App\Domain\Retail).
+    'item_sale' => [
+        'description' => 'مشتريات رقم :id من الاستقبال',
+        'not_stock' => 'لا يُباع إلا ما هو من المخزون.',
+        'sale_item_updated' => 'تم تحديث مادة البيع.',
+    ],
+
 ];

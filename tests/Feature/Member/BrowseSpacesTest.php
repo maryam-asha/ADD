@@ -2,6 +2,10 @@
 
 namespace Tests\Feature\Member;
 
+use Add\Inventory\Assets\Enums\MaintenanceType;
+use Add\Inventory\Assets\Models\Asset;
+use Add\Inventory\Assets\Services\MaintenanceService;
+use Add\Inventory\Catalog\Models\Item;
 use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\BusinessHourException;
@@ -482,13 +486,12 @@ class BrowseSpacesTest extends TestCase
         $this->assertContains('Boardroom Nile', $titles);
     }
 
-    public function test_amenities_merge_space_amenities_and_equipment_resources(): void
+    public function test_amenities_merge_space_amenities_and_inventory_equipment(): void
     {
         $this->actingAsMember();
 
         // Wi-Fi is sourced from the space's SpaceAmenity rows (the seeded
-        // default co_space matrix), not a Resource row — a Hot Desk no
-        // longer has any Resource row categorized as an amenity.
+        // default co_space matrix).
         $hotDesk = Space::query()->where('space_type', 'co_space')->firstOrFail();
 
         $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=hot_desk');
@@ -505,17 +508,22 @@ class BrowseSpacesTest extends TestCase
         $this->assertSame('wifi', $detailAmenity['icon']);
         $this->assertSame('Wi-Fi', $detailAmenity['name']);
 
-        // Equipment still merges in alongside amenities — Meeting Room A's
-        // screen is a real, active Resource row, not a SpaceAmenity one.
-        $meetingRoom = Space::query()->where('space_type', 'room')->firstOrFail();
-        $screenResource = $meetingRoom->resources()->where('name', 'Presentation Screen')->firstOrFail();
+        // Equipment merges in alongside amenities — Meeting Room A's screen
+        // is an inventory asset in the room, in a category shown to members.
+        $screen = Item::query()->where('sku', 'like', 'DEMO-%')->get()->firstOrFail(fn (Item $item) => $item->name['en'] === 'Presentation Screen');
 
         $roomResponse = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
         $roomResponse->assertOk();
-        $screenAmenity = collect($roomResponse->json('data.spaces.0.amenities'))->firstWhere('key', 'screen');
+        $screenAmenity = collect($roomResponse->json('data.spaces.0.amenities'))->firstWhere('key', 'item_'.$screen->id);
         $this->assertNotNull($screenAmenity);
-        $this->assertSame($screenResource->name, $screenAmenity['label']);
+        $this->assertSame('Presentation Screen', $screenAmenity['label']);
         $this->assertSame('screen', $screenAmenity['icon']);
+
+        // An asset under repair drops off at once.
+        $asset = Asset::query()->where('item_id', $screen->id)->firstOrFail();
+        app(MaintenanceService::class)->open($asset, MaintenanceType::Corrective, 'Cracked');
+        $repaired = $this->withHeader('lang', 'en')->getJson('/api/v1/member/spaces?space_type=meeting_room');
+        $this->assertNull(collect($repaired->json('data.spaces.0.amenities'))->firstWhere('key', 'item_'.$screen->id));
 
         // Meeting Room A also carries its own `ac` SpaceAmenity row (seeded
         // `room` matrix) — both sources are present on the same card.

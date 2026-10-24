@@ -179,6 +179,7 @@ return [
             'event_registration' => 'an event registration',
             'coworking_session' => 'a coworking session',
             'booking_extension' => 'a booking extension',
+            'item_sale' => 'a purchase at reception',
         ],
     ],
 
@@ -257,6 +258,19 @@ return [
         'training_cancelled' => [
             'title' => 'Training cancelled',
             'body' => 'The :course_en session on :starts_on has been cancelled.',
+        ],
+    ],
+
+    // Inventory (packages/add/inventory), sent through
+    // App\Domain\Inventory\Adapters\AddInventoryNotifier.
+    'inventory' => [
+        'maintenance_due' => [
+            'title' => 'Maintenance due',
+            'body' => ':title for asset :asset is due on :date.',
+        ],
+        'warranty_ending' => [
+            'title' => 'Warranty ending',
+            'body' => 'The warranty of asset :asset ends on :date.',
         ],
     ],
 

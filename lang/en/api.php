@@ -44,6 +44,7 @@ return [
         // The member's wallet history (WalletTransactionPresenter): what
         // each row was, and the pool it moved.
         'kinds' => [
+            'item_sale' => 'Purchase at reception',
             'booking' => 'Booking',
             'booking_extension' => 'Booking extension',
             'coworking_session' => 'Coworking session',
@@ -140,8 +141,7 @@ return [
         'space_status_updated' => 'Space status updated.',
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
-        'resource_updated' => 'Resource updated.',
-        'resource_status_updated' => 'Resource status updated.',
+        'amenity_updated' => 'Amenity updated.',
         'seat_desk_updated' => 'Seat/desk updated.',
         'seat_desk_code_taken' => 'Another desk in this branch already has this code.',
         'seat_desk_held' => 'This desk belongs to a live Dedicated Desk subscription.',
@@ -219,6 +219,7 @@ return [
     ],
 
     'reception' => [
+        'stock_location_required' => 'Choose where the stock is taken from, or open a cash register at your branch.',
         'checked_in' => 'Checked in.',
         'checked_out' => 'Checked out.',
         'cancelled' => 'Booking cancelled.',
@@ -523,16 +524,6 @@ return [
             'business' => 'Quiet, dedicated private office designed for maximum focus, confidentiality, comfort, and security.',
             'event_hall' => 'Spacious and versatile hall equipped with modern AV technology, ideal for conferences, large workshops, and gatherings.',
         ],
-        'amenities' => [
-            'wifi' => 'Wi-Fi',
-            'power_outlet' => 'Power Outlets',
-            'printing' => 'Printing Access',
-            'ergonomic_chairs' => 'Ergonomic Chairs',
-            'locker' => 'Locker',
-            'cafe_access' => 'Cafe Access',
-            'ac' => 'Air Conditioning',
-            'stage' => 'Stage',
-        ],
     ],
 
     'membership' => [
@@ -794,4 +785,12 @@ return [
         'benefit_points_whole' => 'Wallet points are whole numbers; :amount is not.',
         'benefit_wallet_description' => 'Employee benefit: :benefit',
     ],
+
+    // Selling stock at reception (App\Domain\Retail).
+    'item_sale' => [
+        'description' => 'Purchase #:id at reception',
+        'not_stock' => 'Only stock items can be sold.',
+        'sale_item_updated' => 'Sale item updated.',
+    ],
+
 ];

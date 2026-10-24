@@ -1,6 +1,7 @@
 <?php
 
 use Add\Hr\Hr;
+use Add\Inventory\Inventory;
 use App\Http\Controllers\Api\V1\Paymera\PaymeraCallbackController;
 use Illuminate\Support\Facades\Route;
 
@@ -58,6 +59,15 @@ Route::prefix('v1')->group(function () {
 
     // A document file's only credential is its temporary signature.
     Route::prefix('hr')->middleware('throttle:60,1')->group(fn () => Hr::signedRoutes());
+
+    /*
+     * Inventory (packages/add/inventory): assets, stock and their catalog.
+     * Dashboard accounts behind the same 'abilities:dashboard' boundary, and
+     * like HR no 'role:' check — every route carries its own
+     * can:inventory.* permission, so a store keeper's custom role works
+     * without admin|operations.
+     */
+    Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('inventory')->group(fn () => Inventory::adminRoutes());
 
     /*
      * Paymera's two return paths. Unauthenticated by necessity: the gateway

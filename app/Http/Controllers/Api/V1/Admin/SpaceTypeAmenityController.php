@@ -10,7 +10,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
 /**
- * The type -> amenity config matrix: which AmenityType values are even
+ * The type -> amenity config matrix: which catalog amenities are even
  * selectable for a given SpaceType (docs/decisions -- amenities move off
  * Resource entirely; StoreSpaceRequest cross-checks a space's submitted
  * amenities against this table). Deliberately not extending

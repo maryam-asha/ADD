@@ -2,6 +2,10 @@
 
 namespace App\Domain\Membership\Services;
 
+use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Stock\Services\StockService;
+use Add\Inventory\Support\Decimal;
+use Add\Inventory\Support\Place;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Exceptions\InsufficientResourceQuotaException;
 use App\Domain\Membership\Models\Membership;
@@ -67,8 +71,13 @@ class ResourceQuotaService
      * for a first-time consume, whereas the grant row is guaranteed to
      * already exist. The ledger read is locked too, as defense-in-depth,
      * but the grant-row lock is what actually serializes concurrent calls.
+     *
+     * `$stockFrom`: where the stock the type uses up comes from (printing:
+     * paper), issued in the same transaction — a shelf that cannot cover it
+     * refuses the consumption too. Ignored for a type with no stock item,
+     * and left out by callers that record no physical use (plan hours).
      */
-    public function consume(PlanResourceGrant $grant, Membership $membership, float $quantity, User $recordedBy, ?string $note = null): ResourceConsumption
+    public function consume(PlanResourceGrant $grant, Membership $membership, float $quantity, User $recordedBy, ?string $note = null, ?Place $stockFrom = null): ResourceConsumption
     {
         if ($quantity <= 0) {
             throw new \InvalidArgumentException('ResourceQuotaService::consume() requires a positive quantity.');
@@ -76,7 +85,7 @@ class ResourceQuotaService
 
         $requested = number_format($quantity, 2, '.', '');
 
-        return DB::transaction(function () use ($grant, $membership, $requested, $recordedBy, $note) {
+        return DB::transaction(function () use ($grant, $membership, $requested, $recordedBy, $note, $stockFrom) {
             $lockedGrant = PlanResourceGrant::whereKey($grant->id)->lockForUpdate()->firstOrFail();
 
             $consumed = $this->sumConsumption($lockedGrant->id, $membership->id, lockForUpdate: true);
@@ -92,13 +101,27 @@ class ResourceQuotaService
                 ));
             }
 
-            return ResourceConsumption::create([
+            $consumption = ResourceConsumption::create([
                 'plan_resource_grant_id' => $lockedGrant->id,
                 'membership_id' => $membership->id,
                 'quantity' => $requested,
                 'recorded_by_user_id' => $recordedBy->id,
                 'note' => $note,
             ]);
+
+            $type = $lockedGrant->resourceType;
+
+            if ($stockFrom !== null && $type?->stockItem !== null) {
+                app(StockService::class)->issue(
+                    $type->stockItem,
+                    $stockFrom,
+                    Decimal::mul($requested, (string) $type->stock_units_per_unit),
+                    IssueReason::Consumption,
+                    new Place(ResourceConsumption::SOURCE, $consumption->id),
+                );
+            }
+
+            return $consumption;
         });
     }
 

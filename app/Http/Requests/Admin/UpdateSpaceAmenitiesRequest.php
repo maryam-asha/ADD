@@ -2,7 +2,6 @@
 
 namespace App\Http\Requests\Admin;
 
-use App\Domain\Foundation\Enums\AmenityType;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use Illuminate\Contracts\Validation\Validator;
@@ -25,14 +24,14 @@ class UpdateSpaceAmenitiesRequest extends FormRequest
             // `present`, not `required`: an empty array is the valid way to
             // clear every amenity this space has turned on.
             'amenities' => ['present', 'array'],
-            'amenities.*' => [Rule::enum(AmenityType::class)],
+            'amenities.*' => ['string', Rule::exists('amenities', 'key')->where('is_active', true)],
         ];
     }
 
     /**
      * Cross-checks submitted amenities against the target space's own
-     * `space_type` config (SpaceTypeAmenity) — an amenity that's a valid
-     * AmenityType value in general but not configured as applicable to
+     * `space_type` config (SpaceTypeAmenity) — an amenity that's in the
+     * catalog in general but not configured as applicable to
      * this space's space_type is still rejected. Same check
      * StoreSpaceRequest runs, but keyed off the route-bound Space's
      * space_type rather than a `space_type` field in the request body —
@@ -52,8 +51,7 @@ class UpdateSpaceAmenitiesRequest extends FormRequest
 
             $allowed = SpaceTypeAmenity::query()
                 ->where('space_type', $space->space_type)
-                ->get()
-                ->map(fn (SpaceTypeAmenity $row) => $row->amenity->value)
+                ->pluck('amenity')
                 ->all();
 
             foreach ($amenities as $amenity) {

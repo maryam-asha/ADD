@@ -6,6 +6,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Retail\Models\ItemSale;
 use App\Domain\Services\Models\ServiceRequest;
 use App\Domain\Services\Models\ServiceType;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -41,6 +42,8 @@ class MorphMapServiceProvider extends ServiceProvider
             'service_request' => ServiceRequest::class,
             'booking' => Booking::class,
             'walkin_session' => WalkinSession::class,
+            // A reception sale, as the payable of its payment.
+            ItemSale::SOURCE => ItemSale::class,
         ]);
     }
 }
