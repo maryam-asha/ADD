@@ -2,16 +2,21 @@
 
 namespace Database\Seeders;
 
+use Add\Inventory\Assets\Models\Asset;
+use Add\Inventory\Assets\Services\AssetService;
+use Add\Inventory\Catalog\Enums\ItemKind;
+use Add\Inventory\Catalog\Models\Category;
+use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Catalog\Models\Unit;
+use Add\Inventory\Support\Place;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
-use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Floor;
-use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\SpaceAmenity;
@@ -22,8 +27,8 @@ use Illuminate\Database\Seeder;
 class SpaceSeeder extends Seeder
 {
     /**
-     * Seeds spatial hierarchy, business hours, spaces, and resources
-     * matching the mobile app Browse Spaces interface.
+     * Seeds spatial hierarchy, business hours, spaces, their amenities and
+     * the equipment in them, matching the mobile app Browse Spaces interface.
      */
     public function run(): void
     {
@@ -107,12 +112,6 @@ class SpaceSeeder extends Seeder
             ]
         );
 
-        $this->seedResources($hotDesk, [
-            ['name' => 'High-Speed Wi-Fi', 'category' => ResourceCategory::Other, 'quantity' => 1],
-            ['name' => 'Desk Power Outlets', 'category' => ResourceCategory::Other, 'quantity' => 1],
-            ['name' => 'Café Access', 'category' => ResourceCategory::Other, 'quantity' => 1],
-        ]);
-
         for ($i = 1; $i <= 10; $i++) {
             SeatDesk::query()->firstOrCreate(
                 ['space_id' => $hotDesk->id, 'code' => sprintf('D-%02d', $i)],
@@ -141,10 +140,9 @@ class SpaceSeeder extends Seeder
             ]
         );
 
-        $this->seedResources($meetingRoom, [
-            ['name' => 'Presentation Screen', 'category' => ResourceCategory::Screen, 'quantity' => 1],
-            ['name' => 'Whiteboard', 'category' => ResourceCategory::Whiteboard, 'quantity' => 1],
-            ['name' => 'Air Conditioning (A/C)', 'category' => ResourceCategory::Other, 'quantity' => 1],
+        $this->seedEquipment($meetingRoom, [
+            ['Screens', 'الشاشات', 'screen', 'Presentation Screen', 'شاشة عرض', 1],
+            ['Whiteboards', 'الألواح البيضاء', 'whiteboard', 'Whiteboard', 'لوح أبيض', 1],
         ]);
 
         // --- Space 3: Private Office 3 ---
@@ -168,11 +166,6 @@ class SpaceSeeder extends Seeder
             ]
         );
 
-        $this->seedResources($privateOffice, [
-            ['name' => 'Smart Lock Access', 'category' => ResourceCategory::Other, 'quantity' => 1],
-            ['name' => 'Air Conditioning (A/C)', 'category' => ResourceCategory::Other, 'quantity' => 1],
-        ]);
-
         // --- Space 4: Event Hall ---
         $eventHall = Space::query()->firstOrCreate(
             [
@@ -194,10 +187,9 @@ class SpaceSeeder extends Seeder
             ]
         );
 
-        $this->seedResources($eventHall, [
-            ['name' => 'Stage & Podium', 'category' => ResourceCategory::Other, 'quantity' => 1],
-            ['name' => 'Laser Projector', 'category' => ResourceCategory::Projector, 'quantity' => 1],
-            ['name' => 'Audio System & Microphones', 'category' => ResourceCategory::Mic, 'quantity' => 2],
+        $this->seedEquipment($eventHall, [
+            ['Projectors', 'أجهزة العرض', 'projector', 'Laser Projector', 'جهاز عرض ليزر', 1],
+            ['Microphones', 'الميكروفونات', 'volume-2', 'Audio System & Microphones', 'نظام صوت وميكروفونات', 2],
         ]);
 
         // 7. Type -> amenity config matrix (admin-editable default starting
@@ -250,22 +242,46 @@ class SpaceSeeder extends Seeder
     }
 
     /**
-     * @param  array<int, array{name: string, category: ResourceCategory, quantity: int}>  $resources
+     * Equipment members see in the space: inventory assets under
+     * "Presentation equipment" (shown to members), registered through
+     * AssetService. Rerunning tops a space up to the count, never past it.
+     * Each row: category en, category ar, icon, item en, item ar, count.
+     *
+     * @param  list<array{0: string, 1: string, 2: string, 3: string, 4: string, 5: int}>  $equipment
      */
-    private function seedResources(Space $space, array $resources): void
+    private function seedEquipment(Space $space, array $equipment): void
     {
-        foreach ($resources as $res) {
-            Resource::query()->firstOrCreate(
-                [
-                    'space_id' => $space->id,
-                    'name' => $res['name'],
-                ],
-                [
-                    'category' => $res['category'],
-                    'quantity' => $res['quantity'],
-                    'status' => OperationalStatus::Active,
-                ]
-            );
+        $unit = Unit::query()->firstOrCreate(['code' => 'piece'], ['name' => ['en' => 'Piece', 'ar' => 'قطعة']]);
+        $root = Category::query()->whereNull('parent_id')->where('icon', 'projector')->first()
+            ?? Category::query()->create([
+                'kind' => ItemKind::Asset,
+                'name' => ['en' => 'Presentation equipment', 'ar' => 'معدات العرض'],
+                'icon' => 'projector',
+                'show_to_members' => true,
+            ]);
+
+        foreach ($equipment as [$categoryEn, $categoryAr, $icon, $itemEn, $itemAr, $count]) {
+            $category = Category::query()->where('parent_id', $root->id)->where('icon', $icon)->first()
+                ?? Category::query()->create([
+                    'parent_id' => $root->id,
+                    'kind' => ItemKind::Asset,
+                    'name' => ['en' => $categoryEn, 'ar' => $categoryAr],
+                    'icon' => $icon,
+                    'show_to_members' => true,
+                ]);
+            $item = Item::query()->where('category_id', $category->id)->get()->first(fn (Item $item) => $item->name['en'] === $itemEn)
+                ?? Item::query()->create([
+                    'category_id' => $category->id,
+                    'unit_id' => $unit->id,
+                    'sku' => 'DEMO-'.strtoupper(substr(md5($itemEn), 0, 6)),
+                    'name' => ['en' => $itemEn, 'ar' => $itemAr],
+                ]);
+
+            $missing = $count - Asset::query()->where('item_id', $item->id)->where('location_type', 'space')->where('location_id', $space->id)->count();
+
+            if ($missing > 0) {
+                app(AssetService::class)->register($item, new Place('space', $space->id), [], $missing);
+            }
         }
     }
 }

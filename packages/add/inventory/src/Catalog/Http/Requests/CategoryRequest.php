@@ -35,6 +35,7 @@ class CategoryRequest extends FormRequest
                 $category === null ? 'required_without:parent_id' : 'sometimes',
                 Rule::enum(ItemKind::class),
             ],
+            'icon' => ['sometimes', 'nullable', 'string', 'max:40'],
             'show_to_members' => ['sometimes', 'boolean'],
             'order' => ['sometimes', 'integer', 'min:0'],
         ];

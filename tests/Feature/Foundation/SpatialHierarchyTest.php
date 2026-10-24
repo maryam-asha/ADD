@@ -2,12 +2,16 @@
 
 namespace Tests\Feature\Foundation;
 
+use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Enums\MaintenanceType;
+use Add\Inventory\Assets\Services\AssetService;
+use Add\Inventory\Assets\Services\MaintenanceService;
+use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Support\Place;
 use App\Domain\Foundation\Enums\OperationalStatus;
-use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Floor;
-use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\Zone;
@@ -34,13 +38,14 @@ class SpatialHierarchyTest extends TestCase
             'building_id' => $zone->floor->building_id,
             'zone_id' => $zone->id,
         ]);
-        $resource = Resource::factory()->for($space)->create(['category' => ResourceCategory::Projector]);
+        // Equipment is an inventory asset kept in the space.
+        $projector = app(AssetService::class)->register(Item::factory()->create(), new Place('space', $space->id))->first();
         $seatDesk = SeatDesk::factory()->for($space)->create();
 
         $space->refresh();
 
         $this->assertTrue($zone->floor->building->branch->is($space->building->branch));
-        $this->assertTrue($resource->space->is($space));
+        $this->assertTrue($projector->location()->is(new Place('space', $space->id)));
         $this->assertTrue($seatDesk->space->is($space));
         $this->assertSame(SpaceType::Room, $space->space_type);
         $this->assertTrue($space->space_type->isLockable());
@@ -87,15 +92,15 @@ class SpatialHierarchyTest extends TestCase
         $this->assertFalse($activeIds->contains($retired->id));
     }
 
-    public function test_resources_carry_their_own_operational_status_independent_of_their_space(): void
+    public function test_equipment_under_repair_does_not_take_its_space_offline(): void
     {
         $space = Space::factory()->create();
-        $resource = Resource::factory()->for($space)->maintenance()->create();
+        $projector = app(AssetService::class)->register(Item::factory()->create(), new Place('space', $space->id))->first();
 
-        $space->refresh();
+        app(MaintenanceService::class)->open($projector, MaintenanceType::Corrective, 'Lamp broken');
 
-        $this->assertSame(OperationalStatus::Maintenance, $resource->status);
-        $this->assertSame(OperationalStatus::Active, $space->status);
+        $this->assertSame(AssetStatus::InMaintenance, $projector->refresh()->status);
+        $this->assertSame(OperationalStatus::Active, $space->refresh()->status);
     }
 
     public function test_building_floor_and_zone_chain_is_navigable_both_directions(): void

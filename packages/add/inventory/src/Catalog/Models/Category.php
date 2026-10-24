@@ -28,8 +28,17 @@ class Category extends Model
         'parent_id',
         'kind',
         'name',
+        'icon',
         'show_to_members',
         'order',
+    ];
+
+    /**
+     * The column defaults, so a model just created reads them too.
+     */
+    protected $attributes = [
+        'show_to_members' => false,
+        'order' => 0,
     ];
 
     protected $casts = [

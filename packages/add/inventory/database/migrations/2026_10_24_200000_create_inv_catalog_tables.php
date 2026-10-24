@@ -34,6 +34,8 @@ return new class extends Migration
             $table->foreignId('parent_id')->nullable()->constrained('inv_categories')->restrictOnDelete();
             $table->string('kind', 10);
             $table->json('name');
+            // For a host's screens (an icon name, never a file).
+            $table->string('icon', 40)->nullable();
             $table->boolean('show_to_members')->default(false);
             $table->unsignedInteger('order')->default(0);
             $table->timestamps();

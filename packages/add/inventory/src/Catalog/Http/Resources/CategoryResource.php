@@ -24,6 +24,7 @@ class CategoryResource extends JsonResource
             'parent_id' => $this->parent_id,
             'kind' => $this->kind->value,
             'name' => $this->name,
+            'icon' => $this->icon,
             'show_to_members' => $this->show_to_members,
             'order' => $this->order,
             'items_count' => $this->whenCounted('items'),

@@ -25,6 +25,13 @@ class Unit extends Model
         'allows_fractions',
     ];
 
+    /**
+     * The column defaults, so a model just created reads them too.
+     */
+    protected $attributes = [
+        'allows_fractions' => false,
+    ];
+
     protected $casts = [
         'name' => 'array',
         'allows_fractions' => 'boolean',

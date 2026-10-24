@@ -40,10 +40,8 @@ use App\Domain\Forms\Models\FormField;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\OperationalStatus;
-use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
-use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\SpaceTypeAmenity;
 use App\Domain\Identity\Enums\CompanyStatus;
@@ -157,10 +155,6 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         Space::class => [
             'space_type' => SpaceType::class,
             'allocation_model' => AllocationModel::class,
-            'status' => OperationalStatus::class,
-        ],
-        Resource::class => [
-            'category' => ResourceCategory::class,
             'status' => OperationalStatus::class,
         ],
         SpaceTypeAmenity::class => [

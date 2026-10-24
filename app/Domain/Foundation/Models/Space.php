@@ -134,11 +134,6 @@ class Space extends Model
         return $this->hasMany(OfficeLease::class);
     }
 
-    public function resources(): HasMany
-    {
-        return $this->hasMany(Resource::class);
-    }
-
     public function amenities(): HasMany
     {
         return $this->hasMany(SpaceAmenity::class);

@@ -70,7 +70,6 @@ use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalletTopUpController;
 use App\Http\Controllers\Api\V1\Admin\RenewalController;
 use App\Http\Controllers\Api\V1\Admin\ReportController;
-use App\Http\Controllers\Api\V1\Admin\ResourceController;
 use App\Http\Controllers\Api\V1\Admin\ResourceTypeController;
 use App\Http\Controllers\Api\V1\Admin\RoleController;
 use App\Http\Controllers\Api\V1\Admin\SeatDeskController;
@@ -138,8 +137,6 @@ Route::apiResource('zones', ZoneController::class)->except('destroy');
 Route::apiResource('spaces', SpaceController::class)->except('destroy');
 Route::patch('spaces/{space}/status', [SpaceController::class, 'updateStatus']);
 Route::patch('spaces/{space}/amenities', [SpaceController::class, 'updateAmenities']);
-Route::apiResource('resources', ResourceController::class)->except('destroy');
-Route::patch('resources/{resource}/status', [ResourceController::class, 'updateStatus']);
 
 // The amenity catalog (Wi-Fi, café access, a stage — what a space offers
 // without being equipment to track; equipment is an inventory asset).
@@ -489,7 +486,6 @@ Route::middleware('role:admin')->group(function () {
     Route::delete('floors/{floor}', [FloorController::class, 'destroy']);
     Route::delete('zones/{zone}', [ZoneController::class, 'destroy']);
     Route::delete('spaces/{space}', [SpaceController::class, 'destroy']);
-    Route::delete('resources/{resource}', [ResourceController::class, 'destroy']);
     Route::delete('seats-desks/{seatDesk}', [SeatDeskController::class, 'destroy']);
     Route::delete('devices/{device}', [DeviceController::class, 'destroy']);
     Route::delete('device-capabilities/{deviceCapability}', [DeviceCapabilityController::class, 'destroy']);

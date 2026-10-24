@@ -35,6 +35,13 @@ class Item extends Model
         'is_active',
     ];
 
+    /**
+     * The column defaults, so a model just created reads them too.
+     */
+    protected $attributes = [
+        'is_active' => true,
+    ];
+
     protected $casts = [
         'category_id' => 'integer',
         'unit_id' => 'integer',

@@ -4,13 +4,12 @@ namespace App\Domain\Foundation\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Enums\OperationalStatus;
-use App\Domain\Foundation\Enums\ResourceCategory;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Amenity;
 use App\Domain\Foundation\Models\Branch;
-use App\Domain\Foundation\Models\Resource;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Inventory\SpaceEquipment;
 use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\BranchHoursPresenter;
@@ -27,6 +26,7 @@ class SpaceBrowseService
         private readonly BranchHoursPresenter $hours,
         private readonly PriceLabelPresenter $prices,
         private readonly OfferResolver $offers,
+        private readonly SpaceEquipment $equipment,
     ) {}
 
     /**
@@ -86,7 +86,7 @@ class SpaceBrowseService
         $spacesQuery = Space::query()
             ->active()
             ->whereDoesntHave('officeLeases', fn ($q) => $q->holdingOn(now()->toDateString()))
-            ->with(['resources', 'amenities.definition', 'building', 'zone.floor'])
+            ->with(['amenities.definition', 'building', 'zone.floor'])
             ->whereHas('building', fn ($q) => $q->where('branch_id', $branch->id));
 
         $requestedType = strtolower((string) ($filters['space_type'] ?? 'all'));
@@ -100,14 +100,15 @@ class SpaceBrowseService
             $spacesQuery->where('capacity', '>=', (int) $filters['min_capacity']);
         }
 
+        // An amenity by its key or name, or equipment members see by its
+        // name.
         if (! empty($filters['amenity'])) {
             $amenityNeedle = strtolower($filters['amenity']);
-            $spacesQuery->whereHas('resources', function ($q) use ($amenityNeedle) {
-                $q->where('status', OperationalStatus::Active)
-                    ->where(function ($sub) use ($amenityNeedle) {
-                        $sub->where('category', $amenityNeedle)
-                            ->orWhere('name', 'LIKE', "%{$amenityNeedle}%");
-                    });
+            $spacesQuery->where(function ($q) use ($amenityNeedle) {
+                $q->whereHas('amenities', function ($toggle) use ($amenityNeedle) {
+                    $toggle->where('amenity', $amenityNeedle)
+                        ->orWhereHas('definition', fn ($amenity) => $amenity->where('is_active', true)->where('name', 'LIKE', "%{$amenityNeedle}%"));
+                })->orWhereIn('id', $this->equipment->spacesMatching($amenityNeedle));
             });
         }
 
@@ -116,6 +117,7 @@ class SpaceBrowseService
         $paginator = $spacesQuery->orderBy('hourly_rate_points', 'asc')->paginate($perPage);
 
         // 5. Transform Space Cards
+        $this->equipment->load(collect($paginator->items())->pluck('id'));
         $items = collect($paginator->items())->map(fn (Space $space) => $this->formatSpaceCard($space, $user));
 
         return [
@@ -297,24 +299,15 @@ class SpaceBrowseService
             $amenities[] = ['key' => 'seat', 'label' => __('api.space.single_seat'), 'icon' => 'user'];
         }
 
-        // Two genuinely different sources merge here: the fixed facility
-        // amenities toggled on for this space (SpaceAmenity) and its active
-        // equipment (Resource — projectors, mics, ...).
+        // Two genuinely different sources merge here: the amenities toggled
+        // on for this space (SpaceAmenity) and the equipment in it members
+        // see (inventory assets — projectors, mics, ...).
         foreach ($this->activeAmenities($space) as $amenity) {
             $amenities[] = $this->resolveAmenity($amenity);
         }
 
-        // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
-        // bare `Resource` to PHP's builtin `resource` stream pseudo-type, which
-        // silently breaks static analysis of this Eloquent model. The FQCN is
-        // left alone by that fixer.
-        /** @var \App\Domain\Foundation\Models\Resource $res */
-        foreach ($space->resources as $res) {
-            if ($res->status !== OperationalStatus::Active) {
-                continue;
-            }
-
-            $amenities[] = $this->resolveResourceAmenity($res);
+        foreach ($this->equipment->for($space) as $equipment) {
+            $amenities[] = $equipment;
         }
 
         // Add lockable if not already present
@@ -354,77 +347,6 @@ class SpaceBrowseService
     }
 
     /**
-     * Category-first amenity resolution shared by the card view
-     * (`buildAmenities()`) and the detail checklist
-     * (`buildAmenitiesChecklist()`). A properly categorized resource is
-     * trusted directly; the substring-matching guesses only run for the
-     * catch-all `Other` category, as a backward-compat path for legacy rows
-     * that haven't been recategorized.
-     *
-     * @return array{key: string, label: string, icon: string}
-     */
-    private function resolveResourceAmenity(Resource $res): array
-    {
-        $icon = match ($res->category) {
-            ResourceCategory::Screen => 'screen',
-            ResourceCategory::Projector => 'projector',
-            ResourceCategory::Whiteboard => 'whiteboard',
-            ResourceCategory::Mic => 'volume-2',
-            default => 'check-circle',
-        };
-
-        $label = $res->name;
-        $key = $res->category->value;
-
-        if ($res->category === ResourceCategory::Other) {
-            $lower = strtolower($res->name);
-            if (str_contains($lower, 'wi-fi') || str_contains($lower, 'wifi')) {
-                $icon = 'wifi';
-                $key = 'wifi';
-                $label = 'Wi-Fi';
-            } elseif (str_contains($lower, 'power') || str_contains($lower, 'outlet')) {
-                $icon = 'zap';
-                $key = 'power';
-                $label = 'Power';
-            } elseif (str_contains($lower, 'café') || str_contains($lower, 'cafe')) {
-                $icon = 'coffee';
-                $key = 'cafe';
-                $label = 'Café';
-            } elseif (str_contains($lower, 'a/c') || str_contains($lower, 'air conditioning')) {
-                $icon = 'snowflake';
-                $key = 'ac';
-                $label = 'A/C';
-            } elseif (str_contains($lower, 'lock')) {
-                $icon = 'lock';
-                $key = 'lockable';
-                $label = 'Lockable';
-            } elseif (str_contains($lower, 'stage')) {
-                $icon = 'stage';
-                $key = 'stage';
-                $label = 'Stage';
-            } elseif (str_contains($lower, 'audio') || str_contains($lower, 'mic')) {
-                $icon = 'volume-2';
-                $key = 'audio';
-                $label = 'Audio';
-            } elseif (str_contains($lower, 'screen')) {
-                $icon = 'tv';
-                $key = 'screen';
-                $label = 'Screen';
-            } elseif (str_contains($lower, 'whiteboard')) {
-                $icon = 'edit-3';
-                $key = 'whiteboard';
-                $label = 'Whiteboard';
-            } elseif (str_contains($lower, 'projector')) {
-                $icon = 'video';
-                $key = 'projector';
-                $label = 'Projector';
-            }
-        }
-
-        return ['key' => $key, 'label' => $label, 'icon' => $icon];
-    }
-
-    /**
      * @return array<string, mixed>
      */
     public function details(Space $space, ?User $user = null): array
@@ -433,7 +355,7 @@ class SpaceBrowseService
             abort(404);
         }
 
-        $space->loadMissing(['resources', 'amenities.definition', 'building.branch', 'zone.floor']);
+        $space->loadMissing(['amenities.definition', 'building.branch', 'zone.floor']);
 
         $timezone = $this->settings->get('app.timezone', 'Asia/Damascus');
         $branch = $space->building->branch;
@@ -537,7 +459,7 @@ class SpaceBrowseService
 
     /**
      * Data-driven regardless of space type: every entry comes from the
-     * space's own active `amenities`/`resources` rows (plus the
+     * space's own active amenities and the equipment members see in it (plus the
      * `is_lockable` flag), not a per-`space_type` fabricated list.
      *
      * @return array<int, array{key: string, name: string, icon: string}>
@@ -555,21 +477,11 @@ class SpaceBrowseService
             ];
         }
 
-        // Fully qualified deliberately: Pint's phpdoc_types fixer lowercases a
-        // bare `Resource` to PHP's builtin `resource` stream pseudo-type, which
-        // silently breaks static analysis of this Eloquent model. The FQCN is
-        // left alone by that fixer.
-        /** @var \App\Domain\Foundation\Models\Resource $res */
-        foreach ($space->resources as $res) {
-            if ($res->status !== OperationalStatus::Active) {
-                continue;
-            }
-
-            $amenity = $this->resolveResourceAmenity($res);
+        foreach ($this->equipment->for($space) as $equipment) {
             $checklist[] = [
-                'key' => $amenity['key'],
-                'name' => $amenity['label'],
-                'icon' => $amenity['icon'],
+                'key' => $equipment['key'],
+                'name' => $equipment['label'],
+                'icon' => $equipment['icon'],
             ];
         }
 
