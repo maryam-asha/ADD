@@ -260,4 +260,17 @@ return [
         ],
     ],
 
+    // Inventory (packages/add/inventory), sent through
+    // App\Domain\Inventory\Adapters\AddInventoryNotifier.
+    'inventory' => [
+        'maintenance_due' => [
+            'title' => 'Maintenance due',
+            'body' => ':title for asset :asset is due on :date.',
+        ],
+        'warranty_ending' => [
+            'title' => 'Warranty ending',
+            'body' => 'The warranty of asset :asset ends on :date.',
+        ],
+    ],
+
 ];

@@ -260,4 +260,17 @@ return [
         ],
     ],
 
+    // Inventory (packages/add/inventory), sent through
+    // App\Domain\Inventory\Adapters\AddInventoryNotifier.
+    'inventory' => [
+        'maintenance_due' => [
+            'title' => 'صيانة مستحقة',
+            'body' => ':title للأصل :asset مستحقة في :date.',
+        ],
+        'warranty_ending' => [
+            'title' => 'ضمان على وشك الانتهاء',
+            'body' => 'ينتهي ضمان الأصل :asset في :date.',
+        ],
+    ],
+
 ];
