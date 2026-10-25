@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Foundation\Models\Building;
+use App\Domain\Inventory\Adapters\AddLocationResolver;
+use App\Http\Controllers\Api\V1\Admin\Concerns\RefusesDeletingPlacesWithInventory;
 use App\Http\Requests\Admin\StoreBuildingRequest;
 use App\Http\Requests\Admin\UpdateBuildingRequest;
 use App\Http\Resources\BuildingResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class BuildingController extends AdminResourceController
 {
+    use RefusesDeletingPlacesWithInventory;
+
     protected function modelClass(): string
     {
         return Building::class;
@@ -45,5 +50,15 @@ class BuildingController extends AdminResourceController
         $building->update($request->validated());
 
         return response()->json(['message' => __('api.admin.building_updated')]);
+    }
+
+    /**
+     * Not while it, or a place deleted with it, still holds inventory.
+     */
+    public function destroy(int $id): Response
+    {
+        $this->refuseIfHoldsInventory(AddLocationResolver::BUILDING, $id);
+
+        return parent::destroy($id);
     }
 }

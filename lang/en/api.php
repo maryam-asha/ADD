@@ -142,6 +142,7 @@ return [
         'space_amenities_updated' => 'Space amenities updated.',
         'space_type_amenities_updated' => 'Amenities updated.',
         'amenity_updated' => 'Amenity updated.',
+        'place_holds_inventory' => 'This place, or one deleted with it, still holds inventory. Move or dispose of its assets and transfer its stock first.',
         'seat_desk_updated' => 'Seat/desk updated.',
         'seat_desk_code_taken' => 'Another desk in this branch already has this code.',
         'seat_desk_held' => 'This desk belongs to a live Dedicated Desk subscription.',

@@ -3,15 +3,20 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Foundation\Models\Floor;
+use App\Domain\Inventory\Adapters\AddLocationResolver;
+use App\Http\Controllers\Api\V1\Admin\Concerns\RefusesDeletingPlacesWithInventory;
 use App\Http\Requests\Admin\StoreFloorRequest;
 use App\Http\Requests\Admin\UpdateFloorRequest;
 use App\Http\Resources\FloorResource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class FloorController extends AdminResourceController
 {
+    use RefusesDeletingPlacesWithInventory;
+
     protected function modelClass(): string
     {
         return Floor::class;
@@ -48,5 +53,15 @@ class FloorController extends AdminResourceController
         $floor->update($request->validated());
 
         return response()->json(['message' => __('api.admin.floor_updated')]);
+    }
+
+    /**
+     * Not while it, or a place deleted with it, still holds inventory.
+     */
+    public function destroy(int $id): Response
+    {
+        $this->refuseIfHoldsInventory(AddLocationResolver::FLOOR, $id);
+
+        return parent::destroy($id);
     }
 }

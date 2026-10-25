@@ -9,7 +9,9 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Inventory\Adapters\AddLocationResolver;
 use App\Domain\Membership\Services\DedicatedDeskService;
+use App\Http\Controllers\Api\V1\Admin\Concerns\RefusesDeletingPlacesWithInventory;
 use App\Http\Requests\Admin\StoreSpaceRequest;
 use App\Http\Requests\Admin\UpdateSpaceAmenitiesRequest;
 use App\Http\Requests\Admin\UpdateSpaceRequest;
@@ -25,6 +27,7 @@ use Illuminate\Validation\ValidationException;
 class SpaceController extends AdminResourceController
 {
     use LogsSensitiveActions;
+    use RefusesDeletingPlacesWithInventory;
 
     protected function modelClass(): string
     {
@@ -92,6 +95,7 @@ class SpaceController extends AdminResourceController
     public function destroy(int $id): Response
     {
         abort_if(app(DedicatedDeskService::class)->spaceHasHeldDesks($id), 422, __('api.admin.co_space_desks_held'));
+        $this->refuseIfHoldsInventory(AddLocationResolver::SPACE, $id);
 
         return parent::destroy($id);
     }
