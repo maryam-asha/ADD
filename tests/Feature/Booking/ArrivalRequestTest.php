@@ -38,15 +38,6 @@ class ArrivalRequestTest extends TestCase
         parent::tearDown();
     }
 
-    private function actingAsMember(): User
-    {
-        $member = User::factory()->create();
-        $member->assignRole('member');
-        Sanctum::actingAs($member, ['*']);
-
-        return $member;
-    }
-
     private function actingAsOperations(): User
     {
         $operator = User::factory()->create();
@@ -61,56 +52,6 @@ class ArrivalRequestTest extends TestCase
         $building = Building::factory()->for($branch)->create();
 
         return Space::factory()->room()->for($building)->create(['hourly_rate_points' => 100]);
-    }
-
-    public function test_creating_an_arrival_request_matches_todays_confirmed_booking(): void
-    {
-        $branch = Branch::factory()->create();
-        $member = $this->actingAsMember();
-        $booking = Booking::factory()->create([
-            'user_id' => $member->id,
-            'space_id' => $this->spaceInBranch($branch)->id,
-            'start_at' => Carbon::parse('2026-08-23 14:00:00', 'Asia/Damascus'),
-            'end_at' => Carbon::parse('2026-08-23 15:00:00', 'Asia/Damascus'),
-        ]);
-
-        $response = $this->postJson('/api/v1/member/arrival-requests');
-
-        $response->assertCreated();
-        $response->assertJsonPath('data.matched_booking_id', $booking->id);
-        $this->assertSame(1, ArrivalRequest::where('user_id', $member->id)->count());
-    }
-
-    public function test_creating_an_arrival_request_with_no_matching_booking_leaves_it_unmatched(): void
-    {
-        Branch::factory()->create();
-        $this->actingAsMember();
-
-        $response = $this->postJson('/api/v1/member/arrival-requests');
-
-        $response->assertCreated();
-        $response->assertJsonPath('data.matched_booking_id', null);
-    }
-
-    public function test_creating_a_second_arrival_request_while_one_is_pending_returns_the_existing_one(): void
-    {
-        $member = $this->actingAsMember();
-
-        $first = $this->postJson('/api/v1/member/arrival-requests');
-        $first->assertCreated();
-
-        $second = $this->postJson('/api/v1/member/arrival-requests');
-        $second->assertOk();
-
-        $this->assertSame($first->json('data.id'), $second->json('data.id'));
-        $this->assertSame(1, ArrivalRequest::where('user_id', $member->id)->count());
-    }
-
-    public function test_a_non_member_cannot_create_an_arrival_request(): void
-    {
-        $this->actingAsOperations();
-
-        $this->postJson('/api/v1/member/arrival-requests')->assertForbidden();
     }
 
     public function test_operations_can_list_pending_arrival_requests(): void

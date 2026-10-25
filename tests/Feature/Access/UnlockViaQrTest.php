@@ -51,9 +51,9 @@ class UnlockViaQrTest extends TestCase
             'expires_at' => now()->addHour(),
         ]);
 
-        $response = $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1']);
+        $response = $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1']);
 
-        $response->assertOk();
+        $response->assertOk()->assertJsonPath('data.outcome', 'unlocked');
         $this->assertDatabaseHas('access_events', [
             'device_id' => $lock->id, 'event_type' => AccessEventType::Unlock->value, 'channel' => AccessEventChannel::QrScan->value,
         ]);
@@ -68,7 +68,7 @@ class UnlockViaQrTest extends TestCase
             'expires_at' => now()->subMinute(),
         ]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
         $this->assertDatabaseHas('access_events', ['device_id' => $lock->id, 'event_type' => AccessEventType::FailedAttempt->value]);
     }
 
@@ -78,7 +78,7 @@ class UnlockViaQrTest extends TestCase
         $lock = Device::factory()->create(['type' => 'lock', 'qr_value' => 'sticker-1']);
         AccessGrant::factory()->revoked()->create(['lock_id' => $lock->id, 'grantee_type' => 'user', 'grantee_id' => $user->id]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
     }
 
     public function test_not_yet_activated_grant_is_denied(): void
@@ -87,7 +87,7 @@ class UnlockViaQrTest extends TestCase
         $lock = Device::factory()->create(['type' => 'lock', 'qr_value' => 'sticker-1']);
         AccessGrant::factory()->create(['lock_id' => $lock->id, 'grantee_type' => 'user', 'grantee_id' => $user->id, 'status' => AccessGrantStatus::Issued]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
     }
 
     public function test_user_with_no_grant_for_this_lock_is_denied(): void
@@ -95,7 +95,7 @@ class UnlockViaQrTest extends TestCase
         $user = $this->actingAsMember();
         Device::factory()->create(['type' => 'lock', 'qr_value' => 'sticker-1']);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
     }
 
     public function test_maintenance_revoked_grant_is_denied_even_if_activated_moments_earlier(): void
@@ -107,7 +107,7 @@ class UnlockViaQrTest extends TestCase
             'status' => AccessGrantStatus::Revoked, 'activated_at' => now()->subSeconds(5), 'expires_at' => now()->addHour(),
         ]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
     }
 
     /**
@@ -127,7 +127,7 @@ class UnlockViaQrTest extends TestCase
             'source_id' => $booking->id, 'expires_at' => now()->addHour(),
         ]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
         $this->assertDatabaseHas('access_events', ['device_id' => $lock->id, 'event_type' => AccessEventType::FailedAttempt->value]);
     }
 
@@ -140,7 +140,7 @@ class UnlockViaQrTest extends TestCase
         AccessGrant::factory()->forCompany()->activated()->create(['lock_id' => $lock->id, 'grantee_id' => $company->id]);
         Http::fake(['api.sciener.test/v3/lock/unlock' => Http::response(['errcode' => 0, 'errmsg' => ''], 200)]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertOk();
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertOk();
     }
 
     public function test_company_member_without_door_access_enabled_is_denied(): void
@@ -151,7 +151,7 @@ class UnlockViaQrTest extends TestCase
         $lock = Device::factory()->create(['type' => 'lock', 'qr_value' => 'sticker-1']);
         AccessGrant::factory()->forCompany()->activated()->create(['lock_id' => $lock->id, 'grantee_id' => $company->id]);
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1'])->assertStatus(403);
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1'])->assertStatus(403);
     }
 
     public function test_a_connection_exception_reaching_ttlock_is_handled_gracefully_not_a_500(): void
@@ -165,18 +165,21 @@ class UnlockViaQrTest extends TestCase
             'lock_id' => $lock->id, 'grantee_type' => 'user', 'grantee_id' => $user->id, 'expires_at' => now()->addHour(),
         ]);
 
-        $response = $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1']);
+        $response = $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1']);
 
         $response->assertStatus(503);
         $response->assertJsonFragment(['message' => __('api.access.unlock_failed')]);
         $this->assertDatabaseHas('access_events', ['device_id' => $lock->id, 'event_type' => AccessEventType::FailedAttempt->value]);
     }
 
-    public function test_unknown_qr_value_returns_404(): void
+    public function test_a_value_that_is_neither_a_kiosk_code_nor_a_lock_is_unknown(): void
     {
         $this->actingAsMember();
 
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'does-not-exist'])->assertStatus(404);
+        $this->withHeader('lang', 'en')
+            ->postJson('/api/v1/member/scan', ['qr_value' => 'does-not-exist'])
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'This code is not recognised. Scan the code on the kiosk screen or the sticker on a door.']);
     }
 
     public function test_gateway_offline_returns_a_distinguishable_message(): void
@@ -186,7 +189,7 @@ class UnlockViaQrTest extends TestCase
         $lock = Device::factory()->create(['type' => 'lock', 'qr_value' => 'sticker-1']);
         AccessGrant::factory()->activated()->create(['lock_id' => $lock->id, 'grantee_type' => 'user', 'grantee_id' => $user->id, 'expires_at' => now()->addHour()]);
 
-        $response = $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1']);
+        $response = $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1']);
 
         $response->assertStatus(503);
         $response->assertJsonFragment(['message' => __('api.access.gateway_offline')]);

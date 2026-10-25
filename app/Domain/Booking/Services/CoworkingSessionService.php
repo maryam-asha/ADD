@@ -27,6 +27,9 @@ class CoworkingSessionService
     /** How long before its start a scan may check a booking in: the same window as every check-in. */
     public const EARLY_CHECK_IN_MINUTES = BookingCheckInService::EARLY_CHECK_IN_MINUTES;
 
+    /** How far ahead a room, office or hall booking turns a scan into a word to reception. */
+    public const NON_COWORKING_ARRIVAL_MINUTES = 60;
+
     public function __construct(
         private readonly KioskCodeVerifier $codes,
         private readonly ScanTicketService $tickets,
@@ -36,11 +39,12 @@ class CoworkingSessionService
         private readonly WalkInCapacityService $walkIns,
         private readonly BusinessHoursService $businessHours,
         private readonly OpenCoworkingSessionLocator $openSessions,
+        private readonly ArrivalRequestService $arrivals,
     ) {}
 
     /**
      * Exactly one of $qrValue (the first scan) or $scanTicket (the member
-     * accepting an uncovered session) is given — StartCoworkingSessionRequest
+     * accepting an uncovered session) is given — ScanRequest
      * enforces it. A ticket is only issued after the member was shown why the
      * plan will not cover them, so presenting one is the acceptance.
      */
@@ -68,19 +72,24 @@ class CoworkingSessionService
             // open-session check below cannot be raced into two sessions.
             User::query()->whereKey($member->id)->lockForUpdate()->first();
 
-            if (($open = $this->openSessionFor($member)) !== null) {
-                return CoworkingStartResult::existing($open);
+            if ($this->openSessionFor($member) !== null) {
+                throw new ReceptionActionException('api.coworking.already_in_session', 409);
             }
 
-            $booking = $this->bookings->matchBookingFor($member, $space->building->branch, now(), $space);
+            $branch = $space->building->branch;
+            $booking = $this->bookings->matchBookingFor($member, $branch, now(), $space);
 
             // The matcher returns today's earliest booking that has not ended,
             // however far off it starts. A scan well before it is not that
             // booking's arrival — checking it in would bill every hour until
-            // then at the booking's rate — so it counts as no booking at all
-            // and the member goes down the walk-in path (a pending booking
-            // outside the window included).
+            // then at the booking's rate — so the member sits on a walk-in
+            // that hands over to the booking when it starts (a pending
+            // booking outside the window included; only a confirmed one is
+            // handed over to).
+            $handoverBooking = null;
+
             if ($booking !== null && $booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
+                $handoverBooking = $booking;
                 $booking = null;
             }
 
@@ -100,6 +109,15 @@ class CoworkingSessionService
                 return CoworkingStartResult::started($booking->fresh());
             }
 
+            // A room, office or hall booking is reception's to check in, as
+            // at the desk: the scan only tells reception the member is here,
+            // rather than opening a coworking session they did not come for.
+            $elsewhere = $this->bookings->nearNonCoworkingBookingFor($member, $branch, now(), self::NON_COWORKING_ARRIVAL_MINUTES);
+
+            if ($elsewhere !== null) {
+                return CoworkingStartResult::arrivalRequested($this->arrivals->request($member, $elsewhere), $elsewhere);
+            }
+
             $coverage = $this->coverage->evaluate($member, now());
 
             if (! $coverage->isCovered() && $scanTicket === null) {
@@ -110,10 +128,33 @@ class CoworkingSessionService
                 );
             }
 
-            $result = $this->walkIns->start($space, $member, SessionStartSource::Scan, $kiosk, ! $coverage->isCovered(), $coverage);
+            try {
+                $result = $this->walkIns->start($space, $member, SessionStartSource::Scan, $kiosk, ! $coverage->isCovered(), $coverage);
+            } catch (ReceptionActionException $e) {
+                // No seat to wait in: their booking still holds one from its start.
+                if ($handoverBooking !== null && $e->messageKey === 'api.reception.no_capacity') {
+                    throw $this->tooEarly($handoverBooking, $branch->timezone);
+                }
+
+                throw $e;
+            }
+
+            if ($handoverBooking !== null) {
+                $result->session->forceFill(['handover_booking_id' => $handoverBooking->id])->save();
+            }
 
             return CoworkingStartResult::started($result->session->fresh(), $coverage);
         });
+    }
+
+    private function tooEarly(Booking $booking, string $timezone): ReceptionActionException
+    {
+        $start = $booking->start_at->copy()->setTimezone($timezone);
+
+        return new ReceptionActionException('api.coworking.booking_too_early', 409, [
+            'start' => $start->format('H:i'),
+            'from' => $start->copy()->subMinutes(self::EARLY_CHECK_IN_MINUTES)->format('H:i'),
+        ]);
     }
 
     /** A session that started, by the `type` segment of the report URLs — "walkin" or "booking"; a booking never checked in is not one. */

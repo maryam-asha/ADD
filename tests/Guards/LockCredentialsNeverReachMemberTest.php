@@ -47,10 +47,11 @@ class LockCredentialsNeverReachMemberTest extends TestCase
             'lock_id' => $lock->id, 'grantee_type' => 'user', 'grantee_id' => $user->id, 'expires_at' => now()->addHour(),
         ]);
 
-        $response = $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'sticker-1']);
+        $response = $this->postJson('/api/v1/member/scan', ['qr_value' => 'sticker-1']);
 
         $body = $response->getContent();
-        $this->assertSame(['message'], array_keys($response->json()), 'The unlock response must contain nothing but a message key.');
+        $this->assertSame(['data'], array_keys($response->json()), 'The unlock response must contain nothing but data.');
+        $this->assertSame(['outcome', 'message'], array_keys($response->json('data')), 'The unlock response must contain nothing but its outcome and a message.');
         foreach (self::FORBIDDEN_STRINGS as $needle) {
             $this->assertStringNotContainsString($needle, $body, "Response leaked \"{$needle}\"");
         }

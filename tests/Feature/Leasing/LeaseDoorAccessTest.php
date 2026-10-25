@@ -68,10 +68,10 @@ class LeaseDoorAccessTest extends LeasingTestCase
         $lease->company->members()->attach($refused->id, ['door_access_enabled' => false]);
 
         Sanctum::actingAs($allowed, ['member-app']);
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'office-sticker'])->assertOk();
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'office-sticker'])->assertOk();
 
         Sanctum::actingAs($refused, ['member-app']);
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'office-sticker'])->assertForbidden();
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'office-sticker'])->assertForbidden();
     }
 
     public function test_revoking_a_lease_deletes_its_passcode(): void

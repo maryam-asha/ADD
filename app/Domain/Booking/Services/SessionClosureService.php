@@ -94,16 +94,19 @@ class SessionClosureService
      * this locks and re-reads the row from the database before deciding —
      * the same lock-then-check pattern WalkInCapacityService::start() uses
      * for the identical class of race.
+     *
+     * The early-walk-in hand-over closes through here too, with its own
+     * $source.
      */
-    public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant): void
+    public function autoClose(Booking|WalkinSession $session, CarbonInterface $closingInstant, TerminationSource $source = TerminationSource::Auto): void
     {
-        DB::transaction(function () use ($session, $closingInstant) {
+        DB::transaction(function () use ($session, $closingInstant, $source) {
             $this->couponLedger->lockForPricing(null);
             $locked = $session::query()->whereKey($session->getKey())->lockForUpdate()->firstOrFail();
 
             $this->assertOpenForClosure($locked);
 
-            $this->finalizeClosure($locked, $closingInstant, TerminationSource::Auto);
+            $this->finalizeClosure($locked, $closingInstant, $source);
         });
     }
 

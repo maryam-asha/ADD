@@ -94,7 +94,7 @@ class DoorArrivalChecksInBookingTest extends TestCase
     private function openDoorAs(User $member): void
     {
         Sanctum::actingAs($member, ['member-app']);
-        $this->postJson('/api/v1/member/access/unlock', ['qr_value' => 'room-door'])->assertOk();
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'room-door'])->assertOk();
     }
 
     public function test_opening_the_booked_room_starts_its_session(): void

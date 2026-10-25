@@ -31,6 +31,7 @@ class WalkinSession extends Model
         'checked_in_at',
         'started_via',
         'kiosk_id',
+        'handover_booking_id',
         'accepted_uncovered',
         'coverage_snapshot',
         'checked_out_at',
@@ -106,6 +107,15 @@ class WalkinSession extends Model
     public function kiosk(): BelongsTo
     {
         return $this->belongsTo(Kiosk::class);
+    }
+
+    /**
+     * The coworking booking this early walk-in becomes when it starts
+     * (coworking:hand-over-early-sessions). Null for every other walk-in.
+     */
+    public function handoverBooking(): BelongsTo
+    {
+        return $this->belongsTo(Booking::class, 'handover_booking_id');
     }
 
     public function coworkingType(): string

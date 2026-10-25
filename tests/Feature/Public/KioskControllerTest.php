@@ -28,8 +28,9 @@ class KioskControllerTest extends TestCase
             'plans',
             'social_links',
             'app_download' => ['app_store', 'google_play'],
-            'arrival_qr' => ['value'],
         ]]);
+        // The kiosk shows one code, the rotating one; there is no static arrival QR.
+        $response->assertJsonMissingPath('data.arrival_qr');
         $response->assertJsonPath('data.banner', []);
         $response->assertJsonPath('data.plans', []);
         $response->assertJsonPath('data.social_links', []);
@@ -141,17 +142,15 @@ class KioskControllerTest extends TestCase
         ]);
     }
 
-    public function test_app_download_and_arrival_qr_read_from_settings(): void
+    public function test_app_download_reads_from_settings(): void
     {
         app(SettingService::class)->set('kiosk.app_store_url', 'https://apps.example.local/add-ios', SettingValueType::String);
         app(SettingService::class)->set('kiosk.google_play_url', 'https://apps.example.local/add-android', SettingValueType::String);
-        app(SettingService::class)->set('kiosk.arrival_qr_value', 'addapp://arrival/kiosk-1', SettingValueType::String);
 
         $response = $this->getJson('/api/v1/public/kiosk');
 
         $response->assertOk();
         $response->assertJsonPath('data.app_download.app_store', 'https://apps.example.local/add-ios');
         $response->assertJsonPath('data.app_download.google_play', 'https://apps.example.local/add-android');
-        $response->assertJsonPath('data.arrival_qr.value', 'addapp://arrival/kiosk-1');
     }
 }

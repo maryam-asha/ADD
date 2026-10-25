@@ -34,7 +34,7 @@ class EnumsTest extends TestCase
 
     public function test_termination_source_cases(): void
     {
-        $this->assertSame(['reception', 'auto'], array_column(TerminationSource::cases(), 'value'));
+        $this->assertSame(['reception', 'auto', 'handed_over'], array_column(TerminationSource::cases(), 'value'));
     }
 
     /**

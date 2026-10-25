@@ -208,6 +208,11 @@ return [
         'unlock_failed' => 'The lock could not be unlocked. Please try again or use the keypad code.',
     ],
 
+    // The app's one scan button (member/scan).
+    'scan' => [
+        'unknown_code' => 'This code is not recognised. Scan the code on the kiosk screen or the sticker on a door.',
+    ],
+
     'currency' => [
         'base_currency_status_locked' => 'The base currency cannot be deactivated.',
         'already_base' => 'This currency is already the base currency.',
@@ -395,6 +400,8 @@ return [
         'confirmation_required' => 'Your plan will not cover this session (:reason). It will be billed at :rate points per hour.',
         'booking_awaiting_payment' => 'Your booking is waiting for its payment. Pay it in the app or at reception, then scan again.',
         'booking_pending_approval' => 'Your booking is awaiting approval. Please see reception.',
+        'already_in_session' => 'You already have an active session. End it before starting a new one.',
+        'booking_too_early' => 'Your booking starts at :start. There is no free seat before then; you can scan from :from.',
         'no_open_session' => 'You have no active session.',
         'end_request_not_pending' => 'This end request is no longer pending.',
         'end_request_cancelled' => 'End request withdrawn.',

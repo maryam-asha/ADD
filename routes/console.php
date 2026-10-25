@@ -50,6 +50,14 @@ Schedule::command('reception:close-overdue-sessions')->everyFiveMinutes()->witho
 Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->withoutOverlapping();
 
 /*
+ * Self-service coworking (docs/decisions/coworking-self-service-sessions.md)
+ * — a member who scanned in early sits on a walk-in until their booking
+ * starts; at that minute the walk-in closes and the booking is checked in,
+ * so the timer runs on without a second scan or a double charge.
+ */
+Schedule::command('coworking:hand-over-early-sessions')->everyMinute()->withoutOverlapping();
+
+/*
  * External exchange-rate suggestion (docs/decisions/exchange-rate-external-suggestion.md)
  * — sp-today's nationwide USD/SYP quote, fetched once a day as a candidate
  * for an admin to review and accept; never written to exchange_rates

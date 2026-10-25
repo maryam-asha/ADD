@@ -4,7 +4,7 @@ namespace App\Http\Requests\Member;
 
 use Illuminate\Foundation\Http\FormRequest;
 
-class StartCoworkingSessionRequest extends FormRequest
+class ScanRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -12,8 +12,9 @@ class StartCoworkingSessionRequest extends FormRequest
     }
 
     /**
-     * Either the scanned code, or the ticket from a confirmation_required
-     * answer together with the member's explicit acceptance.
+     * Either what the member scanned — the kiosk's code or a lock's sticker —
+     * or the ticket from a confirmation_required answer together with the
+     * member's explicit acceptance.
      *
      * @return array<string, mixed>
      */

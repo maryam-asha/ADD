@@ -49,7 +49,7 @@ class CoworkingSessionStartTest extends TestCase
     private function scan(?array $body = null): TestResponse
     {
         return $this->withHeader('lang', 'en')->postJson(
-            '/api/v1/member/coworking-sessions',
+            '/api/v1/member/scan',
             $body ?? ['qr_value' => $this->qrFor($this->kiosk, $this->secret)],
         );
     }
@@ -105,8 +105,8 @@ class CoworkingSessionStartTest extends TestCase
         $this->actingAsMember();
         $ticket = $this->scan()->json('scan_ticket');
 
-        $id = $this->accept($ticket)->assertCreated()->json('data.id');
-        $this->accept($ticket)->assertOk()->assertJsonPath('data.id', $id);
+        $this->accept($ticket)->assertCreated();
+        $this->accept($ticket)->assertStatus(409);
 
         $this->assertSame(1, WalkinSession::count());
     }
@@ -313,17 +313,6 @@ class CoworkingSessionStartTest extends TestCase
         $this->assertSame(0, WalkinSession::count());
     }
 
-    public function test_scanning_with_a_session_already_open_returns_it(): void
-    {
-        $member = $this->actingAsMember();
-        $this->subscribe($member, $this->planWithHours(40));
-        $id = $this->scan()->assertCreated()->json('data.id');
-        $this->travel(5)->minutes();
-
-        $this->scan()->assertOk()->assertJsonPath('data.id', $id);
-        $this->assertSame(1, WalkinSession::count());
-    }
-
     public function test_a_kiosk_whose_space_is_under_maintenance_starts_nothing(): void
     {
         $this->actingAsMember();
@@ -388,26 +377,10 @@ class CoworkingSessionStartTest extends TestCase
         $this->scan()->assertStatus(429);
     }
 
-    /**
-     * Without a key prefix, every plain `throttle:` a member hits counts
-     * against one per-user key, so ten door unlocks would lock them out of
-     * scanning in too.
-     */
-    public function test_the_scan_throttle_has_its_own_bucket(): void
-    {
-        $this->actingAsMember();
-
-        foreach (range(1, 10) as $attempt) {
-            $this->postJson('/api/v1/member/access/unlock', []);
-        }
-
-        $this->scan()->assertStatus(422)->assertJsonPath('reason', 'no_plan');
-    }
-
     public function test_only_members_can_start_sessions(): void
     {
         $this->actingAsOperations();
 
-        $this->postJson('/api/v1/member/coworking-sessions', ['qr_value' => 'x'])->assertForbidden();
+        $this->postJson('/api/v1/member/scan', ['qr_value' => 'x'])->assertForbidden();
     }
 }

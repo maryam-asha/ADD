@@ -39,6 +39,12 @@ class CoworkingSessionResource extends JsonResource
                 ? new SessionCoverageResource($session->coverage_snapshot)
                 : null,
             'accepted_uncovered' => $isWalkin && $session->accepted_uncovered,
+            // An early walk-in that becomes this booking when it starts.
+            'upcoming_booking' => $isWalkin && $session->handoverBooking !== null ? [
+                'id' => $session->handoverBooking->id,
+                'start_at' => $session->handoverBooking->start_at->toIso8601String(),
+                'end_at' => $session->handoverBooking->end_at->toIso8601String(),
+            ] : null,
             'end_request' => $session->pendingEndRequest === null
                 ? null
                 : new SessionEndRequestResource($session->pendingEndRequest),

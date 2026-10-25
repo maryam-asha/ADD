@@ -297,10 +297,6 @@
             "value": ""
         },
         {
-            "key": "hr_work_location_id",
-            "value": ""
-        },
-        {
             "key": "hr_employee_id",
             "value": ""
         },
@@ -371,6 +367,11 @@
         {
             "key": "item_sale_id",
             "value": "1"
+        },
+        {
+            "key": "lock_qr_value",
+            "value": "",
+            "type": "string"
         }
     ],
     "event": [
@@ -5557,7 +5558,7 @@
                                                 "pay"
                                             ]
                                         },
-                                        "description": "Pays the member's own closed, unpaid coworking session from the app \u2014 the card (or `wallet`, or `cash` to leave it for the desk) chosen when ending it, or later. `{type}` is `booking` or `walkin` (Start Session saves `coworking_session_type` and `coworking_session_id`; Session Report shows what is owed). The session already happened, so there is no window and no cancellation: a failed card leaves it owed and the member can pay again, here or at reception.\n\nBody: `payment_method` (required: `wallet` | `cash` | `paymera`), `wallet_owner_type`/`wallet_owner_id` (pick a company wallet \u2014 read with `wallet` only), `coupon_code` (optional; leave it out for none).\n\nAlways 201 `{data: {payment, redirect_url, next}}` (plus `coupon: {code, applied, points_discounted, message}` beside `data` when a code was sent); `next` is `redirect` (open `redirect_url` in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (`payment` and `redirect_url` null). `payment.transaction_id` is the payment's row in the wallet history once it settles.\n\nErrors: 404 not the member's session \u00b7 409 already paid \u00b7 422 while the session is still open (it must be checked out first) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 422 for a refused coupon `{message, reason}` \u00b7 503 = card payment unavailable (our misconfiguration); 502 = could not start \u2014 neither is a declined card, nothing was charged.\n\n### Cases \u2014 see this request's saved examples\n- **Card (next: redirect)** \u2014 201.\n- **Error: Already Paid** \u2014 409.\n- **Error: Session Still Open** \u2014 422."
+                                        "description": "Pays the member's own closed, unpaid coworking session from the app \u2014 the card (or `wallet`, or `cash` to leave it for the desk) chosen when ending it, or later. `{type}` is `booking` or `walkin` (Scan QR saves `coworking_session_type` and `coworking_session_id`; Session Report shows what is owed). The session already happened, so there is no window and no cancellation: a failed card leaves it owed and the member can pay again, here or at reception.\n\nBody: `payment_method` (required: `wallet` | `cash` | `paymera`), `wallet_owner_type`/`wallet_owner_id` (pick a company wallet \u2014 read with `wallet` only), `coupon_code` (optional; leave it out for none).\n\nAlways 201 `{data: {payment, redirect_url, next}}` (plus `coupon: {code, applied, points_discounted, message}` beside `data` when a code was sent); `next` is `redirect` (open `redirect_url` in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (`payment` and `redirect_url` null). `payment.transaction_id` is the payment's row in the wallet history once it settles.\n\nErrors: 404 not the member's session \u00b7 409 already paid \u00b7 422 while the session is still open (it must be checked out first) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 422 for a refused coupon `{message, reason}` \u00b7 503 = card payment unavailable (our misconfiguration); 502 = could not start \u2014 neither is a declined card, nothing was charged.\n\n### Cases \u2014 see this request's saved examples\n- **Card (next: redirect)** \u2014 201.\n- **Error: Already Paid** \u2014 409.\n- **Error: Session Still Open** \u2014 422."
                                     },
                                     "response": [
                                         {
@@ -8482,234 +8483,11 @@
                     ]
                 },
                 {
-                    "name": "10. Access & Arrival",
-                    "description": "Opening a door by QR, and telling reception you have arrived (kiosk).",
+                    "name": "10. Scan (Kiosk & Doors)",
+                    "description": "One request for the app's scan button: the kiosk's rotating code (coworking session, booking check-in, or a word to reception) and a door's sticker (unlock) both go to POST member/scan.",
                     "item": [
                         {
-                            "name": "Unlock via QR",
-                            "request": {
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{member_token}}"
-                                        }
-                                    ]
-                                },
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "Content-Type",
-                                        "value": "application/json"
-                                    },
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "body": {
-                                    "mode": "raw",
-                                    "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
-                                    "options": {
-                                        "raw": {
-                                            "language": "json"
-                                        }
-                                    }
-                                },
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/access/unlock",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "access",
-                                        "unlock"
-                                    ]
-                                },
-                                "description": "Resolves qr_value to a lock, checks for an activated access_grants row for the scanning user (or a company they belong to with door_access_enabled) still inside its active window, and calls TTLockClient::remoteUnlock() server-side. Other denial responses not shown as saved examples: 404 `lock_not_found` (qr_value matches no lock), 503 `gateway_offline`/`unlock_failed` (the vendor call itself failed)."
-                            },
-                            "response": [
-                                {
-                                    "name": "200 OK",
-                                    "originalRequest": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/access/unlock",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "access",
-                                                "unlock"
-                                            ]
-                                        }
-                                    },
-                                    "status": "OK",
-                                    "code": 200,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"message\": \"Unlocked.\"\n}"
-                                },
-                                {
-                                    "name": "403 Forbidden \u00e2\u20ac\u201d No Active Grant",
-                                    "originalRequest": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"qr_value\": \"the-lock-sticker-qr-value\"\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/access/unlock",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "access",
-                                                "unlock"
-                                            ]
-                                        }
-                                    },
-                                    "status": "Forbidden",
-                                    "code": 403,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"message\": \"You do not have active access to this lock right now.\"\n}"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "Create Arrival Request",
-                            "event": [
-                                {
-                                    "listen": "test",
-                                    "script": {
-                                        "type": "text/javascript",
-                                        "exec": [
-                                            "if (pm.response.code === 200 || pm.response.code === 201) {",
-                                            "    pm.collectionVariables.set('arrival_request_id', pm.response.json().data.id);",
-                                            "}"
-                                        ]
-                                    }
-                                }
-                            ],
-                            "request": {
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{member_token}}"
-                                        }
-                                    ]
-                                },
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "url": {
-                                    "raw": "{{base_url}}/api/v1/member/arrival-requests",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "v1",
-                                        "member",
-                                        "arrival-requests"
-                                    ]
-                                },
-                                "description": "Matches the member's own booking for today at the (single) branch, if one exists with status confirmed/pending and no check-in yet -- purely informational, decides nothing. Calling this again while a request is still pending returns the existing row instead of creating a duplicate."
-                            }
-                        }
-                    ]
-                },
-                {
-                    "name": "11. Coworking Sessions",
-                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. Rooms and other spaces keep their own flow. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: Start Session \u2192 (422 confirmation_required \u2192 Start Session again with scan_ticket + accept_uncovered) \u2192 Current Session for the timer \u2192 Request End \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Start Session builds the kiosk's current code itself.",
-                    "item": [
-                        {
-                            "name": "Start Session (Scan Kiosk Code)",
+                            "name": "Scan QR (Kiosk Code or Door Sticker)",
                             "event": [
                                 {
                                     "listen": "prerequest",
@@ -8750,12 +8528,15 @@
                                         "type": "text/javascript",
                                         "exec": [
                                             "const body = pm.response.json();",
-                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data) {",
+                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.outcome === 'session') {",
                                             "    pm.collectionVariables.set('coworking_session_type', body.data.type);",
                                             "    pm.collectionVariables.set('coworking_session_id', body.data.id);",
                                             "}",
                                             "if (pm.response.code === 422 && body.scan_ticket) {",
                                             "    pm.collectionVariables.set('scan_ticket', body.scan_ticket);",
+                                            "}",
+                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.outcome === 'arrival_requested') {",
+                                            "    pm.collectionVariables.set('arrival_request_id', body.data.arrival_request.id);",
                                             "}"
                                         ]
                                     }
@@ -8793,7 +8574,7 @@
                                     }
                                 },
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                    "raw": "{{base_url}}/api/v1/member/scan",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -8801,10 +8582,10 @@
                                         "api",
                                         "v1",
                                         "member",
-                                        "coworking-sessions"
+                                        "scan"
                                     ]
                                 },
-                                "description": "**Scan the kiosk's code** (the request as saved). qr_value is what the kiosk's QR holds: `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (200 with it \u2014 scanning twice is harmless) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started is checked in (type booking) \u2192 otherwise a walk-in: started at once when your plan covers it, else 422 confirmation_required. Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves coworking_session_type and coworking_session_id on 200/201, and scan_ticket on 422 confirmation_required.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It** \u2014 201 walk-in; coverage.status covered, coverage.covered_until is when the plan stops covering it (window end or hours running out, whichever first).\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing has started. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201 paid walk-in, accepted_uncovered true. Coverage is evaluated again at this moment (a renewal in between makes it covered).\n- **Already in a Session** \u2014 200 with the open session, nothing new started.\n- **Booking Checked In** \u2014 201, type booking \u2014 your booking on this space was checked in instead of a walk-in.\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}` \u2014 no walk-in fallback, which would route around approval.\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}` \u2014 wrong, too old, malformed, or from an inactive/unpaired kiosk.\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}` \u2014 the kiosk's space is not an active co_space (e.g. under maintenance).\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`"
+                                "description": "**The app's one scan button.** Send whatever the camera read as qr_value; the backend decides what it is:\n- `add-cowork:v1:\u2026` (the kiosk's rotating code) \u2192 a coworking session, a booking check-in, or a word to reception \u2014 below.\n- a door's sticker (a lock's qr_value) \u2192 opens that door when you hold an activated access grant on it (data.outcome unlocked); 403 no_active_grant, 503 gateway_offline / unlock_failed. Opening a booked room's door also checks that booking in. Nothing about the lock comes back.\n- anything else \u2192 422 `This code is not recognised\u2026`.\nEvery 200/201 says what happened in data.outcome: session, arrival_requested or unlocked. To test a door, put a lock's qr_value in {{lock_qr_value}} and send it as qr_value.\n\n**The kiosk's code** (the request as saved). qr_value is what the kiosk's QR holds: `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (409 \u2014 end it first) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started is checked in (type booking) \u2192 a booking of yours on a room, office or event hall at this branch, running or starting within 60 minutes: no session, reception is told instead (data.outcome arrival_requested, 201; 200 when you already had a pending request) \u2192 otherwise a walk-in: started at once when your plan covers it, else 422 confirmation_required. If your coworking booking on this space starts later today, that walk-in waits for it: data.upcoming_booking names it, and when it starts the walk-in closes and the booking is checked in from the same instant (coworking:hand-over-early-sessions, every minute) \u2014 no second scan; with no free seat until then, 409 booking_too_early.  Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves coworking_session_type and coworking_session_id when a session started (outcome session), arrival_request_id on arrival_requested, and scan_ticket on 422 confirmation_required.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It** \u2014 201 walk-in; coverage.status covered, coverage.covered_until is when the plan stops covering it (window end or hours running out, whichever first).\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing has started. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201 paid walk-in, accepted_uncovered true. Coverage is evaluated again at this moment (a renewal in between makes it covered).\n- **Error: Already in a Session** \u2014 409 `{\"message\":\"You already have an active session. End it before starting a new one.\"}`\n- **Booking Checked In** \u2014 201, type booking \u2014 your booking on this space was checked in instead of a walk-in.\n- **Room Booking - Reception Told** \u2014 201, outcome arrival_requested, with the arrival request and the booking (space, start_at, end_at). Nothing started; show \"reception has been told\".\n- **Early Arrival - Waits for Booking** \u2014 201 walk-in with upcoming_booking; it turns into that booking when it starts.\n- **Error: Booking Too Early** \u2014 409 `{\"message\":\"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"}`\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}` \u2014 no walk-in fallback, which would route around approval.\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}` \u2014 wrong, too old, malformed, or from an inactive/unpaired kiosk.\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}` \u2014 the kiosk's space is not an active co_space (e.g. under maintenance).\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`\n- **Door Unlocked** \u2014 200 `{\"data\":{\"outcome\":\"unlocked\",\"message\":\"Unlocked.\"}}`\n- **Error: Door - No Active Grant** \u2014 403\n- **Error: Unknown Code** \u2014 422, neither a kiosk code nor a door sticker."
                             },
                             "response": [
                                 {
@@ -8841,7 +8622,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -8849,7 +8630,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -8863,7 +8644,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
                                 },
                                 {
                                     "name": "Confirmation Required",
@@ -8899,7 +8680,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -8907,7 +8688,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -8957,7 +8738,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -8965,7 +8746,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -8979,10 +8760,10 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 2,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:05:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"not_covered\",\n            \"reason\": \"no_plan\",\n            \"plan\": null,\n            \"hours_total\": null,\n            \"hours_remaining\": null,\n            \"window\": null,\n            \"covered_until\": null\n        },\n        \"accepted_uncovered\": true,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 2,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:05:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"not_covered\",\n            \"reason\": \"no_plan\",\n            \"plan\": null,\n            \"hours_total\": null,\n            \"hours_remaining\": null,\n            \"window\": null,\n            \"covered_until\": null\n        },\n        \"accepted_uncovered\": true,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
                                 },
                                 {
-                                    "name": "Already in a Session",
+                                    "name": "Error: Already in a Session",
                                     "originalRequest": {
                                         "auth": {
                                             "type": "bearer",
@@ -9015,7 +8796,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9023,12 +8804,12 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
-                                    "status": "OK",
-                                    "code": 200,
+                                    "status": "Conflict",
+                                    "code": 409,
                                     "_postman_previewlanguage": "json",
                                     "header": [
                                         {
@@ -9037,7 +8818,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"message\": \"You already have an active session. End it before starting a new one.\"\n}"
                                 },
                                 {
                                     "name": "Booking Checked In",
@@ -9073,7 +8854,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9081,7 +8862,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9095,7 +8876,181 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"booking\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": null,\n        \"accepted_uncovered\": false,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"booking\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": null,\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Room Booking - Reception Told",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"arrival_requested\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": 9\n        },\n        \"booking\": {\n            \"id\": 9,\n            \"space\": {\n                \"id\": 4,\n                \"name\": \"Meeting Room A\",\n                \"space_type\": \"room\"\n            },\n            \"start_at\": \"2026-08-17T07:30:00+00:00\",\n            \"end_at\": \"2026-08-17T08:30:00+00:00\"\n        }\n    }\n}"
+                                },
+                                {
+                                    "name": "Early Arrival - Waits for Booking",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 3,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": {\n            \"id\": 7,\n            \"start_at\": \"2026-08-17T08:00:00+00:00\",\n            \"end_at\": \"2026-08-17T10:00:00+00:00\"\n        },\n        \"end_request\": null\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Booking Too Early",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{coworking_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Conflict",
+                                    "code": 409,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"\n}"
                                 },
                                 {
                                     "name": "Error: Booking Awaiting Approval",
@@ -9131,7 +9086,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9139,7 +9094,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9189,7 +9144,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9197,7 +9152,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9247,7 +9202,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9255,7 +9210,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9305,7 +9260,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9313,7 +9268,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9363,7 +9318,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9371,7 +9326,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9421,7 +9376,7 @@
                                             }
                                         },
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions",
+                                            "raw": "{{base_url}}/api/v1/member/scan",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -9429,7 +9384,7 @@
                                                 "api",
                                                 "v1",
                                                 "member",
-                                                "coworking-sessions"
+                                                "scan"
                                             ]
                                         }
                                     },
@@ -9444,9 +9399,189 @@
                                     ],
                                     "cookie": [],
                                     "body": "{\n    \"message\": \"This space has no available capacity right now.\"\n}"
+                                },
+                                {
+                                    "name": "Door Unlocked",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{lock_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"unlocked\",\n        \"message\": \"Unlocked.\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Door - No Active Grant",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{lock_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"You do not have active access to this lock right now.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Unknown Code",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"https://example.com\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This code is not recognised. Scan the code on the kiosk screen or the sticker on a door.\"\n}"
                                 }
                             ]
-                        },
+                        }
+                    ]
+                },
+                {
+                    "name": "11. Coworking Sessions",
+                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 Current Session for the timer \u2192 Request End \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.",
+                    "item": [
                         {
                             "name": "Current Session (Timer)",
                             "request": {
@@ -9527,7 +9662,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": null,\n        \"discounts\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null,\n        \"discounts\": []\n    }\n}"
                                 },
                                 {
                                     "name": "No Open Session",
@@ -9619,7 +9754,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 2 Hours\"\n            },\n            \"hours_total\": 2,\n            \"hours_remaining\": 2,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"end_request\": {\n            \"id\": 1,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n            \"resolved_at\": null,\n            \"checked_out_at\": null\n        },\n        \"discounts\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 2 Hours\"\n            },\n            \"hours_total\": 2,\n            \"hours_remaining\": 2,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": {\n            \"id\": 1,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n            \"resolved_at\": null,\n            \"checked_out_at\": null\n        },\n        \"discounts\": []\n    }\n}"
                                 }
                             ]
                         },
@@ -9984,7 +10119,7 @@
                                         "report"
                                     ]
                                 },
-                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Start Session saves both variables. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced."
+                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Scan QR saves both variables. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced."
                             },
                             "response": [
                                 {
@@ -16760,7 +16895,7 @@
                         },
                         {
                             "name": "Arrival Requests",
-                            "description": "docs/decisions/kiosk-display.md. A member's arrival request is created via Member (App) > Kiosk > Create Arrival Request, which auto-captures {{arrival_request_id}}. Confirming a matched request calls Check In Booking above unchanged; confirming an unmatched one (space_id required) calls Start Walk-in Session above unchanged -- no new booking/session logic exists here, this is purely a dispatch to those two actions.",
+                            "description": "docs/decisions/kiosk-display.md. A member's arrival request is created by Member (App) > 10. Scan (Kiosk & Doors) > Scan QR when they scan the kiosk with a room, office or hall booking about to start; it saves {{arrival_request_id}}. Confirming a matched request calls Check In Booking above unchanged; confirming an unmatched one (space_id required) calls Start Walk-in Session above unchanged -- no new booking/session logic exists here, this is purely a dispatch to those two actions.",
                             "item": [
                                 {
                                     "name": "List Pending Arrival Requests",
@@ -28008,7 +28143,7 @@
                                 "kiosk"
                             ]
                         },
-                        "description": "docs/decisions/kiosk-display.md. No login. One aggregate call for the kiosk screen, every section inside `data`:\n\n- `banner`: one flat, mixed list of live Announcements (each carries its own `type`: news / event / offer), ordered by sort_order across all types together.\n- `plans`: exactly the member app's package catalog (`GET member/packages` -> `data`), same fields item for item: active, public subscription plans; `pricing` in the base currency (no viewer to pick another); only offers open to everyone in `sale`; `is_current` always false. Full details of one plan (balances, discounts, resources) stay on `member/packages/{plan}`.\n- `social_links`: visible Contact Links.\n- `app_download.app_store` / `app_download.google_play` and `arrival_qr.value`: Setting rows (Admin > Settings). The client renders every QR itself; this endpoint never generates an image.\n\nEvery section key is always present, even as an empty array."
+                        "description": "docs/decisions/kiosk-display.md. No login. One aggregate call for the kiosk screen, every section inside `data`:\n\n- `banner`: one flat, mixed list of live Announcements (each carries its own `type`: news / event / offer), ordered by sort_order across all types together.\n- `plans`: exactly the member app's package catalog (`GET member/packages` -> `data`), same fields item for item: active, public subscription plans; `pricing` in the base currency (no viewer to pick another); only offers open to everyone in `sale`; `is_current` always false. Full details of one plan (balances, discounts, resources) stay on `member/packages/{plan}`.\n- `social_links`: visible Contact Links.\n- `app_download.app_store` / `app_download.google_play`: Setting rows (Admin > Settings). The client renders every QR itself; this endpoint never generates an image. The kiosk shows one scannable code, its rotating coworking code (Kiosk (device app) \u2192 Pair Kiosk); there is no static arrival QR.\n\nEvery section key is always present, even as an empty array."
                     },
                     "response": [
                         {
@@ -28045,7 +28180,7 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n    \"data\": {\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"price\": 100,\n                    \"currency\": \"$\",\n                    \"unit\": \"month\",\n                    \"unit_label\": \"month\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        },\n        \"arrival_qr\": {\n            \"value\": \"addapp://arrival\"\n        }\n    }\n}"
+                            "body": "{\n    \"data\": {\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"price\": 100,\n                    \"currency\": \"$\",\n                    \"unit\": \"month\",\n                    \"unit_label\": \"month\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        }\n    }\n}"
                         }
                     ]
                 },
@@ -28100,7 +28235,7 @@
                                 "pair"
                             ]
                         },
-                        "description": "Called by the kiosk app, no login. Trades a pairing code (Admin \u2192 Kiosks \u2192 Issue Pairing Code; case, spaces and dashes are ignored) for the kiosk's TOTP secret \u2014 the only response that ever carries it, sent with Cache-Control: no-store. Every pairing generates a new secret, so pairing a replacement device cuts off the old one. Throttled to 5 per minute. Saves kiosk_id and kiosk_secret (Member \u2192 11. Coworking Sessions \u2192 Start Session uses them).\n\nWhat the kiosk app does with it: keep `secret` in secure storage (Keychain / Keystore), never in plain preferences or logs; show a QR holding `{qr_prefix}:{kiosk_id}:{code}` where code = TOTP(secret) with `totp.algorithm` / `totp.digits` / `totp.period` (SHA1, 8, 30 \u2014 any RFC 6238 library), refreshed every period; keep the device clock NTP-synced (one step of drift is tolerated). It never calls the API again after pairing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Invalid or Expired Code** \u2014 422 `{\"message\":\"This pairing code is invalid or has expired.\"}` \u2014 the same answer for a wrong, expired or already-used code and for an inactive kiosk.\n- **Error: Too Many Attempts** \u2014 429 after 5 attempts in a minute."
+                        "description": "Called by the kiosk app, no login. Trades a pairing code (Admin \u2192 Kiosks \u2192 Issue Pairing Code; case, spaces and dashes are ignored) for the kiosk's TOTP secret \u2014 the only response that ever carries it, sent with Cache-Control: no-store. Every pairing generates a new secret, so pairing a replacement device cuts off the old one. Throttled to 5 per minute. Saves kiosk_id and kiosk_secret (Member \u2192 10. Scan (Kiosk & Doors) \u2192 Scan QR uses them).\n\nWhat the kiosk app does with it: keep `secret` in secure storage (Keychain / Keystore), never in plain preferences or logs; show a QR holding `{qr_prefix}:{kiosk_id}:{code}` where code = TOTP(secret) with `totp.algorithm` / `totp.digits` / `totp.period` (SHA1, 8, 30 \u2014 any RFC 6238 library), refreshed every period; keep the device clock NTP-synced (one step of drift is tolerated). It never calls the API again after pairing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Invalid or Expired Code** \u2014 422 `{\"message\":\"This pairing code is invalid or has expired.\"}` \u2014 the same answer for a wrong, expired or already-used code and for an inactive kiosk.\n- **Error: Too Many Attempts** \u2014 429 after 5 attempts in a minute."
                     },
                     "response": [
                         {

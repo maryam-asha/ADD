@@ -9,6 +9,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use Carbon\CarbonInterface;
 
 /**
  * The one place a booking is checked in — by reception at the desk, via a
@@ -29,7 +30,12 @@ class BookingCheckInService
         private readonly OpenCoworkingSessionLocator $openSessions,
     ) {}
 
-    public function checkIn(Booking $booking, SessionStartSource $via = SessionStartSource::Reception, ?Kiosk $kiosk = null): void
+    /**
+     * $at is when the member came in, now by default; the hand-over of an
+     * early walk-in passes the instant that walk-in closed, so the two
+     * sessions meet without a gap.
+     */
+    public function checkIn(Booking $booking, SessionStartSource $via = SessionStartSource::Reception, ?Kiosk $kiosk = null, ?CarbonInterface $at = null): void
     {
         if ($booking->status === BookingStatus::Cancelled) {
             throw new ReceptionActionException('api.reception.already_cancelled', 409);
@@ -84,7 +90,7 @@ class BookingCheckInService
         // does: `checked_in_at` is never before `start_at` (the bookings
         // table's CHECK constraint holds MySQL to the same).
         $booking->forceFill([
-            'checked_in_at' => now()->max($booking->start_at),
+            'checked_in_at' => ($at ?? now())->max($booking->start_at),
             'checked_in_via' => $via,
             'kiosk_id' => $kiosk?->id,
         ])->save();

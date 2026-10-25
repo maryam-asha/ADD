@@ -1,8 +1,6 @@
 <?php
 
-use App\Http\Controllers\Api\V1\Member\AccessUnlockController;
 use App\Http\Controllers\Api\V1\Member\AccountController;
-use App\Http\Controllers\Api\V1\Member\ArrivalRequestController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyOfficeLeaseController;
@@ -24,6 +22,7 @@ use App\Http\Controllers\Api\V1\Member\PreferencesController;
 use App\Http\Controllers\Api\V1\Member\PrivacyPolicyController;
 use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
+use App\Http\Controllers\Api\V1\Member\ScanController;
 use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
 use App\Http\Controllers\Api\V1\Member\SpaceController;
 use App\Http\Controllers\Api\V1\Member\TopUpController;
@@ -100,22 +99,16 @@ Route::post('bookings/batch', [BookingController::class, 'storeBatch']);
 Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 
-// Reception kiosk "I'm here" signal (docs/decisions/kiosk-display.md) —
-// never changes booking/session state by itself.
-Route::post('arrival-requests', [ArrivalRequestController::class, 'store']);
-
-// QR-scan unlock channel — docs/decisions/qr-lock-unlock.md §4. The member
-// scans the sticker fixed at the lock; the backend resolves qr_value to a
-// device, checks for an active access_grants row, and calls
-// TTLockClient::remoteUnlock() server-side.
-Route::post('access/unlock', [AccessUnlockController::class, 'unlock'])->middleware('throttle:10,1');
-
-// Self-service coworking sessions (docs/decisions/coworking-self-service-sessions.md):
-// scan the kiosk's rotating code to start, read the running session for the
-// timer. Static segments are declared before any {type}/{id} wildcard. The
+// The app's one scan button (ScanController): the kiosk's rotating code
+// starts a coworking session, checks a booking in or tells reception the
+// member is here (docs/decisions/coworking-self-service-sessions.md); a
+// lock's sticker opens that door (docs/decisions/qr-lock-unlock.md §4). The
 // throttle's third argument is a key prefix: without it the scan would share
-// one per-user bucket with access/unlock.
-Route::post('coworking-sessions', [CoworkingSessionController::class, 'start'])->middleware('throttle:10,1,coworking-scan');
+// one per-user bucket with every other plainly throttled member route.
+Route::post('scan', [ScanController::class, 'scan'])->middleware('throttle:10,1,member-scan');
+
+// The running coworking session: the timer, asking to end, the report.
+// Static segments are declared before any {type}/{id} wildcard.
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
 Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
 Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);

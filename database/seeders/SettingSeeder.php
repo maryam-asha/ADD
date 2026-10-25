@@ -46,7 +46,6 @@ class SettingSeeder extends Seeder
         $settings->setDefault('kiosk.arrival_request_expiry_minutes', 30, SettingValueType::Int);
         $settings->setDefault('kiosk.app_store_url', 'https://apps.example.local/ios', SettingValueType::String);
         $settings->setDefault('kiosk.google_play_url', 'https://apps.example.local/android', SettingValueType::String);
-        $settings->setDefault('kiosk.arrival_qr_value', 'addapp://arrival', SettingValueType::String);
         $settings->setDefault('module.cafe.is_enabled', true, SettingValueType::Bool);
         $settings->setDefault('app.timezone', 'Asia/Damascus', SettingValueType::String);
         $settings->setDefault('point.rate_usd', '0.10', SettingValueType::String);
