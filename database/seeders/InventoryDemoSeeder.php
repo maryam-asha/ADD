@@ -16,6 +16,7 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Catalog\Models\Unit;
 use Add\Inventory\Catalog\Services\CatalogService;
 use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -118,10 +119,10 @@ class InventoryDemoSeeder extends Seeder
         }
 
         $this->command?->info(sprintf(
-            'Inventory demo data seeded: %d items, %d assets, %d stock places.',
+            'Inventory demo data seeded: %d items, %d assets, %d stock balances.',
             Item::query()->where('sku', 'like', self::SKU.'%')->count(),
             Asset::query()->whereIn('item_id', collect($this->items)->pluck('id'))->count(),
-            collect($this->places)->count(),
+            StockBalance::query()->whereIn('item_id', collect($this->items)->pluck('id'))->where('quantity', '>', 0)->count(),
         ));
     }
 
