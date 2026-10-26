@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
-use App\Concerns\LogsSensitiveActions;
 use App\Domain\Access\Exceptions\LockAccessDeniedException;
 use App\Domain\Access\Services\UnlockService;
 use App\Domain\Booking\Enums\CoworkingStartOutcome;
@@ -12,14 +11,14 @@ use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\ScanRequest;
 use App\Http\Resources\ArrivalRequestResource;
-use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\SessionCoverageResource;
 use Illuminate\Http\JsonResponse;
 
 /**
  * The app's one scan button. The value says what was scanned: the kiosk's
- * rotating code (`add-cowork:v1:…`) starts a coworking session, checks a
- * booking in or tells reception the member is here
+ * rotating code (`add-cowork:v1:…`) files a request reception confirms —
+ * the coworking session or booking check-in starts at that confirmation —
+ * or tells reception the member is here for a room
  * (docs/decisions/coworking-self-service-sessions.md); anything else is
  * looked up as a lock's sticker and opens that door
  * (docs/decisions/qr-lock-unlock.md). Every answer that succeeds says which
@@ -27,8 +26,6 @@ use Illuminate\Http\JsonResponse;
  */
 class ScanController extends Controller
 {
-    use LogsSensitiveActions;
-
     public function scan(ScanRequest $request, CoworkingSessionService $sessions, UnlockService $locks): JsonResponse
     {
         $qrValue = $request->validated('qr_value');
@@ -69,28 +66,23 @@ class ScanController extends Controller
             ], 422);
         }
 
-        if ($result->outcome === CoworkingStartOutcome::ArrivalRequested) {
-            return response()->json(['data' => [
-                'outcome' => $result->outcome->value,
-                'arrival_request' => (new ArrivalRequestResource($result->arrivalRequest))->resolve($request),
-                'booking' => [
-                    'id' => $result->booking->id,
-                    'space' => [
-                        'id' => $result->booking->space->id,
-                        'name' => $result->booking->space->translate('name'),
-                        'space_type' => $result->booking->space->space_type,
-                    ],
-                    'start_at' => $result->booking->start_at->toIso8601String(),
-                    'end_at' => $result->booking->end_at->toIso8601String(),
+        // A request for reception, either kind: nothing has started yet.
+        $booking = $result->booking ?? $result->arrivalRequest->matchedBooking;
+
+        return response()->json(['data' => [
+            'outcome' => $result->outcome->value,
+            'arrival_request' => (new ArrivalRequestResource($result->arrivalRequest))->resolve($request),
+            'booking' => $booking === null ? null : [
+                'id' => $booking->id,
+                'space' => [
+                    'id' => $booking->space->id,
+                    'name' => $booking->space->translate('name'),
+                    'space_type' => $booking->space->space_type,
                 ],
-            ]], $result->arrivalRequest->wasRecentlyCreated ? 201 : 200);
-        }
-
-        $this->logSensitiveAction('coworking_session_started', $result->session, ['via' => 'scan']);
-
-        return response()->json([
-            'data' => ['outcome' => 'session'] + (new CoworkingSessionResource($result->session))->resolve($request),
-        ], 201);
+                'start_at' => $booking->start_at->toIso8601String(),
+                'end_at' => $booking->end_at->toIso8601String(),
+            ],
+        ]], $result->arrivalRequest->wasRecentlyCreated ? 201 : 200);
     }
 
     /** Nothing but the outcome: no lock or vendor detail reaches the member (LockCredentialsNeverReachMemberTest). */

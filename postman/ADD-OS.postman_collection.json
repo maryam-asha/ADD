@@ -5558,7 +5558,7 @@
                                                 "pay"
                                             ]
                                         },
-                                        "description": "Pays the member's own closed, unpaid coworking session from the app \u2014 the card (or `wallet`, or `cash` to leave it for the desk) chosen when ending it, or later. `{type}` is `booking` or `walkin` (Scan QR saves `coworking_session_type` and `coworking_session_id`; Session Report shows what is owed). The session already happened, so there is no window and no cancellation: a failed card leaves it owed and the member can pay again, here or at reception.\n\nBody: `payment_method` (required: `wallet` | `cash` | `paymera`), `wallet_owner_type`/`wallet_owner_id` (pick a company wallet \u2014 read with `wallet` only), `coupon_code` (optional; leave it out for none).\n\nAlways 201 `{data: {payment, redirect_url, next}}` (plus `coupon: {code, applied, points_discounted, message}` beside `data` when a code was sent); `next` is `redirect` (open `redirect_url` in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (`payment` and `redirect_url` null). `payment.transaction_id` is the payment's row in the wallet history once it settles.\n\nErrors: 404 not the member's session \u00b7 409 already paid \u00b7 422 while the session is still open (it must be checked out first) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 422 for a refused coupon `{message, reason}` \u00b7 503 = card payment unavailable (our misconfiguration); 502 = could not start \u2014 neither is a declined card, nothing was charged.\n\n### Cases \u2014 see this request's saved examples\n- **Card (next: redirect)** \u2014 201.\n- **Error: Already Paid** \u2014 409.\n- **Error: Session Still Open** \u2014 422."
+                                        "description": "Pays the member's own closed, unpaid coworking session from the app \u2014 the card (or `wallet`, or `cash` to leave it for the desk) chosen when ending it, or later. `{type}` is `booking` or `walkin` (Current Session saves `coworking_session_type` and `coworking_session_id` once reception has started it; Session Report shows what is owed). The session already happened, so there is no window and no cancellation: a failed card leaves it owed and the member can pay again, here or at reception.\n\nBody: `payment_method` (required: `wallet` | `cash` | `paymera`), `wallet_owner_type`/`wallet_owner_id` (pick a company wallet \u2014 read with `wallet` only), `coupon_code` (optional; leave it out for none).\n\nAlways 201 `{data: {payment, redirect_url, next}}` (plus `coupon: {code, applied, points_discounted, message}` beside `data` when a code was sent); `next` is `redirect` (open `redirect_url` in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (`payment` and `redirect_url` null). `payment.transaction_id` is the payment's row in the wallet history once it settles.\n\nErrors: 404 not the member's session \u00b7 409 already paid \u00b7 422 while the session is still open (it must be checked out first) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 422 for a refused coupon `{message, reason}` \u00b7 503 = card payment unavailable (our misconfiguration); 502 = could not start \u2014 neither is a declined card, nothing was charged.\n\n### Cases \u2014 see this request's saved examples\n- **Card (next: redirect)** \u2014 201.\n- **Error: Already Paid** \u2014 409.\n- **Error: Session Still Open** \u2014 422."
                                     },
                                     "response": [
                                         {
@@ -8528,15 +8528,12 @@
                                         "type": "text/javascript",
                                         "exec": [
                                             "const body = pm.response.json();",
-                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.outcome === 'session') {",
-                                            "    pm.collectionVariables.set('coworking_session_type', body.data.type);",
-                                            "    pm.collectionVariables.set('coworking_session_id', body.data.id);",
+                                            "// Nothing has started yet: reception confirms the request (Admin > Reception Operations > Arrival Requests).",
+                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.arrival_request) {",
+                                            "    pm.collectionVariables.set('arrival_request_id', body.data.arrival_request.id);",
                                             "}",
                                             "if (pm.response.code === 422 && body.scan_ticket) {",
                                             "    pm.collectionVariables.set('scan_ticket', body.scan_ticket);",
-                                            "}",
-                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.outcome === 'arrival_requested') {",
-                                            "    pm.collectionVariables.set('arrival_request_id', body.data.arrival_request.id);",
                                             "}"
                                         ]
                                     }
@@ -8585,11 +8582,11 @@
                                         "scan"
                                     ]
                                 },
-                                "description": "**The app's one scan button.** Send whatever the camera read as qr_value; the backend decides what it is:\n- `add-cowork:v1:\u2026` (the kiosk's rotating code) \u2192 a coworking session, a booking check-in, or a word to reception \u2014 below.\n- a door's sticker (a lock's qr_value) \u2192 opens that door when you hold an activated access grant on it (data.outcome unlocked); 403 no_active_grant, 503 gateway_offline / unlock_failed. Opening a booked room's door also checks that booking in. Nothing about the lock comes back.\n- anything else \u2192 422 `This code is not recognised\u2026`.\nEvery 200/201 says what happened in data.outcome: session, arrival_requested or unlocked. To test a door, put a lock's qr_value in {{lock_qr_value}} and send it as qr_value.\n\n**The kiosk's code** (the request as saved). qr_value is what the kiosk's QR holds: `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (409 \u2014 end it first) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started is checked in (type booking) \u2192 a booking of yours on a room, office or event hall at this branch, running or starting within 60 minutes: no session, reception is told instead (data.outcome arrival_requested, 201; 200 when you already had a pending request) \u2192 otherwise a walk-in: started at once when your plan covers it, else 422 confirmation_required. If your coworking booking on this space starts later today, that walk-in waits for it: data.upcoming_booking names it, and when it starts the walk-in closes and the booking is checked in from the same instant (coworking:hand-over-early-sessions, every minute) \u2014 no second scan; with no free seat until then, 409 booking_too_early.  Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves coworking_session_type and coworking_session_id when a session started (outcome session), arrival_request_id on arrival_requested, and scan_ticket on 422 confirmation_required.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It** \u2014 201 walk-in; coverage.status covered, coverage.covered_until is when the plan stops covering it (window end or hours running out, whichever first).\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing has started. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201 paid walk-in, accepted_uncovered true. Coverage is evaluated again at this moment (a renewal in between makes it covered).\n- **Error: Already in a Session** \u2014 409 `{\"message\":\"You already have an active session. End it before starting a new one.\"}`\n- **Booking Checked In** \u2014 201, type booking \u2014 your booking on this space was checked in instead of a walk-in.\n- **Room Booking - Reception Told** \u2014 201, outcome arrival_requested, with the arrival request and the booking (space, start_at, end_at). Nothing started; show \"reception has been told\".\n- **Early Arrival - Waits for Booking** \u2014 201 walk-in with upcoming_booking; it turns into that booking when it starts.\n- **Error: Booking Too Early** \u2014 409 `{\"message\":\"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"}`\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}` \u2014 no walk-in fallback, which would route around approval.\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}` \u2014 wrong, too old, malformed, or from an inactive/unpaired kiosk.\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}` \u2014 the kiosk's space is not an active co_space (e.g. under maintenance).\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`\n- **Door Unlocked** \u2014 200 `{\"data\":{\"outcome\":\"unlocked\",\"message\":\"Unlocked.\"}}`\n- **Error: Door - No Active Grant** \u2014 403\n- **Error: Unknown Code** \u2014 422, neither a kiosk code nor a door sticker."
+                                "description": "**The app's one scan button.** Send whatever the camera read as qr_value; the backend decides what it is:\n- `add-cowork:v1:\u2026` (the kiosk's rotating code) \u2192 a request reception must confirm. **Nothing starts at the scan**: a coworking session or a coworking booking's check-in starts when reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm), and is billed from that moment.\n- a door's sticker (a lock's qr_value) \u2192 opens that door when you hold an activated access grant on it (data.outcome unlocked); 403 no_active_grant, 503 gateway_offline / unlock_failed. Opening a booked room's door also checks that booking in. Nothing about the lock comes back.\n- anything else \u2192 422 `This code is not recognised\u2026`.\nEvery 200/201 says what happened in data.outcome: awaiting_confirmation, arrival_requested or unlocked. To test a door, put a lock's qr_value in {{lock_qr_value}} and send it as qr_value.\n\n**The kiosk's code** (the request as saved). qr_value is `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (409 \u2014 end it first) \u2192 a request of yours is already waiting on reception (200 with it, nothing new) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started: a request to check it in (data.arrival_request.matched_booking_id, data.booking; 409 if it awaits approval or payment) \u2192 a booking of yours on a room, office or event hall at this branch, running or starting within 60 minutes: an ordinary arrival request (outcome arrival_requested, purpose arrival) \u2192 otherwise a walk-in: filed at once when your plan covers it, else 422 confirmation_required first. The walk-in's capacity and hours are checked at the scan and again when reception confirms. If your coworking booking on this space starts later today, the walk-in waits for it (data.arrival_request.upcoming_booking): once started it closes at the booking's start and the booking is checked in from the same instant (coworking:hand-over-early-sessions, every minute) \u2014 no second scan or confirmation; with no free seat until then, 409 booking_too_early. Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves arrival_request_id when a request is filed, and scan_ticket on 422 confirmation_required. Then follow 11. Coworking Sessions \u2192 Current Session: data.state is awaiting_confirmation until reception confirms, then active; the member also gets a coworking.session_started (or coworking.start_rejected) notification.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It - Awaiting Reception** \u2014 201, outcome awaiting_confirmation, arrival_request.purpose coworking_start with the space and coverage.\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing filed. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201, arrival_request.accepted_uncovered true. Coverage is evaluated again at this moment.\n- **Error: Already in a Session** \u2014 409 `{\"message\":\"You already have an active session. End it before starting a new one.\"}`\n- **Coworking Booking - Awaiting Reception** \u2014 201 with arrival_request.matched_booking_id and data.booking; checked in when reception confirms.\n- **Room Booking - Reception Told** \u2014 201, outcome arrival_requested (purpose arrival), with the booking. Show \"reception has been told\".\n- **Early Arrival - Awaiting Reception** \u2014 201 with arrival_request.upcoming_booking; the walk-in reception starts turns into that booking when it begins.\n- **Error: Booking Too Early** \u2014 409 `{\"message\":\"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"}`\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}`\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}`\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}`\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`\n- **Door Unlocked** \u2014 200 `{\"data\":{\"outcome\":\"unlocked\",\"message\":\"Unlocked.\"}}`\n- **Error: Door - No Active Grant** \u2014 403\n- **Error: Unknown Code** \u2014 422, neither a kiosk code nor a door sticker."
                             },
                             "response": [
                                 {
-                                    "name": "Plan Covers It",
+                                    "name": "Plan Covers It - Awaiting Reception",
                                     "originalRequest": {
                                         "auth": {
                                             "type": "bearer",
@@ -8644,7 +8641,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"awaiting_confirmation\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"purpose\": \"coworking_start\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": null,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"coverage\": {\n                \"status\": \"covered\",\n                \"reason\": null,\n                \"plan\": {\n                    \"id\": 1,\n                    \"name\": \"Flex 40 Hours\"\n                },\n                \"hours_total\": 40,\n                \"hours_remaining\": 40,\n                \"window\": {\n                    \"start\": \"08:00\",\n                    \"end\": \"20:00\"\n                },\n                \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n            },\n            \"accepted_uncovered\": false,\n            \"upcoming_booking\": null\n        },\n        \"booking\": null\n    }\n}"
                                 },
                                 {
                                     "name": "Confirmation Required",
@@ -8760,7 +8757,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 2,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:05:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"not_covered\",\n            \"reason\": \"no_plan\",\n            \"plan\": null,\n            \"hours_total\": null,\n            \"hours_remaining\": null,\n            \"window\": null,\n            \"covered_until\": null\n        },\n        \"accepted_uncovered\": true,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"awaiting_confirmation\",\n        \"arrival_request\": {\n            \"id\": 7,\n            \"purpose\": \"coworking_start\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": null,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"coverage\": {\n                \"status\": \"not_covered\",\n                \"reason\": \"no_plan\",\n                \"plan\": null,\n                \"hours_total\": null,\n                \"hours_remaining\": null,\n                \"window\": null,\n                \"covered_until\": null\n            },\n            \"accepted_uncovered\": true,\n            \"upcoming_booking\": null\n        },\n        \"booking\": null\n    }\n}"
                                 },
                                 {
                                     "name": "Error: Already in a Session",
@@ -8821,7 +8818,7 @@
                                     "body": "{\n    \"message\": \"You already have an active session. End it before starting a new one.\"\n}"
                                 },
                                 {
-                                    "name": "Booking Checked In",
+                                    "name": "Coworking Booking - Awaiting Reception",
                                     "originalRequest": {
                                         "auth": {
                                             "type": "bearer",
@@ -8876,7 +8873,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"booking\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": null,\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"awaiting_confirmation\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"purpose\": \"coworking_start\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": 7,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"coverage\": null,\n            \"accepted_uncovered\": false,\n            \"upcoming_booking\": null\n        },\n        \"booking\": {\n            \"id\": 7,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\",\n                \"space_type\": \"co_space\"\n            },\n            \"start_at\": \"2026-08-17T07:10:00+00:00\",\n            \"end_at\": \"2026-08-17T09:10:00+00:00\"\n        }\n    }\n}"
                                 },
                                 {
                                     "name": "Room Booking - Reception Told",
@@ -8934,10 +8931,10 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"outcome\": \"arrival_requested\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": 9\n        },\n        \"booking\": {\n            \"id\": 9,\n            \"space\": {\n                \"id\": 4,\n                \"name\": \"Meeting Room A\",\n                \"space_type\": \"room\"\n            },\n            \"start_at\": \"2026-08-17T07:30:00+00:00\",\n            \"end_at\": \"2026-08-17T08:30:00+00:00\"\n        }\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"arrival_requested\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"purpose\": \"arrival\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": 9,\n            \"space\": null,\n            \"coverage\": null,\n            \"accepted_uncovered\": false,\n            \"upcoming_booking\": null\n        },\n        \"booking\": {\n            \"id\": 9,\n            \"space\": {\n                \"id\": 4,\n                \"name\": \"Meeting Room A\",\n                \"space_type\": \"room\"\n            },\n            \"start_at\": \"2026-08-17T07:30:00+00:00\",\n            \"end_at\": \"2026-08-17T08:30:00+00:00\"\n        }\n    }\n}"
                                 },
                                 {
-                                    "name": "Early Arrival - Waits for Booking",
+                                    "name": "Early Arrival - Awaiting Reception",
                                     "originalRequest": {
                                         "auth": {
                                             "type": "bearer",
@@ -8992,7 +8989,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"outcome\": \"session\",\n        \"type\": \"walkin\",\n        \"id\": 3,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": {\n            \"id\": 7,\n            \"start_at\": \"2026-08-17T08:00:00+00:00\",\n            \"end_at\": \"2026-08-17T10:00:00+00:00\"\n        },\n        \"end_request\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"awaiting_confirmation\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"purpose\": \"coworking_start\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": null,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"coverage\": {\n                \"status\": \"covered\",\n                \"reason\": null,\n                \"plan\": {\n                    \"id\": 1,\n                    \"name\": \"Flex 40 Hours\"\n                },\n                \"hours_total\": 40,\n                \"hours_remaining\": 40,\n                \"window\": {\n                    \"start\": \"08:00\",\n                    \"end\": \"20:00\"\n                },\n                \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n            },\n            \"accepted_uncovered\": false,\n            \"upcoming_booking\": {\n                \"id\": 7,\n                \"start_at\": \"2026-08-17T08:00:00+00:00\",\n                \"end_at\": \"2026-08-17T10:00:00+00:00\"\n            }\n        },\n        \"booking\": null\n    }\n}"
                                 },
                                 {
                                     "name": "Error: Booking Too Early",
@@ -9580,7 +9577,7 @@
                 },
                 {
                     "name": "11. Coworking Sessions",
-                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 Current Session for the timer \u2192 Request End \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.",
+                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm) and the session starts then \u2192 Current Session for the timer \u2192 Request End \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.",
                     "item": [
                         {
                             "name": "Current Session (Timer)",
@@ -9615,7 +9612,7 @@
                                         "current"
                                     ]
                                 },
-                                "description": "The member's open coworking session, for the timer: checked_in_at, coverage (walk-ins: the plan coverage taken at start \u2014 covered_until is when the plan stops covering it), accepted_uncovered, and end_request while one is pending. data is null when nothing is open.\n\n### Cases \u2014 see this request's saved examples\n- **No Open Session** \u2014 200 `{\"data\": null}`.\n- **End Requested** \u2014 200 with end_request {id, status: pending, requested_at, \u2026} \u2014 show \"waiting for reception\".\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off."
+                                "description": "The member's open coworking session, for the timer: checked_in_at, coverage (walk-ins: the plan coverage taken at start \u2014 covered_until is when the plan stops covering it), accepted_uncovered, and end_request while one is pending. data.state is active for the running session, or awaiting_confirmation (with the arrival_request) while a kiosk scan waits for reception to confirm it \u2014 show \"waiting for reception\" and poll; data is null when there is neither.\n\n### Cases \u2014 see this request's saved examples\n- **Awaiting Reception** \u2014 200 `{\"data\": {\"state\": \"awaiting_confirmation\", \"arrival_request\": {\u2026}}}`.\n- **No Open Session** \u2014 200 `{\"data\": null}`.\n- **End Requested** \u2014 200 with end_request {id, status: pending, requested_at, \u2026} \u2014 show \"waiting for reception\".\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off."
                             },
                             "response": [
                                 {
@@ -9662,7 +9659,53 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null,\n        \"discounts\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"state\": \"active\",\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T07:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 40 Hours\"\n            },\n            \"hours_total\": 40,\n            \"hours_remaining\": 40,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": null,\n        \"discounts\": []\n    }\n}"
+                                },
+                                {
+                                    "name": "Awaiting Reception",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"state\": \"awaiting_confirmation\",\n        \"arrival_request\": {\n            \"id\": 6,\n            \"purpose\": \"coworking_start\",\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T07:00:00.000000Z\",\n            \"matched_booking_id\": null,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"coverage\": {\n                \"status\": \"covered\",\n                \"reason\": null,\n                \"plan\": {\n                    \"id\": 1,\n                    \"name\": \"Flex 40 Hours\"\n                },\n                \"hours_total\": 40,\n                \"hours_remaining\": 40,\n                \"window\": {\n                    \"start\": \"08:00\",\n                    \"end\": \"20:00\"\n                },\n                \"covered_until\": \"2026-08-17T17:00:00+00:00\"\n            },\n            \"accepted_uncovered\": false,\n            \"upcoming_booking\": null\n        }\n    }\n}"
                                 },
                                 {
                                     "name": "No Open Session",
@@ -9754,7 +9797,23 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 2 Hours\"\n            },\n            \"hours_total\": 2,\n            \"hours_remaining\": 2,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": {\n            \"id\": 1,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n            \"resolved_at\": null,\n            \"checked_out_at\": null\n        },\n        \"discounts\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"state\": \"active\",\n        \"type\": \"walkin\",\n        \"id\": 1,\n        \"space\": {\n            \"id\": 1,\n            \"name\": \"Co-working Hall\"\n        },\n        \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n        \"checked_out_at\": null,\n        \"started_via\": \"scan\",\n        \"hourly_rate_points\": 100,\n        \"coverage\": {\n            \"status\": \"covered\",\n            \"reason\": null,\n            \"plan\": {\n                \"id\": 1,\n                \"name\": \"Flex 2 Hours\"\n            },\n            \"hours_total\": 2,\n            \"hours_remaining\": 2,\n            \"window\": {\n                \"start\": \"08:00\",\n                \"end\": \"20:00\"\n            },\n            \"covered_until\": \"2026-08-17T07:00:00+00:00\"\n        },\n        \"accepted_uncovered\": false,\n        \"upcoming_booking\": null,\n        \"end_request\": {\n            \"id\": 1,\n            \"status\": \"pending\",\n            \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n            \"resolved_at\": null,\n            \"checked_out_at\": null\n        },\n        \"discounts\": []\n    }\n}"
+                                }
+                            ],
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "const body = pm.response.json();",
+                                            "// The session reception started: saved for Request End, Session Report and Pay.",
+                                            "if (pm.response.code === 200 && body.data && body.data.state === 'active') {",
+                                            "    pm.collectionVariables.set('coworking_session_type', body.data.type);",
+                                            "    pm.collectionVariables.set('coworking_session_id', body.data.id);",
+                                            "}"
+                                        ]
+                                    }
                                 }
                             ]
                         },
@@ -10119,7 +10178,7 @@
                                         "report"
                                     ]
                                 },
-                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Scan QR saves both variables. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced."
+                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Current Session saves both variables once reception has started it. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced."
                             },
                             "response": [
                                 {
@@ -10614,7 +10673,7 @@
                                         "home"
                                     ]
                                 },
-                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{type: walkin|booking, id, space {id, name, type}, branch {id, name}, checked_in_at, end_requested}`. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current.\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.",
+                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{state: active|awaiting_confirmation, type: walkin|booking, id, arrival_request_id, space {id, name, type}, branch {id, name}, requested_at, checked_in_at, end_requested}`. state = awaiting_confirmation \u0628\u0639\u062f \u0645\u0633\u062d \u0627\u0644\u0643\u064a\u0648\u0633\u0643 \u0648\u0642\u0628\u0644 \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644: \u0644\u0627 \u062c\u0644\u0633\u0629 \u0628\u0639\u062f\u060c \u0641\u064a\u0643\u0648\u0646 id \u0648checked_in_at \u0628\u0642\u064a\u0645\u0629 null\u060c \u0648arrival_request_id \u0648requested_at \u0644\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u0644\u0651\u0642. state = active \u0644\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629\u060c \u0648\u064a\u0643\u0648\u0646 arrival_request_id \u0648requested_at \u0628\u0642\u064a\u0645\u0629 null. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current.\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -16895,7 +16954,7 @@
                         },
                         {
                             "name": "Arrival Requests",
-                            "description": "docs/decisions/kiosk-display.md. A member's arrival request is created by Member (App) > 10. Scan (Kiosk & Doors) > Scan QR when they scan the kiosk with a room, office or hall booking about to start; it saves {{arrival_request_id}}. Confirming a matched request calls Check In Booking above unchanged; confirming an unmatched one (space_id required) calls Start Walk-in Session above unchanged -- no new booking/session logic exists here, this is purely a dispatch to those two actions.",
+                            "description": "docs/decisions/kiosk-display.md, docs/decisions/coworking-self-service-sessions.md. Every kiosk scan lands here (Member (App) > 10. Scan (Kiosk & Doors) > Scan QR, which saves {{arrival_request_id}}): a room, office or hall booking about to start (purpose arrival), or a coworking session that starts only when reception confirms it (purpose coworking_start). Confirming a matched arrival calls Check In Booking above unchanged; an unmatched one (space_id required) calls Start Walk-in Session above unchanged; a coworking start runs the same check-in or walk-in rules on the kiosk's space.",
                             "item": [
                                 {
                                     "name": "List Pending Arrival Requests",
@@ -16921,7 +16980,7 @@
                                                 "arrival-requests"
                                             ]
                                         },
-                                        "description": "Paginated, status = pending only, ordered by requested_at ascending, with the member's name/phone and the matched booking (if any) eager-loaded."
+                                        "description": "Paginated, status = pending only, ordered by requested_at ascending, with the member (name, phone, avatar_url) and the matched booking (if any). Each row's purpose says what confirming it does: arrival (check its booking in, or pick a space for a walk-in) or coworking_start (a member who scanned the kiosk: confirming starts their coworking session on `space`, nothing to choose) \u2014 the latter also carries coverage (what the member was shown about their plan), accepted_uncovered (they agreed to pay the hourly rate) and upcoming_booking (an early arrival). A request nobody answers expires after kiosk.arrival_request_expiry_minutes (30)."
                                     }
                                 },
                                 {
@@ -16950,7 +17009,7 @@
                                                 "confirm"
                                             ]
                                         },
-                                        "description": "**Matched Booking** (the request as saved). When the request has a matched_booking_id, no body is needed -- this calls Check In Booking's own logic unchanged, including its already-checked-in/wrong-status/outside-business-hours guards, and propagates that response verbatim on failure.\n\n### Cases \u2014 see this request's saved examples\n- **Unmatched -- Walk-in** \u2014 When the request has no matched_booking_id, space_id is required -- this calls Start Walk-in Session's own logic unchanged, including its capacity/business-hours guards.\n- **Error: Space Required** \u2014 422 when the request is unmatched and no space_id was supplied in the body.\n- **Error: Not Pending** \u2014 409 when the request has already been confirmed, rejected, or expired."
+                                        "description": "**Matched Booking** (the request as saved). When the request has a matched_booking_id, no body is needed -- this calls Check In Booking's own logic unchanged, including its already-checked-in/wrong-status/outside-business-hours guards, and propagates that response verbatim on failure.\n\n**Coworking start** (purpose coworking_start, filed by a member's kiosk scan): no body either -- the space is the kiosk's. This is the moment the member's coworking session starts, billed from now: it checks their coworking booking in (matched_booking_id, or the booking an early arrival was waiting for once it is within 15 minutes), or starts the walk-in with the walk-in's own capacity/business-hours guards, handing over to upcoming_booking when that begins. 409 coverage_changed when the plan stopped covering a member who did not accept paying \u2014 reject it and have them scan again. The member gets a coworking.session_started notification.\n\n### Cases \u2014 see this request's saved examples\n- **Unmatched -- Walk-in** \u2014 When an arrival request has no matched_booking_id, space_id is required -- this calls Start Walk-in Session's own logic unchanged, including its capacity/business-hours guards.\n- **Coworking Start - Session Started** \u2014 200 `{\"message\":\"Arrival confirmed.\"}`.\n- **Error: Plan No Longer Covers** \u2014 409 for a coworking start whose plan stopped covering it.\n- **Error: Space Required** \u2014 422 when an arrival request is unmatched and no space_id was supplied in the body.\n- **Error: Not Pending** \u2014 409 when the request has already been confirmed, rejected, or expired."
                                     },
                                     "response": [
                                         {
@@ -17002,6 +17061,84 @@
                                             ],
                                             "cookie": [],
                                             "body": ""
+                                        },
+                                        {
+                                            "name": "Coworking Start - Session Started",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "arrival-requests",
+                                                        "{{arrival_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"Arrival confirmed.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Plan No Longer Covers",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/arrival-requests/{{arrival_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "arrival-requests",
+                                                        "{{arrival_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Conflict",
+                                            "code": 409,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"The member's plan no longer covers this session. Reject the request and ask them to scan again.\"\n}"
                                         },
                                         {
                                             "name": "Error: Space Required",
@@ -17109,7 +17246,7 @@
                                                 "reject"
                                             ]
                                         },
-                                        "description": "No refund/cancellation logic applies -- nothing was ever charged or reserved by the arrival request itself. 409 if the request is not currently pending."
+                                        "description": "No refund/cancellation logic applies -- nothing was ever charged or reserved by the arrival request itself. 409 if the request is not currently pending. Rejecting a coworking_start sends the member a coworking.start_rejected notification; nothing started, so nothing is billed."
                                     }
                                 }
                             ]

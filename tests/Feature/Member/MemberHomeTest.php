@@ -2,7 +2,10 @@
 
 namespace Tests\Feature\Member;
 
+use App\Domain\Booking\Enums\ArrivalRequestPurpose;
+use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\Announcement;
@@ -119,13 +122,55 @@ class MemberHomeTest extends TestCase
         ]);
 
         $this->home()->assertJsonPath('data.active_session', [
+            'state' => 'active',
             'type' => 'walkin',
             'id' => $session->id,
+            'arrival_request_id' => null,
             'space' => ['id' => $openSpace->id, 'name' => 'Open Space', 'type' => 'co_space'],
             'branch' => ['id' => $openSpace->building->branch_id, 'name' => 'Main Branch'],
+            'requested_at' => null,
             'checked_in_at' => '2026-10-13T08:35:00+03:00',
             'end_requested' => false,
         ]);
+    }
+
+    public function test_a_kiosk_scan_waiting_for_reception_is_the_card_on_top(): void
+    {
+        $openSpace = Space::factory()->create([
+            'building_id' => $this->room->building_id,
+            'space_type' => SpaceType::CoSpace,
+            'name' => ['en' => 'Open Space', 'ar' => 'المساحة المفتوحة'],
+        ]);
+        $request = ArrivalRequest::factory()->create([
+            'user_id' => $this->member->id,
+            'purpose' => ArrivalRequestPurpose::CoworkingStart,
+            'space_id' => $openSpace->id,
+            'status' => ArrivalRequestStatus::Pending,
+            'requested_at' => now()->subMinutes(2),
+        ]);
+
+        $this->home()->assertJsonPath('data.active_session', [
+            'state' => 'awaiting_confirmation',
+            'type' => 'walkin',
+            'id' => null,
+            'arrival_request_id' => $request->id,
+            'space' => ['id' => $openSpace->id, 'name' => 'Open Space', 'type' => 'co_space'],
+            'branch' => ['id' => $openSpace->building->branch_id, 'name' => 'Main Branch'],
+            'requested_at' => '2026-10-13T09:58:00+03:00',
+            'checked_in_at' => null,
+            'end_requested' => false,
+        ]);
+    }
+
+    public function test_an_arrival_request_for_a_room_is_not_a_session_card(): void
+    {
+        ArrivalRequest::factory()->create([
+            'user_id' => $this->member->id,
+            'purpose' => ArrivalRequestPurpose::Arrival,
+            'status' => ArrivalRequestStatus::Pending,
+        ]);
+
+        $this->home()->assertJsonPath('data.active_session', null);
     }
 
     public function test_today_holds_the_bookings_still_ahead_today_in_the_district(): void

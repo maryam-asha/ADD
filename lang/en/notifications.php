@@ -157,6 +157,14 @@ return [
     ],
 
     'coworking' => [
+        'session_started' => [
+            'title' => 'Session Started',
+            'body' => 'Reception confirmed you are here. Your session at :space has started.',
+        ],
+        'start_rejected' => [
+            'title' => 'Session Not Started',
+            'body' => 'Reception did not confirm your session. Please see the reception desk.',
+        ],
         'session_ended' => [
             'title' => 'Session Ended',
             'body' => 'Your session at :space has ended. Tap to see the report.',

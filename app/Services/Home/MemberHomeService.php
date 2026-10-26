@@ -5,6 +5,7 @@ namespace App\Services\Home;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\ArrivalRequestService;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
@@ -36,6 +37,7 @@ class MemberHomeService
 {
     public function __construct(
         private readonly CoworkingSessionService $sessions,
+        private readonly ArrivalRequestService $arrivals,
         private readonly ServiceCatalogService $catalog,
         private readonly BookingPresentationService $presentation,
         private readonly EventBrowseService $events,
@@ -59,7 +61,7 @@ class MemberHomeService
         return [
             'greeting' => $this->greeting($member, $localNow, $locale),
             'unread_notifications' => $member->unreadNotifications()->count(),
-            'active_session' => $session === null ? null : $this->session($session, $locale),
+            'active_session' => $session === null ? $this->awaitingSession($member, $locale) : $this->session($session, $locale),
             'banners' => $this->banners($locale),
             'today' => $this->today($member, $session, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
@@ -83,8 +85,9 @@ class MemberHomeService
     }
 
     /**
-     * The card above everything else while a session runs. Its detail —
-     * the price, the coverage, ending it — is coworking-sessions/current.
+     * The card above everything else while a session runs (state active).
+     * Its detail — the price, the coverage, ending it — is
+     * coworking-sessions/current.
      *
      * @return array<string, mixed>
      */
@@ -93,12 +96,45 @@ class MemberHomeService
         $session->loadMissing(['space.building.branch', 'pendingEndRequest']);
 
         return [
+            'state' => 'active',
             'type' => $session->coworkingType(),
             'id' => $session->id,
+            'arrival_request_id' => null,
             'space' => $this->space($session->space, $locale),
             'branch' => $this->branch($session->space->building?->branch, $locale),
+            'requested_at' => null,
             'checked_in_at' => $this->time->toLocal($session->checked_in_at)?->toIso8601String(),
             'end_requested' => $session->pendingEndRequest !== null,
+        ];
+    }
+
+    /**
+     * The same card while a kiosk scan waits for reception to start the
+     * session (state awaiting_confirmation): no session yet, so no id or
+     * check-in time. Null when nothing waits.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function awaitingSession(User $member, string $locale): ?array
+    {
+        $request = $this->arrivals->pendingFor($member);
+
+        if ($request === null || ! $request->isCoworkingStart() || $request->space === null) {
+            return null;
+        }
+
+        $request->loadMissing('space.building.branch');
+
+        return [
+            'state' => 'awaiting_confirmation',
+            'type' => $request->matched_booking_id !== null ? 'booking' : 'walkin',
+            'id' => null,
+            'arrival_request_id' => $request->id,
+            'space' => $this->space($request->space, $locale),
+            'branch' => $this->branch($request->space->building?->branch, $locale),
+            'requested_at' => $this->time->toLocal($request->requested_at)?->toIso8601String(),
+            'checked_in_at' => null,
+            'end_requested' => false,
         ];
     }
 

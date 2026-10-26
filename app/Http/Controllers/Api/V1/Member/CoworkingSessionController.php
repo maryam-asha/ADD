@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\ArrivalRequestService;
 use App\Domain\Booking\Services\CoworkingSessionService;
 use App\Domain\Booking\Services\SessionEndService;
 use App\Domain\Booking\Services\SessionReportBuilder;
@@ -14,6 +15,7 @@ use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\PayCoworkingSessionRequest;
 use App\Http\Requests\Member\RequestSessionEndRequest;
+use App\Http\Resources\ArrivalRequestResource;
 use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
 use Illuminate\Http\JsonResponse;
@@ -26,11 +28,24 @@ class CoworkingSessionController extends Controller
     use AnswersPayments;
     use LogsSensitiveActions;
 
-    public function current(Request $request, CoworkingSessionService $sessions): JsonResponse
+    /**
+     * The running session (state active), or the scan still waiting on
+     * reception to start one (state awaiting_confirmation), or null.
+     */
+    public function current(Request $request, CoworkingSessionService $sessions, ArrivalRequestService $arrivals): JsonResponse
     {
         $open = $sessions->openSessionFor($request->user());
 
-        return response()->json(['data' => $open === null ? null : new CoworkingSessionResource($open)]);
+        if ($open !== null) {
+            return response()->json(['data' => ['state' => 'active'] + (new CoworkingSessionResource($open))->resolve($request)]);
+        }
+
+        $pending = $arrivals->pendingFor($request->user());
+
+        return response()->json(['data' => $pending !== null && $pending->isCoworkingStart() ? [
+            'state' => 'awaiting_confirmation',
+            'arrival_request' => (new ArrivalRequestResource($pending))->resolve($request),
+        ] : null]);
     }
 
     /** A session that is not the caller's is a 404, not a 403 — its existence is not theirs to learn. */

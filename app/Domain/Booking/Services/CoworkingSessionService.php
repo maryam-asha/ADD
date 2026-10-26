@@ -4,7 +4,6 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\DataTransferObjects\CoworkingStartResult;
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -17,6 +16,9 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * Self-service coworking sessions (docs/decisions/coworking-self-service-sessions.md).
+ * A scan files a request reception confirms; the session starts at that
+ * confirmation (CoworkingStartConfirmation).
+ *
  * Orchestration only: every rule that decides whether a session may start —
  * business hours, capacity, booking status — stays in the service that
  * already enforces it for reception, so the desk and the scan cannot
@@ -34,7 +36,6 @@ class CoworkingSessionService
         private readonly KioskCodeVerifier $codes,
         private readonly ScanTicketService $tickets,
         private readonly ArrivalRequestMatcher $bookings,
-        private readonly BookingCheckInService $checkIns,
         private readonly SessionCoverageEvaluator $coverage,
         private readonly WalkInCapacityService $walkIns,
         private readonly BusinessHoursService $businessHours,
@@ -76,6 +77,13 @@ class CoworkingSessionService
                 throw new ReceptionActionException('api.coworking.already_in_session', 409);
             }
 
+            // Already waiting on reception: scanning again changes nothing.
+            if (($pending = $this->arrivals->pendingFor($member)) !== null) {
+                return $pending->isCoworkingStart()
+                    ? CoworkingStartResult::awaitingConfirmation($pending)
+                    : CoworkingStartResult::arrivalRequested($pending, $pending->matchedBooking);
+            }
+
             $branch = $space->building->branch;
             $booking = $this->bookings->matchBookingFor($member, $branch, now(), $space);
 
@@ -85,7 +93,8 @@ class CoworkingSessionService
             // then at the booking's rate — so the member sits on a walk-in
             // that hands over to the booking when it starts (a pending
             // booking outside the window included; only a confirmed one is
-            // handed over to).
+            // handed over to). Either way nothing starts until reception
+            // confirms the member is here.
             $handoverBooking = null;
 
             if ($booking !== null && $booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
@@ -104,9 +113,7 @@ class CoworkingSessionService
                     throw new ReceptionActionException('api.coworking.booking_pending_approval', 409);
                 }
 
-                $this->checkIns->checkIn($booking, SessionStartSource::Scan, $kiosk);
-
-                return CoworkingStartResult::started($booking->fresh());
+                return CoworkingStartResult::awaitingConfirmation($this->arrivals->coworkingStart($member, $kiosk, $booking));
             }
 
             // A room, office or hall booking is reception's to check in, as
@@ -128,8 +135,11 @@ class CoworkingSessionService
                 );
             }
 
+            // The walk-in's own rules, now, so the member is refused at the
+            // kiosk rather than after reception confirms; they are applied
+            // again when the walk-in actually starts.
             try {
-                $result = $this->walkIns->start($space, $member, SessionStartSource::Scan, $kiosk, ! $coverage->isCovered(), $coverage);
+                $this->walkIns->assertCanStart($space, $member);
             } catch (ReceptionActionException $e) {
                 // No seat to wait in: their booking still holds one from its start.
                 if ($handoverBooking !== null && $e->messageKey === 'api.reception.no_capacity') {
@@ -139,11 +149,14 @@ class CoworkingSessionService
                 throw $e;
             }
 
-            if ($handoverBooking !== null) {
-                $result->session->forceFill(['handover_booking_id' => $handoverBooking->id])->save();
-            }
-
-            return CoworkingStartResult::started($result->session->fresh(), $coverage);
+            return CoworkingStartResult::awaitingConfirmation($this->arrivals->coworkingStart(
+                $member,
+                $kiosk,
+                null,
+                $handoverBooking,
+                ! $coverage->isCovered(),
+                $coverage,
+            ));
         });
     }
 

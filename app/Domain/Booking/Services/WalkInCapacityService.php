@@ -52,71 +52,7 @@ class WalkInCapacityService
         ?SessionCoverage $coverage = null,
     ): WalkInStartResult {
         return DB::transaction(function () use ($space, $member, $via, $kiosk, $acceptedUncovered, $coverage) {
-            $space->loadMissing('building');
-
-            // A co_space, or a room lent to co-working right now, seats the
-            // walk-in from its branch's pool — locked before the space, as
-            // every path that touches the pool does
-            // (docs/decisions/coworking-seat-pool.md).
-            $inPool = $this->availability->usesBranchPool($space)
-                || $this->availability->isInCoworkingMode(
-                    $this->availability->blockingCoworkingWindows($space, now(), now()->addSecond()),
-                    now(),
-                    now()->addSecond(),
-                );
-
-            if ($inPool) {
-                Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
-            }
-
-            $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
-
-            // A leased office is its tenant's today (docs/decisions/office-leases.md).
-            $timezone = $this->availability->rulesFor($locked)->timezone;
-
-            if ($this->availability->isHeldByLease(
-                $this->availability->blockingLeases($locked->id, now(), now()->addSecond(), $timezone),
-                now(),
-                now()->addSecond(),
-                $timezone,
-            )) {
-                throw new ReceptionActionException('api.booking.office_leased');
-            }
-
-            // At most one open coworking session per member, whichever path
-            // starts it (docs/decisions/coworking-self-service-sessions.md);
-            // the scan returns the open one before it ever gets here. Rooms
-            // and the other space types are not coworking sessions.
-            if ($locked->space_type === SpaceType::CoSpace && $this->openSessions->for($member) !== null) {
-                throw new ReceptionActionException('api.reception.member_already_in_session', 409);
-            }
-
-            $branch = $locked->building->branch;
-
-            if (! $this->businessHours->isWithinBusinessHours(now(), $branch)) {
-                throw new ReceptionActionException('api.reception.outside_business_hours');
-            }
-
-            $seatCovered = false;
-
-            if ($inPool) {
-                $seatCovered = $this->assertPoolSeat($locked, $member);
-            } elseif ($locked->capacity !== null) {
-                $occupied = Booking::query()
-                    ->where('space_id', $locked->id)
-                    ->whereNotNull('checked_in_at')
-                    ->whereNull('checked_out_at')
-                    ->count();
-
-                $occupied += WalkinSession::query()
-                    ->where('space_id', $locked->id)
-                    ->whereNull('checked_out_at')
-                    ->count();
-
-                if ($occupied >= $locked->capacity) {
-                    throw new ReceptionActionException('api.reception.no_capacity');
-                }
-            }
+            [$locked, $seatCovered] = $this->admit($space, $member);
 
             // Stamped now, not re-resolved at checkout: it pins which
             // subscription was in force when the session started.
@@ -161,6 +97,93 @@ class WalkInCapacityService
                 $applies ? null : 'api.reception.outside_plan_window',
             );
         });
+    }
+
+    /**
+     * Whether $member could start a walk-in on $space right now, by the same
+     * rules start() applies — so a kiosk scan can refuse at once rather than
+     * after reception confirms. Nothing is written.
+     */
+    public function assertCanStart(Space $space, User $member): void
+    {
+        DB::transaction(fn () => $this->admit($space, $member));
+    }
+
+    /**
+     * Every rule a walk-in must pass, under the locks start() holds while it
+     * writes. Called inside a transaction.
+     *
+     * @return array{0: Space, 1: bool} the locked space, and whether the walk-in sits in a seat already held
+     */
+    private function admit(Space $space, User $member): array
+    {
+        $space->loadMissing('building');
+
+        // A co_space, or a room lent to co-working right now, seats the
+        // walk-in from its branch's pool — locked before the space, as
+        // every path that touches the pool does
+        // (docs/decisions/coworking-seat-pool.md).
+        $inPool = $this->availability->usesBranchPool($space)
+            || $this->availability->isInCoworkingMode(
+                $this->availability->blockingCoworkingWindows($space, now(), now()->addSecond()),
+                now(),
+                now()->addSecond(),
+            );
+
+        if ($inPool) {
+            Branch::query()->whereKey($space->building->branch_id)->lockForUpdate()->first();
+        }
+
+        $locked = Space::query()->whereKey($space->id)->lockForUpdate()->firstOrFail();
+
+        // A leased office is its tenant's today (docs/decisions/office-leases.md).
+        $timezone = $this->availability->rulesFor($locked)->timezone;
+
+        if ($this->availability->isHeldByLease(
+            $this->availability->blockingLeases($locked->id, now(), now()->addSecond(), $timezone),
+            now(),
+            now()->addSecond(),
+            $timezone,
+        )) {
+            throw new ReceptionActionException('api.booking.office_leased');
+        }
+
+        // At most one open coworking session per member, whichever path
+        // starts it (docs/decisions/coworking-self-service-sessions.md);
+        // the scan refuses a member already in one before it gets here. Rooms
+        // and the other space types are not coworking sessions.
+        if ($locked->space_type === SpaceType::CoSpace && $this->openSessions->for($member) !== null) {
+            throw new ReceptionActionException('api.reception.member_already_in_session', 409);
+        }
+
+        $branch = $locked->building->branch;
+
+        if (! $this->businessHours->isWithinBusinessHours(now(), $branch)) {
+            throw new ReceptionActionException('api.reception.outside_business_hours');
+        }
+
+        $seatCovered = false;
+
+        if ($inPool) {
+            $seatCovered = $this->assertPoolSeat($locked, $member);
+        } elseif ($locked->capacity !== null) {
+            $occupied = Booking::query()
+                ->where('space_id', $locked->id)
+                ->whereNotNull('checked_in_at')
+                ->whereNull('checked_out_at')
+                ->count();
+
+            $occupied += WalkinSession::query()
+                ->where('space_id', $locked->id)
+                ->whereNull('checked_out_at')
+                ->count();
+
+            if ($occupied >= $locked->capacity) {
+                throw new ReceptionActionException('api.reception.no_capacity');
+            }
+        }
+
+        return [$locked, $seatCovered];
     }
 
     /**

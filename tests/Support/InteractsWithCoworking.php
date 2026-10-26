@@ -2,6 +2,8 @@
 
 namespace Tests\Support;
 
+use App\Domain\Booking\Enums\ArrivalRequestStatus;
+use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\DayOfWeek;
@@ -16,6 +18,7 @@ use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Support\Security\Totp;
 use Carbon\CarbonInterface;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 
 /**
@@ -103,6 +106,24 @@ trait InteractsWithCoworking
             'current_period_start' => now()->subDays(10),
             'current_period_end' => $periodEnd ?? now()->addDays(20),
         ]);
+    }
+
+    /**
+     * Reception confirms $member's pending kiosk request — the moment a
+     * scanned session starts — then the test carries on as $member.
+     */
+    protected function confirmAtReception(User $member): TestResponse
+    {
+        $request = ArrivalRequest::query()
+            ->where('user_id', $member->id)
+            ->where('status', ArrivalRequestStatus::Pending)
+            ->sole();
+
+        $this->actingAsOperations();
+        $response = $this->postJson('/api/v1/admin/reception/arrival-requests/'.$request->id.'/confirm', [], ['lang' => 'en']);
+        Sanctum::actingAs($member, ['*']);
+
+        return $response;
     }
 
     private function actingAsRole(string $role): User

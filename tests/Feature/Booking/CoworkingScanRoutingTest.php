@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
@@ -22,8 +23,9 @@ use Tests\Support\InteractsWithCoworking;
 use Tests\TestCase;
 
 /**
- * One kiosk code for every arrival: what the scan does depends on what the
- * member has (docs/decisions/coworking-self-service-sessions.md).
+ * One kiosk code for every arrival: what the scan files for reception
+ * depends on what the member has, and a coworking session starts only when
+ * reception confirms it (docs/decisions/coworking-self-service-sessions.md).
  */
 class CoworkingScanRoutingTest extends TestCase
 {
@@ -78,23 +80,51 @@ class CoworkingScanRoutingTest extends TestCase
         return Space::factory()->room()->create(['building_id' => $this->space->building_id]);
     }
 
-    public function test_a_session_started_by_the_scan_says_so(): void
+    /** A member the plan covers, scanned in and confirmed by reception. */
+    private function startedSession(User $member): void
+    {
+        $this->scan()->assertCreated();
+        $this->confirmAtReception($member)->assertOk();
+    }
+
+    public function test_a_scan_files_a_coworking_start_and_nothing_starts(): void
     {
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
 
         $this->scan()
             ->assertCreated()
-            ->assertJsonPath('data.outcome', 'session')
-            ->assertJsonPath('data.type', 'walkin')
-            ->assertJsonPath('data.upcoming_booking', null);
+            ->assertJsonPath('data.outcome', 'awaiting_confirmation')
+            ->assertJsonPath('data.arrival_request.purpose', 'coworking_start')
+            ->assertJsonPath('data.arrival_request.upcoming_booking', null);
+
+        $request = ArrivalRequest::sole();
+        $this->assertSame(ArrivalRequestPurpose::CoworkingStart, $request->purpose);
+        $this->assertSame($this->kiosk->id, $request->kiosk_id);
+        $this->assertSame($this->space->id, $request->space_id);
+        $this->assertSame(0, WalkinSession::count());
+    }
+
+    public function test_reception_sees_the_coworking_start_with_its_space_and_plan(): void
+    {
+        $member = $this->actingAsMember();
+        $this->subscribe($member, $this->planWithHours(40));
+        $this->scan()->assertCreated();
+
+        $this->actingAsOperations();
+        $this->getJson('/api/v1/admin/reception/arrival-requests')
+            ->assertOk()
+            ->assertJsonPath('data.0.purpose', 'coworking_start')
+            ->assertJsonPath('data.0.user.id', $member->id)
+            ->assertJsonPath('data.0.space.id', $this->space->id)
+            ->assertJsonPath('data.0.coverage.status', 'covered');
     }
 
     public function test_scanning_with_a_session_already_open_is_refused(): void
     {
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
         $this->travel(5)->minutes();
 
         $this->scan()
@@ -113,6 +143,7 @@ class CoworkingScanRoutingTest extends TestCase
         $this->scan()
             ->assertCreated()
             ->assertJsonPath('data.outcome', 'arrival_requested')
+            ->assertJsonPath('data.arrival_request.purpose', 'arrival')
             ->assertJsonPath('data.arrival_request.status', 'pending')
             ->assertJsonPath('data.arrival_request.matched_booking_id', $booking->id)
             ->assertJsonPath('data.booking.id', $booking->id)
@@ -121,7 +152,7 @@ class CoworkingScanRoutingTest extends TestCase
 
         $request = ArrivalRequest::sole();
         $this->assertSame(ArrivalRequestStatus::Pending, $request->status);
-        $this->assertSame($member->id, $request->user_id);
+        $this->assertSame(ArrivalRequestPurpose::Arrival, $request->purpose);
         $this->assertSame(0, WalkinSession::count());
         $this->assertNull($booking->fresh()->checked_in_at);
     }
@@ -135,13 +166,13 @@ class CoworkingScanRoutingTest extends TestCase
         $this->assertSame(0, WalkinSession::count());
     }
 
-    public function test_scanning_again_for_a_room_booking_returns_the_same_request(): void
+    public function test_scanning_again_returns_the_request_already_waiting(): void
     {
         $member = $this->actingAsMember();
         $this->bookingOn($this->roomInSameBranch(), $member, '10:30', '11:30');
 
         $id = $this->scan()->assertCreated()->json('data.arrival_request.id');
-        $this->scan()->assertOk()->assertJsonPath('data.arrival_request.id', $id);
+        $this->scan()->assertOk()->assertJsonPath('data.outcome', 'arrival_requested')->assertJsonPath('data.arrival_request.id', $id);
 
         $this->assertSame(1, ArrivalRequest::count());
     }
@@ -152,8 +183,8 @@ class CoworkingScanRoutingTest extends TestCase
         $this->subscribe($member, $this->planWithHours(40));
         $this->bookingOn($this->roomInSameBranch(), $member, '15:00', '16:00');
 
-        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'session')->assertJsonPath('data.type', 'walkin');
-        $this->assertSame(0, ArrivalRequest::count());
+        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'awaiting_confirmation');
+        $this->assertSame(ArrivalRequestPurpose::CoworkingStart, ArrivalRequest::sole()->purpose);
     }
 
     public function test_a_room_booking_in_another_branch_is_ignored(): void
@@ -162,8 +193,7 @@ class CoworkingScanRoutingTest extends TestCase
         $this->subscribe($member, $this->planWithHours(40));
         $this->bookingOn(Space::factory()->room()->create(), $member, '10:30', '11:30');
 
-        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'session');
-        $this->assertSame(0, ArrivalRequest::count());
+        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'awaiting_confirmation');
     }
 
     public function test_an_early_arrival_for_a_coworking_booking_sits_until_it_starts(): void
@@ -174,13 +204,28 @@ class CoworkingScanRoutingTest extends TestCase
 
         $this->scan()
             ->assertCreated()
-            ->assertJsonPath('data.outcome', 'session')
-            ->assertJsonPath('data.type', 'walkin')
-            ->assertJsonPath('data.upcoming_booking.id', $booking->id)
-            ->assertJsonPath('data.upcoming_booking.start_at', $booking->start_at->toIso8601String());
+            ->assertJsonPath('data.outcome', 'awaiting_confirmation')
+            ->assertJsonPath('data.arrival_request.upcoming_booking.id', $booking->id)
+            ->assertJsonPath('data.arrival_request.upcoming_booking.start_at', $booking->start_at->toIso8601String());
+
+        $this->confirmAtReception($member)->assertOk();
 
         $this->assertSame($booking->id, WalkinSession::sole()->handover_booking_id);
         $this->assertNull($booking->fresh()->checked_in_at);
+    }
+
+    public function test_an_early_arrival_confirmed_once_the_booking_is_near_checks_the_booking_in(): void
+    {
+        $member = $this->actingAsMember();
+        $this->subscribe($member, $this->planWithHours(40));
+        $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
+        $this->scan()->assertCreated();
+
+        Carbon::setTestNow($this->damascus('10:50'));
+        $this->confirmAtReception($member)->assertOk();
+
+        $this->assertSame(0, WalkinSession::count());
+        $this->assertTrue($booking->fresh()->checked_in_at->equalTo($booking->start_at));
     }
 
     public function test_the_timer_shows_the_booking_the_early_session_hands_over_to(): void
@@ -188,10 +233,11 @@ class CoworkingScanRoutingTest extends TestCase
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
 
         $this->getJson('/api/v1/member/coworking-sessions/current')
             ->assertOk()
+            ->assertJsonPath('data.state', 'active')
             ->assertJsonPath('data.upcoming_booking.id', $booking->id);
     }
 
@@ -207,7 +253,7 @@ class CoworkingScanRoutingTest extends TestCase
         $this->scan($kiosk, $secret)
             ->assertStatus(409)
             ->assertExactJson(['message' => 'Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.']);
-        $this->assertSame(1, WalkinSession::count());
+        $this->assertSame(0, ArrivalRequest::count());
     }
 
     public function test_the_early_session_hands_over_to_the_booking_when_it_starts(): void
@@ -215,7 +261,7 @@ class CoworkingScanRoutingTest extends TestCase
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
 
         Carbon::setTestNow($this->damascus('11:00:30'));
         $this->artisan('coworking:hand-over-early-sessions')->assertSuccessful();
@@ -240,7 +286,7 @@ class CoworkingScanRoutingTest extends TestCase
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
 
         Carbon::setTestNow($this->damascus('10:59'));
         $this->artisan('coworking:hand-over-early-sessions')->assertSuccessful();
@@ -254,7 +300,7 @@ class CoworkingScanRoutingTest extends TestCase
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
         $booking->forceFill(['status' => BookingStatus::Cancelled])->save();
 
         Carbon::setTestNow($this->damascus('11:01'));
@@ -271,7 +317,7 @@ class CoworkingScanRoutingTest extends TestCase
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
-        $this->scan()->assertCreated();
+        $this->startedSession($member);
         $walkin = WalkinSession::sole();
         $walkin->endRequests()->create([
             'user_id' => $member->id,

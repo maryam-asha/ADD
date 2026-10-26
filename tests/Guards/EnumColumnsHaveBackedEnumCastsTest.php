@@ -9,6 +9,7 @@ use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Access\Models\AccessEvent;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
@@ -132,6 +133,7 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
             'channel' => AccessEventChannel::class,
         ],
         ArrivalRequest::class => [
+            'purpose' => ArrivalRequestPurpose::class,
             'status' => ArrivalRequestStatus::class,
         ],
         Booking::class => [
