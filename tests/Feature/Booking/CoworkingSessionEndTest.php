@@ -22,6 +22,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
 use Spatie\Activitylog\Models\Activity;
 use Tests\Support\InteractsWithCoworking;
 use Tests\TestCase;
@@ -61,9 +62,18 @@ class CoworkingSessionEndTest extends TestCase
         return [$member, $session];
     }
 
+    /**
+     * What the app does: show the checkout, then send its token with how the
+     * member chose to pay (cash unless a test says otherwise).
+     */
     private function requestEnd(array $body = []): TestResponse
     {
-        return $this->withHeader('lang', 'en')->postJson('/api/v1/member/coworking-sessions/current/end-request', $body);
+        $token = $this->getJson('/api/v1/member/coworking-sessions/current/checkout')->json('data.checkout_token') ?? 'no-checkout';
+
+        return $this->withHeader('lang', 'en')->postJson(
+            '/api/v1/member/coworking-sessions/current/end-request',
+            $body + ['checkout_token' => $token, 'payment_method' => 'cash'],
+        );
     }
 
     private function walletWith(User $member, int $points): Wallet
@@ -274,15 +284,97 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertSame('20', $properties->get('amount_owed'));
     }
 
-    public function test_reception_can_set_a_different_time(): void
+    public function test_reception_cannot_move_the_time_the_member_was_shown_a_price_for(): void
     {
         [, $session] = $this->memberInSession();
         $this->requestEnd();
         $this->travel(30)->minutes();
 
-        $this->confirm(SessionEndRequest::sole(), ['checked_out_at' => '2026-08-17 10:30:00'])->assertOk();
+        $this->confirm(SessionEndRequest::sole(), ['checked_out_at' => '2026-08-17 10:30:00'])
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'The member agreed to the time and price shown at checkout, so the checkout time cannot be changed.']);
+
+        $this->assertNull($session->fresh()->checked_out_at);
+        $this->assertSame(SessionEndRequestStatus::Pending, SessionEndRequest::sole()->status);
+    }
+
+    public function test_reception_can_still_set_the_time_of_a_request_from_before_checkouts(): void
+    {
+        [$member, $session] = $this->memberInSession();
+        $endRequest = $session->endRequests()->create([
+            'user_id' => $member->id,
+            'requested_at' => now(),
+            'status' => SessionEndRequestStatus::Pending,
+        ]);
+        $this->travel(30)->minutes();
+
+        $this->confirm($endRequest, ['checked_out_at' => '2026-08-17 10:30:00'])->assertOk();
 
         $this->assertTrue($session->fresh()->checked_out_at->equalTo(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus')));
+    }
+
+    public function test_the_session_closes_at_the_checkout_time_and_price_however_late_the_member_presses(): void
+    {
+        [, $session] = $this->memberInSession();
+        $token = $this->getJson('/api/v1/member/coworking-sessions/current/checkout')
+            ->assertJsonPath('data.closing.points', 200)
+            ->json('data.checkout_token');
+        $this->travel(4)->minutes(); // reading the summary
+
+        $this->requestEnd(['checkout_token' => $token])->assertCreated()->assertJsonPath('data.quoted_points', 200);
+        $this->travel(20)->minutes(); // reception is busy
+        $this->confirm(SessionEndRequest::sole())->assertOk();
+
+        $session->refresh();
+        $this->assertTrue($session->checked_out_at->equalTo(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')));
+        $this->assertSame(200, $session->price_points);
+    }
+
+    public function test_an_expired_checkout_is_shown_again_before_ending(): void
+    {
+        $this->memberInSession();
+        $token = $this->getJson('/api/v1/member/coworking-sessions/current/checkout')->json('data.checkout_token');
+        $this->travel(6)->minutes();
+
+        $this->requestEnd(['checkout_token' => $token])
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'This summary has expired. Open it again to see the final time and price.']);
+        $this->assertSame(0, SessionEndRequest::count());
+    }
+
+    public function test_another_members_checkout_cannot_end_this_session(): void
+    {
+        $this->memberInSession();
+        $token = $this->getJson('/api/v1/member/coworking-sessions/current/checkout')->json('data.checkout_token');
+        $this->memberInSession();
+
+        $this->requestEnd(['checkout_token' => $token])->assertStatus(422);
+        $this->assertSame(0, SessionEndRequest::count());
+    }
+
+    public function test_the_members_report_keeps_every_attempt_to_pay(): void
+    {
+        [$member, $session] = $this->memberInSession();
+        $this->walletWith($member, 500);
+        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->confirm(SessionEndRequest::sole())->assertOk();
+        Sanctum::actingAs($member, ['*']);
+
+        $this->getJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/report")
+            ->assertOk()
+            ->assertJsonCount(1, 'data.payments')
+            ->assertJsonPath('data.payments.0.method', 'wallet')
+            ->assertJsonPath('data.payments.0.status', 'accepted')
+            ->assertJsonPath('data.payments.0.amount_points', 200);
+    }
+
+    public function test_ending_needs_a_checkout_and_a_payment_method(): void
+    {
+        $this->memberInSession();
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/coworking-sessions/current/end-request', [])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['checkout_token', 'payment_method']);
     }
 
     public function test_a_confirmed_request_cannot_be_confirmed_again(): void

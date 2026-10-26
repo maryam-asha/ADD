@@ -7,12 +7,12 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * The member's "end session" press, with how they will pay: `wallet` spends
- * their points when reception confirms, `cash` is handed over at the desk, a
- * gateway (`paymera`) is paid in the app once the session is closed and
- * priced. Optional, so an app that does not send it keeps today's behaviour:
- * reception settles it later
- * (docs/decisions/coworking-self-service-sessions.md).
+ * The member's "end session" press, after the checkout showed them the time
+ * and the price: `checkout_token` is that checkout, so the session is closed
+ * at exactly what they agreed to, and `payment_method` how they will pay —
+ * `wallet` spends their points when reception confirms, `cash` is handed
+ * over at the desk, a gateway (`paymera`) is paid in the app once reception
+ * has confirmed (docs/decisions/coworking-self-service-sessions.md).
  */
 class RequestSessionEndRequest extends FormRequest
 {
@@ -27,7 +27,8 @@ class RequestSessionEndRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'payment_method' => ['nullable', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
+            'checkout_token' => ['required', 'string'],
+            'payment_method' => ['required', 'string', Rule::in(array_keys(app(PaymentMethodRegistry::class)->enabled()))],
         ];
     }
 }

@@ -33,6 +33,16 @@ return Application::configure(basePath: dirname(__DIR__))
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
     )
+    // POST /api/broadcasting/auth: signs a private-channel subscription for
+    // the socket server (routes/channels.php). 'api' rather than the
+    // framework's default 'web' group, because that is the group
+    // statefulApi() puts Sanctum's stateful middleware on — the dashboard's
+    // session cookie is only read there — while auth:sanctum also takes the
+    // member app's Bearer token.
+    ->withBroadcasting(__DIR__.'/../routes/channels.php', [
+        'prefix' => 'api',
+        'middleware' => ['api', 'auth:sanctum'],
+    ])
     ->withMiddleware(function (Middleware $middleware): void {
         // Every response speaks whichever locale this resolves — prepended
         // globally (not scoped to the "api" group) so it runs before

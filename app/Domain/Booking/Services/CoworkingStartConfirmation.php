@@ -5,6 +5,8 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Events\ArrivalRequestResolved;
+use App\Domain\Booking\Events\CoworkingStartConfirmed;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
@@ -12,6 +14,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -28,6 +31,7 @@ class CoworkingStartConfirmation
         private readonly BookingCheckInService $checkIns,
         private readonly WalkInCapacityService $walkIns,
         private readonly SessionCoverageEvaluator $coverage,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     public function confirm(ArrivalRequest $request, User $operator): Booking|WalkinSession
@@ -55,6 +59,13 @@ class CoworkingStartConfirmation
                 'confirmed_by_user_id' => $operator->id,
                 'confirmed_space_id' => $session->space_id,
             ])->save();
+
+            // Sent once this commits: the member's waiting screen moves on,
+            // and every desk screen drops the request from its queue.
+            $this->realtime->send(
+                new CoworkingStartConfirmed($locked, $session),
+                new ArrivalRequestResolved($locked, ArrivalRequestStatus::Confirmed),
+            );
 
             return $session->fresh();
         });

@@ -4,6 +4,10 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
+use App\Domain\Booking\Events\CoworkingSessionEnded;
+use App\Domain\Booking\Events\SessionEndRequestCancelled;
+use App\Domain\Booking\Events\SessionEndRequestCreated;
+use App\Domain\Booking\Events\SessionEndRequestResolved;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SessionEndRequest;
@@ -15,6 +19,7 @@ use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -28,6 +33,10 @@ use Illuminate\Support\Facades\DB;
  * SessionClosureService::autoClose() takes them in, so the two cannot
  * deadlock, and a closure that lands between a lookup and a write is
  * always seen.
+ *
+ * Each step tells the desk (and, on confirmation, the member) in real time
+ * once its transaction commits — RealtimeBroadcaster; the FCM push the
+ * controller sends on confirmation is unchanged.
  */
 class SessionEndService
 {
@@ -35,15 +44,21 @@ class SessionEndService
         private readonly CoworkingSessionService $sessions,
         private readonly SessionClosureService $closures,
         private readonly PaymentService $payments,
+        private readonly CheckoutTokenService $checkouts,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
      * `$paymentMethod` is how the member will pay (a config/payments.php
-     * key); pressing again with another one changes the waiting request's.
+     * key); `$checkoutToken` is the checkout they were shown
+     * (CheckoutTokenService), whose time and price the request keeps, so
+     * reception closes the session at exactly what the member agreed to.
+     * Pressing again, after a fresh checkout or with another method,
+     * updates the waiting request.
      */
-    public function request(User $member, ?string $paymentMethod = null): SessionEndRequest
+    public function request(User $member, string $paymentMethod, string $checkoutToken): SessionEndRequest
     {
-        return DB::transaction(function () use ($member, $paymentMethod) {
+        return DB::transaction(function () use ($member, $paymentMethod, $checkoutToken) {
             // One pending request per session, even on a double tap.
             User::query()->whereKey($member->id)->lockForUpdate()->first();
 
@@ -59,22 +74,34 @@ class SessionEndService
                 throw new ReceptionActionException('api.coworking.no_open_session');
             }
 
+            $quote = $this->checkouts->redeem($checkoutToken, $member, $session);
+
             $pending = $session->pendingEndRequest()->first();
 
             if ($pending !== null) {
-                if ($paymentMethod !== null && $pending->payment_method !== $paymentMethod) {
-                    $pending->forceFill(['payment_method' => $paymentMethod])->save();
-                }
+                $pending->forceFill([
+                    'requested_at' => $quote->at,
+                    'quoted_points' => $quote->points,
+                    'payment_method' => $paymentMethod,
+                ])->save();
+
+                // Changed, not new — still the desk's cue to reload it.
+                $this->realtime->send(new SessionEndRequestCreated($pending->setRelation('sessionable', $session)));
 
                 return $pending;
             }
 
-            return $session->endRequests()->create([
+            $created = $session->endRequests()->create([
                 'user_id' => $member->id,
-                'requested_at' => now(),
+                'requested_at' => $quote->at,
+                'quoted_points' => $quote->points,
                 'status' => SessionEndRequestStatus::Pending,
                 'payment_method' => $paymentMethod,
             ]);
+
+            $this->realtime->send(new SessionEndRequestCreated($created->setRelation('sessionable', $session)));
+
+            return $created;
         });
     }
 
@@ -99,13 +126,18 @@ class SessionEndService
         if ($updated === 0) {
             throw new ReceptionActionException('api.coworking.end_request_not_pending', 409);
         }
+
+        $this->realtime->send(new SessionEndRequestCancelled($pending->setRelation('sessionable', $session)));
     }
 
     /**
-     * $checkedOutAt defaults to the moment the member pressed. Marked
-     * confirmed before closing, so the closure's "supersede whatever is still
-     * pending" leaves this row alone; both happen in one transaction, so a
-     * closure that refuses (past closing, before check-in) undoes the mark too.
+     * $checkedOutAt defaults to the moment the member pressed. A request
+     * made from a checkout closes at the time that checkout priced, and no
+     * other: reception confirms the member left, it does not move the time
+     * the member was shown a price for. Marked confirmed before closing, so
+     * the closure's "supersede whatever is still pending" leaves this row
+     * alone; both happen in one transaction, so a closure that refuses (past
+     * closing, before check-in) undoes the mark too.
      */
     /**
      * Closing the session settles it the way the member chose
@@ -127,6 +159,10 @@ class SessionEndService
                 throw new ReceptionActionException('api.coworking.end_request_not_pending', 409);
             }
 
+            if ($locked->quoted_points !== null && $checkedOutAt !== null) {
+                throw new ReceptionActionException('api.coworking.end_time_locked');
+            }
+
             $time = $checkedOutAt ?? $locked->requested_at;
 
             $locked->forceFill([
@@ -139,6 +175,14 @@ class SessionEndService
             $this->closures->closeOut($lockedSession, $time);
 
             $this->settleAsChosen($lockedSession, $locked->payment_method, $cashCollected, $operator);
+
+            $locked->setRelation('sessionable', $lockedSession);
+
+            // Only if the closure above commits: a refused one is not news.
+            $this->realtime->send(
+                new CoworkingSessionEnded($locked),
+                new SessionEndRequestResolved($locked),
+            );
 
             return $locked;
         });

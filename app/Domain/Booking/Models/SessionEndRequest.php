@@ -10,12 +10,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 class SessionEndRequest extends Model
 {
-    protected $fillable = ['user_id', 'requested_at', 'status', 'payment_method'];
+    protected $fillable = ['user_id', 'requested_at', 'quoted_points', 'status', 'payment_method'];
 
     protected function casts(): array
     {
         return [
             'requested_at' => 'datetime',
+            'quoted_points' => 'integer',
             'status' => SessionEndRequestStatus::class,
             'resolved_at' => 'datetime',
             'checked_out_at' => 'datetime',

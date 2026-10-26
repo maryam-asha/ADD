@@ -110,6 +110,9 @@ Route::post('scan', [ScanController::class, 'scan'])->middleware('throttle:10,1,
 // The running coworking session: the timer, asking to end, the report.
 // Static segments are declared before any {type}/{id} wildcard.
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
+// What ending now would come to and how it can be paid — shown before the
+// member asks to end, so they choose a method knowing the amount.
+Route::get('coworking-sessions/current/checkout', [CoworkingSessionController::class, 'checkout']);
 Route::post('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'requestEnd']);
 Route::delete('coworking-sessions/current/end-request', [CoworkingSessionController::class, 'cancelEnd']);
 Route::get('coworking-sessions/{type}/{id}/report', [CoworkingSessionController::class, 'report'])

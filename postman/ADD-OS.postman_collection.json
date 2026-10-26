@@ -17,6 +17,11 @@
             "type": "string"
         },
         {
+            "key": "member_id",
+            "value": "",
+            "type": "string"
+        },
+        {
             "key": "founder_id",
             "value": "",
             "type": "string"
@@ -372,6 +377,11 @@
             "key": "lock_qr_value",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "checkout_token",
+            "value": "",
+            "type": "string"
         }
     ],
     "event": [
@@ -450,6 +460,7 @@
                                             "    const body = pm.response.json();",
                                             "    pm.collectionVariables.set('member_token', body.access_token);",
                                             "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                                            "    if (body.user && body.user.id) { pm.collectionVariables.set('member_id', body.user.id); } // private-member.{id}, for real-time",
                                             "    console.log('member_token + member_refresh_token captured');",
                                             "}"
                                         ]
@@ -542,6 +553,7 @@
                                             "    const body = pm.response.json();",
                                             "    pm.collectionVariables.set('member_token', body.access_token);",
                                             "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                                            "    if (body.user && body.user.id) { pm.collectionVariables.set('member_id', body.user.id); } // private-member.{id}, for real-time",
                                             "    console.log('member_token + member_refresh_token captured');",
                                             "}"
                                         ]
@@ -842,6 +854,7 @@
                                             "    const body = pm.response.json();",
                                             "    pm.collectionVariables.set('member_token', body.access_token);",
                                             "    pm.collectionVariables.set('member_refresh_token', body.refresh_token);",
+                                            "    if (body.user && body.user.id) { pm.collectionVariables.set('member_id', body.user.id); } // private-member.{id}, for real-time",
                                             "    console.log('member_token + member_refresh_token captured');",
                                             "}"
                                         ]
@@ -8582,7 +8595,7 @@
                                         "scan"
                                     ]
                                 },
-                                "description": "**The app's one scan button.** Send whatever the camera read as qr_value; the backend decides what it is:\n- `add-cowork:v1:\u2026` (the kiosk's rotating code) \u2192 a request reception must confirm. **Nothing starts at the scan**: a coworking session or a coworking booking's check-in starts when reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm), and is billed from that moment.\n- a door's sticker (a lock's qr_value) \u2192 opens that door when you hold an activated access grant on it (data.outcome unlocked); 403 no_active_grant, 503 gateway_offline / unlock_failed. Opening a booked room's door also checks that booking in. Nothing about the lock comes back.\n- anything else \u2192 422 `This code is not recognised\u2026`.\nEvery 200/201 says what happened in data.outcome: awaiting_confirmation, arrival_requested or unlocked. To test a door, put a lock's qr_value in {{lock_qr_value}} and send it as qr_value.\n\n**The kiosk's code** (the request as saved). qr_value is `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (409 \u2014 end it first) \u2192 a request of yours is already waiting on reception (200 with it, nothing new) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started: a request to check it in (data.arrival_request.matched_booking_id, data.booking; 409 if it awaits approval or payment) \u2192 a booking of yours on a room, office or event hall at this branch, running or starting within 60 minutes: an ordinary arrival request (outcome arrival_requested, purpose arrival) \u2192 otherwise a walk-in: filed at once when your plan covers it, else 422 confirmation_required first. The walk-in's capacity and hours are checked at the scan and again when reception confirms. If your coworking booking on this space starts later today, the walk-in waits for it (data.arrival_request.upcoming_booking): once started it closes at the booking's start and the booking is checked in from the same instant (coworking:hand-over-early-sessions, every minute) \u2014 no second scan or confirmation; with no free seat until then, 409 booking_too_early. Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves arrival_request_id when a request is filed, and scan_ticket on 422 confirmation_required. Then follow 11. Coworking Sessions \u2192 Current Session: data.state is awaiting_confirmation until reception confirms, then active; the member also gets a coworking.session_started (or coworking.start_rejected) notification.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It - Awaiting Reception** \u2014 201, outcome awaiting_confirmation, arrival_request.purpose coworking_start with the space and coverage.\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing filed. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201, arrival_request.accepted_uncovered true. Coverage is evaluated again at this moment.\n- **Error: Already in a Session** \u2014 409 `{\"message\":\"You already have an active session. End it before starting a new one.\"}`\n- **Coworking Booking - Awaiting Reception** \u2014 201 with arrival_request.matched_booking_id and data.booking; checked in when reception confirms.\n- **Room Booking - Reception Told** \u2014 201, outcome arrival_requested (purpose arrival), with the booking. Show \"reception has been told\".\n- **Early Arrival - Awaiting Reception** \u2014 201 with arrival_request.upcoming_booking; the walk-in reception starts turns into that booking when it begins.\n- **Error: Booking Too Early** \u2014 409 `{\"message\":\"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"}`\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}`\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}`\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}`\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`\n- **Door Unlocked** \u2014 200 `{\"data\":{\"outcome\":\"unlocked\",\"message\":\"Unlocked.\"}}`\n- **Error: Door - No Active Grant** \u2014 403\n- **Error: Unknown Code** \u2014 422, neither a kiosk code nor a door sticker."
+                                "description": "**The app's one scan button.** Send whatever the camera read as qr_value; the backend decides what it is:\n- `add-cowork:v1:\u2026` (the kiosk's rotating code) \u2192 a request reception must confirm. **Nothing starts at the scan**: a coworking session or a coworking booking's check-in starts when reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm), and is billed from that moment.\n- a door's sticker (a lock's qr_value) \u2192 opens that door when you hold an activated access grant on it (data.outcome unlocked); 403 no_active_grant, 503 gateway_offline / unlock_failed. Opening a booked room's door also checks that booking in. Nothing about the lock comes back.\n- anything else \u2192 422 `This code is not recognised\u2026`.\nEvery 200/201 says what happened in data.outcome: awaiting_confirmation, arrival_requested or unlocked. To test a door, put a lock's qr_value in {{lock_qr_value}} and send it as qr_value.\n\n**The kiosk's code** (the request as saved). qr_value is `add-cowork:v1:{kiosk_id}:{8-digit code}`; a code is accepted during its 30 s step and one step either side. The pre-request script builds {{coworking_qr_value}} from kiosk_secret (saved by Kiosk (device app) \u2192 Pair Kiosk); without a secret, paste a scanned value into that variable.\n\nChecked in this order: the code (or ticket) \u2192 the kiosk's space is an active co_space \u2192 business hours \u2192 you already have an open coworking session (409 \u2014 end it first) \u2192 a request of yours is already waiting on reception (200 with it, nothing new) \u2192 a confirmed booking of yours on this space today that starts within 15 minutes or has started: a request to check it in (data.arrival_request.matched_booking_id, data.booking; 409 if it awaits approval or payment) \u2192 a booking of yours on a room, office or event hall at this branch, running or starting within 60 minutes: an ordinary arrival request (outcome arrival_requested, purpose arrival) \u2192 otherwise a walk-in: filed at once when your plan covers it, else 422 confirmation_required first. The walk-in's capacity and hours are checked at the scan and again when reception confirms. If your coworking booking on this space starts later today, the walk-in waits for it (data.arrival_request.upcoming_booking): once started it closes at the booking's start and the booking is checked in from the same instant (coworking:hand-over-early-sessions, every minute) \u2014 no second scan or confirmation; with no free seat until then, 409 booking_too_early. Coverage reasons: no_plan, plan_expired, plan_without_hours, hours_exhausted, outside_window. Throttled to 10 per minute. Saves arrival_request_id when a request is filed, and scan_ticket on 422 confirmation_required. Then follow 11. Coworking Sessions \u2192 Current Session: data.state is awaiting_confirmation until reception confirms, then active; the member also gets a coworking.session_started (or coworking.start_rejected) notification.\n\n### Cases \u2014 see this request's saved examples\n- **Plan Covers It - Awaiting Reception** \u2014 201, outcome awaiting_confirmation, arrival_request.purpose coworking_start with the space and coverage.\n- **Confirmation Required** \u2014 422 with reason, coverage, hourly_rate_points and a scan_ticket valid 120 s. Nothing filed. Show the message and ask the member.\n- **Accept Uncovered** \u2014 body `{\"scan_ticket\": \"\u2026\", \"accept_uncovered\": true}` \u2192 201, arrival_request.accepted_uncovered true. Coverage is evaluated again at this moment.\n- **Error: Already in a Session** \u2014 409 `{\"message\":\"You already have an active session. End it before starting a new one.\"}`\n- **Coworking Booking - Awaiting Reception** \u2014 201 with arrival_request.matched_booking_id and data.booking; checked in when reception confirms.\n- **Room Booking - Reception Told** \u2014 201, outcome arrival_requested (purpose arrival), with the booking. Show \"reception has been told\".\n- **Early Arrival - Awaiting Reception** \u2014 201 with arrival_request.upcoming_booking; the walk-in reception starts turns into that booking when it begins.\n- **Error: Booking Too Early** \u2014 409 `{\"message\":\"Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.\"}`\n- **Error: Booking Awaiting Approval** \u2014 409 `{\"message\":\"Your booking is awaiting approval. Please see reception.\"}`\n- **Error: Ticket Expired** \u2014 422 `{\"message\":\"This confirmation has expired. Scan the kiosk code again.\"}` \u2014 also for a ticket that is not yours or was tampered with.\n- **Error: Invalid Code** \u2014 422 `{\"message\":\"This code is not valid. Scan the code currently shown on the kiosk.\"}`\n- **Error: Kiosk Unavailable** \u2014 422 `{\"message\":\"Coworking sessions are not available at this kiosk right now.\"}`\n- **Error: Outside Business Hours** \u2014 422 `{\"message\":\"This action is not available outside business hours.\"}`\n- **Error: No Capacity** \u2014 422 `{\"message\":\"This space has no available capacity right now.\"}`\n- **Door Unlocked** \u2014 200 `{\"data\":{\"outcome\":\"unlocked\",\"message\":\"Unlocked.\"}}`\n- **Error: Door - No Active Grant** \u2014 403\n- **Error: Unknown Code** \u2014 422, neither a kiosk code nor a door sticker.\n\nReal-time: a request filed here is announced to reception's dashboard (`arrival_request.created` on `private-reception`). While the member waits (`awaiting_confirmation`), the app hears `coworking.start_confirmed`, `coworking.start_rejected` or `coworking.start_expired` on `private-member.{id}` \u2014 see 11. Coworking Sessions' description."
                             },
                             "response": [
                                 {
@@ -9577,7 +9590,7 @@
                 },
                 {
                     "name": "11. Coworking Sessions",
-                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm) and the session starts then \u2192 Current Session for the timer \u2192 Request End \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.",
+                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm) and the session starts then \u2192 Current Session for the timer \u2192 Checkout (Before Ending): the final time and price, sealed by checkout_token \u2192 Request End with the token and the chosen method \u2192 reception confirms the member left \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.\n\n## Real-time updates (Pusher Channels) \u2014 for the app\n\nWhile the member waits for reception (a coworking start, or an end request), the API pushes a small event over a WebSocket the moment reception acts, so the app does not have to poll. The event carries ids only: on every event the app **re-fetches what it already reads** \u2014 GET member/coworking-sessions/current and GET member/home \u2014 and those stay the only source of truth. The FCM pushes (coworking.session_started, coworking.start_rejected, coworking.session_ended) are unchanged: they are what reaches an app in the background or closed.\n\n### Connect\nAny Pusher-protocol client (Flutter: `pusher_channels_flutter`).\n- **App key** and **cluster**: PUSHER_APP_KEY and PUSHER_APP_CLUSTER from the backend team (public values; the secret never leaves the server). The same protocol works against a self-hosted Reverb server later \u2014 then only host/port/key change.\n- **Auth endpoint** for private channels: `POST {{base_url}}/api/broadcasting/auth` (no /v1) with headers `Authorization: Bearer <member access token>` and `Accept: application/json`, body `socket_id` + `channel_name` (form-encoded or JSON). It answers 200 `{\"auth\": \"<key>:<signature>\"}` \u2014 hand that map back to the client library (in `pusher_channels_flutter` that is the `onAuthorizer` callback: call the endpoint yourself and return the decoded JSON). 403 = not your channel; 401 = the access token expired \u2192 POST auth/refresh, then reconnect. See \"Real-time: Authorize Member Channel\" below.\n- **Subscribe** after login to `private-member.{user_id}` \u2014 your own id, `user.id` in the Login / Register response (saved as {{member_id}}). Unsubscribe and disconnect on logout. Anyone else's id is refused.\n\n### Events on private-member.{user_id}\nEvent names have no leading dot in a raw Pusher client. `data` is a JSON object (some clients hand it over as a string \u2014 decode it); ignore keys you do not know (Laravel adds `socket: null`).\n\n| Event | data | What the app does |\n|---|---|---|\n| `coworking.start_confirmed` | `{arrival_request_id, session_type: \"walkin\"\\|\"booking\", session_id}` | Reception started the session. Re-fetch current (state becomes `active`) and home; leave the waiting screen for the timer. |\n| `coworking.start_rejected` | `{arrival_request_id}` | Reception declined. Re-fetch (data becomes null); leave the waiting screen and say reception declined. |\n| `coworking.start_expired` | `{arrival_request_id}` | Nobody answered within kiosk.arrival_request_expiry_minutes (30). Re-fetch; leave the waiting screen and offer to scan again. |\n| `coworking.session_ended` | `{session_end_request_id, session_type, session_id}` | Reception confirmed the member left. Re-fetch current (data becomes null) and home; open the Session Report (GET member/coworking-sessions/{session_type}/{session_id}/report). |\n\n### Fallback\n- Keep FCM as it is. A socket event and an FCM push may both arrive for the same change \u2014 re-fetching twice is harmless.\n- Poll only when the socket is **not connected** and the member is on a waiting screen (state `awaiting_confirmation`, or an `end_request` pending): GET member/coworking-sessions/current every ~10 s. Stop when the socket is connected again.\n- Events sent while the app was disconnected are not replayed: on every (re)connect and on returning to the foreground, re-fetch once.\n- Locally (BROADCAST_CONNECTION=log) nothing is sent \u2014 the events are written to storage/logs/laravel.log \u2014 so test the flow with polling, or against a Pusher app.\n\nThe dashboard listens on `private-reception` (Admin \u2192 Reception Operations); a member is refused it (403).",
                     "item": [
                         {
                             "name": "Current Session (Timer)",
@@ -9612,7 +9625,7 @@
                                         "current"
                                     ]
                                 },
-                                "description": "The member's open coworking session, for the timer: checked_in_at, coverage (walk-ins: the plan coverage taken at start \u2014 covered_until is when the plan stops covering it), accepted_uncovered, and end_request while one is pending. data.state is active for the running session, or awaiting_confirmation (with the arrival_request) while a kiosk scan waits for reception to confirm it \u2014 show \"waiting for reception\" and poll; data is null when there is neither.\n\n### Cases \u2014 see this request's saved examples\n- **Awaiting Reception** \u2014 200 `{\"data\": {\"state\": \"awaiting_confirmation\", \"arrival_request\": {\u2026}}}`.\n- **No Open Session** \u2014 200 `{\"data\": null}`.\n- **End Requested** \u2014 200 with end_request {id, status: pending, requested_at, \u2026} \u2014 show \"waiting for reception\".\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off."
+                                "description": "The member's open coworking session, for the timer: checked_in_at, coverage (walk-ins: the plan coverage taken at start \u2014 covered_until is when the plan stops covering it), accepted_uncovered, and end_request while one is pending. data.state is active for the running session, or awaiting_confirmation (with the arrival_request) while a kiosk scan waits for reception to confirm it \u2014 show \"waiting for reception\" and poll; data is null when there is neither.\n\n### Cases \u2014 see this request's saved examples\n- **Awaiting Reception** \u2014 200 `{\"data\": {\"state\": \"awaiting_confirmation\", \"arrival_request\": {\u2026}}}`.\n- **No Open Session** \u2014 200 `{\"data\": null}`.\n- **End Requested** \u2014 200 with end_request {id, status: pending, requested_at, \u2026} \u2014 show \"waiting for reception\".\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off.\n\nReal-time: while `awaiting_confirmation` or with an `end_request` pending, re-fetch this on `coworking.start_confirmed`, `coworking.start_rejected`, `coworking.start_expired` and `coworking.session_ended` (channel `private-member.{id}`, see the folder description) instead of polling; poll every ~10 s only while the socket is disconnected."
                             },
                             "response": [
                                 {
@@ -9818,6 +9831,201 @@
                             ]
                         },
                         {
+                            "name": "Checkout (Before Ending)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/checkout",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "current",
+                                        "checkout"
+                                    ]
+                                },
+                                "description": "**Before the member asks to end** \u2014 what ending the running session now comes to. **This is final**: `checkout_token` seals the time and the price, Request End sends it back, and reception closes the session at exactly that time and price \u2014 however long the member takes to press, whatever reception does. Nothing changes here: the session runs on and reception is not asked anything.\n\nIn the app: \"End session\" \u2192 this \u2192 show the summary, with the methods from GET member/payment-methods?purpose=coworking_session (purpose=booking for a booking; without payable_id \u2014 a running session has no price on record yet, so compare the wallet's `balance` with `closing.points`) \u2192 the member picks one \u2192 Request End with checkout_token + payment_method \u2192 reception confirms the member left \u2192 paid as chosen \u2192 Session Report.\n\n- `session`, `lines`, `plan`: the session report so far (caf\u00e9 orders will appear in `lines` as kind `order` once they are added to sessions, with no change to this shape).\n- `closing`: the final charge \u2014 `points`, `price` / `price_numeric` / `currency` in the member's currency, `price_point`, `covered_seconds` the plan absorbs, `already_paid` for a booking paid when made (then points is 0); `at` is the time it is billed up to.\n- `checkout_token`, `checkout_token_expires_at`: send the token with Request End before it expires (5 minutes); past it, open the checkout again. Saved to {{checkout_token}}.\n\n### Cases \u2014 see this request's saved examples\n- **Owes Points** \u2014 200, closing.points 200.\n- **Covered by Plan** \u2014 200, closing.points 0, covered_seconds the whole stretch.\n- **Error: No Open Session** \u2014 422 `{\"message\":\"You have no active session.\"}`."
+                            },
+                            "response": [
+                                {
+                                    "name": "Owes Points",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/checkout",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "checkout"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": null,\n            \"duration_seconds\": 7200,\n            \"termination_source\": null\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time so far\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": null,\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            }\n        ],\n        \"plan\": null,\n        \"totals\": null,\n        \"closing\": {\n            \"at\": \"2026-08-17T07:00:00+00:00\",\n            \"points\": 200,\n            \"price\": \"20 $\",\n            \"price_numeric\": 20,\n            \"currency\": \"USD\",\n            \"price_point\": \"200 pts\",\n            \"covered_seconds\": 0,\n            \"already_paid\": false\n        },\n        \"checkout_token\": \"eyJpdiI6IkNoZWNrb3V0VG9rZW4iLCJ2YWx1ZSI6Ii4uLiJ9\",\n        \"checkout_token_expires_at\": \"2026-08-17T07:05:00+00:00\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Covered by Plan",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/checkout",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "checkout"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": null,\n            \"duration_seconds\": 7200,\n            \"termination_source\": null\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time so far\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": null,\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 40 Hours\",\n            \"hours_used\": 0,\n            \"hours_remaining\": 40\n        },\n        \"totals\": null,\n        \"closing\": {\n            \"at\": \"2026-08-17T07:00:00+00:00\",\n            \"points\": 0,\n            \"price\": \"0 $\",\n            \"price_numeric\": 0,\n            \"currency\": \"USD\",\n            \"price_point\": \"0 pts\",\n            \"covered_seconds\": 7200,\n            \"already_paid\": false\n        },\n        \"checkout_token\": \"eyJpdiI6IkNoZWNrb3V0VG9rZW4iLCJ2YWx1ZSI6Ii4uLiJ9\",\n        \"checkout_token_expires_at\": \"2026-08-17T07:05:00+00:00\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: No Open Session",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/checkout",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "checkout"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"You have no active session.\"\n}"
+                                }
+                            ],
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "const body = pm.response.json();",
+                                            "// Request End sends it back: the session closes at exactly this time and price.",
+                                            "if (pm.response.code === 200 && body.data && body.data.checkout_token) {",
+                                            "    pm.collectionVariables.set('checkout_token', body.data.checkout_token);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
                             "name": "Request End",
                             "event": [
                                 {
@@ -9845,6 +10053,10 @@
                                 "method": "POST",
                                 "header": [
                                     {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
                                         "key": "lang",
                                         "value": "{{lang}}",
                                         "type": "text"
@@ -9864,7 +10076,16 @@
                                         "end-request"
                                     ]
                                 },
-                                "description": "The member presses \"end session\". Reception confirms it (Admin \u2192 Reception Operations \u2192 Session End Requests); the session is billed up to this moment by default. 201 with the request; pressing again while it is pending returns the same one (200). Saves session_end_request_id.\n\n### Cases \u2014 see this request's saved examples\n- **Already Requested** \u2014 200 with the pending request.\n- **Error: No Open Session** \u2014 422 `{\"message\":\"You have no active session.\"}` \u2014 also when reception already checked the member out."
+                                "description": "The member's \"end session\" press, after Checkout (Before Ending) showed them the time and the price. Both fields are required:\n- `checkout_token` \u2014 from the checkout: the request keeps its time (`requested_at`) and price (`quoted_points`), and reception closes the session at exactly those. An expired, tampered or another session's token is 422 `checkout_expired` \u2014 open the checkout again.\n- `payment_method` \u2014 how the member will pay (a key from GET member/payment-methods). After reception confirms: `wallet` is spent at once, `cash` is taken at the desk, a gateway (`paymera`) is paid in the app with POST coworking-sessions/{type}/{id}/pay, which answers its redirect_url. Every attempt is kept on the session (Session Report \u2192 `payments`), so a failed card can be paid again, the same way or another.\n\nThe member then waits for reception to confirm they left (Current Session shows end_request). Pressing again, with a fresh checkout or another method, updates the waiting request (200). Withdraw End Request cancels it.\n\nReal-time: reception's dashboard is told at once (`session_end_request.created`, for a new or a changed request); when it confirms, the app hears `coworking.session_ended` on `private-member.{id}` \u2014 re-fetch Current Session and open the Session Report.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             },
                             "response": [
                                 {
@@ -9900,6 +10121,15 @@
                                                 "current",
                                                 "end-request"
                                             ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
                                         }
                                     },
                                     "status": "Created",
@@ -9912,7 +10142,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"resolved_at\": null,\n        \"checked_out_at\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"quoted_points\": 200,\n        \"resolved_at\": null,\n        \"checked_out_at\": null,\n        \"payment_method\": \"wallet\"\n    }\n}"
                                 },
                                 {
                                     "name": "Already Requested",
@@ -9947,6 +10177,15 @@
                                                 "current",
                                                 "end-request"
                                             ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
                                         }
                                     },
                                     "status": "OK",
@@ -9959,7 +10198,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"resolved_at\": null,\n        \"checked_out_at\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"id\": 1,\n        \"status\": \"pending\",\n        \"requested_at\": \"2026-08-17T08:00:00+00:00\",\n        \"quoted_points\": 200,\n        \"resolved_at\": null,\n        \"checked_out_at\": null,\n        \"payment_method\": \"wallet\"\n    }\n}"
                                 },
                                 {
                                     "name": "Error: No Open Session",
@@ -9994,6 +10233,15 @@
                                                 "current",
                                                 "end-request"
                                             ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
                                         }
                                     },
                                     "status": "Unprocessable Content",
@@ -10007,6 +10255,118 @@
                                     ],
                                     "cookie": [],
                                     "body": "{\n    \"message\": \"You have no active session.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Checkout Expired",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This summary has expired. Open it again to see the final time and price.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Token and Method Required",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/current/end-request",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "current",
+                                                "end-request"
+                                            ]
+                                        },
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"checkout_token\": \"{{checkout_token}}\",\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The checkout token field is required. (and 1 more error)\",\n    \"errors\": {\n        \"checkout_token\": [\n            \"The checkout token field is required.\"\n        ],\n        \"payment_method\": [\n            \"The payment method field is required.\"\n        ]\n    }\n}"
                                 }
                             ]
                         },
@@ -10044,7 +10404,7 @@
                                         "end-request"
                                     ]
                                 },
-                                "description": "Withdraws the pending end request; the session keeps running. Returns {message}. With no open session: 422 no_open_session.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Nothing Pending** \u2014 409 `{\"message\":\"This end request is no longer pending.\"}` \u2014 no request pending (never made, already withdrawn, or already confirmed)."
+                                "description": "Withdraws the pending end request; the session keeps running. Returns {message}. With no open session: 422 no_open_session.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Nothing Pending** \u2014 409 `{\"message\":\"This end request is no longer pending.\"}` \u2014 no request pending (never made, already withdrawn, or already confirmed).\n\nReal-time: reception's dashboard is told at once (`session_end_request.cancelled`)."
                             },
                             "response": [
                                 {
@@ -10178,7 +10538,7 @@
                                         "report"
                                     ]
                                 },
-                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Current Session saves both variables once reception has started it. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced."
+                                "description": "**Closed walk-in, partly on the plan** (the request as saved). type is booking or walkin \u2014 Current Session saves both variables once reception has started it. Your own sessions only.\n\n- `session`: type, id, space, started_via, checked_in_at, checked_out_at, duration_seconds, termination_source.\n- `lines`: time first \u2014 a closed walk-in splits into \"Time covered by your plan\" (source plan) and \"Charged time\" (source charge, with points and amount); an open session has one \"Time so far\" line (source null); a booking shows its stored charge. Then one line per resource consumption during the session (printing, internet \u2014 kind resource_consumption); the plan-hours row is already the time line, so it is not repeated. Caf\u00e9 orders will join as kind order.\n- `plan`: for a walk-in on a plan with hours \u2014 name, hours_used by this session, hours_remaining; null otherwise.\n- `totals`: amount_owed, currency, payment_state, payment_method, paid_at \u2014 null while the session is open.\n\n### Cases \u2014 see this request's saved examples\n- **Session Still Open** \u2014 200, one \"Time so far\" line and totals null.\n- **Booking** \u2014 200, one charged time line with the booking's stored amount.\n- **Error: Not Your Session** \u2014 404 \u2014 someone else's session, or a booking that was never checked in.\n\n`totals.discounts` (added 2026-10-18): beside `totals.payment`, what was taken off the session, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced.\n\n`payments`: every attempt to pay for the session, oldest first \u2014 `{id, method, status, amount_points, created_at, settled_at}`, status pending / accepted / failed / canceled / expired / reversed / needs_review. A card that failed or was abandoned stays listed beside the one that went through."
                             },
                             "response": [
                                 {
@@ -10227,7 +10587,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 10800,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time covered by your plan\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 1,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": 100,\n                \"amount\": \"10.00\",\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 2,\n            \"hours_remaining\": 0\n        },\n        \"totals\": {\n            \"amount_owed\": \"10.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        }\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 10800,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time covered by your plan\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 1,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": 100,\n                \"amount\": \"10.00\",\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 2,\n            \"hours_remaining\": 0\n        },\n        \"totals\": {\n            \"amount_owed\": \"10.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        },\n        \"payments\": [\n            {\n                \"id\": 41,\n                \"method\": \"paymera\",\n                \"status\": \"failed\",\n                \"amount_points\": 200,\n                \"created_at\": \"2026-08-17T07:06:00+00:00\",\n                \"settled_at\": null\n            },\n            {\n                \"id\": 42,\n                \"method\": \"wallet\",\n                \"status\": \"accepted\",\n                \"amount_points\": 200,\n                \"created_at\": \"2026-08-17T07:08:00+00:00\",\n                \"settled_at\": \"2026-08-17T07:08:00+00:00\"\n            }\n        ]\n    }\n}"
                                 },
                                 {
                                     "name": "Session Still Open",
@@ -10275,7 +10635,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": null,\n            \"duration_seconds\": 9000,\n            \"termination_source\": null\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time so far\",\n                \"quantity\": 2.5,\n                \"unit\": \"hour\",\n                \"source\": null,\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 0,\n            \"hours_remaining\": 2\n        },\n        \"totals\": null\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"walkin\",\n            \"id\": 1,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"scan\",\n            \"checked_in_at\": \"2026-08-17T05:00:00+00:00\",\n            \"checked_out_at\": null,\n            \"duration_seconds\": 9000,\n            \"termination_source\": null\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Time so far\",\n                \"quantity\": 2.5,\n                \"unit\": \"hour\",\n                \"source\": null,\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": null\n            },\n            {\n                \"kind\": \"resource_consumption\",\n                \"label\": \"Printing\",\n                \"quantity\": 20,\n                \"unit\": \"page\",\n                \"source\": \"plan\",\n                \"points\": null,\n                \"amount\": null,\n                \"recorded_at\": \"2026-08-17T06:30:00+00:00\"\n            }\n        ],\n        \"plan\": {\n            \"name\": \"Flex 2 Hours\",\n            \"hours_used\": 0,\n            \"hours_remaining\": 2\n        },\n        \"totals\": null,\n        \"payments\": []\n    }\n}"
                                 },
                                 {
                                     "name": "Booking",
@@ -10323,7 +10683,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"booking\",\n            \"id\": 2,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"reception\",\n            \"checked_in_at\": \"2026-08-17T06:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 7200,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": null,\n                \"amount\": \"20.00\",\n                \"recorded_at\": null\n            }\n        ],\n        \"plan\": null,\n        \"totals\": {\n            \"amount_owed\": \"20.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        }\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"session\": {\n            \"type\": \"booking\",\n            \"id\": 2,\n            \"space\": {\n                \"id\": 1,\n                \"name\": \"Co-working Hall\"\n            },\n            \"started_via\": \"reception\",\n            \"checked_in_at\": \"2026-08-17T06:00:00+00:00\",\n            \"checked_out_at\": \"2026-08-17T08:00:00+00:00\",\n            \"duration_seconds\": 7200,\n            \"termination_source\": \"reception\"\n        },\n        \"lines\": [\n            {\n                \"kind\": \"time\",\n                \"label\": \"Charged time\",\n                \"quantity\": 2,\n                \"unit\": \"hour\",\n                \"source\": \"charge\",\n                \"points\": null,\n                \"amount\": \"20.00\",\n                \"recorded_at\": null\n            }\n        ],\n        \"plan\": null,\n        \"totals\": {\n            \"amount_owed\": \"20.00\",\n            \"currency\": \"USD\",\n            \"payment_state\": \"unpaid\",\n            \"payment_method\": null,\n            \"paid_at\": null\n        },\n        \"payments\": [\n            {\n                \"id\": 41,\n                \"method\": \"paymera\",\n                \"status\": \"failed\",\n                \"amount_points\": 200,\n                \"created_at\": \"2026-08-17T07:06:00+00:00\",\n                \"settled_at\": null\n            },\n            {\n                \"id\": 42,\n                \"method\": \"wallet\",\n                \"status\": \"accepted\",\n                \"amount_points\": 200,\n                \"created_at\": \"2026-08-17T07:08:00+00:00\",\n                \"settled_at\": \"2026-08-17T07:08:00+00:00\"\n            }\n        ]\n    }\n}"
                                 },
                                 {
                                     "name": "Error: Not Your Session",
@@ -10372,6 +10732,241 @@
                                     ],
                                     "cookie": [],
                                     "body": "{\n    \"message\": \"The requested resource was not found.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Real-time: Authorize Member Channel",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "urlencoded",
+                                    "urlencoded": [
+                                        {
+                                            "key": "socket_id",
+                                            "value": "123456.7890123",
+                                            "type": "text",
+                                            "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                        },
+                                        {
+                                            "key": "channel_name",
+                                            "value": "private-member.{{member_id}}",
+                                            "type": "text"
+                                        }
+                                    ]
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/broadcasting/auth",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "broadcasting",
+                                        "auth"
+                                    ]
+                                },
+                                "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"auth\": \"a1b2c3d4e5f6:7f3c9e0d2b8a4f61c5e7d9b3a1f0e2c4d6b8a0f1e3c5d7b9a2f4e6c8d0b1a3f5e7\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Your Channel",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Token Expired",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "Unauthorized",
+                                    "code": 401,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
                                 }
                             ]
                         }
@@ -15802,7 +16397,7 @@
                 },
                 {
                     "name": "Reception Operations",
-                    "description": "Check-in/check-out, payment settlement, cancellation, manual wallet top-up, and booking approval/extension (docs/decisions/reception-operations-scope.md, docs/decisions/booking-creation-approval-extension.md). Bookings are created via Member (App) > Bookings > Create Booking, which auto-captures {{booking_id}}; walk-ins are created via Start Walk-in Session below, which auto-captures {{walkin_session_id}}.",
+                    "description": "Check-in/check-out, payment settlement, cancellation, manual wallet top-up, and booking approval/extension (docs/decisions/reception-operations-scope.md, docs/decisions/booking-creation-approval-extension.md). Bookings are created via Member (App) > Bookings > Create Booking, which auto-captures {{booking_id}}; walk-ins are created via Start Walk-in Session below, which auto-captures {{walkin_session_id}}.\n\n## Real-time updates (Pusher Channels) \u2014 for the dashboard\n\nThe desk's screens (arrivals, active sessions, end requests) are told the moment something changes on `private-reception`, and re-fetch the lists they already show. Admin and operations accounts, signed in to the dashboard, only: a member \u2014 or a member-app token of someone who also works the desk \u2014 is refused (403). Authorize with `POST {{base_url}}/api/broadcasting/auth` on the dashboard session (see \"Real-time: Authorize Reception Channel\" below). The events carry ids and a status only; with Laravel Echo listen with a leading dot (`.listen('.arrival_request.created', \u2026)`), since the names are set by broadcastAs().\n\n| Event | data | When |\n|---|---|---|\n| `arrival_request.created` | `{arrival_request_id, purpose: \"arrival\"\\|\"coworking_start\", status: \"pending\"}` | A member's kiosk scan filed a request (a scan while one already waits sends nothing). |\n| `arrival_request.resolved` | `{arrival_request_id, purpose, status: \"confirmed\"\\|\"rejected\"\\|\"expired\"}` | Confirmed or rejected here, or expired by kiosk:expire-stale-arrival-requests. |\n| `session_end_request.created` | `{session_end_request_id, session_type: \"walkin\"\\|\"booking\", session_id, status: \"pending\"}` | A member asked to end, or changed the waiting request (a fresh checkout, another payment method). |\n| `session_end_request.cancelled` | same, `status: \"cancelled\"` | The member withdrew it. |\n| `session_end_request.resolved` | same, `status: \"confirmed\"` | Reception confirmed it (Session End Requests \u2192 Confirm). |\n\nThe member is told on their own channel at the same time (coworking.start_confirmed / start_rejected / start_expired / session_ended \u2014 Member (App) \u2192 11. Coworking Sessions).",
                     "item": [
                         {
                             "name": "Check-in & Check-out",
@@ -16954,7 +17549,7 @@
                         },
                         {
                             "name": "Arrival Requests",
-                            "description": "docs/decisions/kiosk-display.md, docs/decisions/coworking-self-service-sessions.md. Every kiosk scan lands here (Member (App) > 10. Scan (Kiosk & Doors) > Scan QR, which saves {{arrival_request_id}}): a room, office or hall booking about to start (purpose arrival), or a coworking session that starts only when reception confirms it (purpose coworking_start). Confirming a matched arrival calls Check In Booking above unchanged; an unmatched one (space_id required) calls Start Walk-in Session above unchanged; a coworking start runs the same check-in or walk-in rules on the kiosk's space.",
+                            "description": "docs/decisions/kiosk-display.md, docs/decisions/coworking-self-service-sessions.md. Every kiosk scan lands here (Member (App) > 10. Scan (Kiosk & Doors) > Scan QR, which saves {{arrival_request_id}}): a room, office or hall booking about to start (purpose arrival), or a coworking session that starts only when reception confirms it (purpose coworking_start). Confirming a matched arrival calls Check In Booking above unchanged; an unmatched one (space_id required) calls Start Walk-in Session above unchanged; a coworking start runs the same check-in or walk-in rules on the kiosk's space.\n\nReal-time: a new request is announced on `private-reception` as `arrival_request.created`, and confirming, rejecting or expiring it as `arrival_request.resolved` \u2014 see Reception Operations' description.",
                             "item": [
                                 {
                                     "name": "List Pending Arrival Requests",
@@ -17253,7 +17848,7 @@
                         },
                         {
                             "name": "Active Sessions",
-                            "description": "Union of currently checked-in-not-checked-out bookings and walk-ins, one flat list so a reception dashboard can render a single table instead of two. is_overdue reuses the same branch-closing-time check the reception:close-overdue-sessions scheduled command uses to auto-close sessions.",
+                            "description": "Union of currently checked-in-not-checked-out bookings and walk-ins, one flat list so a reception dashboard can render a single table instead of two. is_overdue reuses the same branch-closing-time check the reception:close-overdue-sessions scheduled command uses to auto-close sessions.\n\nReal-time: the dashboard re-fetches this list on any `private-reception` event (a start confirmed, an end confirmed), with polling every 30 s only as a fallback.",
                             "item": [
                                 {
                                     "name": "List Active Reception Sessions",
@@ -17399,7 +17994,7 @@
                         },
                         {
                             "name": "Session End Requests",
-                            "description": "A member presses \"end session\" in the app (Member \u2192 11. Coworking Sessions \u2192 Request End); reception confirms it here. An unconfirmed request is still honoured by the nightly auto-close, which bills to requested_at rather than closing time. See docs/decisions/coworking-self-service-sessions.md.",
+                            "description": "A member presses \"end session\" in the app (Member \u2192 11. Coworking Sessions \u2192 Request End); reception confirms it here. An unconfirmed request is still honoured by the nightly auto-close, which bills to requested_at rather than closing time. See docs/decisions/coworking-self-service-sessions.md.\n\nReal-time: asking, changing and withdrawing are announced on `private-reception` (`session_end_request.created` / `.cancelled`), confirming as `session_end_request.resolved` \u2014 and the member hears `coworking.session_ended` on `private-member.{id}`. See Reception Operations' description.",
                             "item": [
                                 {
                                     "name": "Confirm Session End",
@@ -17427,7 +18022,7 @@
                                                 "confirm"
                                             ]
                                         },
-                                        "description": "**Bill to when the member pressed end** (the request as saved, no body). Ends a session the member asked to end in the app: billed up to requested_at, so the time reception took to confirm is never charged \u2014 or up to checked_out_at when given (district wall-clock, not in the future). Closes through the same closure as Check Out, then notifies the member (coworking.session_ended) so their app opens the report. The request id comes with the row in List Active Reception Sessions (end_request.id). Returns {message}.\n\n### Cases \u2014 see this request's saved examples\n- **Different End Time** \u2014 body `{\"checked_out_at\": \"2026-08-17 11:15:00\"}` bills to that time instead.\n- **Error: Not Pending** \u2014 409 `{\"message\":\"This end request is no longer pending.\"}` \u2014 already confirmed, withdrawn by the member, or the session was checked out another way (desk checkout or auto-close supersede it).\n- **Error: Past Closing Time** \u2014 422 `{\"message\":\"The checkout time cannot be after the branch's closing time.\"}` \u2014 nothing changes: the request stays pending and the session open."
+                                        "description": "A request the member made from a checkout (it carries `quoted_points`) closes at its `requested_at` \u2014 the time the member was shown a price for \u2014 and `checked_out_at` is refused with 422 `end_time_locked`: confirming says the member left, it does not change what they agreed to. Only a request from before checkouts (quoted_points null) may still be given another time.\n\n**Bill to when the member pressed end** (the request as saved, no body). Ends a session the member asked to end in the app: billed up to requested_at, so the time reception took to confirm is never charged \u2014 or up to checked_out_at when given (district wall-clock, not in the future). Closes through the same closure as Check Out, then notifies the member (coworking.session_ended) so their app opens the report. The request id comes with the row in List Active Reception Sessions (end_request.id). Returns {message}.\n\n### Cases \u2014 see this request's saved examples\n- **Different End Time** \u2014 body `{\"checked_out_at\": \"2026-08-17 11:15:00\"}` bills to that time instead.\n- **Error: Not Pending** \u2014 409 `{\"message\":\"This end request is no longer pending.\"}` \u2014 already confirmed, withdrawn by the member, or the session was checked out another way (desk checkout or auto-close supersede it).\n- **Error: Past Closing Time** \u2014 422 `{\"message\":\"The checkout time cannot be after the branch's closing time.\"}` \u2014 nothing changes: the request stays pending and the session open."
                                     },
                                     "response": [
                                         {
@@ -17470,7 +18065,7 @@
                                             "body": "{\n    \"message\": \"Session ended.\"\n}"
                                         },
                                         {
-                                            "name": "Different End Time",
+                                            "name": "Different End Time (request from before checkouts)",
                                             "originalRequest": {
                                                 "method": "POST",
                                                 "header": [
@@ -17598,8 +18193,194 @@
                                             ],
                                             "cookie": [],
                                             "body": "{\n    \"message\": \"The checkout time cannot be after the branch's closing time.\"\n}"
+                                        },
+                                        {
+                                            "name": "Error: Time Locked by Checkout",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/admin/reception/session-end-requests/{{session_end_request_id}}/confirm",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "admin",
+                                                        "reception",
+                                                        "session-end-requests",
+                                                        "{{session_end_request_id}}",
+                                                        "confirm"
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Unprocessable Content",
+                                            "code": 422,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n    \"message\": \"The member agreed to the time and price shown at checkout, so the checkout time cannot be changed.\"\n}"
                                         }
                                     ]
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Real-time: Authorize Reception Channel",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "urlencoded",
+                                    "urlencoded": [
+                                        {
+                                            "key": "socket_id",
+                                            "value": "123456.7890123",
+                                            "type": "text",
+                                            "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                        },
+                                        {
+                                            "key": "channel_name",
+                                            "value": "private-reception",
+                                            "type": "text"
+                                        }
+                                    ]
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/broadcasting/auth",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "broadcasting",
+                                        "auth"
+                                    ]
+                                },
+                                "description": "Signs the dashboard's subscription to `private-reception` \u2014 Laravel Echo calls this itself (with the session cookie and X-XSRF-TOKEN, like every dashboard call). Admin or operations, signed in to the dashboard. Answers `{\"auth\": \"<key>:<signature>\"}`. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Allowed** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 a member, or a member-app token."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-reception",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the dashboard's subscription to `private-reception` \u2014 Laravel Echo calls this itself (with the session cookie and X-XSRF-TOKEN, like every dashboard call). Admin or operations, signed in to the dashboard. Answers `{\"auth\": \"<key>:<signature>\"}`. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Allowed** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 a member, or a member-app token."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"auth\": \"a1b2c3d4e5f6:2c4e6a8b0d1f3a5c7e9b1d3f5a7c9e0b2d4f6a8c1e3b5d7f9a0c2e4b6d8f1a3c\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Allowed",
+                                    "originalRequest": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-reception",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the dashboard's subscription to `private-reception` \u2014 Laravel Echo calls this itself (with the session cookie and X-XSRF-TOKEN, like every dashboard call). Admin or operations, signed in to the dashboard. Answers `{\"auth\": \"<key>:<signature>\"}`. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Allowed** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 a member, or a member-app token."
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
                                 }
                             ]
                         },

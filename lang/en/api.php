@@ -403,6 +403,8 @@ return [
         'already_in_session' => 'You already have an active session. End it before starting a new one.',
         'booking_too_early' => 'Your booking starts at :start. There is no free seat before then; you can scan from :from.',
         'coverage_changed' => "The member's plan no longer covers this session. Reject the request and ask them to scan again.",
+        'checkout_expired' => 'This summary has expired. Open it again to see the final time and price.',
+        'end_time_locked' => 'The member agreed to the time and price shown at checkout, so the checkout time cannot be changed.',
         'no_open_session' => 'You have no active session.',
         'end_request_not_pending' => 'This end request is no longer pending.',
         'end_request_cancelled' => 'End request withdrawn.',
