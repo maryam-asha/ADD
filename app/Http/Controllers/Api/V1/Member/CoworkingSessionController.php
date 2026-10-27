@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\ArrivalRequestService;
@@ -14,6 +15,7 @@ use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PayableCheckout;
+use App\Domain\Finance\Payments\PaymentStart;
 use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\PayCoworkingSessionRequest;
@@ -21,6 +23,7 @@ use App\Http\Requests\Member\RequestSessionEndRequest;
 use App\Http\Resources\ArrivalRequestResource;
 use App\Http\Resources\CoworkingSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
+use App\Services\Realtime\RealtimeBroadcaster;
 use App\Support\Presenters\PriceLabelPresenter;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -54,10 +57,9 @@ class CoworkingSessionController extends Controller
 
     /**
      * What ending the running session now would come to, before the member
-     * asks to end it, so they choose how to pay knowing the amount: the
-     * report so far and what closing now would charge (the same quote
-     * reception closes from). The methods come from GET member/payment-methods
-     * with purpose coworking_session (or booking).
+     * asks to end it: the report so far and what closing now would charge
+     * (the same quote reception closes from). How to pay is chosen later,
+     * once reception has confirmed the end (pay()).
      *
      * What this shows is final: `checkout_token` seals the time and the price,
      * the member sends it with their end request, and reception closes the
@@ -129,12 +131,17 @@ class CoworkingSessionController extends Controller
     }
 
     /**
-     * A closed session is paid as the member asks — the card chosen when
-     * ending it, the wallet, or at the desk. There is no create request to
-     * send again for a session, so it has its own endpoint. Not the
-     * member's: 404, as for the report.
+     * A closed session is paid as the member chooses once reception has
+     * confirmed the end, from the methods GET member/payment-methods lists
+     * for purpose coworking_session (or booking): `wallet` spends the points
+     * now, a gateway (`paymera`) answers with its `redirect_url`, and `cash`
+     * answers `next: pay_at_reception` and tells the desk to collect it
+     * (CoworkingPaymentAtReception), which settles it through
+     * settle-payment. There is no create request to send again for a
+     * session, so it has its own endpoint. Not the member's: 404, as for the
+     * report.
      */
-    public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout): JsonResponse
+    public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout, RealtimeBroadcaster $realtime): JsonResponse
     {
         $session = $sessions->find($type, $id);
 
@@ -156,6 +163,10 @@ class CoworkingSessionController extends Controller
             return $this->paymentFailureResponse($e, $request->user()->id) ?? throw $e;
         }
 
+        if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
+            $realtime->send(new CoworkingPaymentAtReception($session));
+        }
+
         return response()->json(
             ['data' => $this->checkoutFields($outcome)] + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : []),
             201,
@@ -165,7 +176,7 @@ class CoworkingSessionController extends Controller
     public function requestEnd(RequestSessionEndRequest $request, SessionEndService $ends): JsonResponse
     {
         try {
-            $endRequest = $ends->request($request->user(), $request->validated('payment_method'), $request->validated('checkout_token'));
+            $endRequest = $ends->request($request->user(), $request->validated('checkout_token'));
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

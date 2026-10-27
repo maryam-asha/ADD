@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
 use App\Domain\Booking\Models\SessionEndRequest;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Models\ExchangeRate;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
@@ -20,6 +21,7 @@ use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
@@ -62,18 +64,30 @@ class CoworkingSessionEndTest extends TestCase
         return [$member, $session];
     }
 
-    /**
-     * What the app does: show the checkout, then send its token with how the
-     * member chose to pay (cash unless a test says otherwise).
-     */
+    /** What the app does: show the checkout, then send its token. */
     private function requestEnd(array $body = []): TestResponse
     {
         $token = $this->getJson('/api/v1/member/coworking-sessions/current/checkout')->json('data.checkout_token') ?? 'no-checkout';
 
         return $this->withHeader('lang', 'en')->postJson(
             '/api/v1/member/coworking-sessions/current/end-request',
-            $body + ['checkout_token' => $token, 'payment_method' => 'cash'],
+            $body + ['checkout_token' => $token],
         );
+    }
+
+    /** What the app does once reception has confirmed: pay by the method the member picks. */
+    private function pay(User $member, WalkinSession $session, string $method): TestResponse
+    {
+        Sanctum::actingAs($member, ['*']);
+
+        return $this->withHeader('lang', 'en')->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => $method]);
+    }
+
+    private function settleCashAtTheDesk(WalkinSession $session): TestResponse
+    {
+        $this->actingAsOperations();
+
+        return $this->withHeader('lang', 'en')->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", ['payment_method' => 'cash']);
     }
 
     private function walletWith(User $member, int $points): Wallet
@@ -144,19 +158,23 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertTrue($session->checked_out_at->equalTo(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')));
         $this->assertSame('20', (string) $session->amount_owed); // 2 h at 100 points, 0.10 USD/point
         $this->assertSame(SessionEndRequestStatus::Confirmed, SessionEndRequest::sole()->status);
-        Notification::assertSentTo($member, GeneralNotification::class);
+        // Still owed: the push sends the member to choose how to pay.
+        Notification::assertSentTo($member, GeneralNotification::class, fn (GeneralNotification $n) => $n->toArray($member)['template_key'] === 'coworking.session_ended_unpaid');
     }
 
-    public function test_the_member_says_how_they_will_pay_when_asking_to_end(): void
+    /** Points that would cover it are not touched: the member chooses how to pay only after the desk confirms. */
+    public function test_confirming_ends_the_session_and_pays_nothing(): void
     {
-        $this->memberInSession();
+        [$member, $session] = $this->memberInSession();
+        $wallet = $this->walletWith($member, 500);
+        $this->requestEnd()->assertCreated();
 
-        $this->requestEnd(['payment_method' => 'cash'])->assertCreated()->assertJsonPath('data.payment_method', 'cash');
-        // Pressing again with another method changes the waiting request's.
-        $this->requestEnd(['payment_method' => 'wallet'])->assertOk()->assertJsonPath('data.payment_method', 'wallet');
-        $this->requestEnd(['payment_method' => 'bitcoin'])->assertUnprocessable()->assertJsonValidationErrors('payment_method');
+        $this->confirm(SessionEndRequest::sole())->assertOk()
+            ->assertJsonPath('message', 'Session ended. Payment is still due.')
+            ->assertJsonPath('data.payment_state', 'unpaid');
 
-        $this->assertSame('wallet', SessionEndRequest::sole()->payment_method);
+        $this->assertSame(PaymentState::Unpaid, $session->fresh()->payment_state);
+        $this->assertSame(0, $wallet->transactions()->where('amount', '<', 0)->count());
     }
 
     /**
@@ -167,7 +185,7 @@ class CoworkingSessionEndTest extends TestCase
     {
         [$member, $session] = $this->memberInSession();
         $this->walletWith($member, 150);
-        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->requestEnd();
         $this->travel(30)->minutes();
         $this->actingAsOperations();
 
@@ -176,53 +194,88 @@ class CoworkingSessionEndTest extends TestCase
             ->assertJsonPath('data.member.id', $member->id)
             ->assertJsonPath('data.closing.points', 200) // 08:00–10:00 at 100 an hour
             ->assertJsonPath('data.closing.at', '2026-08-17T10:00:00+03:00')
-            ->assertJsonPath('data.closing.end_request.payment_method', 'wallet')
             ->assertJsonPath('data.wallet_points', 150);
 
         $this->assertNull($session->fresh()->checked_out_at, 'A quote closes nothing.');
     }
 
-    /** Points chosen: confirming closes the session and spends them in the same step. */
-    public function test_confirming_a_wallet_request_spends_the_members_points(): void
+    /** Points chosen after the end: spent at once. */
+    public function test_points_chosen_after_the_end_are_spent_at_once(): void
     {
         [$member, $session] = $this->memberInSession();
         $wallet = $this->walletWith($member, 500);
-        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->requestEnd();
+        $this->confirm(SessionEndRequest::sole())->assertOk();
 
-        $this->confirm(SessionEndRequest::sole())->assertOk()
-            ->assertJsonPath('message', 'Session ended and paid.')
-            ->assertJsonPath('data.payment_state', 'paid');
+        $this->pay($member, $session, 'wallet')->assertCreated()->assertJsonPath('data.next', 'done');
 
         $this->assertSame(PaymentState::Paid, $session->fresh()->payment_state);
         $this->assertSame(1, $wallet->transactions()->where('amount', -200)->count());
     }
 
-    /** Too few points: still closed — the member is out of the door — and still owed. */
-    public function test_a_wallet_that_no_longer_covers_it_leaves_the_session_owed(): void
+    /** Too few points: refused, still closed — the member is out of the door — and still owed, to pay another way. */
+    public function test_points_that_do_not_cover_it_leave_the_session_owed(): void
     {
         [$member, $session] = $this->memberInSession();
         $this->walletWith($member, 50);
-        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->requestEnd();
+        $this->confirm(SessionEndRequest::sole())->assertOk();
 
-        $this->confirm(SessionEndRequest::sole())->assertOk()->assertJsonPath('data.payment_state', 'unpaid');
+        $this->pay($member, $session, 'wallet')->assertUnprocessable()->assertJsonPath('shortage', 150);
 
         $session->refresh();
         $this->assertNotNull($session->checked_out_at);
         $this->assertSame(PaymentState::Unpaid, $session->payment_state);
     }
 
-    /** Cash chosen: the desk takes the money, and one press ends and settles it. */
-    public function test_confirming_a_cash_request_with_the_money_in_hand_settles_it(): void
+    /** Cash chosen after the end: the member is sent to the desk, which takes the money and settles it. */
+    public function test_cash_chosen_after_the_end_is_settled_by_the_desk(): void
     {
         [$member, $session] = $this->memberInSession();
         $this->walletWith($member, 0);
-        $this->requestEnd(['payment_method' => 'cash']);
+        $this->requestEnd();
+        $this->confirm(SessionEndRequest::sole())->assertOk();
 
-        $this->confirm(SessionEndRequest::sole(), ['cash_collected' => true])->assertOk()->assertJsonPath('data.payment_state', 'paid');
+        $this->pay($member, $session, 'cash')->assertCreated()
+            ->assertJsonPath('data.next', 'pay_at_reception')
+            ->assertJsonPath('data.payment', null);
+        $this->assertSame(PaymentState::Unpaid, $session->fresh()->payment_state, 'Nothing is paid until the desk has the money.');
+
+        $this->settleCashAtTheDesk($session)->assertOk();
 
         $session->refresh();
         $this->assertSame(PaymentState::Paid, $session->payment_state);
         $this->assertSame(PaymentSource::Cash, $session->payment_source);
+    }
+
+    /** A card chosen after the end: the answer carries the Paymera page to open. */
+    public function test_a_card_chosen_after_the_end_answers_with_the_payment_link(): void
+    {
+        config([
+            'paymera.base_url' => 'https://egate-t.paymera.test',
+            'paymera.api_key' => 'test-key',
+            'paymera.terminal_id' => '99990001',
+            'paymera.currency' => 'SYP',
+            'paymera.default_lang' => 'en',
+        ]);
+        ExchangeRate::factory()->create(['currency_code' => 'SYP', 'rate_to_base' => '0.0001']);
+        Http::fake([
+            '*/api/create-payment' => Http::response([
+                'ErrorMessage' => 'Success',
+                'ErrorCode' => 0,
+                'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1'],
+            ]),
+        ]);
+        [$member, $session] = $this->memberInSession();
+        $this->walletWith($member, 0);
+        $this->requestEnd();
+        $this->confirm(SessionEndRequest::sole())->assertOk();
+
+        $this->pay($member, $session, 'paymera')->assertCreated()
+            ->assertJsonPath('data.next', 'redirect')
+            ->assertJsonPath('data.redirect_url', 'https://egate-t.paymera.test/start/pay-1/en');
+
+        $this->assertSame(PaymentState::Unpaid, $session->fresh()->payment_state, 'Paid only once the bank answers.');
     }
 
     /** The session's page says how it was paid: points and their worth, or the cash and its currency. */
@@ -230,8 +283,10 @@ class CoworkingSessionEndTest extends TestCase
     {
         [$member, $session] = $this->memberInSession();
         $this->walletWith($member, 500);
-        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->requestEnd();
         $this->confirm(SessionEndRequest::sole())->assertOk();
+        $this->pay($member, $session, 'wallet')->assertCreated();
+        $this->actingAsOperations();
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/admin/reception/sessions/walkin/{$session->id}/report")
             ->assertOk()
@@ -249,26 +304,16 @@ class CoworkingSessionEndTest extends TestCase
             'checked_in_at' => Carbon::parse('2026-08-17 08:00:00', 'Asia/Damascus')->utc(),
         ]);
         $this->walletWith($other, 0);
-        $this->requestEnd(['payment_method' => 'cash']);
-        $this->confirm(SessionEndRequest::where('user_id', $other->id)->sole(), ['cash_collected' => true])->assertOk();
+        $this->requestEnd();
+        $this->confirm(SessionEndRequest::where('user_id', $other->id)->sole())->assertOk();
+        $this->pay($other, $cashSession, 'cash')->assertCreated();
+        $this->settleCashAtTheDesk($cashSession)->assertOk();
 
         $this->withHeader('lang', 'en')->getJson("/api/v1/admin/reception/sessions/walkin/{$cashSession->id}/report")
             ->assertOk()
             ->assertJsonPath('data.payments.0.method', 'cash')
             ->assertJsonPath('data.payments.0.cash.amount', '20')
             ->assertJsonPath('data.payments.0.cash.currency', 'USD');
-    }
-
-    /** A card is paid in the app once the session is priced: the desk only ends it. */
-    public function test_confirming_a_card_request_only_ends_the_session(): void
-    {
-        [$member, $session] = $this->memberInSession();
-        $this->walletWith($member, 500);
-        $this->requestEnd(['payment_method' => 'paymera']);
-
-        $this->confirm(SessionEndRequest::sole(), ['cash_collected' => true])->assertOk()->assertJsonPath('data.payment_state', 'unpaid');
-
-        $this->assertSame(PaymentState::Unpaid, $session->fresh()->payment_state);
     }
 
     public function test_the_confirmation_audit_records_the_amount_owed_like_a_desk_checkout(): void
@@ -356,9 +401,9 @@ class CoworkingSessionEndTest extends TestCase
     {
         [$member, $session] = $this->memberInSession();
         $this->walletWith($member, 500);
-        $this->requestEnd(['payment_method' => 'wallet']);
+        $this->requestEnd();
         $this->confirm(SessionEndRequest::sole())->assertOk();
-        Sanctum::actingAs($member, ['*']);
+        $this->pay($member, $session, 'wallet')->assertCreated();
 
         $this->getJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/report")
             ->assertOk()
@@ -368,13 +413,15 @@ class CoworkingSessionEndTest extends TestCase
             ->assertJsonPath('data.payments.0.amount_points', 200);
     }
 
-    public function test_ending_needs_a_checkout_and_a_payment_method(): void
+    /** How to pay is not asked here: only after reception confirms. */
+    public function test_ending_needs_a_checkout_and_no_payment_method(): void
     {
         $this->memberInSession();
 
         $this->withHeader('lang', 'en')->postJson('/api/v1/member/coworking-sessions/current/end-request', [])
             ->assertUnprocessable()
-            ->assertJsonValidationErrors(['checkout_token', 'payment_method']);
+            ->assertJsonValidationErrors('checkout_token')
+            ->assertJsonMissingValidationErrors('payment_method');
     }
 
     public function test_a_confirmed_request_cannot_be_confirmed_again(): void

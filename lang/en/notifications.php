@@ -169,6 +169,10 @@ return [
             'title' => 'Session Ended',
             'body' => 'Your session at :space has ended. Tap to see the report.',
         ],
+        'session_ended_unpaid' => [
+            'title' => 'Session Ended',
+            'body' => 'Your session at :space has ended. Tap to choose how to pay.',
+        ],
     ],
 
     'payment' => [

@@ -6,6 +6,7 @@ use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Events\ArrivalRequestCreated;
 use App\Domain\Booking\Events\ArrivalRequestResolved;
+use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Events\CoworkingSessionEnded;
 use App\Domain\Booking\Events\CoworkingStartConfirmed;
 use App\Domain\Booking\Events\CoworkingStartExpired;
@@ -22,6 +23,8 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Wallet;
 use App\Services\Notification\Drivers\MockPushProvider;
 use App\Services\Notification\PushProvider;
 use Carbon\Carbon;
@@ -36,6 +39,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Testing\TestResponse;
+use Laravel\Sanctum\Sanctum;
 use Tests\Support\InteractsWithCoworking;
 use Tests\TestCase;
 
@@ -57,6 +61,7 @@ class CoworkingRealtimeTest extends TestCase
         CoworkingStartRejected::class,
         CoworkingStartExpired::class,
         CoworkingSessionEnded::class,
+        CoworkingPaymentAtReception::class,
         SessionEndRequestCreated::class,
         SessionEndRequestCancelled::class,
         SessionEndRequestResolved::class,
@@ -119,7 +124,6 @@ class CoworkingRealtimeTest extends TestCase
 
         return $this->withHeader('lang', 'en')->postJson('/api/v1/member/coworking-sessions/current/end-request', [
             'checkout_token' => $token,
-            'payment_method' => 'cash',
         ]);
     }
 
@@ -315,12 +319,33 @@ class CoworkingRealtimeTest extends TestCase
         $this->actingAsOperations();
         $this->postJson("/api/v1/admin/reception/session-end-requests/{$endRequest->id}/confirm")->assertOk();
 
+        // `unpaid`: the app's cue to show the payment methods.
         Event::assertDispatched(CoworkingSessionEnded::class, fn (CoworkingSessionEnded $e) => $this->onChannel($e, "private-member.{$member->id}")
             && $e->broadcastAs() === 'coworking.session_ended'
-            && $e->broadcastWith() === ['session_end_request_id' => $endRequest->id, 'session_type' => 'walkin', 'session_id' => $session->id]);
+            && $e->broadcastWith() === ['session_end_request_id' => $endRequest->id, 'session_type' => 'walkin', 'session_id' => $session->id, 'payment_state' => 'unpaid']);
         Event::assertDispatched(SessionEndRequestResolved::class, fn (SessionEndRequestResolved $e) => $this->onChannel($e, 'private-reception')
             && $e->broadcastAs() === 'session_end_request.resolved'
             && $e->broadcastWith() === ['session_end_request_id' => $endRequest->id, 'session_type' => 'walkin', 'session_id' => $session->id, 'status' => 'confirmed']);
+    }
+
+    /** Cash chosen once the session has ended: the desk hears it has money to collect; points do not tell it. */
+    public function test_choosing_cash_after_the_end_tells_the_desk(): void
+    {
+        [$member, $session] = $this->memberInSession();
+        Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]); // no points
+        $this->requestEnd()->assertCreated();
+        $this->actingAsOperations();
+        $this->postJson('/api/v1/admin/reception/session-end-requests/'.SessionEndRequest::sole()->id.'/confirm')->assertOk();
+        Event::fake(self::EVENTS);
+        Sanctum::actingAs($member, ['*']);
+
+        $this->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'wallet'])->assertUnprocessable();
+        Event::assertNotDispatched(CoworkingPaymentAtReception::class);
+
+        $this->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'cash'])->assertCreated();
+        Event::assertDispatched(CoworkingPaymentAtReception::class, fn (CoworkingPaymentAtReception $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'coworking.pay_at_reception'
+            && $e->broadcastWith() === ['session_type' => 'walkin', 'session_id' => $session->id, 'member_id' => $member->id]);
     }
 
     /** The data is saved before the socket server is called; its failure is logged and the answer stands. */

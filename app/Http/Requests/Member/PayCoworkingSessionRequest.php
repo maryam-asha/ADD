@@ -7,8 +7,8 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 /**
- * Paying a closed coworking session from the app — the card the member
- * chose when ending it, or another method.
+ * Paying a closed coworking session from the app, by the method the member
+ * picks once reception has confirmed the end.
  */
 class PayCoworkingSessionRequest extends FormRequest
 {
