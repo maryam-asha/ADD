@@ -9590,10 +9590,245 @@
                 },
                 {
                     "name": "11. Coworking Sessions",
-                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\nFlow: 10. Scan QR \u2192 (422 confirmation_required \u2192 Scan QR again with scan_ticket + accept_uncovered) \u2192 reception confirms (Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm) and the session starts then \u2192 Current Session for the timer \u2192 Checkout (Before Ending): the final time and price, sealed by checkout_token \u2192 Request End with the token and the chosen method \u2192 reception confirms the member left \u2192 reception confirms \u2192 the member gets a coworking.session_ended notification \u2192 Session Report.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.\n\n## Real-time updates (Pusher Channels) \u2014 for the app\n\nWhile the member waits for reception (a coworking start, or an end request), the API pushes a small event over a WebSocket the moment reception acts, so the app does not have to poll. The event carries ids only: on every event the app **re-fetches what it already reads** \u2014 GET member/coworking-sessions/current and GET member/home \u2014 and those stay the only source of truth. The FCM pushes (coworking.session_started, coworking.start_rejected, coworking.session_ended) are unchanged: they are what reaches an app in the background or closed.\n\n### Connect\nAny Pusher-protocol client (Flutter: `pusher_channels_flutter`).\n- **App key** and **cluster**: PUSHER_APP_KEY and PUSHER_APP_CLUSTER from the backend team (public values; the secret never leaves the server). The same protocol works against a self-hosted Reverb server later \u2014 then only host/port/key change.\n- **Auth endpoint** for private channels: `POST {{base_url}}/api/broadcasting/auth` (no /v1) with headers `Authorization: Bearer <member access token>` and `Accept: application/json`, body `socket_id` + `channel_name` (form-encoded or JSON). It answers 200 `{\"auth\": \"<key>:<signature>\"}` \u2014 hand that map back to the client library (in `pusher_channels_flutter` that is the `onAuthorizer` callback: call the endpoint yourself and return the decoded JSON). 403 = not your channel; 401 = the access token expired \u2192 POST auth/refresh, then reconnect. See \"Real-time: Authorize Member Channel\" below.\n- **Subscribe** after login to `private-member.{user_id}` \u2014 your own id, `user.id` in the Login / Register response (saved as {{member_id}}). Unsubscribe and disconnect on logout. Anyone else's id is refused.\n\n### Events on private-member.{user_id}\nEvent names have no leading dot in a raw Pusher client. `data` is a JSON object (some clients hand it over as a string \u2014 decode it); ignore keys you do not know (Laravel adds `socket: null`).\n\n| Event | data | What the app does |\n|---|---|---|\n| `coworking.start_confirmed` | `{arrival_request_id, session_type: \"walkin\"\\|\"booking\", session_id}` | Reception started the session. Re-fetch current (state becomes `active`) and home; leave the waiting screen for the timer. |\n| `coworking.start_rejected` | `{arrival_request_id}` | Reception declined. Re-fetch (data becomes null); leave the waiting screen and say reception declined. |\n| `coworking.start_expired` | `{arrival_request_id}` | Nobody answered within kiosk.arrival_request_expiry_minutes (30). Re-fetch; leave the waiting screen and offer to scan again. |\n| `coworking.session_ended` | `{session_end_request_id, session_type, session_id}` | Reception confirmed the member left. Re-fetch current (data becomes null) and home; open the Session Report (GET member/coworking-sessions/{session_type}/{session_id}/report). |\n\n### Fallback\n- Keep FCM as it is. A socket event and an FCM push may both arrive for the same change \u2014 re-fetching twice is harmless.\n- Poll only when the socket is **not connected** and the member is on a waiting screen (state `awaiting_confirmation`, or an `end_request` pending): GET member/coworking-sessions/current every ~10 s. Stop when the socket is connected again.\n- Events sent while the app was disconnected are not replayed: on every (re)connect and on returning to the foreground, re-fetch once.\n- Locally (BROADCAST_CONNECTION=log) nothing is sent \u2014 the events are written to storage/logs/laravel.log \u2014 so test the flow with polling, or against a Pusher app.\n\nThe dashboard listens on `private-reception` (Admin \u2192 Reception Operations); a member is refused it (403).",
+                    "description": "Self-service coworking sessions, co_space only: scan the kiosk's rotating code to start, watch the timer, ask to end, read the report. One code for every arrival: a member with a room, office or hall booking about to start is announced to reception instead, and one who comes early for a coworking booking waits on a walk-in that turns into the booking. See docs/decisions/coworking-self-service-sessions.md.\n\n## The flow, in the order the app calls it\n1. **After login, once** \u2014 connect to Pusher and subscribe to `private-member.{user_id}`; the client calls *1. Real-time: Authorize Member Channel* for you (see Real-time below).\n2. **Scan** \u2014 *10. Scan (Kiosk & Doors) \u2192 Scan QR* with the kiosk's code. 201 `outcome: awaiting_confirmation` \u2014 nothing has started. If 422 `confirmation_required`: show the reason and the hourly rate, and on \"accept\" send Scan QR again with `scan_ticket` + `accept_uncovered: true`.\n3. **Wait for reception** \u2014 show \"waiting for reception\". *2. Current Session* answers `state: awaiting_confirmation`. Reception confirms in *Admin \u2192 Reception Operations \u2192 Arrival Requests \u2192 Confirm* (or rejects).\n4. **Started** \u2014 event `coworking.start_confirmed` (or the FCM push) \u2192 re-fetch *2. Current Session*: `state: active`; show the timer (it runs in the app). `coworking.start_rejected` / `coworking.start_expired` \u2192 leave the waiting screen.\n5. **\"End session\" pressed** \u2014 *3. Checkout (Before Ending)*: the final time and price, sealed by `checkout_token`. Show it with the methods from *GET member/payment-methods?purpose=coworking_session* (booking: `purpose=booking`).\n6. **The member picks a method** \u2014 *4. Request End* with `checkout_token` + `payment_method`. Show \"waiting for reception\" (*2. Current Session* shows `end_request`). Changed their mind: *5. Withdraw End Request*.\n7. **Reception confirms the member left** \u2014 *Admin \u2192 Reception Operations \u2192 Session End Requests \u2192 Confirm Session End*; the session closes at the checkout's time and price. Wallet is spent then; cash is taken at the desk.\n8. **Ended** \u2014 event `coworking.session_ended` (or the FCM push) \u2192 open *7. Session Report*.\n9. **Pay, if still owed** \u2014 when Session Report says `totals.payment.state: unpaid` (a card, or a short wallet): *6. Pay Coworking Session* \u2192 open `redirect_url`. Every attempt shows in *7. Session Report* \u2192 `payments`; a failed one can be paid again.\n\nTo run it end to end from Postman: Admin \u2192 Kiosks \u2192 Create Kiosk \u2192 Issue Pairing Code, then Kiosk (device app) \u2192 Pair Kiosk. That saves kiosk_id and kiosk_secret, and Scan QR builds the kiosk's current code itself.\n\n## Real-time updates (Pusher Channels) \u2014 for the app\n\nWhile the member waits for reception (a coworking start, or an end request), the API pushes a small event over a WebSocket the moment reception acts, so the app does not have to poll. The event carries ids only: on every event the app **re-fetches what it already reads** \u2014 GET member/coworking-sessions/current and GET member/home \u2014 and those stay the only source of truth. The FCM pushes (coworking.session_started, coworking.start_rejected, coworking.session_ended) are unchanged: they are what reaches an app in the background or closed.\n\n### Connect\nAny Pusher-protocol client (Flutter: `pusher_channels_flutter`).\n- **App key** and **cluster**: PUSHER_APP_KEY and PUSHER_APP_CLUSTER from the backend team (public values; the secret never leaves the server). The same protocol works against a self-hosted Reverb server later \u2014 then only host/port/key change.\n- **Auth endpoint** for private channels: `POST {{base_url}}/api/broadcasting/auth` (no /v1) with headers `Authorization: Bearer <member access token>` and `Accept: application/json`, body `socket_id` + `channel_name` (form-encoded or JSON). It answers 200 `{\"auth\": \"<key>:<signature>\"}` \u2014 hand that map back to the client library (in `pusher_channels_flutter` that is the `onAuthorizer` callback: call the endpoint yourself and return the decoded JSON). 403 = not your channel; 401 = the access token expired \u2192 POST auth/refresh, then reconnect. See \"Real-time: Authorize Member Channel\" below.\n- **Subscribe** after login to `private-member.{user_id}` \u2014 your own id, `user.id` in the Login / Register response (saved as {{member_id}}). Unsubscribe and disconnect on logout. Anyone else's id is refused.\n\n### Events on private-member.{user_id}\nEvent names have no leading dot in a raw Pusher client. `data` is a JSON object (some clients hand it over as a string \u2014 decode it); ignore keys you do not know (Laravel adds `socket: null`).\n\n| Event | data | What the app does |\n|---|---|---|\n| `coworking.start_confirmed` | `{arrival_request_id, session_type: \"walkin\"\\|\"booking\", session_id}` | Reception started the session. Re-fetch current (state becomes `active`) and home; leave the waiting screen for the timer. |\n| `coworking.start_rejected` | `{arrival_request_id}` | Reception declined. Re-fetch (data becomes null); leave the waiting screen and say reception declined. |\n| `coworking.start_expired` | `{arrival_request_id}` | Nobody answered within kiosk.arrival_request_expiry_minutes (30). Re-fetch; leave the waiting screen and offer to scan again. |\n| `coworking.session_ended` | `{session_end_request_id, session_type, session_id}` | Reception confirmed the member left. Re-fetch current (data becomes null) and home; open the Session Report (GET member/coworking-sessions/{session_type}/{session_id}/report). |\n\n### Fallback\n- Keep FCM as it is. A socket event and an FCM push may both arrive for the same change \u2014 re-fetching twice is harmless.\n- Poll only when the socket is **not connected** and the member is on a waiting screen (state `awaiting_confirmation`, or an `end_request` pending): GET member/coworking-sessions/current every ~10 s. Stop when the socket is connected again.\n- Events sent while the app was disconnected are not replayed: on every (re)connect and on returning to the foreground, re-fetch once.\n- Locally (BROADCAST_CONNECTION=log) nothing is sent \u2014 the events are written to storage/logs/laravel.log \u2014 so test the flow with polling, or against a Pusher app.\n\nThe dashboard listens on `private-reception` (Admin \u2192 Reception Operations); a member is refused it (403).",
                     "item": [
                         {
-                            "name": "Current Session (Timer)",
+                            "name": "1. Real-time: Authorize Member Channel",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "urlencoded",
+                                    "urlencoded": [
+                                        {
+                                            "key": "socket_id",
+                                            "value": "123456.7890123",
+                                            "type": "text",
+                                            "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                        },
+                                        {
+                                            "key": "channel_name",
+                                            "value": "private-member.{{member_id}}",
+                                            "type": "text"
+                                        }
+                                    ]
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/broadcasting/auth",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "broadcasting",
+                                        "auth"
+                                    ]
+                                },
+                                "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                            },
+                            "response": [
+                                {
+                                    "name": "200 OK",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"auth\": \"a1b2c3d4e5f6:7f3c9e0d2b8a4f61c5e7d9b3a1f0e2c4d6b8a0f1e3c5d7b9a2f4e6c8d0b1a3f5e7\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Your Channel",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Token Expired",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "urlencoded",
+                                            "urlencoded": [
+                                                {
+                                                    "key": "socket_id",
+                                                    "value": "123456.7890123",
+                                                    "type": "text",
+                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
+                                                },
+                                                {
+                                                    "key": "channel_name",
+                                                    "value": "private-member.{{member_id}}",
+                                                    "type": "text"
+                                                }
+                                            ]
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/broadcasting/auth",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "broadcasting",
+                                                "auth"
+                                            ]
+                                        },
+                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
+                                    },
+                                    "status": "Unauthorized",
+                                    "code": 401,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "2. Current Session (Timer)",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -9831,7 +10066,7 @@
                             ]
                         },
                         {
-                            "name": "Checkout (Before Ending)",
+                            "name": "3. Checkout (Before Ending)",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -10026,7 +10261,7 @@
                             ]
                         },
                         {
-                            "name": "Request End",
+                            "name": "4. Request End",
                             "event": [
                                 {
                                     "listen": "test",
@@ -10371,7 +10606,7 @@
                             ]
                         },
                         {
-                            "name": "Withdraw End Request",
+                            "name": "5. Withdraw End Request (optional)",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -10504,7 +10739,243 @@
                             ]
                         },
                         {
-                            "name": "Session Report",
+                            "name": "6. Pay Coworking Session",
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "// Store the new payment id so \"Get Payment Status\" can follow on.",
+                                            "if (pm.response.code === 201) {",
+                                            "    const body = pm.response.json();",
+                                            "    pm.collectionVariables.set('payment_id', body.data.payment.id);",
+                                            "    pm.collectionVariables.set('paymera_redirect_url', body.data.redirect_url);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"payment_method\": \"paymera\",\n    \"coupon_code\": \"{{coupon_code}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/pay",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "coworking-sessions",
+                                        "{{coworking_session_type}}",
+                                        "{{coworking_session_id}}",
+                                        "pay"
+                                    ]
+                                },
+                                "description": "**Step 6 \u2014 only after reception has confirmed the end, and only if the session is still owed.** Read Session Report first: `totals.payment.state` is `unpaid` when there is something to pay. What happens by the method chosen at Request End:\n- `wallet` \u2014 already spent when reception confirmed; nothing to call (unless the wallet was short \u2014 then pay here with another method).\n- `cash` \u2014 taken at the desk; nothing to call.\n- `paymera` (card) \u2014 the member taps \"Pay now\": call this with `payment_method: paymera`, open `redirect_url`, then poll Get Payment Status. A failed or abandoned card is kept in Session Report \u2192 `payments` and the session stays owed: call this again, the same way or another.\n\nSame request as Wallet & Payments \u2192 Payments \u2192 Pay Coworking Session, placed here so the flow reads in order.\n\nPays the member's own closed, unpaid coworking session from the app \u2014 the card (or `wallet`, or `cash` to leave it for the desk) chosen when ending it, or later. `{type}` is `booking` or `walkin` (Current Session saves `coworking_session_type` and `coworking_session_id` once reception has started it; Session Report shows what is owed). The session already happened, so there is no window and no cancellation: a failed card leaves it owed and the member can pay again, here or at reception.\n\nBody: `payment_method` (required: `wallet` | `cash` | `paymera`), `wallet_owner_type`/`wallet_owner_id` (pick a company wallet \u2014 read with `wallet` only), `coupon_code` (optional; leave it out for none).\n\nAlways 201 `{data: {payment, redirect_url, next}}` (plus `coupon: {code, applied, points_discounted, message}` beside `data` when a code was sent); `next` is `redirect` (open `redirect_url` in a WebView, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (`payment` and `redirect_url` null). `payment.transaction_id` is the payment's row in the wallet history once it settles.\n\nErrors: 404 not the member's session \u00b7 409 already paid \u00b7 422 while the session is still open (it must be checked out first) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 422 for a refused coupon `{message, reason}` \u00b7 503 = card payment unavailable (our misconfiguration); 502 = could not start \u2014 neither is a declined card, nothing was charged.\n\n### Cases \u2014 see this request's saved examples\n- **Card (next: redirect)** \u2014 201.\n- **Error: Already Paid** \u2014 409.\n- **Error: Session Still Open** \u2014 422."
+                            },
+                            "response": [
+                                {
+                                    "name": "Card (next: redirect)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"payment_method\": \"paymera\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"payment\": {\n            \"id\": 26,\n            \"status\": \"pending\",\n            \"purpose\": \"coworking_session\",\n            \"method\": \"paymera\",\n            \"charged_amount\": 138400,\n            \"currency\": \"SYP\",\n            \"points_to_credit\": 100,\n            \"amount_points\": 100,\n            \"transaction_id\": null,\n            \"payable\": {\n                \"type\": \"walkin_session\",\n                \"id\": 1\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"gateway_payment_id\": \"7a9b1c2d-example\",\n            \"created_at\": \"2026-10-06T15:10:02.000000Z\"\n        },\n        \"redirect_url\": \"https://egate-t.paymera.cc/start/7a9b1c2d-example/ar\",\n        \"next\": \"redirect\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Already Paid",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"payment_method\": \"paymera\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Conflict",
+                                    "code": 409,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"\u062a\u0645 \u062f\u0641\u0639 \u0647\u0630\u0627 \u0645\u0633\u0628\u0642\u0627\u064b.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Session Still Open",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"payment_method\": \"paymera\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/coworking-sessions/{{coworking_session_type}}/{{coworking_session_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "coworking-sessions",
+                                                "{{coworking_session_type}}",
+                                                "{{coworking_session_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"\u064a\u062c\u0628 \u062a\u0633\u062c\u064a\u0644 \u062e\u0631\u0648\u062c \u0647\u0630\u0627 \u0627\u0644\u062d\u062c\u0632 \u0623\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0642\u0628\u0644 \u062a\u0633\u0648\u064a\u0629 \u0627\u0644\u062f\u0641\u0639.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "7. Session Report",
                             "request": {
                                 "auth": {
                                     "type": "bearer",
@@ -10732,241 +11203,6 @@
                                     ],
                                     "cookie": [],
                                     "body": "{\n    \"message\": \"The requested resource was not found.\"\n}"
-                                }
-                            ]
-                        },
-                        {
-                            "name": "Real-time: Authorize Member Channel",
-                            "request": {
-                                "auth": {
-                                    "type": "bearer",
-                                    "bearer": [
-                                        {
-                                            "key": "token",
-                                            "value": "{{member_token}}"
-                                        }
-                                    ]
-                                },
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "body": {
-                                    "mode": "urlencoded",
-                                    "urlencoded": [
-                                        {
-                                            "key": "socket_id",
-                                            "value": "123456.7890123",
-                                            "type": "text",
-                                            "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                        },
-                                        {
-                                            "key": "channel_name",
-                                            "value": "private-member.{{member_id}}",
-                                            "type": "text"
-                                        }
-                                    ]
-                                },
-                                "url": {
-                                    "raw": "{{base_url}}/api/broadcasting/auth",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "broadcasting",
-                                        "auth"
-                                    ]
-                                },
-                                "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
-                            },
-                            "response": [
-                                {
-                                    "name": "200 OK",
-                                    "originalRequest": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "urlencoded",
-                                            "urlencoded": [
-                                                {
-                                                    "key": "socket_id",
-                                                    "value": "123456.7890123",
-                                                    "type": "text",
-                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                                },
-                                                {
-                                                    "key": "channel_name",
-                                                    "value": "private-member.{{member_id}}",
-                                                    "type": "text"
-                                                }
-                                            ]
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/broadcasting/auth",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "broadcasting",
-                                                "auth"
-                                            ]
-                                        },
-                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
-                                    },
-                                    "status": "OK",
-                                    "code": 200,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"auth\": \"a1b2c3d4e5f6:7f3c9e0d2b8a4f61c5e7d9b3a1f0e2c4d6b8a0f1e3c5d7b9a2f4e6c8d0b1a3f5e7\"\n}"
-                                },
-                                {
-                                    "name": "Error: Not Your Channel",
-                                    "originalRequest": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "urlencoded",
-                                            "urlencoded": [
-                                                {
-                                                    "key": "socket_id",
-                                                    "value": "123456.7890123",
-                                                    "type": "text",
-                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                                },
-                                                {
-                                                    "key": "channel_name",
-                                                    "value": "private-member.{{member_id}}",
-                                                    "type": "text"
-                                                }
-                                            ]
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/broadcasting/auth",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "broadcasting",
-                                                "auth"
-                                            ]
-                                        },
-                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
-                                    },
-                                    "status": "Forbidden",
-                                    "code": 403,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
-                                },
-                                {
-                                    "name": "Error: Token Expired",
-                                    "originalRequest": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "urlencoded",
-                                            "urlencoded": [
-                                                {
-                                                    "key": "socket_id",
-                                                    "value": "123456.7890123",
-                                                    "type": "text",
-                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                                },
-                                                {
-                                                    "key": "channel_name",
-                                                    "value": "private-member.{{member_id}}",
-                                                    "type": "text"
-                                                }
-                                            ]
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/broadcasting/auth",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "broadcasting",
-                                                "auth"
-                                            ]
-                                        },
-                                        "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
-                                    },
-                                    "status": "Unauthorized",
-                                    "code": 401,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
                                 }
                             ]
                         }
