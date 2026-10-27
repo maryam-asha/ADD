@@ -11357,7 +11357,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions?payment_state=&per_page=15&page=1",
+                                    "raw": "{{base_url}}/api/v1/member/coworking-sessions",
                                     "host": [
                                         "{{base_url}}"
                                     ],
