@@ -12,11 +12,12 @@ use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
- * Task B2 pilot: Branches is the one resource switched from the coarse
+ * Task B2 pilot: Branches was the first resource switched from the coarse
  * role:admin|operations route-group check to granular `permission:`
- * middleware (docs/decisions/rbac-permission-pilot.md), proving a custom
- * role can reach an admin action on the strength of its granted permissions
- * alone, not by matching a hardcoded role name.
+ * middleware (docs/decisions/rbac-permission-pilot.md) — since 2026-10-27
+ * every admin route works this way — proving a custom role can reach an
+ * admin action on the strength of its granted permissions alone, not by
+ * matching a hardcoded role name.
  */
 class BranchPermissionEnforcementTest extends TestCase
 {
@@ -162,13 +163,16 @@ class BranchPermissionEnforcementTest extends TestCase
     public function test_permission_seeder_is_idempotent(): void
     {
         // Running PermissionSeeder twice (setUp already ran it once) must not
-        // throw and must leave operations with exactly the same grant.
+        // throw and must leave operations with exactly the same grant — the
+        // one the 2026_10_27 migration gave it, Branches included.
+        $operations = Role::findByName('operations', 'web');
+        $before = $operations->permissions()->pluck('name')->sort()->values()->all();
+
         $this->seed(PermissionSeeder::class);
 
-        $operations = Role::findByName('operations', 'web');
-        $this->assertEqualsCanonicalizing(
-            ['branches.view', 'branches.create', 'branches.update'],
-            $operations->permissions()->pluck('name')->all()
-        );
+        $after = $operations->fresh()->permissions()->pluck('name')->sort()->values()->all();
+        $this->assertSame($before, $after);
+        $this->assertContains('branches.update', $after);
+        $this->assertNotContains('branches.delete', $after);
     }
 }

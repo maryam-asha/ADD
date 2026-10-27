@@ -21,8 +21,10 @@ use LogicException;
  * the resource are identical for every owner, and whatever does differ
  * lives on the owner's HasForms hooks.
  *
- * Call it inside whichever middleware group should guard that owner's
- * editor — the registrar adds no middleware of its own.
+ * Every admin route names its permission
+ * (docs/decisions/rbac-permission-pilot.md, 2026-10-27), so the caller
+ * passes two: the one that reads the editor (GET) and the one that changes
+ * it (POST, PATCH, DELETE) — normally the owner's `view` and `update`.
  */
 final class FormFieldRoutes
 {
@@ -31,8 +33,10 @@ final class FormFieldRoutes
 
     /**
      * @param  class-string<HasForms>  $ownerClass
+     * @param  string  $readPermission  e.g. `events.view`
+     * @param  string  $writePermission  e.g. `events.update`
      */
-    public static function register(string $uri, string $ownerClass, FormPurpose $purpose): void
+    public static function register(string $uri, string $ownerClass, FormPurpose $purpose, string $readPermission, string $writePermission): void
     {
         if (! is_subclass_of($ownerClass, HasForms::class)) {
             throw new LogicException("{$ownerClass} does not implement ".HasForms::class.'.');
@@ -54,9 +58,12 @@ final class FormFieldRoutes
             self::ACTION_KEY => $form,
         ];
 
-        Route::get($uri, $action('index'));
-        Route::post($uri, $action('store'));
-        Route::patch("{$uri}/{field}", $action('update'))->whereNumber('field');
-        Route::delete("{$uri}/{field}", $action('destroy'))->whereNumber('field');
+        $read = "permission:{$readPermission}";
+        $write = "permission:{$writePermission}";
+
+        Route::get($uri, $action('index'))->middleware($read);
+        Route::post($uri, $action('store'))->middleware($write);
+        Route::patch("{$uri}/{field}", $action('update'))->whereNumber('field')->middleware($write);
+        Route::delete("{$uri}/{field}", $action('destroy'))->whereNumber('field')->middleware($write);
     }
 }

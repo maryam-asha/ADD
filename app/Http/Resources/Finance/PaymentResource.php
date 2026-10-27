@@ -26,7 +26,9 @@ class PaymentResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $isAdmin = $request->user()?->hasAnyRole(['admin', 'operations']) ?? false;
+        // A staff account is one holding any permission (as the `staff`
+        // middleware has it); members and providers hold none.
+        $isAdmin = $request->user()?->getAllPermissions()->isNotEmpty() ?? false;
 
         return [
             'id' => $this->id,

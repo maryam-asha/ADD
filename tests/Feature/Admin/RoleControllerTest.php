@@ -7,7 +7,6 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -54,7 +53,7 @@ class RoleControllerTest extends TestCase
     public function test_admin_can_create_a_custom_role_with_an_initial_permission_list(): void
     {
         $this->actingAsAdmin();
-        $permissionName = Permission::query()->value('name');
+        $permissionName = 'amenities.view';
 
         $response = $this->postJson('/api/v1/admin/roles', [
             'name' => 'front-desk',
@@ -86,7 +85,7 @@ class RoleControllerTest extends TestCase
     {
         $this->actingAsAdmin();
         $role = Role::create(['name' => 'front-desk', 'guard_name' => 'web']);
-        $permissionName = Permission::query()->value('name');
+        $permissionName = 'amenities.view';
 
         $this->patchJson("/api/v1/admin/roles/{$role->id}", [
             'permissions' => [$permissionName],
@@ -218,6 +217,45 @@ class RoleControllerTest extends TestCase
         $destroyResponse->assertNoContent();
     }
 
+    public function test_saving_a_role_adds_the_view_of_every_module_it_is_given_an_action_on(): void
+    {
+        $this->actingAsAdmin();
+
+        $this->postJson('/api/v1/admin/roles', [
+            'name' => 'front-desk',
+            'permissions' => ['amenities.create', 'reception.check_in', 'notifications.broadcast'],
+        ])->assertCreated();
+
+        // notifications has no `view`, so nothing is added for it.
+        $this->assertEqualsCanonicalizing(
+            ['amenities.create', 'amenities.view', 'reception.check_in', 'reception.view', 'notifications.broadcast'],
+            Role::findByName('front-desk', 'web')->permissions()->pluck('name')->all()
+        );
+
+        $role = Role::findByName('front-desk', 'web');
+        $this->patchJson("/api/v1/admin/roles/{$role->id}", [
+            'permissions' => ['companies.update_status', 'hr.employees.update'],
+        ])->assertOk();
+
+        $this->assertEqualsCanonicalizing(
+            ['companies.update_status', 'companies.view', 'hr.employees.update', 'hr.employees.view'],
+            $role->fresh()->permissions()->pluck('name')->all()
+        );
+    }
+
+    public function test_a_custom_role_holding_the_roles_permissions_manages_roles_without_being_admin(): void
+    {
+        $manager = User::factory()->create();
+        Role::create(['name' => 'role-manager', 'guard_name' => 'web'])
+            ->givePermissionTo(['roles.view', 'roles.create']);
+        $manager->assignRole('role-manager');
+        Sanctum::actingAs($manager, ['*']);
+
+        $this->getJson('/api/v1/admin/roles')->assertOk();
+        $this->postJson('/api/v1/admin/roles', ['name' => 'new-role'])->assertCreated();
+        $this->deleteJson('/api/v1/admin/roles/'.Role::findByName('new-role', 'web')->id)->assertForbidden();
+    }
+
     public function test_a_non_admin_operations_role_gets_403_on_mutating_role_actions(): void
     {
         $operator = User::factory()->create();
@@ -236,7 +274,7 @@ class RoleControllerTest extends TestCase
     {
         $this->actingAsAdmin();
         $memberRole = Role::findByName('member', 'web');
-        $permissionName = Permission::query()->value('name');
+        $permissionName = 'amenities.view';
 
         $response = $this->withHeader('lang', 'en')->patchJson("/api/v1/admin/roles/{$memberRole->id}", [
             'permissions' => [$permissionName],
@@ -251,7 +289,7 @@ class RoleControllerTest extends TestCase
     {
         $this->actingAsAdmin();
         $memberRole = Role::findByName('member', 'web');
-        $permissionName = Permission::query()->value('name');
+        $permissionName = 'amenities.view';
 
         $response = $this->withHeader('lang', 'ar')->patchJson("/api/v1/admin/roles/{$memberRole->id}", [
             'permissions' => [$permissionName],
@@ -282,7 +320,7 @@ class RoleControllerTest extends TestCase
     public function test_admin_can_still_sync_permissions_onto_a_custom_role_and_onto_admin_and_operations(): void
     {
         $this->actingAsAdmin();
-        $permissionName = Permission::query()->value('name');
+        $permissionName = 'amenities.view';
 
         $customRole = Role::create(['name' => 'front-desk', 'guard_name' => 'web']);
         $this->patchJson("/api/v1/admin/roles/{$customRole->id}", ['permissions' => [$permissionName]])

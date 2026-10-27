@@ -11829,7 +11829,7 @@
                                         "me"
                                     ]
                                 },
-                                "description": "Guarded by role:admin|operations \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c a logged-in member-only account gets 403 here, not 401. Also blocked (403) if the account's own status is deactivated/blocked, even with a fully valid session \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c see EnsureAuthenticatedUserIsActive."
+                                "description": "Takes any staff account (one holding at least one permission; the `staff` middleware) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c a logged-in member-only account gets 403 here, not 401. Also blocked (403) if the account's own status is deactivated/blocked, even with a fully valid session \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c see EnsureAuthenticatedUserIsActive."
                             }
                         },
                         {
@@ -12589,7 +12589,7 @@
                                         "companies"
                                     ]
                                 },
-                                "description": "Needs permission office-leases.create on top of the admin/operations role. Creates the company, its wallet and its first lease; the branch is the office's. office_leases is in the response only with office-leases.view. 422 if private_office_request_id isn't currently 'quoted' - run Private Office Requests/Mark as Quoted first."
+                                "description": "Needs permission office-leases.create. Creates the company, its wallet and its first lease; the branch is the office's. office_leases is in the response only with office-leases.view. 422 if private_office_request_id isn't currently 'quoted' - run Private Office Requests/Mark as Quoted first."
                             }
                         },
                         {
@@ -12870,7 +12870,7 @@
                 },
                 {
                     "name": "Company Members",
-                    "description": "door_access_enabled and is_admin are the only scoped capabilities in the app (D.8). Everything here sits under role:admin|operations; a company's own admin has the equivalent self-service actions under Member (App)/Company.",
+                    "description": "door_access_enabled and is_admin are the only scoped capabilities in the app (D.8). Listing is companies.view; adding, changing and removing members is companies.manage_members; a company's own admin has the equivalent self-service actions under Member (App)/Company.",
                     "item": [
                         {
                             "name": "List Company Members",
@@ -13176,7 +13176,7 @@
                                         "users"
                                     ]
                                 },
-                                "description": "role must be \"operations\" or \"admin\" \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c this endpoint never creates a plain member. admin-only route (role:admin, not role:admin|operations \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c an operations account gets 403 here)."
+                                "description": "role must be \"operations\" or \"admin\" \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c this endpoint never creates a plain member. Needs users.create (not held by operations \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c an operations account gets 403 here)."
                             }
                         },
                         {
@@ -13344,14 +13344,14 @@
                                         "role"
                                     ]
                                 },
-                                "description": "role must be the name of an existing role (dynamic \u00e2\u20ac\u201d not limited to member/operations/admin; see the Roles folder for managing custom roles). admin-only route. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
+                                "description": "role must be the name of an existing role (dynamic \u00e2\u20ac\u201d not limited to member/operations/admin; see the Roles folder for managing custom roles). Needs users.assign_role. Returns `{\"message\": \"...\"}` on success, not the updated user resource."
                             }
                         }
                     ]
                 },
                 {
                     "name": "Roles",
-                    "description": "Dynamic role CRUD with auto-derived, granular permissions (docs/decisions/rbac-permission-pilot.md). member/operations/admin are protected and can never be renamed or deleted; member can never hold a permission. These five routes are themselves still gated by role:admin only, not by permission:* middleware \u00e2\u20ac\u201d Branches is the sole pilot resource with real route-level permission enforcement in this pass. A custom role can be granted roles.view/create/update/delete (they exist and sync via PermissionSyncService), but a user holding only that custom role cannot yet call these endpoints on the strength of those permissions alone; only an actual admin/operations account can.",
+                    "description": "Dynamic role CRUD with auto-derived, granular permissions (docs/decisions/rbac-permission-pilot.md). member/operations/admin are protected and can never be renamed or deleted; member can never hold a permission. Every admin route names its own permission and no role name is checked (2026-10-27): these five need roles.view (list roles, list permissions), roles.create, roles.update and roles.delete, so any role granted them can manage roles. Saving a role also grants the view of every module it is given an action on.",
                     "item": [
                         {
                             "name": "List Roles",
@@ -13437,7 +13437,7 @@
                                         "roles"
                                     ]
                                 },
-                                "description": "admin-only route. name must be unique; each permissions entry must already exist (see List Permissions). Any name is allowed for a new custom role \u00e2\u20ac\u201d the three built-in names are already taken, so a client can't recreate them through this route."
+                                "description": "Needs roles.create. name must be unique; each permissions entry must already exist (see List Permissions). Any name is allowed for a new custom role \u00e2\u20ac\u201d the three built-in names are already taken, so a client can't recreate them through this route."
                             }
                         },
                         {
@@ -13482,7 +13482,7 @@
                                         "{{role_id}}"
                                     ]
                                 },
-                                "description": "admin-only route (PUT or PATCH, both accepted). Renaming a protected role (member/operations/admin) is rejected with 422 (api.role.protected_rename). Sending a permissions key for the member role is always rejected with 422 (api.role.member_out_of_scope) \u00e2\u20ac\u201d member never touches the admin dashboard, so it's out of scope for permissions regardless of rename intent. Returns `{\"message\": \"...\"}` on success, not the updated role resource."
+                                "description": "Needs roles.update (PUT or PATCH, both accepted). Renaming a protected role (member/operations/admin) is rejected with 422 (api.role.protected_rename). Sending a permissions key for the member role is always rejected with 422 (api.role.member_out_of_scope) \u00e2\u20ac\u201d member never touches the admin dashboard, so it's out of scope for permissions regardless of rename intent. Returns `{\"message\": \"...\"}` on success, not the updated role resource."
                             }
                         },
                         {
@@ -13514,7 +13514,7 @@
                                         "{{role_id}}"
                                     ]
                                 },
-                                "description": "admin-only route. Rejects the three protected roles (422, api.role.protected_delete) and any role still assigned to a user (422, api.role.role_in_use \u00e2\u20ac\u201d reassign those users first). Returns 204 No Content on success, not a message body."
+                                "description": "Needs roles.delete. Rejects the three protected roles (422, api.role.protected_delete) and any role still assigned to a user (422, api.role.role_in_use \u00e2\u20ac\u201d reassign those users first). Returns 204 No Content on success, not a message body."
                             }
                         },
                         {
@@ -13545,7 +13545,7 @@
                                         "permissions"
                                     ]
                                 },
-                                "description": "admin-only route. Every permission in the system, auto-derived from actual admin routes by PermissionSyncService (docs/decisions/rbac-permission-pilot.md) and grouped by module: `{data: [{module, actions: [{name, action}]}]}`. Coverage is deliberately partial today \u00e2\u20ac\u201d AdminResourceController subclasses plus a short manual list (Users/ErrorLogs/Roles/Settings); about a dozen other admin controllers (Company, CompanyMember, Currency, ExchangeRate, ExchangeRateSuggestion, PrivacyPolicy, all six Reception/* controllers) aren't covered yet, and `permissions:sync` prints an \"uncovered controllers\" warning for the non-Reception half of that gap."
+                                "description": "Needs roles.view. Every permission in the system, derived from the permission: middleware of the admin routes plus the HR and Inventory packages' abilities by PermissionSyncService (docs/decisions/rbac-permission-pilot.md), grouped by module: `{data: [{module, actions: [{name, action}]}]}`. Every name guards at least one route; `permissions:sync --prune` drops names nothing uses any more."
                             }
                         }
                     ]
@@ -13752,7 +13752,7 @@
                 },
                 {
                     "name": "Coupons",
-                    "description": "Discount coupons (docs/decisions/pricing-offers-and-coupons.md). Reads are open to admin and operations; create, update and delete are admin-only and audited (`coupon_created` / `coupon_updated` / `coupon_deleted`).\n\n- `code`: letters, digits, `-` and `_`, stored upper-case; members type it in any case.\n- `discount_type`: `percentage` (1\u2013100) or `amount_off` (points). `max_discount_points` caps a percentage; `min_amount_points` is compared with the price after any offer.\n- `combinable_with_offers: false` \u2014 the code is weighed against the list price instead of stacking on a sale/plan discount; when the offer is already lower the purchase goes through at the offer price with `coupon.applied: false`.\n- Who: `user_ids` (none = anyone), `company_id` (that company's members), `new_members_only`, `usage_limit` (first N uses), `per_user_limit` (defaults to 1 on create; send null for unlimited).\n- What: `targets` (none = every purchase a coupon can be spent on \u2014 never a wallet top-up). Each target is a `purpose` (`booking` | `coworking_session` | `plan_purchase` | `event_registration`) and at most one item: `plan_id` for a plan, `space_id` or `space_type` for time in a space, `event_id` for an event.\n- `starts_at`/`ends_at` are local (Damascus) wall-clock times, like every other typed time.\n\nUses are counted live from the record they are on: cancelling a booking, a failed card or an expired cash hold gives the use back.\n- `locked: true` (List/Get): the coupon or offer has been used, so it can only be switched on/off (`Set Coupon Active`); editing it is 409 `api.coupon.used_locked` and deleting it 409 `api.coupon.has_redemptions`.",
+                    "description": "Discount coupons (docs/decisions/pricing-offers-and-coupons.md). Reads need coupons.view; create, update and delete need coupons.create / coupons.update / coupons.delete and are audited (`coupon_created` / `coupon_updated` / `coupon_deleted`).\n\n- `code`: letters, digits, `-` and `_`, stored upper-case; members type it in any case.\n- `discount_type`: `percentage` (1\u2013100) or `amount_off` (points). `max_discount_points` caps a percentage; `min_amount_points` is compared with the price after any offer.\n- `combinable_with_offers: false` \u2014 the code is weighed against the list price instead of stacking on a sale/plan discount; when the offer is already lower the purchase goes through at the offer price with `coupon.applied: false`.\n- Who: `user_ids` (none = anyone), `company_id` (that company's members), `new_members_only`, `usage_limit` (first N uses), `per_user_limit` (defaults to 1 on create; send null for unlimited).\n- What: `targets` (none = every purchase a coupon can be spent on \u2014 never a wallet top-up). Each target is a `purpose` (`booking` | `coworking_session` | `plan_purchase` | `event_registration`) and at most one item: `plan_id` for a plan, `space_id` or `space_type` for time in a space, `event_id` for an event.\n- `starts_at`/`ends_at` are local (Damascus) wall-clock times, like every other typed time.\n\nUses are counted live from the record they are on: cancelling a booking, a failed card or an expired cash hold gives the use back.\n- `locked: true` (List/Get): the coupon or offer has been used, so it can only be switched on/off (`Set Coupon Active`); editing it is 409 `api.coupon.used_locked` and deleting it 409 `api.coupon.has_redemptions`.",
                     "item": [
                         {
                             "name": "List Coupons",
@@ -14724,7 +14724,7 @@
                 },
                 {
                     "name": "Settings",
-                    "description": "Global key/value config (docs/decisions/settings-key-value-store.md). List is available to admin and operations; update is admin-only.",
+                    "description": "Global key/value config (docs/decisions/settings-key-value-store.md). List needs settings.view; update needs settings.update.",
                     "item": [
                         {
                             "name": "List Settings",
@@ -14805,7 +14805,7 @@
                 },
                 {
                     "name": "Business Hours",
-                    "description": "Per-branch weekly schedule and date exceptions (docs/decisions/business-hours.md). List/Get are available to admin and operations; Create/Update/Delete are admin-only where the route requires it.",
+                    "description": "Per-branch weekly schedule and date exceptions (docs/decisions/business-hours.md). Each verb needs its module permission: business-hours.view/create/update/delete (business-hour-exceptions.* for exceptions).",
                     "item": [
                         {
                             "name": "Weekly Schedule",
@@ -15009,7 +15009,7 @@
                                                 "{{business_hour_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations)."
+                                        "description": "Needs business-hours.delete (not held by operations)."
                                     }
                                 }
                             ]
@@ -15270,7 +15270,7 @@
                                                 "{{business_hour_exception_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations)."
+                                        "description": "Needs business-hour-exceptions.delete (not held by operations)."
                                     }
                                 }
                             ]
@@ -19573,7 +19573,7 @@
                                                 "{{branch_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Building/Floor/Zone/Space/Resource/SeatDesk/Device under this branch."
+                                        "description": "Needs branches.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Building/Floor/Zone/Space/Resource/SeatDesk/Device under this branch."
                                     }
                                 }
                             ]
@@ -19780,7 +19780,7 @@
                                                 "{{building_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Floor/Zone/Space/Resource/SeatDesk under this building."
+                                        "description": "Needs buildings.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Floor/Zone/Space/Resource/SeatDesk under this building."
                                     }
                                 }
                             ]
@@ -19988,7 +19988,7 @@
                                                 "{{floor_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Zone/Space under this floor."
+                                        "description": "Needs floors.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Zone/Space under this floor."
                                     }
                                 }
                             ]
@@ -20196,7 +20196,7 @@
                                                 "{{zone_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Space under this zone."
+                                        "description": "Needs zones.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Space under this zone."
                                     }
                                 }
                             ]
@@ -20456,7 +20456,7 @@
                                                 "{{space_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Resource/SeatDesk under this space."
+                                        "description": "Needs spaces.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every Resource/SeatDesk under this space."
                                     }
                                 }
                             ]
@@ -20685,7 +20685,7 @@
                                                 "{{seat_desk_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations). Lowers the co_space's capacity by one. A desk a live Dedicated Desk subscription holds is refused with 422 {message}; untie it first (PUT memberships/{id}/desks)."
+                                        "description": "Needs seats-desks.delete (not held by operations). Lowers the co_space's capacity by one. A desk a live Dedicated Desk subscription holds is refused with 422 {message}; untie it first (PUT memberships/{id}/desks)."
                                     }
                                 }
                             ]
@@ -20899,7 +20899,7 @@
                                                 "{{device_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every DeviceCapability on this device."
+                                        "description": "Needs devices.delete (not held by operations) \u0623\u00a2\u00e2\u201a\u00ac\u00e2\u20ac\u200c cascades through every DeviceCapability on this device."
                                     }
                                 }
                             ]
@@ -21107,7 +21107,7 @@
                                                 "{{device_capability_id}}"
                                             ]
                                         },
-                                        "description": "Admin-only (not operations)."
+                                        "description": "Needs device-capabilities.delete (not held by operations)."
                                     }
                                 }
                             ]
@@ -22637,7 +22637,7 @@
                 },
                 {
                     "name": "Error Logs",
-                    "description": "Mobile client crash/error reports ingested unauthenticated via Mobile/Report Client Error. List/Get are available to admin and operations; Delete is admin-only. Gap found in the Task 15 Postman audit -- this existed in routes/api/v1/admin.php with no Postman coverage at all.",
+                    "description": "Mobile client crash/error reports ingested unauthenticated via Mobile/Report Client Error. List/Get need error-logs.view; Delete needs error-logs.delete. Gap found in the Task 15 Postman audit -- this existed in routes/api/v1/admin.php with no Postman coverage at all.",
                     "item": [
                         {
                             "name": "List Error Logs",
@@ -22756,7 +22756,7 @@
                                         "{{error_log_id}}"
                                     ]
                                 },
-                                "description": "Admin-only (not operations)."
+                                "description": "Needs error-logs.delete (not held by operations)."
                             }
                         }
                     ]

@@ -39,8 +39,8 @@ class CompanyPolicy
      * Operations/admin manage both fields unconditionally through the
      * admin-dashboard endpoints (Api\V1\Admin\CompanyMemberController) —
      * not via a Policy bypass, but because that controller never calls
-     * this check at all; its `role:admin|operations` route gate is the
-     * only authorization it has, independent of this Policy.
+     * this check at all; its routes' `companies.manage_members` permission
+     * is the only authorization it has, independent of this Policy.
      */
     public function manageMembers(User $user, Company $company): bool
     {

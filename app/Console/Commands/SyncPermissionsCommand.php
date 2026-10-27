@@ -7,13 +7,15 @@ use Illuminate\Console\Command;
 
 class SyncPermissionsCommand extends Command
 {
-    protected $signature = 'permissions:sync';
+    protected $signature = 'permissions:sync
+        {--prune : Delete the permissions no admin route or permission source names any more (and every grant of them)}';
 
-    protected $description = 'Derive admin-dashboard permissions from registered routes/controllers, sync them into the permissions table, and re-attach every permission to the admin role.';
+    protected $description = 'Sync the permissions table with the permission: middleware of the admin routes (plus the HR/Inventory permission sources), and re-attach every permission to the admin role.';
 
     public function handle(PermissionSyncService $service): int
     {
-        $result = $service->sync();
+        $prune = (bool) $this->option('prune');
+        $result = $service->sync($prune);
 
         $this->components->info("{$result['total']} permissions in sync (".count($result['created']).' newly created).');
 
@@ -22,13 +24,10 @@ class SyncPermissionsCommand extends Command
         }
 
         if ($result['stale']) {
-            $this->components->warn('No longer matched by a live admin route (left in place, not deleted):');
+            $prune
+                ? $this->components->warn('No longer named by any admin route or permission source — deleted, with every grant of them:')
+                : $this->components->warn('No longer named by any admin route or permission source (left in place; run with --prune to delete them):');
             $this->table(['Stale'], array_map(fn ($n) => [$n], $result['stale']));
-        }
-
-        if ($result['uncovered']) {
-            $this->components->warn('Admin controllers with NO permission coverage at all (neither reflected nor manually registered — see PermissionSyncService::MANUAL_REGISTRATIONS docblock):');
-            $this->table(['Uncovered controller'], array_map(fn ($n) => [$n], $result['uncovered']));
         }
 
         return self::SUCCESS;

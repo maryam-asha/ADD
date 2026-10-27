@@ -15,9 +15,11 @@ use Illuminate\Support\Facades\Broadcast;
 // expired, their session ended.
 Broadcast::channel('member.{id}', fn (User $user, string $id) => (int) $user->id === (int) $id);
 
-// The reception desk — one today, a single branch. Admin or operations,
-// signed in to the dashboard: the ability check keeps a member-app token of
-// someone who also works the desk out, the same seal the admin route group
-// holds (TokenPairService::MEMBER_APP_ABILITY). The dashboard's own session
-// carries a TransientToken, which passes it.
-Broadcast::channel('reception', fn (User $user) => $user->hasAnyRole(['admin', 'operations']) && $user->tokenCan('dashboard'));
+// The reception desk — one today, a single branch. Whoever may see the desk
+// (`reception.view`, the permission its screens read with — any role, by
+// permission, never by role name: docs/decisions/rbac-permission-pilot.md,
+// 2026-10-27), signed in to the dashboard: the ability check keeps a
+// member-app token of someone who also works the desk out, the same seal the
+// admin route group holds (TokenPairService::MEMBER_APP_ABILITY). The
+// dashboard's own session carries a TransientToken, which passes it.
+Broadcast::channel('reception', fn (User $user) => $user->can('reception.view') && $user->tokenCan('dashboard'));

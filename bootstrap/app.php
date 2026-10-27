@@ -5,6 +5,7 @@ use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
 use App\Http\Middleware\EnsureActiveProvider;
+use App\Http\Middleware\EnsureStaffAccount;
 use App\Http\Middleware\RedirectIfAuthenticated;
 use App\Http\Middleware\ResolveDefaultBranch;
 use App\Http\Middleware\SetLocaleFromHeader;
@@ -89,6 +90,9 @@ return Application::configure(basePath: dirname(__DIR__))
             // The provider route group (docs/decisions/service-providers.md):
             // the account's provider exists and is active.
             'provider.active' => EnsureActiveProvider::class,
+            // The two admin routes with no resource of their own (me,
+            // media/upload): any account holding at least one permission.
+            'staff' => EnsureStaffAccount::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —

@@ -20,14 +20,19 @@ Route::prefix('v1')->group(function () {
     // globally in bootstrap/app.php, not per route group.
     //
     // 'abilities:dashboard' is the isolation boundary between the two client
-    // surfaces, and it is separate from 'role' on purpose. The role says what
-    // its holder may do; the ability says which surface issued the credential
-    // being presented. A person who is genuinely both a member and an operator
-    // passes the role check with an app token — so only the ability keeps that
-    // token, minted behind a single factor, out of the operations API. The
-    // dashboard's own session satisfies this automatically (Sanctum gives a
-    // session-authenticated user a TransientToken that allows every ability).
-    Route::middleware(['auth:sanctum', 'abilities:dashboard', 'role:admin|operations'])
+    // surfaces, and it is separate from authorization on purpose. Permissions
+    // say what their holder may do; the ability says which surface issued the
+    // credential being presented. A person who is genuinely both a member and
+    // an operator holds the permissions with an app token too — so only the
+    // ability keeps that token, minted behind a single factor, out of the
+    // operations API. The dashboard's own session satisfies this automatically
+    // (Sanctum gives a session-authenticated user a TransientToken that allows
+    // every ability).
+    //
+    // No 'role:' check: every route in admin.php names its own permission, so
+    // any role reaches exactly what its permissions grant
+    // (docs/decisions/rbac-permission-pilot.md, 2026-10-27).
+    Route::middleware(['auth:sanctum', 'abilities:dashboard'])
         ->prefix('admin')
         ->group(base_path('routes/api/v1/admin.php'));
 
@@ -50,7 +55,7 @@ Route::prefix('v1')->group(function () {
      * employee is an HR record, not a role. Anyone with an active employee
      * record reaches hr/me (operations, sales, the café, ...), and every
      * admin route carries its own can:hr.* permission, so a custom HR role
-     * works without admin|operations.
+     * works on its permissions alone, like every admin route.
      */
     Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('hr')->group(function () {
         Route::middleware('hr.employee')->prefix('me')->group(fn () => Hr::selfServiceRoutes());
@@ -65,7 +70,7 @@ Route::prefix('v1')->group(function () {
      * Dashboard accounts behind the same 'abilities:dashboard' boundary, and
      * like HR no 'role:' check — every route carries its own
      * can:inventory.* permission, so a store keeper's custom role works
-     * without admin|operations.
+     * on its permissions alone.
      */
     Route::middleware(['auth:sanctum', 'abilities:dashboard'])->prefix('inventory')->group(fn () => Inventory::adminRoutes());
 

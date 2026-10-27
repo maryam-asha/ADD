@@ -251,3 +251,87 @@ relax them. No new guard test was added for the pilot itself — like
 capability rather than a schema-shape invariant, covered instead by
 `SyncPermissionsCommandTest`, `RoleControllerTest`, and
 `BranchPermissionEnforcementTest`.
+
+## 2026-10-27 — the pilot is now the rule everywhere
+
+**Spec:** `docs/superpowers/specs/2026-10-27-permission-only-dashboard-access-design.md`.
+Everything above stays as the record of how the pilot was reasoned; this section
+records what replaced it and what was given up. Where it contradicts the text
+above, this section is the current state.
+
+### What changed
+
+- **No role name is checked for staff access.** `routes/api.php`'s admin group is
+  `auth:sanctum` + `abilities:dashboard` only — `role:admin|operations` is gone,
+  and so are every `Route::withoutMiddleware('role:admin|operations')` wrapper
+  and the `role:admin` group in `routes/api/v1/admin.php`. Every admin route
+  names its own `permission:` middleware (`|` = any of), per the spec's table.
+  A role is a bag of permissions; any role, whatever its name, reaches exactly
+  the admin API its permissions grant. This is the same rule HR (`can:hr.*`) and
+  Inventory (`can:inventory.*`) already followed.
+- **Two routes take any staff account**: `GET me` and `POST media/upload` have no
+  resource of their own, so they sit behind `staff`
+  (`App\Http\Middleware\EnsureStaffAccount`) — any account holding at least one
+  permission. `member` and `provider` hold none, so they are still refused.
+- **Routes are the single source of permission names.** `PermissionSyncService`
+  now reads the `permission:` middleware of every route under `api/v1/admin/`,
+  plus the tagged `permissions.sources` (HR, Inventory — their routes live
+  outside `admin/` and check `can:`). The `AdminResourceController` reflection,
+  `MANUAL_REGISTRATIONS` and the "uncovered controllers" warning are removed:
+  the coverage gap listed under "Explicitly not done here" above is closed,
+  because a route without a permission now fails a guard instead of being
+  reported. There is no longer a way to register a permission that guards
+  nothing. `permissions:sync` reports stale names; `permissions:sync --prune`
+  deletes them (and every grant of them).
+- **Permission names follow the module of what the route serves**, not the
+  controller: `spaces/{space}/coworking-windows` is `spaces.update`, the
+  attendee decisions are `events.manage_attendees`, reception splits into
+  `reception.view/check_in/book/approve/settle_payment/record_consumption`, and
+  so on (the spec's table is the full list). The Spatial Hierarchy destroys
+  that used to be `role:admin` are `<module>.delete`, back inside each
+  `apiResource`.
+- **`admin` still holds everything** the same way as before — every sync
+  re-attaches every permission. No `Gate::before`.
+- **`operations` is an ordinary role now.** The data migration
+  `2026_10_27_100000_grant_operations_its_pre_permission_reach` runs the sync
+  and grants `operations` a written-out snapshot of the permission of every
+  route it reached before (everything in the old `admin.php` outside the
+  `role:admin` group and the already permission-gated blocks), keeping what
+  it already held. `PermissionSeeder` now only syncs; the old branches-only
+  grant there is subsumed by the migration. Tests get the same state, since
+  `RefreshDatabase` runs the migration: `assignRole('admin')` still means
+  "holds everything" and `assignRole('operations')` means "reaches what it
+  reached before".
+- **Saving a role adds the `view` of every module it is given an action on**
+  (`StoreRoleRequest`/`UpdateRoleRequest` → `GrantsModuleViews`):
+  `amenities.create` brings `amenities.view`, `hr.employees.update` brings
+  `hr.employees.view`, when that view exists.
+
+### What was given up
+
+- **`operations` no longer means "everything that isn't admin-only".** It holds
+  a fixed list. A route added from now on is reachable by `operations` only if
+  someone grants it the new permission (the Roles screen, or a migration like
+  this one) — the old implicit "new resource, operations gets it" is gone, on
+  purpose: it is what made custom roles useless.
+- **A role's reach is now exactly its permissions**, for admin too. An empty
+  `permissions` table locks *everyone* out of the admin API, not just out of
+  Branches as in the pilot — deploy order matters more (migrate first; the
+  migration runs the sync).
+- **Some grants widened for `operations`** because one name now guards routes
+  that used to sit at different tiers: `reports.view` covered the discount and
+  offer reports operations already read, so operations now also reads
+  `reports/revenue` and `reports/providers`; the any-of guards on `users` GET
+  and `reception/wallet-balance` gave it `users.view` and `wallet-top-ups.view`.
+- **Roles and users management is no longer pinned to `admin` by name.**
+  Whoever holds `roles.update` or `users.assign_role` can hand out any
+  permission — including those two. That is the point of the change, and also
+  the thing to be careful granting.
+
+### Guard
+
+`tests/Guards/AdminRoutesArePermissionGatedTest.php`: every route under
+`api/v1/admin/` carries a `permission:` middleware except the allowlisted
+`me` and `media/upload` (which must carry `staff`), none carries `role:`, and
+all keep `auth:sanctum` + `abilities:dashboard`. Behaviour:
+`tests/Feature/Identity/PermissionOnlyAdminAccessTest.php`.

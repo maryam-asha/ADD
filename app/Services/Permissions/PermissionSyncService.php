@@ -2,154 +2,70 @@
 
 namespace App\Services\Permissions;
 
-use App\Http\Controllers\Api\V1\Admin\AdminResourceController;
-use App\Http\Controllers\Api\V1\Admin\CompanyProviderController;
-use App\Http\Controllers\Api\V1\Admin\DashboardController;
-use App\Http\Controllers\Api\V1\Admin\DashboardStatsController;
-use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
-use App\Http\Controllers\Api\V1\Admin\InvoiceController;
-use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
-use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
-use App\Http\Controllers\Api\V1\Admin\PaymentController;
-use App\Http\Controllers\Api\V1\Admin\ProviderController;
-use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
-use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
-use App\Http\Controllers\Api\V1\Admin\RenewalController;
-use App\Http\Controllers\Api\V1\Admin\ReportController;
-use App\Http\Controllers\Api\V1\Admin\RoleController;
-use App\Http\Controllers\Api\V1\Admin\SettingController;
-use App\Http\Controllers\Api\V1\Admin\UserController;
+use Illuminate\Routing\Route as RoutingRoute;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
-use ReflectionClass;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\PermissionRegistrar;
 
 /**
- * The single source of truth for deriving admin-dashboard permissions from
- * registered routes/controllers — both `permissions:sync` (SyncPermissionsCommand)
- * and PermissionSeeder call `sync()` here rather than duplicating this logic.
+ * The single source of truth for the admin-dashboard permission set — both
+ * `permissions:sync` (SyncPermissionsCommand) and PermissionSeeder call
+ * `sync()` here rather than duplicating this logic.
+ *
+ * Routes are the only source of names (docs/decisions/rbac-permission-pilot.md,
+ * 2026-10-27): every `permission:` middleware on a route under
+ * `api/v1/admin/` (split on `|`, Spatie's any-of), plus the names a tagged
+ * `permissions.sources` publishes (the HR and Inventory packages, whose
+ * routes live outside `admin/` and check `can:` abilities). There is no way
+ * to register a permission that guards nothing.
  */
 class PermissionSyncService
 {
-    /**
-     * A deliberately partial, hand-picked list — NOT every controller that
-     * fails to extend AdminResourceController. It covers exactly these four
-     * (see each controller's own class docblock for why — no `order`
-     * column, destructive-delete/status semantics that don't fit the
-     * generic CRUD shape), because this pilot only converted those four to
-     * permission-derived coverage. At least a dozen more admin controllers
-     * (`CompanyController`, `CompanyMemberController`, `CurrencyController`,
-     * `ExchangeRateController`, `ExchangeRateSuggestionController`,
-     * `PrivacyPolicyController`, and all six `Reception/*Controller`
-     * classes) also don't extend AdminResourceController and get NO
-     * permission coverage today — an acknowledged gap, not a silent one:
-     * see docs/decisions/rbac-permission-pilot.md's "Explicitly not done
-     * here", and `uncoveredControllers()` below, which surfaces the
-     * non-Reception half of that gap in `permissions:sync`'s own output so
-     * it stays visible rather than assumed-exhaustive.
-     *
-     * @var array<class-string, array<string, list<string>>>
-     */
-    private const MANUAL_REGISTRATIONS = [
-        UserController::class => [
-            'users' => ['view', 'create', 'update', 'update_status', 'assign_role'],
-        ],
-        ErrorLogController::class => [
-            'error-logs' => ['view', 'delete'],
-        ],
-        RoleController::class => [
-            'roles' => ['view', 'create', 'update', 'delete'],
-        ],
-        SettingController::class => [
-            'settings' => ['view', 'update'],
-        ],
-        // Invoice reports (docs/decisions/provider-reports.md).
-        ReportController::class => [
-            'reports' => ['view'],
-        ],
-        // The dashboard's home page, one permission per section.
-        DashboardController::class => [
-            'dashboard' => ['operations', 'finance', 'members', 'spaces'],
-        ],
-        DashboardStatsController::class => [
-            'dashboard' => ['operations', 'members'],
-        ],
-        // Card payments. `reverse` is the only one actually enforced as a
-        // permission today (routes/api/v1/admin.php) — reversing moves real
-        // money at the bank, so it gets a granular grant rather than riding
-        // on role:admin|operations like the listing does. `view` is
-        // registered alongside it so a custom role can be given read-only
-        // access to the ledger once the pilot widens.
-        PaymentController::class => [
-            'payments' => ['view', 'reverse'],
-        ],
-        // Provider invoicing - each action its own grant, so recording money
-        // can be given to accounts staff without the right to void or cancel.
-        InvoiceController::class => [
-            'invoices' => ['view', 'cancel'],
-        ],
-        InvoicePaymentController::class => [
-            'invoices' => ['record_payment', 'void_payment'],
-        ],
-        // Auto-renewal (docs/superpowers/specs/2026-10-11-auto-renewal-design.md).
-        RenewalController::class => [
-            'renewals' => ['manage'],
-        ],
-        // Service providers (docs/decisions/service-providers.md). Every
-        // route is permission-gated, so the decision on a provider request
-        // can be given to operations, or any custom role, from the roles
-        // screen.
-        ProviderController::class => [
-            'providers' => ['view', 'create', 'update', 'status'],
-        ],
-        ProviderUserController::class => [
-            'providers' => ['update'],
-        ],
-        CompanyProviderController::class => [
-            'providers' => ['transfer_company'],
-        ],
-        ProviderRequestController::class => [
-            'provider-requests' => ['view', 'approve', 'reject'],
-        ],
-        // Office leases (docs/superpowers/specs/2026-10-10-office-leases-design.md).
-        // Ending a lease early is its own grant.
-        OfficeLeaseController::class => [
-            'office-leases' => ['view', 'create', 'terminate'],
-        ],
-    ];
+    public const ADMIN_URI_PREFIX = 'api/v1/admin/';
+
+    private const GUARD = 'web';
 
     /**
-     * Fixed method-name -> action-word mapping. Any other method name (a
-     * custom action like `updateStatus`) is intentionally not mapped —
-     * skipped silently rather than guessed at.
+     * Creates every derived name that is missing, re-attaches every permission
+     * to `admin`, and reports the names nothing derives any more ("stale").
+     * With `$prune`, the stale names are deleted — and with them every grant
+     * of them, to any role or user — instead of only being reported.
      *
-     * @var array<string, string>
+     * @return array{total: int, created: list<string>, stale: list<string>, pruned: bool}
      */
-    private const METHOD_ACTIONS = [
-        'index' => 'view',
-        'show' => 'view',
-        'store' => 'create',
-        'update' => 'update',
-        'destroy' => 'delete',
-    ];
-
-    /**
-     * @return array{total: int, created: string[], stale: string[], uncovered: string[]}
-     */
-    public function sync(): array
+    public function sync(bool $prune = false): array
     {
         $derivedNames = $this->deriveNames();
 
-        $created = [];
-        foreach ($derivedNames as $name) {
-            $permission = Permission::findOrCreate($name, 'web');
+        $existing = Permission::query()->where('guard_name', self::GUARD)->pluck('name')->all();
+        $created = array_values(array_diff($derivedNames, $existing));
 
-            if ($permission->wasRecentlyCreated) {
-                $created[] = $name;
-            }
+        // One insert, not a findOrCreate per name: this runs inside a
+        // migration, which every RefreshDatabase test replays.
+        if ($created !== []) {
+            $now = now();
+            Permission::query()->insert(array_map(fn (string $name) => [
+                'name' => $name,
+                'guard_name' => self::GUARD,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ], $created));
         }
+
+        $stale = Permission::query()
+            ->whereNotIn('name', $derivedNames)
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+
+        if ($prune && $stale !== []) {
+            $this->delete($stale);
+        }
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         // Fresh, unfiltered Permission::query()->where('guard_name', 'web')
         // — not just what this run created — so admin ends up with every
@@ -160,43 +76,34 @@ class PermissionSyncService
         // everything. The explicit guard_name filter makes the "only 'web'
         // exists today" assumption explicit rather than implicit — nothing
         // else in this app uses a different guard yet.
-        Role::findOrCreate('admin', 'web')->syncPermissions(
-            Permission::query()->where('guard_name', 'web')->get()
+        Role::findOrCreate('admin', self::GUARD)->syncPermissions(
+            Permission::query()->where('guard_name', self::GUARD)->get()
         );
-
-        $stale = Permission::query()
-            ->whereNotIn('name', $derivedNames)
-            ->pluck('name')
-            ->all();
-
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
         return [
             'total' => Permission::count(),
             'created' => $created,
             'stale' => $stale,
-            'uncovered' => $this->uncoveredControllers(),
+            'pruned' => $prune && $stale !== [],
         ];
     }
 
     /**
+     * Every permission name the routes and the tagged sources produce, sorted.
+     *
      * @return list<string>
      */
-    private function deriveNames(): array
+    public function deriveNames(): array
     {
         $names = [];
 
-        foreach ($this->discoverControllers() as $controller) {
-            foreach ($this->derivePermissionsForController($controller) as $name) {
-                $names[$name] = true;
+        foreach (Route::getRoutes() as $route) {
+            if (! str_starts_with($route->uri(), self::ADMIN_URI_PREFIX)) {
+                continue;
             }
-        }
 
-        foreach (self::MANUAL_REGISTRATIONS as $modules) {
-            foreach ($modules as $module => $actions) {
-                foreach ($actions as $action) {
-                    $names["{$module}.{$action}"] = true;
-                }
+            foreach (self::permissionsOf(self::effectiveMiddleware($route)) as $name) {
+                $names[$name] = true;
             }
         }
 
@@ -207,122 +114,68 @@ class PermissionSyncService
             }
         }
 
-        return array_keys($names);
+        $names = array_keys($names);
+        sort($names);
+
+        return $names;
     }
 
     /**
-     * Flat (non-recursive) glob, deliberately: this does NOT reach
-     * Api/V1/Admin/Reception/*Controller.php, which is out of scope — see
-     * uncoveredControllers() below, which uses the same glob for the same
-     * reason.
+     * A route's middleware, less whatever a withoutMiddleware() strips from it.
      *
-     * @return list<class-string>
+     * @return list<mixed>
      */
-    private function discoverControllers(): array
+    public static function effectiveMiddleware(RoutingRoute $route): array
     {
-        $controllers = [];
+        $excluded = $route->excludedMiddleware();
 
-        foreach (glob(app_path('Http/Controllers/Api/V1/Admin/*Controller.php')) ?: [] as $file) {
-            $class = 'App\\Http\\Controllers\\Api\\V1\\Admin\\'.basename($file, '.php');
-
-            if (! class_exists($class)) {
-                continue;
-            }
-
-            $reflection = new ReflectionClass($class);
-
-            if ($reflection->isSubclassOf(AdminResourceController::class) && ! $reflection->isAbstract()) {
-                $controllers[] = $class;
-            }
-        }
-
-        return $controllers;
+        return array_values(array_filter(
+            $route->gatherMiddleware(),
+            fn ($middleware) => ! (is_string($middleware) && in_array($middleware, $excluded, true)),
+        ));
     }
 
     /**
-     * @param  class-string  $controller
+     * The permission names a route's middleware list requires, any of:
+     * `permission:a|b` → [a, b]. Spatie's optional `,guard` suffix is dropped.
+     *
+     * @param  array<int, mixed>  $middleware
      * @return list<string>
      */
-    private function derivePermissionsForController(string $controller): array
+    public static function permissionsOf(array $middleware): array
     {
         $names = [];
 
-        foreach (Route::getRoutes() as $route) {
-            $actionName = $route->getActionName();
-
-            if (! str_contains($actionName, '@')) {
+        foreach ($middleware as $entry) {
+            if (! is_string($entry) || ! str_starts_with($entry, 'permission:')) {
                 continue;
             }
 
-            [$routeController, $method] = explode('@', $actionName, 2);
-
-            if ($routeController !== $controller) {
-                continue;
+            foreach (explode('|', Str::before(Str::after($entry, 'permission:'), ',')) as $name) {
+                if (($name = trim($name)) !== '') {
+                    $names[] = $name;
+                }
             }
-
-            if (! isset(self::METHOD_ACTIONS[$method])) {
-                continue;
-            }
-
-            $uri = $route->uri();
-            $afterAdmin = Str::after($uri, 'v1/admin/');
-
-            if ($afterAdmin === $uri) {
-                continue;
-            }
-
-            $module = Str::before(Str::before($afterAdmin, '/'), '{');
-
-            if ($module === '') {
-                continue;
-            }
-
-            $names[] = "{$module}.".self::METHOD_ACTIONS[$method];
         }
 
-        return array_values(array_unique($names));
+        return $names;
     }
 
     /**
-     * Admin controllers that get no permission coverage at all today:
-     * neither reflected by discoverControllers() (they don't extend
-     * AdminResourceController) nor listed in MANUAL_REGISTRATIONS. This
-     * makes the gap `permissions:sync` reports visible instead of a silent
-     * assumption that the manual list is exhaustive.
-     *
-     * Same flat, non-recursive glob as discoverControllers(), so
-     * Api/V1/Admin/Reception/*Controller.php is excluded here too, on
-     * purpose, not by omission: its actions (checkIn/checkOut/approve/
-     * reject/settlePayment/...) don't fit the index/show/store/update/
-     * destroy vocabulary this service derives module.action permissions
-     * from at all, so flagging it here wouldn't point at an actionable fix
-     * the same way the other controllers in this list do — it would need
-     * its own custom permission-naming scheme first. See
-     * docs/decisions/rbac-permission-pilot.md's "Explicitly not done here"
-     * for the full reasoning and the six Reception controller names.
-     *
-     * @return list<class-string>
+     * @param  list<string>  $names
      */
-    private function uncoveredControllers(): array
+    private function delete(array $names): void
     {
-        $covered = array_merge($this->discoverControllers(), array_keys(self::MANUAL_REGISTRATIONS));
+        $ids = Permission::query()->whereIn('name', $names)->pluck('id');
 
-        $uncovered = [];
-
-        foreach (glob(app_path('Http/Controllers/Api/V1/Admin/*Controller.php')) ?: [] as $file) {
-            $class = 'App\\Http\\Controllers\\Api\\V1\\Admin\\'.basename($file, '.php');
-
-            if ($class === AdminResourceController::class || ! class_exists($class)) {
-                continue;
-            }
-
-            if (! in_array($class, $covered, true)) {
-                $uncovered[] = $class;
-            }
-        }
-
-        sort($uncovered);
-
-        return $uncovered;
+        DB::transaction(function () use ($ids) {
+            DB::table(config('permission.table_names.role_has_permissions'))
+                ->whereIn(config('permission.column_names.permission_pivot_key') ?? 'permission_id', $ids)
+                ->delete();
+            DB::table(config('permission.table_names.model_has_permissions'))
+                ->whereIn(config('permission.column_names.permission_pivot_key') ?? 'permission_id', $ids)
+                ->delete();
+            Permission::query()->whereKey($ids)->delete();
+        });
     }
 }

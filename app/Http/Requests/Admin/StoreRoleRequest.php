@@ -2,10 +2,13 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Admin\Concerns\GrantsModuleViews;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreRoleRequest extends FormRequest
 {
+    use GrantsModuleViews;
+
     public function authorize(): bool
     {
         return true;

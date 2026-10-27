@@ -2,6 +2,10 @@
 
 namespace Tests\Feature\Console;
 
+use Add\Hr\Authorization\Abilities as HrAbilities;
+use Add\Inventory\Authorization\Abilities as InventoryAbilities;
+use App\Domain\Identity\Models\User;
+use App\Services\Permissions\PermissionSyncService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Spatie\Permission\Models\Permission;
@@ -10,8 +14,10 @@ use Tests\TestCase;
 
 /**
  * `permissions:sync` (App\Console\Commands\SyncPermissionsCommand) derives
- * permissions from routes/controllers via PermissionSyncService — this is
- * the derivation-correctness coverage for that service.
+ * permissions from the admin routes' `permission:` middleware, plus the
+ * tagged permission sources, via PermissionSyncService — this is the
+ * derivation-correctness coverage for that service
+ * (docs/decisions/rbac-permission-pilot.md, 2026-10-27).
  */
 class SyncPermissionsCommandTest extends TestCase
 {
@@ -23,62 +29,45 @@ class SyncPermissionsCommandTest extends TestCase
         $this->seed(RoleSeeder::class);
     }
 
-    public function test_it_derives_permissions_for_an_auto_scanned_resource(): void
+    public function test_it_derives_permissions_from_route_middleware(): void
     {
         $this->artisan('permissions:sync')->assertExitCode(0);
 
-        $this->assertDatabaseHas('permissions', ['name' => 'branches.view']);
-        $this->assertDatabaseHas('permissions', ['name' => 'branches.create']);
-        $this->assertDatabaseHas('permissions', ['name' => 'branches.update']);
-
-        // routes/api/v1/admin.php registers `branches` entirely by hand
-        // (not via ->apiResource(...)) inside a
-        // Route::withoutMiddleware('role:admin|operations') group, with
-        // each action — including destroy — gated by its own
-        // permission:branches.* middleware (docs/decisions/rbac-permission-pilot.md).
-        // Route introspection matches on the live Route objects regardless
-        // of which block registered them, so branches.delete is still
-        // derived correctly from that hand-written destroy route.
-        $this->assertDatabaseHas('permissions', ['name' => 'branches.delete']);
+        foreach ([
+            'branches.view', 'branches.create', 'branches.update', 'branches.delete',
+            'amenities.delete', 'reception.check_in', 'events.manage_attendees', 'kiosks.pair',
+            'users.view', 'users.assign_role', 'roles.update', 'error-logs.delete', 'settings.update',
+        ] as $name) {
+            $this->assertDatabaseHas('permissions', ['name' => $name]);
+        }
     }
 
-    public function test_a_resource_registered_without_a_destroy_route_at_all_gets_no_delete_permission(): void
+    public function test_every_side_of_an_any_of_middleware_becomes_a_permission(): void
     {
-        // ContactLinks is a plain `Route::apiResource(...)` with no
-        // `->except()` and no separate destroy route removed anywhere —
-        // unlike branches/buildings/etc., it keeps the full apiResource
-        // shape including a real, generically-CRUD destroy. This test exists
-        // to prove *unmapped* methods are skipped, using `founders` custom
-        // action-less shape isn't available, so instead assert on a resource
-        // that legitimately has no route under its module at all.
+        // GET users is `permission:users.view|members.view|reception.view`.
+        $names = app(PermissionSyncService::class)->deriveNames();
+
+        $this->assertContains('users.view', $names);
+        $this->assertContains('members.view', $names);
+        $this->assertContains('reception.view', $names);
+    }
+
+    public function test_a_route_with_no_permission_middleware_yields_no_permission(): void
+    {
         $this->artisan('permissions:sync')->assertExitCode(0);
 
-        // `Route::get('me', ...)` uses CurrentUserController, which is not
-        // an AdminResourceController subclass and not manually registered —
-        // no `me.*` permission should ever be derived from it.
+        // `me` and `media/upload` sit behind `staff`, not a permission.
         $this->assertDatabaseMissing('permissions', ['name' => 'me.view']);
+        $this->assertDatabaseMissing('permissions', ['name' => 'media.create']);
     }
 
-    public function test_manual_registrations_produce_their_fixed_permission_sets(): void
+    public function test_permission_sources_are_included(): void
     {
-        $this->artisan('permissions:sync')->assertExitCode(0);
+        $names = app(PermissionSyncService::class)->deriveNames();
 
-        $this->assertDatabaseHas('permissions', ['name' => 'users.view']);
-        $this->assertDatabaseHas('permissions', ['name' => 'users.create']);
-        $this->assertDatabaseHas('permissions', ['name' => 'users.update']);
-        $this->assertDatabaseHas('permissions', ['name' => 'users.update_status']);
-        $this->assertDatabaseHas('permissions', ['name' => 'users.assign_role']);
-
-        $this->assertDatabaseHas('permissions', ['name' => 'roles.view']);
-        $this->assertDatabaseHas('permissions', ['name' => 'roles.create']);
-        $this->assertDatabaseHas('permissions', ['name' => 'roles.update']);
-        $this->assertDatabaseHas('permissions', ['name' => 'roles.delete']);
-
-        $this->assertDatabaseHas('permissions', ['name' => 'error-logs.view']);
-        $this->assertDatabaseHas('permissions', ['name' => 'error-logs.delete']);
-
-        $this->assertDatabaseHas('permissions', ['name' => 'settings.view']);
-        $this->assertDatabaseHas('permissions', ['name' => 'settings.update']);
+        foreach ([...HrAbilities::all(), ...InventoryAbilities::all()] as $ability) {
+            $this->assertContains($ability, $names);
+        }
     }
 
     public function test_running_the_command_twice_is_idempotent(): void
@@ -102,11 +91,13 @@ class SyncPermissionsCommandTest extends TestCase
         $this->assertGreaterThan(0, Permission::count());
     }
 
-    public function test_a_permission_inserted_outside_the_command_survives_a_run_and_is_reported_as_stale(): void
+    public function test_a_stale_permission_is_reported_and_kept_without_prune(): void
     {
         Permission::create(['name' => 'ghost.view', 'guard_name' => 'web']);
 
-        $this->artisan('permissions:sync')->assertExitCode(0);
+        $this->artisan('permissions:sync')
+            ->expectsOutputToContain('ghost.view')
+            ->assertExitCode(0);
 
         $this->assertDatabaseHas('permissions', ['name' => 'ghost.view']);
 
@@ -116,16 +107,33 @@ class SyncPermissionsCommandTest extends TestCase
         $this->assertTrue($admin->hasPermissionTo('ghost.view'));
     }
 
-    public function test_it_warns_about_admin_controllers_with_no_permission_coverage_at_all(): void
+    public function test_prune_deletes_stale_permissions_and_every_grant_of_them(): void
     {
-        // CompanyController is one of at least 12 currently-uncovered admin
-        // controllers (docs/decisions/rbac-permission-pilot.md's
-        // "Explicitly not done here") — it neither extends
-        // AdminResourceController (so discoverControllers() never finds it)
-        // nor appears in PermissionSyncService::MANUAL_REGISTRATIONS. This
-        // proves the gap is surfaced, not silent.
-        $this->artisan('permissions:sync')
-            ->expectsOutputToContain('CompanyController')
+        $ghost = Permission::create(['name' => 'ghost.view', 'guard_name' => 'web']);
+        Role::findOrCreate('front-desk', 'web')->givePermissionTo(['ghost.view', 'amenities.view']);
+        User::factory()->create()->givePermissionTo('ghost.view');
+
+        $this->artisan('permissions:sync', ['--prune' => true])
+            ->expectsOutputToContain('ghost.view')
             ->assertExitCode(0);
+
+        $this->assertDatabaseMissing('permissions', ['name' => 'ghost.view']);
+        $this->assertDatabaseMissing('role_has_permissions', ['permission_id' => $ghost->id]);
+        $this->assertDatabaseMissing('model_has_permissions', ['permission_id' => $ghost->id]);
+        $this->assertSame(['amenities.view'], Role::findByName('front-desk', 'web')->permissions()->pluck('name')->all());
+        $this->assertSame(Permission::count(), Role::findByName('admin', 'web')->permissions()->count());
+    }
+
+    public function test_prune_leaves_every_derived_permission_alone(): void
+    {
+        $before = Permission::count();
+
+        $this->artisan('permissions:sync', ['--prune' => true])->assertExitCode(0);
+
+        $this->assertSame($before, Permission::count());
+        $this->assertEqualsCanonicalizing(
+            app(PermissionSyncService::class)->deriveNames(),
+            Permission::query()->pluck('name')->all()
+        );
     }
 }

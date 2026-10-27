@@ -34,7 +34,8 @@ class RoleController extends Controller
     {
         $role = Role::create(['name' => $request->validated('name'), 'guard_name' => 'web']);
 
-        if ($permissions = $request->validated('permissions')) {
+        // Every action granted brings its module's view (GrantsModuleViews).
+        if ($permissions = $request->grantedPermissions()) {
             $role->syncPermissions($permissions);
         }
 
@@ -66,7 +67,7 @@ class RoleController extends Controller
         }
 
         if ($request->has('permissions')) {
-            $role->syncPermissions($request->validated('permissions') ?? []);
+            $role->syncPermissions($request->grantedPermissions() ?? []);
         }
 
         $this->logSensitiveAction('role_updated', $role, [

@@ -11,6 +11,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Providers\Models\Provider;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\Feature\Invoicing\InvoicingTestCase;
 
 class ProvidersReportTest extends InvoicingTestCase
@@ -66,8 +67,14 @@ class ProvidersReportTest extends InvoicingTestCase
         $this->assertNull($beta['branch_share'][0]['share']);
     }
 
+    /**
+     * Operations holds `reports.view` since the admin API went permission-only
+     * (it reached the discount and offer reports, which share the name); a
+     * role without it is refused.
+     */
     public function test_operations_without_the_permission_is_refused(): void
     {
+        Role::findByName('operations', 'web')->revokePermissionTo('reports.view');
         $operator = User::factory()->create();
         $operator->assignRole('operations');
         Sanctum::actingAs($operator, ['*']);

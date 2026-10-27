@@ -17,8 +17,8 @@ use Illuminate\Http\Response;
 /**
  * Adding a member and toggling their door-access flag are both operations
  * capabilities (PRD §4: "إنشاء حسابات الشركات وإضافة أعضائها"), gated by the
- * same role:admin|operations group as the rest of admin.php — no narrower
- * restriction than that.
+ * `companies.manage_members` permission (listing: `companies.view`) — any
+ * role holding it, operations included.
  */
 class CompanyMemberController extends Controller
 {
@@ -71,8 +71,8 @@ class CompanyMemberController extends Controller
     /**
      * Operations grants/revokes company-admin status unconditionally — not
      * via a Gate::before/Policy bypass, this controller never calls
-     * CompanyPolicy::manageMembers() at all, so the role:admin|operations
-     * route gate is its only authorization. This is also the only way a
+     * CompanyPolicy::manageMembers() at all, so the route's
+     * `companies.manage_members` permission is its only authorization. This is also the only way a
      * company ever gets its first admin, since a company admin can only
      * grant is_admin to an *existing* member (CompanyPolicy::manageMembers,
      * enforced on the member-facing endpoint instead).

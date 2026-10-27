@@ -7,6 +7,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -75,6 +76,18 @@ class BroadcastChannelAuthorizationTest extends TestCase
 
         Sanctum::actingAs($this->userWithRole('admin'), ['dashboard']);
         $this->authorize('private-reception')->assertOk();
+    }
+
+    /** By permission, not role name: any role that may see the desk hears it. */
+    public function test_a_custom_role_with_reception_view_may_listen_to_the_desk_and_one_without_may_not(): void
+    {
+        Role::create(['name' => 'front-desk', 'guard_name' => 'web'])->givePermissionTo('reception.view');
+        Sanctum::actingAs($this->userWithRole('front-desk'), ['dashboard']);
+        $this->authorize('private-reception')->assertOk();
+
+        Role::create(['name' => 'stack_holder', 'guard_name' => 'web'])->givePermissionTo('amenities.view');
+        Sanctum::actingAs($this->userWithRole('stack_holder'), ['dashboard']);
+        $this->authorize('private-reception')->assertForbidden();
     }
 
     /** The member app's token never reaches the desk, even for someone who also works it. */

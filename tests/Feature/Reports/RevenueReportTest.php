@@ -13,6 +13,7 @@ use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\Feature\Invoicing\InvoicingTestCase;
 
 class RevenueReportTest extends InvoicingTestCase
@@ -129,8 +130,14 @@ class RevenueReportTest extends InvoicingTestCase
         $this->assertSame('1800', collect($recent)->firstWhere('currency', 'USD')['billed']);
     }
 
+    /**
+     * Operations holds `reports.view` since the admin API went permission-only
+     * (it reached the discount and offer reports, which share the name); a
+     * role without it is refused.
+     */
     public function test_operations_without_the_permission_is_refused(): void
     {
+        Role::findByName('operations', 'web')->revokePermissionTo('reports.view');
         $operator = User::factory()->create();
         $operator->assignRole('operations');
         Sanctum::actingAs($operator, ['*']);
