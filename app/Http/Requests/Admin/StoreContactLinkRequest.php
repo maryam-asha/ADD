@@ -2,13 +2,21 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreContactLinkRequest extends FormRequest
 {
+    use DropsNullDefaults;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->dropNullDefaults(['sort_order', 'is_visible']);
     }
 
     /**

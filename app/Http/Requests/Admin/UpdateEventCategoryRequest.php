@@ -3,15 +3,23 @@
 namespace App\Http\Requests\Admin;
 
 use App\Domain\Experience\Models\EventCategory;
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
 class UpdateEventCategoryRequest extends FormRequest
 {
+    use DropsNullDefaults;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->dropNullDefaults(['order', 'is_active']);
     }
 
     /**

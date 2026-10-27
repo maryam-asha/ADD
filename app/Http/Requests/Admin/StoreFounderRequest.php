@@ -2,14 +2,22 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreFounderRequest extends FormRequest
 {
+    use DropsNullDefaults;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->dropNullDefaults(['order']);
     }
 
     /**

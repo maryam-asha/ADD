@@ -41,6 +41,23 @@ class ContactLinkAdminTest extends TestCase
         ]);
     }
 
+    public function test_a_null_sort_order_or_is_visible_falls_back_to_the_defaults(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $this->postJson('/api/v1/admin/contact-links', [
+            'type' => 'social_instagram',
+            'value' => 'https://instagram.com/adddistrict',
+            'sort_order' => null,
+            'is_visible' => null,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.sort_order', 0)
+            ->assertJsonPath('data.is_visible', true);
+    }
+
     public function test_a_new_platform_type_is_accepted_without_any_allow_list(): void
     {
         $admin = User::factory()->create();

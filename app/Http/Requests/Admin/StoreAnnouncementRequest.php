@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
 use App\Domain\Ecosystem\Enums\AnnouncementType;
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use App\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,7 +12,7 @@ use Illuminate\Validation\Rule;
 
 class StoreAnnouncementRequest extends FormRequest
 {
-    use InterpretsLocalTimes;
+    use DropsNullDefaults, InterpretsLocalTimes;
 
     public function authorize(): bool
     {
@@ -21,6 +22,7 @@ class StoreAnnouncementRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->interpretLocalTimes(['starts_at', 'ends_at']);
+        $this->dropNullDefaults(['sort_order', 'is_active']);
     }
 
     /**

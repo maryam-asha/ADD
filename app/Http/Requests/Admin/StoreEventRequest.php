@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use App\Http\Requests\Concerns\InterpretsLocalTimes;
 use App\Http\Requests\Concerns\ValidatesEventRegistrationWindow;
 use App\Support\TranslatableField;
@@ -9,7 +10,7 @@ use Illuminate\Foundation\Http\FormRequest;
 
 class StoreEventRequest extends FormRequest
 {
-    use InterpretsLocalTimes, ValidatesEventRegistrationWindow;
+    use DropsNullDefaults, InterpretsLocalTimes, ValidatesEventRegistrationWindow;
 
     public function authorize(): bool
     {
@@ -23,6 +24,7 @@ class StoreEventRequest extends FormRequest
     {
         $this->interpretLocalTimes(['start_at', 'end_at', 'registration_opens_at', 'registration_closes_at']);
         $this->interpretLocalTimesIn('sessions', ['start_at', 'end_at']);
+        $this->dropNullDefaults(['status', 'order']);
 
         if ($this->has('room_id') && ! $this->has('space_id')) {
             $this->merge([

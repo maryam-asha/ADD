@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Admin;
 
 use Add\Inventory\Catalog\Models\Item;
+use App\Http\Requests\Concerns\DropsNullDefaults;
 use App\Support\TranslatableField;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
@@ -10,9 +11,16 @@ use Illuminate\Validation\Rule;
 
 class StoreResourceTypeRequest extends FormRequest
 {
+    use DropsNullDefaults;
+
     public function authorize(): bool
     {
         return true;
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->dropNullDefaults(['order', 'is_active']);
     }
 
     /**

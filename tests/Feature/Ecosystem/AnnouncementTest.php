@@ -48,6 +48,33 @@ class AnnouncementTest extends TestCase
         ]);
     }
 
+    public function test_a_null_sort_order_or_is_active_falls_back_to_the_defaults(): void
+    {
+        $this->actingAsAdmin();
+
+        $id = $this->postJson('/api/v1/admin/announcements', [
+            'type' => 'event',
+            'image_url' => 'https://example.com/event.png',
+            'sort_order' => null,
+            'is_active' => null,
+        ])
+            ->assertCreated()
+            ->assertJsonPath('data.sort_order', 0)
+            ->assertJsonPath('data.is_active', true)
+            ->json('data.id');
+
+        Announcement::whereKey($id)->update(['sort_order' => 4]);
+
+        $this->patchJson("/api/v1/admin/announcements/{$id}", [
+            'type' => 'event',
+            'image_url' => 'https://example.com/event.png',
+            'sort_order' => null,
+            'is_active' => null,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('announcements', ['id' => $id, 'sort_order' => 4, 'is_active' => 1]);
+    }
+
     public function test_a_type_outside_the_closed_set_is_rejected(): void
     {
         $this->actingAsAdmin();
