@@ -10,6 +10,7 @@ use App\Domain\Booking\Events\CoworkingSessionEnded;
 use App\Domain\Booking\Events\CoworkingStartConfirmed;
 use App\Domain\Booking\Events\CoworkingStartExpired;
 use App\Domain\Booking\Events\CoworkingStartRejected;
+use App\Domain\Booking\Events\CoworkingStartRequested;
 use App\Domain\Booking\Events\SessionEndRequestCancelled;
 use App\Domain\Booking\Events\SessionEndRequestCreated;
 use App\Domain\Booking\Events\SessionEndRequestResolved;
@@ -51,6 +52,7 @@ class CoworkingRealtimeTest extends TestCase
     private const EVENTS = [
         ArrivalRequestCreated::class,
         ArrivalRequestResolved::class,
+        CoworkingStartRequested::class,
         CoworkingStartConfirmed::class,
         CoworkingStartRejected::class,
         CoworkingStartExpired::class,
@@ -138,6 +140,36 @@ class CoworkingRealtimeTest extends TestCase
             && $e->broadcastWith() === ['arrival_request_id' => $request->id, 'purpose' => 'coworking_start', 'status' => 'pending']);
     }
 
+    /** So the member's other screens — home above all — show the wait without being asked. */
+    public function test_a_coworking_scan_tells_the_member_too(): void
+    {
+        Event::fake(self::EVENTS);
+        $member = $this->memberWaiting();
+        $request = ArrivalRequest::sole();
+
+        Event::assertDispatchedTimes(CoworkingStartRequested::class, 1);
+        Event::assertDispatched(CoworkingStartRequested::class, fn (CoworkingStartRequested $e) => $this->onChannel($e, "private-member.{$member->id}")
+            && $e->broadcastAs() === 'coworking.start_requested'
+            && $e->broadcastWith() === ['arrival_request_id' => $request->id, 'session_type' => 'walkin', 'space_id' => $this->space->id]);
+    }
+
+    public function test_a_room_arrival_is_not_a_coworking_start_for_the_member(): void
+    {
+        Event::fake(self::EVENTS);
+        $member = $this->actingAsMember();
+        $room = Space::factory()->room()->create(['building_id' => $this->space->building_id]);
+        Booking::factory()->create([
+            'user_id' => $member->id,
+            'space_id' => $room->id,
+            'start_at' => now()->addMinutes(10),
+            'end_at' => now()->addMinutes(70),
+        ]);
+
+        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'arrival_requested');
+
+        Event::assertNotDispatched(CoworkingStartRequested::class);
+    }
+
     public function test_scanning_again_while_waiting_announces_nothing_new(): void
     {
         $this->memberWaiting();
@@ -146,6 +178,7 @@ class CoworkingRealtimeTest extends TestCase
         $this->scan()->assertOk();
 
         Event::assertNotDispatched(ArrivalRequestCreated::class);
+        Event::assertNotDispatched(CoworkingStartRequested::class);
     }
 
     public function test_a_room_arrival_tells_the_desk_too_and_its_confirmation_resolves_it(): void

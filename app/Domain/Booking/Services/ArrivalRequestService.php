@@ -5,6 +5,7 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Events\ArrivalRequestCreated;
+use App\Domain\Booking\Events\CoworkingStartRequested;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
@@ -70,8 +71,12 @@ class ArrivalRequestService
     {
         $request = ArrivalRequest::create($attributes);
 
-        // After the scan's transaction commits, so the desk's re-fetch finds it.
-        $this->realtime->send(new ArrivalRequestCreated($request));
+        // After the scan's transaction commits, so the desk's re-fetch finds
+        // it — and the member's other screens (home) for a coworking start.
+        $this->realtime->send(...array_filter([
+            new ArrivalRequestCreated($request),
+            $request->isCoworkingStart() ? new CoworkingStartRequested($request) : null,
+        ]));
 
         return $request;
     }
