@@ -6,6 +6,7 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\ArrivalRequestService;
 use App\Domain\Booking\Services\CheckoutTokenService;
 use App\Domain\Booking\Services\CoworkingSessionService;
@@ -18,10 +19,12 @@ use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Member\ListCoworkingSessionsRequest;
 use App\Http\Requests\Member\PayCoworkingSessionRequest;
 use App\Http\Requests\Member\RequestSessionEndRequest;
 use App\Http\Resources\ArrivalRequestResource;
 use App\Http\Resources\CoworkingSessionResource;
+use App\Http\Resources\MemberCoworkingSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
 use App\Services\Realtime\RealtimeBroadcaster;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -107,6 +110,53 @@ class CoworkingSessionController extends Controller
         ]]);
     }
 
+    /**
+     * The member's past sessions, newest first — walk-ins and checked-in
+     * bookings on a coworking space together — as cards
+     * (MemberCoworkingSessionResource). The running one is current().
+     */
+    public function index(ListCoworkingSessionsRequest $request, CoworkingSessionService $sessions): JsonResponse
+    {
+        $paymentState = $request->paymentState();
+        $paginator = $sessions->pastSessionsFor($request->user(), $paymentState, (int) ($request->validated('per_page') ?? 15));
+
+        return response()->json([
+            'data' => MemberCoworkingSessionResource::collection($paginator->items())->resolve(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+                'total' => $paginator->total(),
+                // What was filtered on; null for every session.
+                'payment_state' => $paymentState?->value,
+            ],
+        ]);
+    }
+
+    /**
+     * One session in full: its card, the session itself (coverage, how it
+     * started and ended), the report's lines, plan and totals, and every
+     * attempt to pay for it. Not the member's: 404, as for the report.
+     */
+    public function show(Request $request, string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports): JsonResponse
+    {
+        $session = $sessions->find($type, $id);
+
+        abort_if($session === null || $session->user_id !== $request->user()->id, 404);
+
+        $report = $reports->build($session);
+
+        return response()->json(['data' => (new MemberCoworkingSessionResource($session))->resolve($request)
+            + (new CoworkingSessionResource($session))->resolve($request)
+            + [
+                'termination_source' => $report['session']['termination_source'],
+                'lines' => $report['lines'],
+                'plan' => $report['plan'],
+                'totals' => $report['totals'],
+                'payments' => $this->paymentAttempts($session),
+            ]]);
+    }
+
     /** A session that is not the caller's is a 404, not a 403 — its existence is not theirs to learn. */
     public function report(Request $request, string $type, int $id, CoworkingSessionService $sessions, SessionReportBuilder $reports): JsonResponse
     {
@@ -116,17 +166,7 @@ class CoworkingSessionController extends Controller
 
         return response()->json(['data' => [
             ...$reports->build($session),
-            // Every attempt to pay for it, oldest first, as it stands: a card
-            // that failed or was abandoned stays here beside the one that went
-            // through.
-            'payments' => Payment::query()->forPayable($session)->oldest('id')->get()->map(fn (Payment $payment) => [
-                'id' => $payment->id,
-                'method' => $payment->method,
-                'status' => $payment->status?->value,
-                'amount_points' => $payment->amount_points,
-                'created_at' => $payment->created_at?->toIso8601String(),
-                'settled_at' => $payment->settled_at?->toIso8601String(),
-            ])->values()->all(),
+            'payments' => $this->paymentAttempts($session),
         ]]);
     }
 
@@ -197,5 +237,24 @@ class CoworkingSessionController extends Controller
         }
 
         return response()->json(['message' => __('api.coworking.end_request_cancelled')]);
+    }
+
+    /**
+     * Every attempt to pay for a session, oldest first, as it stands: a card
+     * that failed or was abandoned stays here beside the one that went
+     * through.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function paymentAttempts(Booking|WalkinSession $session): array
+    {
+        return Payment::query()->forPayable($session)->oldest('id')->get()->map(fn (Payment $payment) => [
+            'id' => $payment->id,
+            'method' => $payment->method,
+            'status' => $payment->status?->value,
+            'amount_points' => $payment->amount_points,
+            'created_at' => $payment->created_at?->toIso8601String(),
+            'settled_at' => $payment->settled_at?->toIso8601String(),
+        ])->values()->all();
     }
 }

@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\DataTransferObjects\CoworkingStartResult;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -12,6 +13,8 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -184,5 +187,40 @@ class CoworkingSessionService
     public function openSessionFor(User $member): Booking|WalkinSession|null
     {
         return $this->openSessions->for($member);
+    }
+
+    /**
+     * The member's ended sessions on a coworking space — walk-ins and
+     * checked-in bookings alike, as OpenCoworkingSessionLocator counts them —
+     * newest first, one list paged across both tables. Each page holds the
+     * models, with what a card reads loaded.
+     *
+     * @return LengthAwarePaginator<int, Booking|WalkinSession>
+     */
+    public function pastSessionsFor(User $member, ?PaymentState $paymentState, int $perPage): LengthAwarePaginator
+    {
+        $ended = fn (Builder $query, string $type) => $query
+            ->select([DB::raw("'{$type}' as type"), 'id', 'checked_in_at'])
+            ->where('user_id', $member->id)
+            ->whereNotNull('checked_in_at')
+            ->whereNotNull('checked_out_at')
+            ->whereHas('space', fn (Builder $space) => $space->where('space_type', SpaceType::CoSpace))
+            ->when($paymentState, fn (Builder $q, PaymentState $state) => $q->where('payment_state', $state->value))
+            ->toBase();
+
+        $page = DB::query()
+            ->fromSub($ended(WalkinSession::query(), 'walkin')->unionAll($ended(Booking::query(), 'booking')), 'sessions')
+            ->orderByDesc('checked_in_at')
+            ->orderByDesc('id')
+            ->paginate($perPage);
+
+        $rows = collect($page->items());
+        $load = fn (string $model, string $type) => $model::query()
+            ->with(['space', 'payments'])
+            ->findMany($rows->where('type', $type)->pluck('id'))
+            ->keyBy('id');
+        $models = ['walkin' => $load(WalkinSession::class, 'walkin'), 'booking' => $load(Booking::class, 'booking')];
+
+        return $page->setCollection($rows->map(fn (object $row) => $models[$row->type]->get($row->id))->filter()->values());
     }
 }

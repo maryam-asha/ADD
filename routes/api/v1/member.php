@@ -107,6 +107,14 @@ Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 // one per-user bucket with every other plainly throttled member route.
 Route::post('scan', [ScanController::class, 'scan'])->middleware('throttle:10,1,member-scan');
 
+// The member's past coworking sessions (walk-ins and checked-in bookings on
+// a coworking space, newest first, `payment_state` to filter) and one
+// session in full — its card, the report and every attempt to pay.
+Route::get('coworking-sessions', [CoworkingSessionController::class, 'index']);
+Route::get('coworking-sessions/{type}/{id}', [CoworkingSessionController::class, 'show'])
+    ->whereIn('type', ['booking', 'walkin'])
+    ->whereNumber('id');
+
 // The running coworking session: the timer, asking to end, the report.
 // Static segments are declared before any {type}/{id} wildcard.
 Route::get('coworking-sessions/current', [CoworkingSessionController::class, 'current']);
