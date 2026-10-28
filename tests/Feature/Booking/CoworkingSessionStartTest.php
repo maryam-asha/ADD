@@ -429,18 +429,54 @@ class CoworkingSessionStartTest extends TestCase
         $this->subscribe($member, $this->planWithHours(40));
         $requestId = $this->scan()->json('data.arrival_request.id');
 
-        $this->getJson('/api/v1/member/coworking-sessions/current')
+        $awaiting = $this->getJson('/api/v1/member/coworking-sessions/current')
             ->assertOk()
             ->assertJsonPath('data.state', 'awaiting_confirmation')
-            ->assertJsonPath('data.arrival_request.id', $requestId);
+            ->assertJsonPath('data.arrival_request_id', $requestId)
+            ->assertJsonPath('data.requested_at', now()->toIso8601String())
+            ->assertJsonPath('data.type', 'walkin')
+            ->assertJsonPath('data.id', null)
+            ->assertJsonPath('data.space.id', $this->space->id)
+            ->assertJsonPath('data.checked_in_at', null)
+            ->assertJsonPath('data.started_via', 'scan')
+            ->assertJsonPath('data.hourly_rate_points', 100)
+            ->assertJsonPath('data.coverage.status', 'covered')
+            ->assertJsonPath('data.end_request', null)
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.discounts', []);
 
         $this->confirmAtReception($member)->assertOk();
 
-        $this->getJson('/api/v1/member/coworking-sessions/current')
+        $active = $this->getJson('/api/v1/member/coworking-sessions/current')
             ->assertOk()
             ->assertJsonPath('data.state', 'active')
+            ->assertJsonPath('data.arrival_request_id', null)
+            ->assertJsonPath('data.requested_at', null)
             ->assertJsonPath('data.id', WalkinSession::sole()->id)
             ->assertJsonPath('data.coverage.covered_until', Carbon::parse('2026-08-17 20:00', 'Asia/Damascus')->utc()->toIso8601String());
+
+        // One shape before and after reception confirms: the same keys, in the same order.
+        $this->assertSame(array_keys($active->json('data')), array_keys($awaiting->json('data')));
+    }
+
+    public function test_the_timer_names_a_booking_check_in_while_it_waits_for_reception(): void
+    {
+        $member = $this->actingAsMember();
+        Booking::factory()->create([
+            'user_id' => $member->id,
+            'space_id' => $this->space->id,
+            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+        ]);
+        $this->scan()->assertCreated();
+
+        $this->getJson('/api/v1/member/coworking-sessions/current')
+            ->assertOk()
+            ->assertJsonPath('data.state', 'awaiting_confirmation')
+            ->assertJsonPath('data.type', 'booking')
+            ->assertJsonPath('data.id', null)
+            ->assertJsonPath('data.coverage', null)
+            ->assertJsonPath('data.accepted_uncovered', false);
     }
 
     public function test_reception_rejecting_starts_nothing_and_the_member_can_scan_again(): void

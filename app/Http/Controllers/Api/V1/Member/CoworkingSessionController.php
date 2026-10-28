@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\ArrivalRequestService;
@@ -22,8 +23,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\ListCoworkingSessionsRequest;
 use App\Http\Requests\Member\PayCoworkingSessionRequest;
 use App\Http\Requests\Member\RequestSessionEndRequest;
-use App\Http\Resources\ArrivalRequestResource;
 use App\Http\Resources\CoworkingSessionResource;
+use App\Http\Resources\CurrentCoworkingSessionResource;
 use App\Http\Resources\MemberCoworkingSessionResource;
 use App\Http\Resources\SessionEndRequestResource;
 use App\Services\Realtime\RealtimeBroadcaster;
@@ -40,22 +41,20 @@ class CoworkingSessionController extends Controller
 
     /**
      * The running session (state active), or the scan still waiting on
-     * reception to start one (state awaiting_confirmation), or null.
+     * reception to start one (state awaiting_confirmation) — the same keys
+     * either way (CurrentCoworkingSessionResource) — or null.
      */
     public function current(Request $request, CoworkingSessionService $sessions, ArrivalRequestService $arrivals): JsonResponse
     {
-        $open = $sessions->openSessionFor($request->user());
+        $current = $sessions->openSessionFor($request->user()) ?? $arrivals->pendingFor($request->user());
 
-        if ($open !== null) {
-            return response()->json(['data' => ['state' => 'active'] + (new CoworkingSessionResource($open))->resolve($request)]);
+        if ($current instanceof ArrivalRequest && ! $current->isCoworkingStart()) {
+            $current = null;
         }
 
-        $pending = $arrivals->pendingFor($request->user());
-
-        return response()->json(['data' => $pending !== null && $pending->isCoworkingStart() ? [
-            'state' => 'awaiting_confirmation',
-            'arrival_request' => (new ArrivalRequestResource($pending))->resolve($request),
-        ] : null]);
+        return response()->json([
+            'data' => $current === null ? null : (new CurrentCoworkingSessionResource($current))->resolve($request),
+        ]);
     }
 
     /**
