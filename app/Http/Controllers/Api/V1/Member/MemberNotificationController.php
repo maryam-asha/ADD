@@ -11,12 +11,19 @@ class MemberNotificationController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
-        $notifications = $request->user()
+        $paginator = $request->user()
             ->notifications()
             ->latest()
             ->paginate(20);
 
-        return NotificationResource::collection($notifications)->response();
+        return response()->json([
+            'data' => NotificationResource::collection($paginator->items())->resolve(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'per_page' => $paginator->perPage(),
+            ],
+        ]);
     }
 
     public function markAsRead(Request $request, string $id): JsonResponse

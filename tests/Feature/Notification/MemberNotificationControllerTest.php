@@ -34,6 +34,10 @@ class MemberNotificationControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonCount(2, 'data');
+        $response->assertExactJson([
+            'data' => $response->json('data'),
+            'meta' => ['current_page' => 1, 'last_page' => 1, 'per_page' => 20],
+        ]);
     }
 
     public function test_member_can_mark_notification_as_read(): void
