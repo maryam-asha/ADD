@@ -432,8 +432,8 @@ class CoworkingSessionStartTest extends TestCase
         $awaiting = $this->getJson('/api/v1/member/coworking-sessions/current')
             ->assertOk()
             ->assertJsonPath('data.state', 'awaiting_confirmation')
-            ->assertJsonPath('data.arrival_request_id', $requestId)
-            ->assertJsonPath('data.requested_at', now()->toIso8601String())
+            ->assertJsonPath('data.arrival_request.id', $requestId)
+            ->assertJsonPath('data.arrival_request.status', 'pending')
             ->assertJsonPath('data.type', 'walkin')
             ->assertJsonPath('data.id', null)
             ->assertJsonPath('data.space.id', $this->space->id)
@@ -450,8 +450,7 @@ class CoworkingSessionStartTest extends TestCase
         $active = $this->getJson('/api/v1/member/coworking-sessions/current')
             ->assertOk()
             ->assertJsonPath('data.state', 'active')
-            ->assertJsonPath('data.arrival_request_id', null)
-            ->assertJsonPath('data.requested_at', null)
+            ->assertJsonPath('data.arrival_request', null)
             ->assertJsonPath('data.id', WalkinSession::sole()->id)
             ->assertJsonPath('data.coverage.covered_until', Carbon::parse('2026-08-17 20:00', 'Asia/Damascus')->utc()->toIso8601String());
 

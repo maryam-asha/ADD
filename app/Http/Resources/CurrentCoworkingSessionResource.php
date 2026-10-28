@@ -13,7 +13,7 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * — one shape for both, like the home card, so the timer reads the same
  * keys before and after reception confirms. While awaiting there is no
  * session yet: its own fields (id, reference, check-in, end request,
- * payment, discounts) are empty, and arrival_request_id is set instead.
+ * payment, discounts) are empty, and arrival_request is set instead.
  */
 class CurrentCoworkingSessionResource extends JsonResource
 {
@@ -25,8 +25,7 @@ class CurrentCoworkingSessionResource extends JsonResource
         if (! $this->resource instanceof ArrivalRequest) {
             return [
                 'state' => 'active',
-                'arrival_request_id' => null,
-                'requested_at' => null,
+                'arrival_request' => null,
             ] + (new CoworkingSessionResource($this->resource))->resolve($request);
         }
 
@@ -34,8 +33,7 @@ class CurrentCoworkingSessionResource extends JsonResource
 
         return [
             'state' => 'awaiting_confirmation',
-            'arrival_request_id' => $arrival->id,
-            'requested_at' => $arrival->requested_at?->toIso8601String(),
+            'arrival_request' => (new ArrivalRequestResource($arrival))->resolve($request),
             // The session reception's confirmation starts: the matched booking's check-in, else a walk-in.
             'type' => $arrival->matched_booking_id !== null ? 'booking' : 'walkin',
             'id' => null,
