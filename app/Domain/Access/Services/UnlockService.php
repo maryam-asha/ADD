@@ -23,6 +23,12 @@ use App\Domain\Membership\Enums\OwnerType;
  * a company they belong to with door_access_enabled), calls
  * TTLockClient::remoteUnlock() server-side, and logs one access_events
  * row either way. docs/decisions/qr-lock-unlock.md §4.
+ *
+ * A member need not pass the desk first (2026-10-28): their own booking's
+ * code still waiting on reception (`issued`) opens the door from the app
+ * while the booking runs — from its start, as on the keypad, since before
+ * it the room may still be someone else's — and that first open activates
+ * the code. Reception activating it stays the other way in.
  */
 class UnlockService
 {
@@ -39,7 +45,7 @@ class UnlockService
             throw new LockAccessDeniedException('api.access.lock_not_found', 404);
         }
 
-        $grant = $this->activeGrantFor($user, $lock);
+        $grant = $this->activeGrantFor($user, $lock) ?? $this->runningBookingGrantFor($user, $lock);
 
         if (! $grant) {
             $this->logEvent($lock, null, AccessEventType::FailedAttempt, $user);
@@ -56,10 +62,45 @@ class UnlockService
             );
         }
 
+        // Only once the door has opened: a lock that did not (gateway down)
+        // leaves the code as it was. Conditional on still being `issued`, so
+        // the desk activating it in the same instant activates it once.
+        if ($grant->status === AccessGrantStatus::Issued) {
+            AccessGrant::query()
+                ->whereKey($grant->id)
+                ->where('status', AccessGrantStatus::Issued)
+                ->update(['status' => AccessGrantStatus::Activated, 'activated_at' => now()]);
+        }
+
         $this->logEvent($lock, $grant, AccessEventType::Unlock, $user);
 
         // A booked room has no kiosk scan: opening its door is the arrival.
         $this->arrivals->forGrant($grant, SessionStartSource::Door);
+    }
+
+    /**
+     * The member's own booking code the desk has not activated yet, while the
+     * booking runs: confirmed, started, not ended, and not past the time the
+     * code had to be activated by (access:expire-unactivated-grants is about
+     * to end it).
+     */
+    private function runningBookingGrantFor(User $user, Device $lock): ?AccessGrant
+    {
+        $now = now();
+
+        return AccessGrant::query()
+            ->where('lock_id', $lock->id)
+            ->where('status', AccessGrantStatus::Issued)
+            ->where('grantee_type', OwnerType::User)
+            ->where('grantee_id', $user->id)
+            ->where('source_type', AccessSourceType::Booking)
+            ->whereNotNull('source_id')
+            ->where('must_activate_by', '>=', $now)
+            ->whereHas('booking', fn ($booking) => $booking
+                ->where('status', BookingStatus::Confirmed)
+                ->where('start_at', '<=', $now)
+                ->where('end_at', '>', $now))
+            ->first();
     }
 
     private function activeGrantFor(User $user, Device $lock): ?AccessGrant
