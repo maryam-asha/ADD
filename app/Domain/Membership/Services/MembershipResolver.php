@@ -5,6 +5,7 @@ namespace App\Domain\Membership\Services;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -64,6 +65,15 @@ class MembershipResolver
     public function hasHeldAnyFor(User $user): bool
     {
         return $this->heldBy($user)->exists();
+    }
+
+    /**
+     * Whether a membership this user holds or held ran on or after $since —
+     * a live one, one still to start, or one that ended since then.
+     */
+    public function hasHeldSinceFor(User $user, CarbonInterface $since): bool
+    {
+        return $this->heldBy($user)->where('current_period_end', '>=', $since)->exists();
     }
 
     /**

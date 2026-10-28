@@ -12,6 +12,7 @@ use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -35,6 +36,13 @@ class CoworkingSessionService
     /** How far ahead a room, office or hall booking turns a scan into a word to reception. */
     public const NON_COWORKING_ARRIVAL_MINUTES = 60;
 
+    /**
+     * A member with no plan in this many days is not asked to accept an
+     * uncovered session: they know they pay, so the scan goes straight to
+     * reception. A plan that lapsed more recently is explained first.
+     */
+    public const LAPSED_PLAN_DAYS = 15;
+
     public function __construct(
         private readonly KioskCodeVerifier $codes,
         private readonly ScanTicketService $tickets,
@@ -44,6 +52,7 @@ class CoworkingSessionService
         private readonly BusinessHoursService $businessHours,
         private readonly OpenCoworkingSessionLocator $openSessions,
         private readonly ArrivalRequestService $arrivals,
+        private readonly MembershipResolver $memberships,
     ) {}
 
     /**
@@ -130,7 +139,10 @@ class CoworkingSessionService
 
             $coverage = $this->coverage->evaluate($member, now());
 
-            if (! $coverage->isCovered() && $scanTicket === null) {
+            // Without a plan in LAPSED_PLAN_DAYS the scan itself is the
+            // acceptance: the request is filed as uncovered, unasked.
+            if (! $coverage->isCovered() && $scanTicket === null
+                && $this->memberships->hasHeldSinceFor($member, now()->subDays(self::LAPSED_PLAN_DAYS))) {
                 return CoworkingStartResult::confirmationRequired(
                     $coverage,
                     $this->tickets->issue($member, $kiosk),

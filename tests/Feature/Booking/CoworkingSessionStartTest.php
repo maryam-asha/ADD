@@ -11,6 +11,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Membership\Services\ResourceQuotaService;
 use Carbon\Carbon;
@@ -61,6 +62,17 @@ class CoworkingSessionStartTest extends TestCase
         return $this->scan(['scan_ticket' => $ticket, 'accept_uncovered' => true]);
     }
 
+    /** A member whose plan ended $daysAgo days ago: recent enough, by default, to be asked before an uncovered session. */
+    private function actingAsLapsedMember(int $daysAgo = 3): User
+    {
+        $member = $this->actingAsMember();
+        $this->subscribe($member, $this->planWithHours(40))
+            ->forceFill(['current_period_start' => now()->subDays($daysAgo + 30), 'current_period_end' => now()->subDays($daysAgo)])
+            ->save();
+
+        return $member;
+    }
+
     public function test_a_member_the_plan_covers_waits_for_reception_and_starts_when_confirmed(): void
     {
         $member = $this->actingAsMember();
@@ -89,25 +101,11 @@ class CoworkingSessionStartTest extends TestCase
         $this->assertTrue($session->checked_in_at->equalTo(now()));
     }
 
-    public function test_a_member_without_a_plan_is_asked_first_and_nothing_starts(): void
-    {
-        $this->actingAsMember();
-
-        $response = $this->scan();
-
-        $response->assertStatus(422)
-            ->assertJsonPath('reason', 'no_plan')
-            ->assertJsonPath('hourly_rate_points', 100)
-            ->assertJsonPath('message', 'Your plan will not cover this session (you have no active plan). It will be billed at 100 points per hour.');
-        $this->assertNotEmpty($response->json('scan_ticket'));
-        $this->assertSame(0, WalkinSession::count());
-    }
-
-    public function test_accepting_with_the_ticket_files_a_paid_session_for_reception(): void
+    public function test_a_member_without_a_plan_is_not_asked_and_the_paid_session_goes_to_reception(): void
     {
         $member = $this->actingAsMember();
 
-        $this->accept($this->scan()->json('scan_ticket'))
+        $this->scan()
             ->assertCreated()
             ->assertJsonPath('data.outcome', 'awaiting_confirmation')
             ->assertJsonPath('data.arrival_request.accepted_uncovered', true)
@@ -119,9 +117,49 @@ class CoworkingSessionStartTest extends TestCase
         $this->assertTrue(WalkinSession::sole()->accepted_uncovered);
     }
 
+    public function test_a_plan_that_ended_over_fifteen_days_ago_is_not_asked_about(): void
+    {
+        $this->actingAsLapsedMember(daysAgo: 16);
+
+        $this->scan()
+            ->assertCreated()
+            ->assertJsonPath('data.arrival_request.accepted_uncovered', true)
+            ->assertJsonPath('data.arrival_request.coverage.reason', 'plan_expired');
+    }
+
+    public function test_a_plan_that_ended_recently_is_explained_first_and_nothing_starts(): void
+    {
+        $this->actingAsLapsedMember(daysAgo: 14);
+
+        $response = $this->scan();
+
+        $response->assertStatus(422)
+            ->assertJsonPath('reason', 'plan_expired')
+            ->assertJsonPath('hourly_rate_points', 100)
+            ->assertJsonPath('message', 'Your plan will not cover this session (your plan has expired). It will be billed at 100 points per hour.');
+        $this->assertNotEmpty($response->json('scan_ticket'));
+        $this->assertSame(0, ArrivalRequest::count());
+    }
+
+    public function test_accepting_with_the_ticket_files_a_paid_session_for_reception(): void
+    {
+        $member = $this->actingAsLapsedMember();
+
+        $this->accept($this->scan()->json('scan_ticket'))
+            ->assertCreated()
+            ->assertJsonPath('data.outcome', 'awaiting_confirmation')
+            ->assertJsonPath('data.arrival_request.accepted_uncovered', true)
+            ->assertJsonPath('data.arrival_request.coverage.reason', 'plan_expired');
+        $this->assertSame(0, WalkinSession::count());
+
+        $this->confirmAtReception($member)->assertOk();
+
+        $this->assertTrue(WalkinSession::sole()->accepted_uncovered);
+    }
+
     public function test_accepting_the_same_ticket_twice_files_one_request(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
 
         $id = $this->accept($ticket)->assertCreated()->json('data.arrival_request.id');
@@ -133,13 +171,13 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_a_space_without_an_hourly_rate_still_asks_before_starting(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $this->space->forceFill(['hourly_rate_points' => null])->save();
 
         $response = $this->scan();
 
         $response->assertStatus(422)
-            ->assertJsonPath('reason', 'no_plan')
+            ->assertJsonPath('reason', 'plan_expired')
             ->assertJsonPath('hourly_rate_points', 0);
         $this->assertNotEmpty($response->json('scan_ticket'));
         $this->assertSame(0, WalkinSession::count());
@@ -147,7 +185,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_a_ticket_for_a_kiosk_revoked_since_it_was_issued_is_refused(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
         app(KioskPairingService::class)->revoke($this->kiosk);
 
@@ -159,7 +197,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_a_ticket_for_a_kiosk_deactivated_since_it_was_issued_is_refused(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
         $this->kiosk->update(['is_active' => false]);
 
@@ -181,7 +219,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_a_ticket_without_the_explicit_acceptance_is_refused(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
 
         $this->scan(['scan_ticket' => $ticket])->assertStatus(422)->assertJsonValidationErrors('accept_uncovered');
@@ -190,7 +228,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_a_code_and_a_ticket_together_are_refused(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
 
         $this->scan([
@@ -215,7 +253,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_the_ticket_expires_after_two_minutes(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
         $this->travel(121)->seconds();
 
@@ -224,7 +262,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_another_members_ticket_is_refused(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
         $this->actingAsMember();
 
@@ -234,7 +272,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_coverage_is_evaluated_again_when_the_member_accepts(): void
     {
-        $member = $this->actingAsMember();
+        $member = $this->actingAsLapsedMember();
         $ticket = $this->scan()->json('scan_ticket');
         $this->subscribe($member, $this->planWithHours(40)); // renewed in between
 
@@ -337,8 +375,8 @@ class CoworkingSessionStartTest extends TestCase
             'end_at' => Carbon::parse('2026-08-17 19:00', 'Asia/Damascus')->utc(),
         ]);
 
-        // The walk-in path: a member with no plan is asked to accept first.
-        $this->scan()->assertStatus(422)->assertJsonPath('reason', 'no_plan');
+        // The walk-in path, not the booking's check-in.
+        $this->scan()->assertCreated()->assertJsonPath('data.arrival_request.matched_booking_id', null);
 
         $this->assertNull($booking->fresh()->checked_in_at);
         $this->assertSame(0, WalkinSession::count());
@@ -450,7 +488,7 @@ class CoworkingSessionStartTest extends TestCase
 
     public function test_scanning_is_throttled_at_ten_a_minute(): void
     {
-        $this->actingAsMember();
+        $this->actingAsLapsedMember();
 
         foreach (range(1, 10) as $attempt) {
             $this->scan()->assertStatus(422);
