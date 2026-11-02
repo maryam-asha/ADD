@@ -15,6 +15,7 @@ use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
@@ -188,14 +189,18 @@ class SessionClosureService
      * What closing an open session at `$at` would charge, without closing it
      * or spending any plan hours: the price finalizeClosure() writes, from
      * the same pricing. A booking already paid keeps the price it was paid
-     * at, and owes nothing more.
+     * at, and owes only what it stays past its end (overstayPoints()).
      *
      * @return array{points: int, covered_seconds: int, already_paid: bool}
      */
     public function quote(Booking|WalkinSession $session, CarbonInterface $at): array
     {
         if ($session instanceof Booking && $session->payment_state === PaymentState::Paid) {
-            return ['points' => (int) $session->price_points, 'covered_seconds' => 0, 'already_paid' => true];
+            $overstay = $this->overstayPoints($session, $at);
+
+            return $overstay > 0
+                ? ['points' => $overstay, 'covered_seconds' => 0, 'already_paid' => false]
+                : ['points' => (int) $session->price_points, 'covered_seconds' => 0, 'already_paid' => true];
         }
 
         $covered = $session instanceof WalkinSession && $session->membership !== null
@@ -232,6 +237,27 @@ class SessionClosureService
         // plan discount — or the best offer now — and its coupon terms
         // (PriceQuoteService, the one place a price is composed).
         return $this->quotes->forSession($session, $from, $from->copy()->addSeconds($billed));
+    }
+
+    /**
+     * What a paid booking owes for staying past its end: the time after
+     * end_at, rounded up to whole billing blocks like any session, at the
+     * booking's own rate and terms. Coworking only — rooms, offices and
+     * halls keep their existing rules. Nothing when it closes at or before
+     * its end: leaving early is never refunded.
+     */
+    private function overstayPoints(Booking $booking, CarbonInterface $checkedOutAt): int
+    {
+        $over = (int) $booking->end_at->diffInSeconds($checkedOutAt, false);
+
+        if ($over <= 0 || $booking->space->space_type !== SpaceType::CoSpace) {
+            return 0;
+        }
+
+        $block = $this->blockSeconds();
+        $billed = (int) (ceil($over / $block) * $block);
+
+        return $this->quotes->forSession($booking, $booking->end_at, $booking->end_at->copy()->addSeconds($billed))->finalPoints;
     }
 
     /**
@@ -308,6 +334,12 @@ class SessionClosureService
             $attributes += $quote->attributes();
         } elseif ($repriced) {
             $attributes += $this->repriceUnpaidBooking($session, $points) + ['list_price_points' => $quote->listPoints];
+        } elseif (($overstay = $this->overstayPoints($session, $checkedOutAt)) > 0) {
+            // Paid for its own window; the time past it is owed on top.
+            $price = (int) $session->price_points + $overstay;
+            $attributes['price_points'] = $price;
+            $attributes['payment_state'] = PaymentState::Unpaid;
+            $attributes['amount_owed'] = $this->points->pointsToUsd($price);
         }
 
         // Checked out is the booking's outcome: it happened
