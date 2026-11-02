@@ -2,6 +2,8 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Booking\Enums\LateArrivalBilling;
+use App\Domain\Booking\Services\CoworkingBookingPolicy;
 use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
@@ -26,6 +28,12 @@ class SettingSeeder extends Seeder
         // A closed session's time is billed in whole blocks of this many
         // minutes, rounded up (SessionClosureService::priceFor()).
         $settings->setDefault('coworking.billing_increment_minutes', 15, SettingValueType::Int);
+        // An unpaid coworking booking is released once this share of its
+        // length passes without its member; an unpaid one's late arrival
+        // is billed from the arrival or the booking start
+        // (CoworkingBookingPolicy).
+        $settings->setDefault(CoworkingBookingPolicy::RELEASE_PERCENT_KEY, CoworkingBookingPolicy::DEFAULT_RELEASE_PERCENT, SettingValueType::Int);
+        $settings->setDefault(CoworkingBookingPolicy::LATE_BILLING_KEY, LateArrivalBilling::Arrival->value, SettingValueType::String);
         // Shown on the confirmation screen's price breakdown. Zero is a
         // decision, not a hardcoded literal — the arithmetic path handles a
         // non-zero rate even though it currently always evaluates to zero.

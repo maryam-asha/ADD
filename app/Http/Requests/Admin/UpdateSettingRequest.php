@@ -2,12 +2,15 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Booking\Enums\LateArrivalBilling;
+use App\Domain\Booking\Services\CoworkingBookingPolicy;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Membership\Services\TopUpMinimum;
 use App\Domain\Settings\Enums\SettingScope;
 use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Models\Setting;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateSettingRequest extends FormRequest
 {
@@ -32,6 +35,14 @@ class UpdateSettingRequest extends FormRequest
 
         if ($this->targetSetting()->key === TopUpMinimum::SETTING_KEY) {
             return ['value' => ['required', 'integer', 'min:1']];
+        }
+
+        if ($this->targetSetting()->key === CoworkingBookingPolicy::RELEASE_PERCENT_KEY) {
+            return ['value' => ['required', 'integer', 'min:1', 'max:100']];
+        }
+
+        if ($this->targetSetting()->key === CoworkingBookingPolicy::LATE_BILLING_KEY) {
+            return ['value' => ['required', 'string', Rule::enum(LateArrivalBilling::class)]];
         }
 
         return [
