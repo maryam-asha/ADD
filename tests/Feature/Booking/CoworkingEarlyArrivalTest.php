@@ -2,12 +2,15 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCheckInService;
+use App\Domain\Booking\Services\WalkInCapacityService;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -81,6 +84,65 @@ class CoworkingEarlyArrivalTest extends TestCase
         app(BookingCheckInService::class)->checkIn($booking);
 
         $this->assertTrue($booking->refresh()->checked_in_at->equalTo($booking->start_at));
+    }
+
+    public function test_a_reception_walk_in_links_the_members_later_booking(): void
+    {
+        $space = $this->coworkingSpace();
+        $member = User::factory()->create();
+        $booking = Booking::factory()->create([
+            'space_id' => $space->id,
+            'user_id' => $member->id,
+            'status' => BookingStatus::Confirmed,
+            'start_at' => now()->addHours(2),
+            'end_at' => now()->addHours(4),
+        ]);
+
+        $session = app(WalkInCapacityService::class)->start($space, $member)->session;
+
+        $this->assertSame($booking->id, $session->refresh()->handover_booking_id);
+    }
+
+    public function test_a_walk_in_with_no_later_booking_links_nothing(): void
+    {
+        $space = $this->coworkingSpace();
+
+        $session = app(WalkInCapacityService::class)->start($space, User::factory()->create())->session;
+
+        $this->assertNull($session->refresh()->handover_booking_id);
+    }
+
+    public function test_a_pending_booking_is_not_linked(): void
+    {
+        $space = $this->coworkingSpace();
+        $member = User::factory()->create();
+        Booking::factory()->pending()->create([
+            'space_id' => $space->id,
+            'user_id' => $member->id,
+            'start_at' => now()->addHours(2),
+            'end_at' => now()->addHours(4),
+        ]);
+
+        $session = app(WalkInCapacityService::class)->start($space, $member)->session;
+
+        $this->assertNull($session->refresh()->handover_booking_id);
+    }
+
+    public function test_a_booking_on_another_coworking_space_is_not_linked(): void
+    {
+        $space = $this->coworkingSpace();
+        $other = Space::factory()->create(['building_id' => $space->building_id]);
+        $member = User::factory()->create();
+        Booking::factory()->create([
+            'space_id' => $other->id,
+            'user_id' => $member->id,
+            'start_at' => now()->addHours(2),
+            'end_at' => now()->addHours(4),
+        ]);
+
+        $session = app(WalkInCapacityService::class)->start($space, $member)->session;
+
+        $this->assertNull($session->refresh()->handover_booking_id);
     }
 
     public function test_a_scan_five_minutes_before_a_coworking_booking_files_a_walk_in_that_hands_over(): void

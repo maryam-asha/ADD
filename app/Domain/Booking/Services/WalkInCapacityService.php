@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\DataTransferObjects\WalkInStartResult;
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
@@ -30,6 +31,7 @@ class WalkInCapacityService
         private readonly AvailabilityService $availability,
         private readonly SessionCoverageEvaluator $coverage,
         private readonly OpenCoworkingSessionLocator $openSessions,
+        private readonly ArrivalRequestMatcher $bookings,
     ) {}
 
     /**
@@ -73,6 +75,7 @@ class WalkInCapacityService
                 // coverage it already showed the member, so the snapshot is
                 // exactly what they agreed to.
                 'coverage_snapshot' => ($coverage ?? $this->coverage->evaluate($member, now()))->toArray(),
+                'handover_booking_id' => $this->laterBookingFor($locked, $member)?->id,
             ]);
 
             // A plan with an access window that isn't open right now does not
@@ -107,6 +110,25 @@ class WalkInCapacityService
     public function assertCanStart(Space $space, User $member): void
     {
         DB::transaction(fn () => $this->admit($space, $member));
+    }
+
+    /**
+     * The member's confirmed booking on this coworking space later today,
+     * which this walk-in hands over to at its start — at the desk as after a
+     * scan, or the walk-in would block that booking's check-in and the
+     * booking would be released as a no-show.
+     */
+    private function laterBookingFor(Space $space, User $member): ?Booking
+    {
+        if ($space->space_type !== SpaceType::CoSpace) {
+            return null;
+        }
+
+        $booking = $this->bookings->matchBookingFor($member, $space->building->branch, now(), $space);
+
+        return $booking !== null && $booking->status === BookingStatus::Confirmed && $booking->start_at->isFuture()
+            ? $booking
+            : null;
     }
 
     /**
