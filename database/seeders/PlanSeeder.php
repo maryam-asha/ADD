@@ -4,11 +4,11 @@ namespace Database\Seeders;
 
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Membership\Enums\AllowanceCycle;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanModule;
-use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Pricing\Models\CouponTarget;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
@@ -144,6 +144,11 @@ class PlanSeeder extends Seeder
             'duration_days' => $data['days'],
             'access_window_start' => $windowStart,
             'access_window_end' => $windowEnd,
+            // Every catalog plan is a coworking plan: hot desks hold a
+            // flexible seat, limited only when the sheet says how many hours.
+            'coworking_seat' => $data['module'] === PlanModule::DEDICATED_DESK ? CoworkingSeat::Dedicated : CoworkingSeat::Flexible,
+            'coworking_hours' => $data['module'] === PlanModule::DEDICATED_DESK ? null : ($data['hours'] ?? null),
+            'allowance_cycle' => AllowanceCycle::Period,
             'reference_plan_id' => $compareTo !== null && $compareTo !== 'space' ? $seeded[$compareTo]->id : null,
             'reference_space_id' => $compareTo === 'space' ? $hotDeskSpace?->id : null,
             'reference_units' => $compareTo === 'space' && $hotDeskSpace === null ? null : $units,
@@ -152,39 +157,17 @@ class PlanSeeder extends Seeder
             'order' => count($seeded) + 1,
         ])->save();
 
-        $hours = $data['hours'] ?? $this->hoursIn($data['days'], $windowStart, $windowEnd);
+        $hours = (int) ($data['hours'] ?? 0);
 
         $plan->balances()->delete();
         $plan->discounts()->delete();
 
         $plan->resourceGrants()->delete();
-        $hourType = ResourceType::query()->where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->first();
-
-        if ($hourType !== null) {
-            $plan->resourceGrants()->create([
-                'resource_type_id' => $hourType->id,
-                'quantity' => $hours,
-                'description' => ['en' => "{$hours} desk hours", 'ar' => "{$hours} ساعة مكتب"],
-                'order' => 1,
-            ]);
-        }
 
         $plan->features()->delete();
         $plan->features()->createMany($this->features($data, $hours));
 
         return $plan;
-    }
-
-    /**
-     * Every hour the window opens over the period: a quota the plan cannot
-     * run out of.
-     */
-    private function hoursIn(int $days, string $start, string $end): int
-    {
-        $minutes = fn (string $time) => ((int) substr($time, 0, 2)) * 60 + (int) substr($time, 3, 2);
-        $open = $minutes($end) - $minutes($start);
-
-        return $days * intdiv($open > 0 ? $open : $open + 24 * 60, 60);
     }
 
     /**

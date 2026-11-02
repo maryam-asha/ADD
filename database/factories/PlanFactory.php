@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanModule;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -54,6 +55,16 @@ class PlanFactory extends Factory
                 ['slug' => PlanModule::DEDICATED_DESK],
                 ['name' => ['en' => 'Dedicated Desk', 'ar' => 'مكتب مخصص'], 'order' => 2, 'is_active' => true],
             )->id,
+            'coworking_seat' => CoworkingSeat::Dedicated,
+        ]);
+    }
+
+    /** A coworking plan with a flexible seat; $hours null is unlimited. */
+    public function coworking(?float $hours = null): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'coworking_seat' => CoworkingSeat::Flexible,
+            'coworking_hours' => $hours,
         ]);
     }
 

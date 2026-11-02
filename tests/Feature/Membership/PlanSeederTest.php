@@ -4,6 +4,7 @@ namespace Tests\Feature\Membership;
 
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
@@ -37,9 +38,9 @@ class PlanSeederTest extends TestCase
         return Plan::query()->where('name->en', $en)->sole();
     }
 
-    private function hours(Plan $plan): float
+    private function hours(Plan $plan): ?float
     {
-        return (float) $plan->resourceGrants()->sole()->quantity;
+        return $plan->coworking_hours === null ? null : (float) $plan->coworking_hours;
     }
 
     public function test_the_catalog_is_the_price_sheet_in_points(): void
@@ -77,19 +78,23 @@ class PlanSeederTest extends TestCase
         $this->assertFalse($this->plan('Hot Desk — Monthly')->isDedicatedDesk());
     }
 
-    public function test_hours_are_the_packages_quota_or_every_hour_of_the_period(): void
+    /** The hour packages are limited; every other plan is unlimited inside its window (product owner, 2026-11-02). */
+    public function test_hour_packages_are_limited_and_the_rest_unlimited(): void
     {
         $this->seed(PlanSeeder::class);
 
         $this->assertSame(25.0, $this->hours($this->plan('25 Hours a Month')));
         $this->assertSame(50.0, $this->hours($this->plan('50 Hours a Month')));
-        $this->assertSame(24.0, $this->hours($this->plan('Hot Desk — Daily')));
-        $this->assertSame(720.0, $this->hours($this->plan('Hot Desk — Monthly')));
+        $this->assertNull($this->hours($this->plan('Hot Desk — Daily')));
+        $this->assertNull($this->hours($this->plan('Hot Desk — Monthly')));
+        $this->assertSame(CoworkingSeat::Flexible, $this->plan('Hot Desk — Monthly')->coworking_seat);
+        $this->assertSame(CoworkingSeat::Dedicated, $this->plan('Dedicated Desk — Monthly')->coworking_seat);
+        $this->assertSame(0, $this->plan('Hot Desk — Monthly')->resourceGrants()->count());
 
         $evening = $this->plan('Hot Desk — Evening Monthly (5 PM – 12 AM)');
         $this->assertSame('17:00', substr((string) $evening->access_window_start, 0, 5));
         $this->assertSame('00:00', substr((string) $evening->access_window_end, 0, 5));
-        $this->assertSame(210.0, $this->hours($evening));
+        $this->assertNull($this->hours($evening));
     }
 
     public function test_savings_match_the_sheets_discount_column(): void
@@ -138,6 +143,7 @@ class PlanSeederTest extends TestCase
         $this->seed(PlanSeeder::class);
 
         $this->assertSame($ids, Plan::query()->orderBy('id')->pluck('id')->all());
-        $this->assertSame(1, $this->plan('Hot Desk — Monthly')->resourceGrants()->count());
+        $this->assertSame(0, $this->plan('Hot Desk — Monthly')->resourceGrants()->count());
+        $this->assertSame(CoworkingSeat::Flexible, $this->plan('Hot Desk — Monthly')->coworking_seat);
     }
 }

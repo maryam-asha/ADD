@@ -2,8 +2,11 @@
 
 namespace App\Domain\Membership\Models;
 
+use App\Casts\PlainDecimal;
 use App\Concerns\HasTranslations;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Membership\Enums\AllowanceCycle;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonImmutable;
@@ -42,6 +45,9 @@ class Plan extends Model
         'reference_space_id',
         'reference_units',
         'duration_days',
+        'coworking_seat',
+        'coworking_hours',
+        'allowance_cycle',
         'access_window_start',
         'access_window_end',
         'is_active',
@@ -60,7 +66,21 @@ class Plan extends Model
             'reference_units' => 'integer',
             'is_active' => 'boolean',
             'is_public' => 'boolean',
+            'coworking_seat' => CoworkingSeat::class,
+            // Hours, not money — null is unlimited.
+            'coworking_hours' => PlainDecimal::class,
+            'allowance_cycle' => AllowanceCycle::class,
         ];
+    }
+
+    /**
+     * Whether the plan includes coworking: a seat the branch pool holds, or
+     * a dedicated desk. A coworking benefit (hours or a discount on a
+     * co_space) on another plan is not this.
+     */
+    public function includesCoworking(): bool
+    {
+        return ($this->coworking_seat ?? CoworkingSeat::None) !== CoworkingSeat::None;
     }
 
     /**
@@ -237,7 +257,13 @@ class Plan extends Model
     /** A Dedicated Desk plan ties its subscriptions to specific desks. */
     public function isDedicatedDesk(): bool
     {
-        return $this->planModule?->slug === PlanModule::DEDICATED_DESK;
+        return $this->coworking_seat === CoworkingSeat::Dedicated;
+    }
+
+    /** Free hours the plan gives on a space or a space type. */
+    public function spaceHours(): HasMany
+    {
+        return $this->hasMany(PlanSpaceHour::class)->orderBy('order');
     }
 
     /** The plan this one's saving is measured against (PlanSavingCalculator). */
