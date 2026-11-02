@@ -8,14 +8,12 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
-use App\Http\Controllers\Api\V1\Member\HomeController;
 use App\Http\Controllers\Api\V1\Member\MemberCouponController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
 use App\Http\Controllers\Api\V1\Member\MemberServiceController;
 use App\Http\Controllers\Api\V1\Member\MemberServiceRequestController;
 use App\Http\Controllers\Api\V1\Member\MembershipController;
-use App\Http\Controllers\Api\V1\Member\PackageController;
 use App\Http\Controllers\Api\V1\Member\PaymentController;
 use App\Http\Controllers\Api\V1\Member\PaymentMethodsController;
 use App\Http\Controllers\Api\V1\Member\PreferencesController;
@@ -24,7 +22,6 @@ use App\Http\Controllers\Api\V1\Member\ProfileController;
 use App\Http\Controllers\Api\V1\Member\PublicDirectoryConsentController;
 use App\Http\Controllers\Api\V1\Member\ScanController;
 use App\Http\Controllers\Api\V1\Member\SpaceAvailabilityController;
-use App\Http\Controllers\Api\V1\Member\SpaceController;
 use App\Http\Controllers\Api\V1\Member\TopUpController;
 use App\Http\Controllers\Api\V1\Member\WalletController;
 use Illuminate\Support\Facades\Route;
@@ -33,12 +30,8 @@ use Illuminate\Support\Facades\Route;
 // applied once, from the group wrapping this file in routes/api.php. A
 // company member is still just a `member` role-wise (D.8), so this group
 // covers both individual and company-affiliated members with no split.
-
-// The app's home screen in one read: the greeting, the unread count, the
-// running co-working session, the banners (announcements placed on the
-// app), today's bookings and events, and "Explore ADD" (the services put on
-// the home screen; each one's page is services/{slug}).
-Route::get('home', [HomeController::class, 'show']);
+// The reads a visitor may make too (home, spaces, packages, events) are in
+// member-visitor.php.
 
 // The member's own (personal) wallet: balances per category, the history
 // newest first, and one row as a receipt with the balance either side of
@@ -59,10 +52,6 @@ Route::post('wallet/top-ups', [TopUpController::class, 'store']);
 // returns the same wallets with their balances inside the `wallet` method.
 // Kept for the app version that still calls it.
 Route::get('wallet/options', [WalletController::class, 'options']);
-
-// Browse spaces for members with working hours, filtering and amenities.
-Route::get('spaces', [SpaceController::class, 'index']);
-Route::get('spaces/{space}', [SpaceController::class, 'show']);
 
 // docs/decisions/booking-availability-and-calendar.md — the read side of
 // the booking rules: which of the space's cells are free on a day. Read-only
@@ -147,13 +136,6 @@ Route::post('companies/{company}/wallet-allocations', [CompanyWalletAllocationCo
 // prices (docs/superpowers/specs/2026-10-10-office-leases-design.md).
 Route::get('companies/{company}/office-leases', [CompanyOfficeLeaseController::class, 'index']);
 
-// Browse the package catalog — "Packages" tab. Each entry carries
-// `is_current`; the member's own subscription and usage is a separate call.
-// `features` is capped at 3 (+ more_features_count); packages/{plan} below
-// is where a client reads one plan's full, untruncated details.
-Route::get('packages', [PackageController::class, 'index']);
-Route::get('packages/{plan}', [PackageController::class, 'show']);
-
 // A member buys a plan for themselves, or (via an optional company_id in the
 // body, CompanyPolicy::manageMembers) a company admin buys it on behalf of
 // their company — one endpoint, self-service checked in the controller.
@@ -202,12 +184,9 @@ Route::get('notifications/unread-count', [MemberNotificationController::class, '
 Route::put('device-token', [MemberDeviceTokenController::class, 'update']);
 Route::delete('device-token', [MemberDeviceTokenController::class, 'destroy']);
 
-// Mobile events calendar, categories, and details for members
-Route::get('events', [EventController::class, 'index']);
-Route::get('events/categories', [EventController::class, 'categories']);
-Route::get('events/statuses', [EventController::class, 'statuses']);
+// The member's own events and registering. Browsing them (the list,
+// categories, statuses, one event) is in member-visitor.php.
 Route::get('events/my-events', [EventController::class, 'myEvents']);
-Route::get('events/{event}', [EventController::class, 'show']);
 Route::get('events/{event}/registration-form', [EventController::class, 'registrationForm']);
 Route::post('events/{event}/register', [EventController::class, 'register']);
 

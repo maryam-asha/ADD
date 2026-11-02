@@ -200,13 +200,14 @@ class ServiceCatalogService
     /**
      * The home screen's "Explore ADD": the services put on it, that this
      * member may see, by layer (the axis's order) and then their own order.
+     * A visitor (no account) holds no plan, so sees those open to all.
      *
      * @return Collection<int, ServiceType> (with 'axis' loaded)
      */
-    public function homeServicesForMember(User $user): Collection
+    public function homeServicesForMember(?User $user): Collection
     {
         return ServiceType::query()
-            ->visibleToMember($this->activePlanModuleIds($user))
+            ->visibleToMember($user !== null ? $this->activePlanModuleIds($user) : [])
             ->where('show_on_home', true)
             ->with('axis')
             ->get()

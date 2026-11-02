@@ -1638,7 +1638,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner \u2014 the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here \u2014 they set up the booking calendar, so they come with Get Space Details \u2192 data.booking.upcoming_closures. hours/periods are TODAY's only \u2014 show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination: a top-level `meta`, beside `data` \u2014 the response is {data: {working_hours_banner, spaces}, meta}\n\nPrice (changed 2026-10-18): `pricing` is `{points, price, currency, unit, unit_label}` \u2014 the hourly rate as numbers, in points and in the member's currency (`currency` header, else their preference, else the base currency); `currency` is the symbol shown beside the amount (`$`; `\u0644.\u0633` in Arabic, `SYP` in English), `unit` is `hour` and `unit_label` the word in the member's language. No labels: the app joins them, with the unit or without.\n\n### Sale\n`sale` \u2014 null, or while a sale on the hourly rate runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original rate struck through. Price a booking with `bookings/preview`, never rate \u00d7 duration."
+                                        "description": "Returns the active spaces matching the Aleppo Digital District mobile app Browse Spaces UI.\n\nIncludes:\n- Branch working hours banner \u2014 the branch's hours, the same for every space, so stated here once and not in each space's details: today's (text, hours, open_time, close_time, is_open, periods); the ordinary week as `schedule` (days grouped by the hours they share, each group with its own periods and hours, Saturday first), open_weekdays and a translated days_label; and the timezone with its label and note. The upcoming closures are NOT here \u2014 they set up the booking calendar, so they come with Get Space Details \u2192 data.booking.upcoming_closures. hours/periods are TODAY's only \u2014 show the week from `schedule`.\n- Badges (OPEN SPACE, MEETING ROOM, PRIVATE OFFICE, EVENT HALL)\n- Hourly pricing with currency\n- Amenities list with icons\n- Pagination: a top-level `meta`, beside `data` \u2014 the response is {data: {working_hours_banner, spaces}, meta}\n\nPrice (changed 2026-10-18): `pricing` is `{points, price, currency, unit, unit_label}` \u2014 the hourly rate as numbers, in points and in the member's currency (`currency` header, else their preference, else the base currency); `currency` is the symbol shown beside the amount (`$`; `\u0644.\u0633` in Arabic, `SYP` in English), `unit` is `hour` and `unit_label` the word in the member's language. No labels: the app joins them, with the unit or without.\n\n### Sale\n`sale` \u2014 null, or while a sale on the hourly rate runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original rate struck through. Price a booking with `bookings/preview`, never rate \u00d7 duration.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                                     },
                                     "response": []
                                 },
@@ -1680,7 +1680,7 @@
                                                 "{{space_id}}"
                                             ]
                                         },
-                                        "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)\n- `booking`: this space's own setup for the booking screen, sent once here \u2014 `upcoming_closures` (every date from today on that the branch is closed all day, as ISO-8601 date-times at local midnight with NO offset, e.g. \"2026-09-30T00:00:00\", to pass straight to DateTime.parse: without an offset it parses as local time, so the 30th stays the 30th on any device \u2014 with +03:00 a device in another timezone would move it to the 29th), and `rules` (granularity; min_duration_minutes = the shortest booking LENGTH, with no maximum; min_notice_minutes = the minimum NOTICE before a booking's start, 0 = none \u2014 slots inside it are not sent; max_days_ahead = how many days ahead a booking may be made, null = no limit \u2014 grey out later dates. The member picks a run of consecutive slots at least min_duration_minutes long; there is no list of lengths). No legend \u2014 the app draws its own. The slots endpoint then carries only what changes per date; call it again on each date change. The indicative price of a run of slots is details.price.hourly_rate_points \u00d7 hours. The branch's week (today's hours and `schedule`) is NOT here \u2014 they are the same for every space and come once with the spaces list, in `working_hours_banner`.\n\nPrice (changed 2026-10-18): `pricing` is `{points, price, currency, unit, unit_label}` \u2014 the hourly rate as numbers, in points and in the member's currency (`currency` header, else their preference, else the base currency); `currency` is the symbol shown beside the amount (`$`; `\u0644.\u0633` in Arabic, `SYP` in English), `unit` is `hour` and `unit_label` the word in the member's language. No labels: the app joins them, with the unit or without.\n\n### Sale\n`sale` \u2014 null, or while a sale on the hourly rate runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original rate struck through. Price a booking with `bookings/preview`, never rate \u00d7 duration."
+                                        "description": "Returns full details for a space matching the mobile app Space Details / Pre-Booking screen.\n\nIncludes:\n- Badge, title, subtitle, and localized description\n- Quick features (Seats, Wi-Fi, Power, Area type)\n- Details card (Price per hour, capacity, formatted location hierarchy, branch working hours)\n- Amenities checklist (Wi-Fi, Power, Chairs, Printing, Locker, Cafe, plus room equipment)\n- Call-to-action button info (Book This Space)\n- `booking`: this space's own setup for the booking screen, sent once here \u2014 `upcoming_closures` (every date from today on that the branch is closed all day, as ISO-8601 date-times at local midnight with NO offset, e.g. \"2026-09-30T00:00:00\", to pass straight to DateTime.parse: without an offset it parses as local time, so the 30th stays the 30th on any device \u2014 with +03:00 a device in another timezone would move it to the 29th), and `rules` (granularity; min_duration_minutes = the shortest booking LENGTH, with no maximum; min_notice_minutes = the minimum NOTICE before a booking's start, 0 = none \u2014 slots inside it are not sent; max_days_ahead = how many days ahead a booking may be made, null = no limit \u2014 grey out later dates. The member picks a run of consecutive slots at least min_duration_minutes long; there is no list of lengths). No legend \u2014 the app draws its own. The slots endpoint then carries only what changes per date; call it again on each date change. The indicative price of a run of slots is details.price.hourly_rate_points \u00d7 hours. The branch's week (today's hours and `schedule`) is NOT here \u2014 they are the same for every space and come once with the spaces list, in `working_hours_banner`.\n\nPrice (changed 2026-10-18): `pricing` is `{points, price, currency, unit, unit_label}` \u2014 the hourly rate as numbers, in points and in the member's currency (`currency` header, else their preference, else the base currency); `currency` is the symbol shown beside the amount (`$`; `\u0644.\u0633` in Arabic, `SYP` in English), `unit` is `hour` and `unit_label` the word in the member's language. No labels: the app joins them, with the unit or without.\n\n### Sale\n`sale` \u2014 null, or while a sale on the hourly rate runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original rate struck through. Price a booking with `bookings/preview`, never rate \u00d7 duration.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                                     },
                                     "response": [
                                         {
@@ -3222,7 +3222,7 @@
                                         "packages"
                                     ]
                                 },
-                                "description": "Returns the package catalog for the \"Packages\" tab \u2014 every active subscription plan, as a lightweight browsing list.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here \u2014 see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `features`: capped at the first 3, plus `more_features_count` for the remainder (e.g. 5 total \u2192 3 returned + `more_features_count: 2`).\n- `tags`, `balances_grant`, `discounts`, `resources_grant` are NOT included here \u2014 they're all \"View details\" data. See \"Get Package Details\" below, which returns them plus the full, untruncated `features` list for one plan.\n\n### Sale\n`sale` \u2014 null, or while a sale runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original price struck through."
+                                "description": "Returns the package catalog for the \"Packages\" tab \u2014 every active subscription plan, as a lightweight browsing list.\n\nEach entry carries `is_current` (true for the member's own active plan, if any) so the client can render \"Current Plan\" vs \"Change Plan\". The member's own usage/consumption is NOT here \u2014 see \"Get Current Membership\" below, a separate call for the separate \"My Subscription\" tab.\n\n- `features`: capped at the first 3, plus `more_features_count` for the remainder (e.g. 5 total \u2192 3 returned + `more_features_count: 2`).\n- `tags`, `balances_grant`, `discounts`, `resources_grant` are NOT included here \u2014 they're all \"View details\" data. See \"Get Package Details\" below, which returns them plus the full, untruncated `features` list for one plan.\n\n### Sale\n`sale` \u2014 null, or while a sale runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original price struck through.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             },
                             "response": [
                                 {
@@ -3317,7 +3317,7 @@
                                     ],
                                     "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
                                 },
-                                "description": "One plan's full details for the \"View details\" screen \u2014 same base fields as a catalog entry, plus `tags`, `balances_grant`, `discounts`, `resources_grant` (none of which are on the catalog card), and `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) \u2014 the same visibility rule the catalog list applies.\n\n### Sale\n`sale` \u2014 null, or while a sale runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original price struck through."
+                                "description": "One plan's full details for the \"View details\" screen \u2014 same base fields as a catalog entry, plus `tags`, `balances_grant`, `discounts`, `resources_grant` (none of which are on the catalog card), and `features` is the complete, untruncated list (no `more_features_count`).\n\n404s when the plan doesn't exist, or isn't currently browsable (`is_active=false` or `is_subscription=false`) \u2014 the same visibility rule the catalog list applies.\n\n### Sale\n`sale` \u2014 null, or while a sale runs `{points, price, original_points, original_price, discount_points, discount_amount, discount_percent, discount_label, currency, unit, unit_label, ends_at, ends_label}` \u2014 amounts are numbers, beside `currency` (the symbol, as in `pricing`) and `unit`/`unit_label` (`hour` for a space, the plan's period for a package: `day`, `week` or `month`, else null; null for an event); no labels. `discount_label` is the badge (\"20% off\"; the amount when under 1%), the percentage rounded down: show the original price struck through.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             },
                             "response": [
                                 {
@@ -6277,7 +6277,7 @@
                                         "categories"
                                     ]
                                 },
-                                "description": "Returns active event categories for the mobile app, with translated names according to the header language, returning only id and name."
+                                "description": "Returns active event categories for the mobile app, with translated names according to the header language, returning only id and name.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             }
                         },
                         {
@@ -6318,7 +6318,7 @@
                                         "statuses"
                                     ]
                                 },
-                                "description": "\u062c\u0644\u0628 \u0642\u0627\u0626\u0645\u0629 \u062d\u0627\u0644\u0627\u062a \u0627\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0644\u062a\u0637\u0628\u064a\u0642 \u0627\u0644\u0623\u0639\u0636\u0627\u0621 \u0645\u0639 \u0627\u0644\u0623\u0644\u0648\u0627\u0646 \u0648\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062a\u0631\u062c\u0645\u0629 (open, full, closed, cancelled)."
+                                "description": "\u062c\u0644\u0628 \u0642\u0627\u0626\u0645\u0629 \u062d\u0627\u0644\u0627\u062a \u0627\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0644\u062a\u0637\u0628\u064a\u0642 \u0627\u0644\u0623\u0639\u0636\u0627\u0621 \u0645\u0639 \u0627\u0644\u0623\u0644\u0648\u0627\u0646 \u0648\u0627\u0644\u0639\u0646\u0627\u0648\u064a\u0646 \u0627\u0644\u0645\u062a\u0631\u062c\u0645\u0629 (open, full, closed, cancelled).\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             }
                         },
                         {
@@ -6401,7 +6401,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Browse upcoming events tailored for the mobile app, with personalized registration status (is_registered), formatted date badges, time ranges, and availability calculation."
+                                "description": "Browse upcoming events tailored for the mobile app, with personalized registration status (is_registered), formatted date badges, time ranges, and availability calculation.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             },
                             "description": "Browse events for the member app with filters: search by event title, filter by category (id or slug), filter by free (1 for free, 0 for paid), and filter by cancelled (1 for cancelled). Returns seats calculation, status badges, and user registration state (is_registered).",
                             "response": [
@@ -6544,7 +6544,7 @@
                                         "{{event_id}}"
                                     ]
                                 },
-                                "description": "Returns full event details for the mobile app screen, including highlights, registration state, capacity breakdown, and formatted dates.\n\n`discounts` (added 2026-10-18): beside `payment`, what was taken off this member's registration, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced. Empty with no registration or nothing taken off."
+                                "description": "Returns full event details for the mobile app screen, including highlights, registration state, capacity breakdown, and formatted dates.\n\n`discounts` (added 2026-10-18): beside `payment`, what was taken off this member's registration, in the shape of a booking's `discounts` (offer, coupon, plan discount, `duration_saving`), as locked when it was priced. Empty with no registration or nothing taken off.\n\n### Visitor mode\nWorks with or without login. With no `Authorization` header it answers a visitor; with a member token, that member's own version. A token that is sent but expired or revoked is a 401 (refresh it), never read as a visitor; a non-member account is a 403. The no-login copy is in 12. App (no login) > Visitor mode."
                             },
                             "description": "Returns full event details for the mobile app screen, including description, member registration state (is_registered), capacity breakdown, seats left, and formatted date/time.",
                             "response": [
@@ -11982,6 +11982,509 @@
                                     "body": "{\n  \"data\": {\n    \"content\": \"# \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0648\u0627\u0644\u062f\u0639\u0645\\n\\n...\",\n    \"contacts\": [\n      {\n        \"type\": \"email\",\n        \"label\": null,\n        \"value\": \"support@add-district.sy\",\n        \"url\": \"mailto:support@add-district.sy\"\n      },\n      {\n        \"type\": \"phone\",\n        \"label\": \"\u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644\",\n        \"value\": \"+963 21 000 0000\",\n        \"url\": \"tel:+963210000000\"\n      },\n      {\n        \"type\": \"whatsapp\",\n        \"label\": \"\u0648\u0627\u062a\u0633\u0627\u0628\",\n        \"value\": \"+963 944 000 000\",\n        \"url\": \"https://wa.me/963944000000\"\n      },\n      {\n        \"type\": \"address\",\n        \"label\": null,\n        \"value\": \"\u062d\u0644\u0628\u060c \u0633\u0648\u0631\u064a\u0627\",\n        \"url\": \"https://www.google.com/maps/search/?api=1&query=%D8%AD%D9%84%D8%A8%D8%8C%20%D8%B3%D9%88%D8%B1%D9%8A%D8%A7\"\n      },\n      {\n        \"type\": \"website\",\n        \"label\": null,\n        \"value\": \"https://add-district.sy\",\n        \"url\": \"https://add-district.sy\"\n      }\n    ]\n  }\n}"
                                 }
                             ]
+                        },
+                        {
+                            "name": "Visitor mode",
+                            "description": "The member app's visitor mode: the screens someone may look at before signing in. These are the member endpoints themselves (`/api/v1/member/...`), sent here with No Auth; each one also takes a member token and then answers that member, as in its own folder. A token that is sent but expired or revoked is a 401, never read as a visitor. Everything else under member/ (bookings, my events, registering, the wallet, ...) still needs a login.",
+                            "item": [
+                                {
+                                    "name": "Get Home",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/home",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "home"
+                                            ]
+                                        },
+                                        "description": "The home screen as a visitor (no login): `greeting` without a name (\"Good morning\"), `unread_notifications` 0, `active_session` null, `today` [], the `banners`, and `explore` (only the services open to every plan). Same request as 13. Home > Get Home, with No Auth.",
+                                        "auth": {
+                                            "type": "noauth"
+                                        }
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "200 \u2014 visitor",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/home",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "home"
+                                                    ]
+                                                },
+                                                "description": "The home screen as a visitor (no login): `greeting` without a name (\"Good morning\"), `unread_notifications` 0, `active_session` null, `today` [], the `banners`, and `explore` (only the services open to every plan). Same request as 13. Home > Get Home, with No Auth.",
+                                                "auth": {
+                                                    "type": "noauth"
+                                                }
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "body": "{\n    \"data\": {\n        \"greeting\": \"Good morning\",\n        \"unread_notifications\": 0,\n        \"active_session\": null,\n        \"banners\": [\n            {\n                \"id\": 1,\n                \"type\": \"offer\",\n                \"type_label\": \"Offer\",\n                \"subtitle\": \"ADD Smart Ecosystem\",\n                \"title\": \"Build. Connect. Grow.\",\n                \"description\": \"Everything your business needs.\",\n                \"cta_label\": \"Explore ADD\",\n                \"image_url\": \"https://cdn.example.com/banner.jpg\",\n                \"link_url\": \"addapp://services\"\n            }\n        ],\n        \"today\": [],\n        \"explore\": [\n            {\n                \"id\": 3,\n                \"slug\": \"rooms\",\n                \"name\": \"Rooms\",\n                \"description\": \"Book a meeting room by the hour.\",\n                \"image_url\": null,\n                \"is_coming_soon\": false,\n                \"axis\": {\n                    \"slug\": \"core\",\n                    \"name\": \"ADD Core\",\n                    \"color\": \"#E5352B\"\n                }\n            }\n        ]\n    }\n}"
+                                        },
+                                        {
+                                            "name": "401 \u2014 expired token",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/member/home",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "member",
+                                                        "home"
+                                                    ]
+                                                },
+                                                "description": "The home screen as a visitor (no login): `greeting` without a name (\"Good morning\"), `unread_notifications` 0, `active_session` null, `today` [], the `banners`, and `explore` (only the services open to every plan). Same request as 13. Home > Get Home, with No Auth.",
+                                                "auth": {
+                                                    "type": "bearer",
+                                                    "bearer": [
+                                                        {
+                                                            "key": "token",
+                                                            "value": "expired-token",
+                                                            "type": "string"
+                                                        }
+                                                    ]
+                                                }
+                                            },
+                                            "status": "Unauthorized",
+                                            "code": 401,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Browse Spaces",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/spaces?space_type=all&per_page=10",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "spaces"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "space_type",
+                                                    "value": "all",
+                                                    "description": "Optional: all, co_space (hot_desk), room (meeting_room), business (private_office), event_hall"
+                                                },
+                                                {
+                                                    "key": "min_capacity",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional: Filter spaces by minimum capacity"
+                                                },
+                                                {
+                                                    "key": "branch_id",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional: Branch ID override"
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "10",
+                                                    "description": "Optional: Number of spaces per page (default: 10)"
+                                                },
+                                                {
+                                                    "key": "page",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Optional: Page number (default: 1)"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Browse spaces as a visitor (no login): the same list, prices in the `currency` header. Same request as 3. Spaces & Bookings > Browse Spaces, with No Auth."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Space Details",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/spaces/{{space_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "spaces",
+                                                "{{space_id}}"
+                                            ]
+                                        },
+                                        "description": "One space as a visitor (no login). Same request as 3. Spaces & Bookings > Get Space Details, with No Auth. Its availability slots still need a login."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Package Catalog",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/packages",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "packages"
+                                            ]
+                                        },
+                                        "description": "The package catalog as a visitor (no login): `is_current` is false on every package. Same request as 4. Packages & Subscription > Get Package Catalog, with No Auth."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Package Details",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/packages/6",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "packages",
+                                                "6"
+                                            ],
+                                            "description": "The path segment is the plan id (e.g. 6 = \"The Dedicated +\")."
+                                        },
+                                        "description": "One package as a visitor (no login): `is_current` is false. Same request as 4. Packages & Subscription > Get Package Details, with No Auth."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Browse Events",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events"
+                                            ],
+                                            "query": [
+                                                {
+                                                    "key": "search",
+                                                    "value": "",
+                                                    "disabled": true,
+                                                    "description": "Search by event title/name (Arabic or English)"
+                                                },
+                                                {
+                                                    "key": "category",
+                                                    "value": "tech",
+                                                    "disabled": true,
+                                                    "description": "Filter by category (category id or category slug)"
+                                                },
+                                                {
+                                                    "key": "free",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Filter free events (1 for free only, 0 for paid)"
+                                                },
+                                                {
+                                                    "key": "cancelled",
+                                                    "value": "1",
+                                                    "disabled": true,
+                                                    "description": "Filter cancelled events (1 for cancelled events)"
+                                                },
+                                                {
+                                                    "key": "per_page",
+                                                    "value": "20",
+                                                    "disabled": true,
+                                                    "description": "Items per page pagination"
+                                                },
+                                                {
+                                                    "key": "status",
+                                                    "value": "open",
+                                                    "disabled": true,
+                                                    "description": "Filter by computed status: open, full, closed, cancelled (or comma-separated e.g. open,full)"
+                                                }
+                                            ]
+                                        },
+                                        "description": "Browse events as a visitor (no login): `is_registered` is false on every event. Same request as 7. Events > Browse Events, with No Auth."
+                                    },
+                                    "description": "Browse events for the member app with filters: search by event title, filter by category (id or slug), filter by free (1 for free, 0 for paid), and filter by cancelled (1 for cancelled). Returns seats calculation, status badges, and user registration state (is_registered).",
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Event Categories",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events/categories",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events",
+                                                "categories"
+                                            ]
+                                        },
+                                        "description": "Event categories as a visitor (no login). Same request as 7. Events > Get Event Categories, with No Auth."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Event Statuses",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events/statuses",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events",
+                                                "statuses"
+                                            ]
+                                        },
+                                        "description": "Event statuses as a visitor (no login). Same request as 7. Events > Get Event Statuses, with No Auth."
+                                    },
+                                    "response": []
+                                },
+                                {
+                                    "name": "Get Event Details",
+                                    "request": {
+                                        "auth": {
+                                            "type": "noauth"
+                                        },
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/events/{{event_id}}",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "events",
+                                                "{{event_id}}"
+                                            ]
+                                        },
+                                        "description": "One event as a visitor (no login): `is_registered` false, no `payment`. Same request as 7. Events > Get Event Details, with No Auth. Registering still needs a login."
+                                    },
+                                    "description": "Returns full event details for the mobile app screen, including description, member registration state (is_registered), capacity breakdown, seats left, and formatted date/time.",
+                                    "response": []
+                                }
+                            ]
                         }
                     ]
                 },
@@ -12016,7 +12519,7 @@
                                         "home"
                                     ]
                                 },
-                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{state: active|awaiting_confirmation, type: walkin|booking, id, arrival_request_id, space {id, name, type}, branch {id, name}, requested_at, checked_in_at, end_requested}`. state = awaiting_confirmation \u0628\u0639\u062f \u0645\u0633\u062d \u0627\u0644\u0643\u064a\u0648\u0633\u0643 \u0648\u0642\u0628\u0644 \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644: \u0644\u0627 \u062c\u0644\u0633\u0629 \u0628\u0639\u062f\u060c \u0641\u064a\u0643\u0648\u0646 id \u0648checked_in_at \u0628\u0642\u064a\u0645\u0629 null\u060c \u0648arrival_request_id \u0648requested_at \u0644\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u0644\u0651\u0642. state = active \u0644\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629\u060c \u0648\u064a\u0643\u0648\u0646 arrival_request_id \u0648requested_at \u0628\u0642\u064a\u0645\u0629 null. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current.\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.",
+                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{state: active|awaiting_confirmation, type: walkin|booking, id, arrival_request_id, space {id, name, type}, branch {id, name}, requested_at, checked_in_at, end_requested}`. state = awaiting_confirmation \u0628\u0639\u062f \u0645\u0633\u062d \u0627\u0644\u0643\u064a\u0648\u0633\u0643 \u0648\u0642\u0628\u0644 \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644: \u0644\u0627 \u062c\u0644\u0633\u0629 \u0628\u0639\u062f\u060c \u0641\u064a\u0643\u0648\u0646 id \u0648checked_in_at \u0628\u0642\u064a\u0645\u0629 null\u060c \u0648arrival_request_id \u0648requested_at \u0644\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u0644\u0651\u0642. state = active \u0644\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629\u060c \u0648\u064a\u0643\u0648\u0646 arrival_request_id \u0648requested_at \u0628\u0642\u064a\u0645\u0629 null. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current.\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.\n\n### \u0648\u0636\u0639 \u0627\u0644\u0632\u0627\u0626\u0631\n\u064a\u0639\u0645\u0644 \u0628\u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0648\u0628\u062f\u0648\u0646\u0647. \u0628\u0644\u0627 \u062a\u0631\u0648\u064a\u0633\u0629 `Authorization` \u064a\u062c\u064a\u0628 \u0627\u0644\u0632\u0627\u0626\u0631: `greeting` \u0628\u0644\u0627 \u0627\u0633\u0645\u060c \u0648`unread_notifications` = 0\u060c \u0648`active_session` = null\u060c \u0648`today` = []\u060c \u0648\u0645\u0639\u0647\u0627 `banners` \u0648`explore` (\u0627\u0644\u062e\u062f\u0645\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629 \u0644\u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062a \u0641\u0642\u0637). \u0645\u0639 token \u0639\u0636\u0648 \u064a\u062c\u064a\u0628 \u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0636\u0648 \u0643\u0645\u0627 \u0641\u0648\u0642. token \u0645\u064f\u0631\u0633\u064e\u0644 \u0644\u0643\u0646\u0647 \u0645\u0646\u062a\u0647\u064d \u0623\u0648 \u0645\u0644\u063a\u0649 \u2190 401 (\u062c\u062f\u0651\u062f\u0647)\u060c \u0648\u0644\u0627 \u064a\u064f\u0642\u0631\u0623 \u0643\u0632\u0627\u0626\u0631\u061b \u062d\u0633\u0627\u0628 \u0644\u064a\u0633 \u0639\u0636\u0648\u0627\u064b \u2190 403. \u0627\u0644\u0646\u0633\u062e\u0629 \u0628\u0644\u0627 \u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0641\u064a 12. App (no login) > Visitor mode.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [

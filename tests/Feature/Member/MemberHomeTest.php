@@ -384,6 +384,49 @@ class MemberHomeTest extends TestCase
         $response->assertJsonPath('data.explore.2.id', $events->id);
     }
 
+    public function test_a_visitor_gets_the_greeting_without_a_name_the_banners_and_explore(): void
+    {
+        $banner = Announcement::factory()->onApp()->create();
+        $axis = ServiceAxis::create(['slug' => 'core', 'name' => ['en' => 'ADD Core', 'ar' => 'ADD Core'], 'color' => '#E5352B', 'order' => 1]);
+        $service = ServiceType::create([
+            'service_axis_id' => $axis->id,
+            'slug' => 'rooms',
+            'name' => ['en' => 'Rooms', 'ar' => 'rooms'],
+            'description' => ['en' => 'About rooms', 'ar' => 'rooms'],
+            'is_active' => true,
+            'show_on_home' => true,
+            'visibility' => 'member',
+            'request_method' => 'internal_redirect',
+            'request_config' => ['route' => 'spaces', 'params' => []],
+            'order' => 1,
+        ]);
+        // The member's own day is never shown to a visitor.
+        Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $this->room->id,
+            'status' => BookingStatus::Confirmed,
+            'start_at' => now()->addHour(),
+            'end_at' => now()->addHours(2),
+        ]);
+        $this->app['auth']->forgetGuards();
+
+        $response = $this->home();
+
+        $response->assertJsonPath('data.greeting', 'Good morning');
+        $response->assertJsonPath('data.unread_notifications', 0);
+        $response->assertJsonPath('data.active_session', null);
+        $response->assertJsonPath('data.today', []);
+        $response->assertJsonPath('data.banners.0.id', $banner->id);
+        $response->assertJsonPath('data.explore.0.id', $service->id);
+    }
+
+    public function test_an_expired_or_unknown_token_is_a_401_not_a_visitor(): void
+    {
+        $this->app['auth']->forgetGuards();
+
+        $this->withToken('not-a-real-token')->getJson('/api/v1/member/home')->assertUnauthorized();
+    }
+
     public function test_an_operations_account_cannot_read_it(): void
     {
         $operations = User::factory()->create();

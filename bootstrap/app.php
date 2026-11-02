@@ -4,6 +4,7 @@ use App\Domain\Finance\Exceptions\InvalidMoneyAmountException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Pricing\Exceptions\CouponRejectedException;
+use App\Http\Middleware\AuthenticateMemberIfPresent;
 use App\Http\Middleware\EnsureActiveProvider;
 use App\Http\Middleware\EnsureStaffAccount;
 use App\Http\Middleware\RedirectIfAuthenticated;
@@ -93,6 +94,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // The two admin routes with no resource of their own (me,
             // media/upload): any account holding at least one permission.
             'staff' => EnsureStaffAccount::class,
+            // The member app's visitor mode (routes/api/v1/member-visitor.php):
+            // a guest goes through, a credential is held to auth:sanctum +
+            // role:member.
+            'member.optional' => AuthenticateMemberIfPresent::class,
         ]);
 
         // The "is this account still active" check is NOT registered here —

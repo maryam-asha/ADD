@@ -40,6 +40,13 @@ Route::prefix('v1')->group(function () {
         ->prefix('member')
         ->group(base_path('routes/api/v1/member.php'));
 
+    // The member app's visitor mode: reads that answer a guest as well as a
+    // member (member.optional). After member.php, so that file's static
+    // segments (events/my-events) win over this one's events/{event}.
+    Route::middleware('member.optional')
+        ->prefix('member')
+        ->group(base_path('routes/api/v1/member-visitor.php'));
+
     // Service providers (docs/decisions/service-providers.md): dashboard
     // accounts, so the same 'abilities:dashboard' boundary as the admin
     // group, but their own role and their own file — a provider never

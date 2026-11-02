@@ -64,10 +64,13 @@ class PackageBrowseTest extends TestCase
         return $member;
     }
 
-    public function test_unauthenticated_user_cannot_access_packages(): void
+    public function test_a_visitor_can_browse_packages_with_none_marked_current(): void
     {
-        $response = $this->getJson('/api/v1/member/packages');
-        $response->assertUnauthorized();
+        $response = $this->withHeader('lang', 'en')->getJson('/api/v1/member/packages');
+
+        $response->assertOk();
+        $this->assertNotEmpty($response->json('data'));
+        $this->assertNotContains(true, array_column($response->json('data'), 'is_current'));
     }
 
     public function test_package_catalog_matches_design_payload_and_marks_the_current_plan(): void
@@ -282,10 +285,14 @@ class PackageBrowseTest extends TestCase
         $this->assertNotNull($spaceTx->expires_at);
     }
 
-    public function test_unauthenticated_user_cannot_access_package_details(): void
+    public function test_a_visitor_can_read_package_details(): void
     {
-        $response = $this->getJson('/api/v1/member/packages/1');
-        $response->assertUnauthorized();
+        $plan = Plan::query()->publiclyListable()->where('is_subscription', true)->firstOrFail();
+
+        $this->getJson("/api/v1/member/packages/{$plan->id}")
+            ->assertOk()
+            ->assertJsonPath('data.id', $plan->id)
+            ->assertJsonPath('data.is_current', false);
     }
 
     /**

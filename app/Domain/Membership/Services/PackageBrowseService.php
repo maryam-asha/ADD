@@ -39,9 +39,10 @@ class PackageBrowseService
      *
      * @return array<int, array<string, mixed>>
      */
-    public function listAvailablePackages(User $user, ?string $moduleFilter = null): array
+    public function listAvailablePackages(?User $user, ?string $moduleFilter = null): array
     {
-        $activeMembership = $this->membershipResolver->activeFor($user);
+        // A visitor (no account) holds no plan, so none is marked current.
+        $activeMembership = $user !== null ? $this->membershipResolver->activeFor($user) : null;
 
         return $this->formatAvailablePackages($activeMembership, $user, $moduleFilter);
     }

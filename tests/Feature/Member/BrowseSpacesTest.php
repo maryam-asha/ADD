@@ -49,10 +49,21 @@ class BrowseSpacesTest extends TestCase
         return $member;
     }
 
-    public function test_unauthenticated_request_is_rejected(): void
+    public function test_a_visitor_can_browse_spaces_and_open_one(): void
     {
-        $response = $this->getJson('/api/v1/member/spaces');
-        $response->assertUnauthorized();
+        $id = $this->getJson('/api/v1/member/spaces')->assertOk()->json('data.spaces.0.id');
+
+        $this->assertNotNull($id);
+        $this->getJson("/api/v1/member/spaces/{$id}")->assertOk()->assertJsonPath('data.id', $id);
+    }
+
+    public function test_an_operations_account_cannot_browse_them(): void
+    {
+        $operations = User::factory()->create();
+        $operations->assignRole('operations');
+        Sanctum::actingAs($operations, ['*']);
+
+        $this->getJson('/api/v1/member/spaces')->assertForbidden();
     }
 
     public function test_member_can_browse_spaces_and_matches_design_payload(): void

@@ -45,9 +45,13 @@ class MemberHomeService
     ) {}
 
     /**
+     * A visitor (no account, the app's visitor mode) gets the greeting
+     * without a name, the banners and "Explore ADD"; the parts about the
+     * member's own account are empty.
+     *
      * @return array<string, mixed>
      */
-    public function for(User $member): array
+    public function for(?User $member): array
     {
         $locale = app()->getLocale();
         $now = now();
@@ -55,6 +59,17 @@ class MemberHomeService
         // "Today" is the district's day, not the server's.
         $dayStart = $localNow->copy()->startOfDay()->utc();
         $dayEnd = $localNow->copy()->addDay()->startOfDay()->utc();
+
+        if ($member === null) {
+            return [
+                'greeting' => $this->greeting(null, $localNow, $locale),
+                'unread_notifications' => 0,
+                'active_session' => null,
+                'banners' => $this->banners($locale),
+                'today' => [],
+                'explore' => $this->explore(null, $locale),
+            ];
+        }
 
         $session = $this->sessions->openSessionFor($member);
 
@@ -68,7 +83,7 @@ class MemberHomeService
         ];
     }
 
-    private function greeting(User $member, CarbonInterface $localNow, string $locale): string
+    private function greeting(?User $member, CarbonInterface $localNow, string $locale): string
     {
         $period = match (true) {
             $localNow->hour >= 5 && $localNow->hour < 12 => 'morning',
@@ -77,7 +92,7 @@ class MemberHomeService
         };
 
         $greeting = __("api.home.greeting.{$period}", [], $locale);
-        $firstName = Str::before(trim((string) $member->name), ' ');
+        $firstName = Str::before(trim((string) $member?->name), ' ');
 
         return $firstName === ''
             ? $greeting
@@ -281,7 +296,7 @@ class MemberHomeService
      *
      * @return list<array<string, mixed>>
      */
-    private function explore(User $member, string $locale): array
+    private function explore(?User $member, string $locale): array
     {
         return $this->catalog->homeServicesForMember($member)
             ->map(fn (ServiceType $service) => [

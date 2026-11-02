@@ -455,6 +455,14 @@ class EventBrowseServiceTest extends TestCase
         $this->assertTrue($guestRes->json('data.can_register'));
         $this->assertFalse($guestRes->json('data.is_registered'));
 
+        // The app's visitor mode reads the member endpoints with no login.
+        $this->getJson('/api/v1/member/events')->assertOk()->assertJsonPath('data.0.id', $event->id);
+        $this->getJson("/api/v1/member/events/{$event->id}")->assertOk()->assertJsonPath('data.is_registered', false);
+        $this->getJson('/api/v1/member/events/categories')->assertOk();
+        $this->getJson('/api/v1/member/events/statuses')->assertOk();
+        // Their own events still need a login, and are not read as an event id.
+        $this->getJson('/api/v1/member/events/my-events')->assertUnauthorized();
+
         // Register member
         EventAttendee::create([
             'event_id' => $event->id,
