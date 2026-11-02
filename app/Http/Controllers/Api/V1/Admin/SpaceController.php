@@ -3,6 +3,9 @@
 namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\BookingNotifier;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
@@ -138,7 +141,7 @@ class SpaceController extends AdminResourceController
         return response()->json(['message' => __('api.admin.space_amenities_updated')]);
     }
 
-    public function updateStatus(UpdateSpaceStatusRequest $request, Space $space): JsonResponse
+    public function updateStatus(UpdateSpaceStatusRequest $request, Space $space, BookingNotifier $notices): JsonResponse
     {
         $before = $space->status;
 
@@ -148,6 +151,18 @@ class SpaceController extends AdminResourceController
             'before' => $before,
             'after' => $space->status,
         ]);
+
+        // Into maintenance: every member with a booking still to come there
+        // hears of it; operations follows up with each.
+        if ($before !== OperationalStatus::Maintenance && $space->status === OperationalStatus::Maintenance) {
+            Booking::query()
+                ->where('space_id', $space->id)
+                ->whereIn('status', BookingStatus::open())
+                ->where('end_at', '>', now())
+                ->with(['space', 'user'])
+                ->get()
+                ->each(fn (Booking $booking) => $notices->affectedByMaintenance($booking));
+        }
 
         return response()->json(['message' => __('api.admin.space_status_updated')]);
     }

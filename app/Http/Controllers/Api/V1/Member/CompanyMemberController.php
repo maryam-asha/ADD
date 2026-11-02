@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\CompanyNotifier;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Services\ProviderRequestService;
 use App\Http\Controllers\Controller;
@@ -26,13 +27,19 @@ class CompanyMemberController extends Controller
 {
     use LogsSensitiveActions;
 
+    public function __construct(private readonly CompanyNotifier $notices) {}
+
     public function updateDoorAccess(UpdateCompanyMemberDoorAccessRequest $request, Company $company, User $user): JsonResponse
     {
         Gate::authorize('manageMembers', $company);
 
+        $before = $this->notices->flags($company, $user)['door_access_enabled'] ?? null;
+
         $company->members()->updateExistingPivot($user->id, [
             'door_access_enabled' => $request->validated('door_access_enabled'),
         ]);
+
+        $this->notices->doorAccessChanged($company, $user, $before, $request->boolean('door_access_enabled'), $request->user());
 
         $this->logSensitiveAction('company_member_door_access_changed', $company, [
             'user_id' => $user->id,
@@ -71,9 +78,13 @@ class CompanyMemberController extends Controller
             return response()->json(['message' => __('api.member.company_admin_requested')], 202);
         }
 
+        $before = $this->notices->flags($company, $user)['is_admin'] ?? null;
+
         $company->members()->updateExistingPivot($user->id, [
             'is_admin' => $request->validated('is_admin'),
         ]);
+
+        $this->notices->adminChanged($company, $user, $before, $request->boolean('is_admin'), $request->user());
 
         $this->logSensitiveAction('company_member_admin_changed', $company, [
             'user_id' => $user->id,

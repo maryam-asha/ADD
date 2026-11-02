@@ -3,6 +3,7 @@
 namespace App\Domain\Leasing\Services;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Services\AccessNotifier;
 use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Booking\Services\AvailabilityService;
 use App\Domain\Foundation\Enums\OperationalStatus;
@@ -37,6 +38,7 @@ class OfficeLeaseService
         private readonly InvoiceIssuer $invoices,
         private readonly PasscodeIssuanceService $passcodes,
         private readonly AvailabilityService $availability,
+        private readonly AccessNotifier $notices,
     ) {}
 
     /**
@@ -156,8 +158,16 @@ class OfficeLeaseService
             }
         }
 
+        // Only the lease's first door is news; one given back after
+        // maintenance, a renewal or a failed close is not.
+        $firstDoor = ! $lease->accessGrants()->exists();
+
         try {
             $this->passcodes->issueForLease($lease);
+
+            if ($firstDoor) {
+                $this->notices->officeOpened($lease);
+            }
 
             return true;
         } catch (\Throwable $e) {

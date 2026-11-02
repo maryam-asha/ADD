@@ -7,6 +7,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Services\ReversePayment;
 use App\Domain\Finance\Services\SyncPaymentStatus;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
@@ -173,6 +174,67 @@ class PaymentNotificationsTest extends TestCase
         app(SyncPaymentStatus::class)->handle($payment);
 
         $this->assertTold($member, 'payment.received');
+    }
+
+    public function test_a_card_payment_the_gateway_failed_is_announced(): void
+    {
+        $member = $this->cardPaymentSettledAs('F');
+
+        $this->assertTold($member, 'payment.failed');
+    }
+
+    public function test_a_payment_the_member_cancelled_is_not_announced(): void
+    {
+        $member = $this->cardPaymentSettledAs('C');
+
+        $this->assertNotTold($member, 'payment.failed');
+    }
+
+    public function test_a_reversed_payment_is_announced_with_its_points(): void
+    {
+        config(['paymera.base_url' => 'https://egate-t.paymera.test', 'paymera.api_key' => 'k', 'paymera.terminal_id' => '99990001']);
+        Http::fake(['*/api/cancel-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0])]);
+        $member = $this->member(100);
+        $payment = Payment::factory()->accepted()->create([
+            'user_id' => $member->id,
+            'wallet_id' => Wallet::first()->id,
+            'points_to_credit' => 100,
+            'wallet_transaction_id' => Wallet::first()->transactions()->first()->id,
+        ]);
+
+        app(ReversePayment::class)->handle($payment, $this->operator());
+
+        $this->assertTold($member, 'payment.reversed');
+        Notification::assertSentTo($member, GeneralNotification::class, fn (GeneralNotification $n) => $n->toArray($member)['template_key'] === 'payment.reversed'
+            && $n->toArray($member)['params']['points'] === 100);
+    }
+
+    /** A card payment the gateway reports as $status: F failed, C cancelled by the cardholder. */
+    private function cardPaymentSettledAs(string $status): User
+    {
+        config([
+            'paymera.base_url' => 'https://egate-t.paymera.test',
+            'paymera.api_key' => 'k',
+            'paymera.terminal_id' => '99990001',
+            'paymera.currency' => 'USD',
+        ]);
+        Http::fake(['*/api/get-payment-status/*' => Http::response([
+            'ErrorMessage' => 'Success', 'ErrorCode' => 0,
+            'Data' => ['status' => $status, 'creationTimestamp' => '2026-01-26 12:06:52.547', 'rrn' => '1', 'amount' => 1000, 'terminalId' => '99990001'],
+        ])]);
+        $member = $this->member();
+        $payment = Payment::factory()->create([
+            'payment_id' => 'pay-1',
+            'user_id' => $member->id,
+            'wallet_id' => Wallet::first()->id,
+            'charged_amount' => 1000,
+            'points_to_credit' => 100,
+            'terminal_id' => '99990001',
+        ]);
+
+        app(SyncPaymentStatus::class)->handle($payment);
+
+        return $member;
     }
 
     public function test_paying_from_the_wallet_in_the_app_is_not_announced(): void

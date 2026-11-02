@@ -9,9 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 /**
  * What a member is told about a payment they did not just make in the app —
- * a card the gateway accepted later, money taken at the desk, a cash hold
- * that lapsed. A wallet payment the member made themselves gets no message:
- * the app already showed them the result.
+ * a card the gateway accepted or failed later, money taken at the desk, a
+ * cash hold that lapsed, a payment an admin reversed. A wallet payment the
+ * member made themselves gets no message, nor a card payment they cancelled
+ * on the gateway's page: the app already showed them the result.
  *
  * Sent after commit, so a payment that rolls back tells nobody.
  */
@@ -27,6 +28,17 @@ class PaymentNotifier
     public function expired(Payment $payment): void
     {
         $this->send($payment, 'payment.expired', ['points' => (int) $payment->amount_points]);
+    }
+
+    /** The card was declined, or the gateway never finished it. */
+    public function failed(Payment $payment): void
+    {
+        $this->send($payment, 'payment.failed', []);
+    }
+
+    public function reversed(Payment $payment): void
+    {
+        $this->send($payment, 'payment.reversed', ['points' => (int) ($payment->points_to_credit ?: $payment->amount_points)]);
     }
 
     /**

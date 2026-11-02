@@ -78,9 +78,12 @@ class BookingCancellationService
         return $booking->start_at->copy()->subMinutes($this->windowMinutesFor($booking));
     }
 
-    public function cancel(Booking $booking): void
+    /**
+     * @return int the points given back
+     */
+    public function cancel(Booking $booking): int
     {
-        DB::transaction(function () use ($booking) {
+        return DB::transaction(function () use ($booking) {
             $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->status === BookingStatus::Cancelled) {
@@ -105,7 +108,7 @@ class BookingCancellationService
                 throw new ReceptionActionException('api.reception.cancellation_window_passed');
             }
 
-            $this->markCancelled($locked);
+            return $this->markCancelled($locked);
         });
     }
 
@@ -131,17 +134,23 @@ class BookingCancellationService
         });
     }
 
-    private function markCancelled(Booking $locked): void
+    /**
+     * @return int the points given back
+     */
+    private function markCancelled(Booking $locked): int
     {
         $locked->forceFill([
             'status' => BookingStatus::Cancelled,
             'cancelled_at' => now(),
         ])->save();
 
+        $refunded = $this->refunder->quote($locked)['points'];
         $this->refunder->refund($locked, 'Booking cancellation refund');
 
         // The usage this booking consumed is returned once it no
         // longer holds a charge (docs/decisions/plan-discounts-design.md).
         $this->discounts->voidFor($locked);
+
+        return $refunded;
     }
 }

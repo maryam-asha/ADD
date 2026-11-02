@@ -17,7 +17,6 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\Company;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -29,10 +28,12 @@ use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 class BookingCreationServiceTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     private BookingCreationService $creations;
@@ -563,7 +564,7 @@ class BookingCreationServiceTest extends TestCase
         $this->assertSame(BookingStatus::Pending, $booking->status);
         $this->assertSame(
             1,
-            NotificationLog::where('user_id', $operator->id)->where('template_key', 'booking.pending_approval')->count()
+            $this->notices($operator, 'booking.pending_approval')->count()
         );
     }
 
@@ -589,7 +590,7 @@ class BookingCreationServiceTest extends TestCase
         $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
 
         $this->assertSame(BookingStatus::Confirmed, $booking->status);
-        $this->assertSame(0, NotificationLog::count());
+        $this->assertDatabaseCount('notifications', 0);
     }
 
     // ------------------------------------------------------------------

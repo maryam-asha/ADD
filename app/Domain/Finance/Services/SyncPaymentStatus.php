@@ -6,6 +6,7 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\PaymeraGateway;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PaymentNotifier;
 use App\Events\Finance\PaymentAccepted;
 use App\Events\Finance\PaymentFailed;
 use Illuminate\Contracts\Cache\LockTimeoutException;
@@ -44,7 +45,10 @@ class SyncPaymentStatus
 
     private const LOCK_WAIT_SECONDS = 10;
 
-    public function __construct(private readonly PaymentMethodRegistry $registry) {}
+    public function __construct(
+        private readonly PaymentMethodRegistry $registry,
+        private readonly PaymentNotifier $notifier,
+    ) {}
 
     /**
      * Brings the local record in line with the gateway. Returns the payment
@@ -221,6 +225,11 @@ class SyncPaymentStatus
 
         event(new PaymentFailed($payment));
 
+        // A decline is news; a cardholder who pressed Cancel already knows.
+        if ($status === PaymentStatus::Failed) {
+            $this->notifier->failed($payment);
+        }
+
         return $payment;
     }
 
@@ -264,6 +273,8 @@ class SyncPaymentStatus
             'payment_id' => $payment->id,
             'gateway_payment_id' => $payment->payment_id,
         ]);
+
+        $this->notifier->failed($payment);
 
         return $payment;
     }

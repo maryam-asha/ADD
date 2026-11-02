@@ -5,13 +5,14 @@ namespace App\Console\Commands;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCancellationService;
+use App\Domain\Booking\Services\BookingNotifier;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Exceptions\PaymeraException;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\SyncPaymentStatus;
-use App\Domain\Identity\Models\NotificationLog;
+use App\Services\Experience\EventNotifier;
 use App\Support\Enums\EventRegistrationStatus;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Model;
@@ -33,22 +34,27 @@ class CancelExpiredPrepayments extends Command
 
     protected $description = 'Cancel bookings and registrations whose prepayment was not completed in time.';
 
-    public function handle(SyncPaymentStatus $sync, PaymentMethodRegistry $methods, BookingCancellationService $cancellations): int
-    {
+    public function handle(
+        SyncPaymentStatus $sync,
+        PaymentMethodRegistry $methods,
+        BookingCancellationService $cancellations,
+        BookingNotifier $bookingNotices,
+        EventNotifier $eventNotices,
+    ): int {
         $cancelled = 0;
         $rejected = 0;
 
         Booking::query()
             ->where('status', BookingStatus::AwaitingPayment)
             ->where('payment_due_at', '<=', now())
-            ->chunkById(100, function ($holds) use ($sync, $methods, $cancellations, &$cancelled) {
+            ->chunkById(100, function ($holds) use ($sync, $methods, $cancellations, $bookingNotices, &$cancelled) {
                 foreach ($holds as $hold) {
                     try {
                         $this->lastWordFromTheGateway($sync, $methods, $hold);
 
                         if ($cancellations->releaseUnpaidHold($hold)) {
                             $cancelled++;
-                            $this->tell($hold->user_id, 'booking.prepayment_expired');
+                            $bookingNotices->paymentExpired($hold);
                         }
                     } catch (Throwable $e) {
                         Log::error('[Payments] could not let an expired booking hold go', ['booking_id' => $hold->id, 'error' => $e->getMessage()]);
@@ -59,14 +65,14 @@ class CancelExpiredPrepayments extends Command
         EventAttendee::query()
             ->where('status', EventRegistrationStatus::AwaitingPayment)
             ->where('payment_due_at', '<=', now())
-            ->chunkById(100, function ($holds) use ($sync, $methods, &$rejected) {
+            ->chunkById(100, function ($holds) use ($sync, $methods, $eventNotices, &$rejected) {
                 foreach ($holds as $hold) {
                     try {
                         $this->lastWordFromTheGateway($sync, $methods, $hold);
 
                         if ($this->rejectRegistration($hold)) {
                             $rejected++;
-                            $this->tell($hold->user_id, 'event.registration_prepayment_expired');
+                            $eventNotices->expired($hold);
                         }
                     } catch (Throwable $e) {
                         Log::error('[Payments] could not let an expired registration hold go', ['event_attendee_id' => $hold->id, 'error' => $e->getMessage()]);
@@ -121,20 +127,5 @@ class CancelExpiredPrepayments extends Command
 
             return true;
         });
-    }
-
-    /** A registration made without an account has no one to tell. */
-    private function tell(?int $userId, string $templateKey): void
-    {
-        if ($userId === null) {
-            return;
-        }
-
-        NotificationLog::create([
-            'user_id' => $userId,
-            'channel' => 'push',
-            'template_key' => $templateKey,
-            'status' => 'sent',
-        ]);
     }
 }

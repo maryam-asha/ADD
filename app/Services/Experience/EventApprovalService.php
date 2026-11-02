@@ -9,7 +9,6 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Services\WalletService;
@@ -34,6 +33,7 @@ class EventApprovalService
 {
     public function __construct(
         private readonly PaymentService $payments,
+        private readonly EventNotifier $notices,
     ) {}
 
     /**
@@ -67,7 +67,7 @@ class EventApprovalService
             $this->chargeIfPaid($event, $locked);
             $this->tellPaymentDue($locked->refresh(), $event);
 
-            $this->notify($locked->user_id, 'event.registration_approved');
+            $this->notices->approved($locked);
         });
     }
 
@@ -92,7 +92,7 @@ class EventApprovalService
                 'approved_at' => now(),
             ])->save();
 
-            $this->notify($locked->user_id, 'event.registration_rejected');
+            $this->notices->rejected($locked);
         });
     }
 
@@ -133,8 +133,9 @@ class EventApprovalService
 
             EventAttendee::query()->whereIn('id', $ids)
                 ->whereNotNull('user_id')
-                ->pluck('user_id')
-                ->each(fn ($userId) => $this->notify($userId, 'event.registration_rejected'));
+                ->with(['user', 'event'])
+                ->get()
+                ->each(fn (EventAttendee $rejected) => $this->notices->rejected($rejected));
 
             return $ids->count();
         });
@@ -268,19 +269,5 @@ class EventApprovalService
                 'event_id' => $attendee->event_id,
             ]);
         });
-    }
-
-    private function notify(?int $userId, string $templateKey): void
-    {
-        if ($userId === null) {
-            return;
-        }
-
-        NotificationLog::create([
-            'user_id' => $userId,
-            'channel' => 'push',
-            'template_key' => $templateKey,
-            'status' => 'sent',
-        ]);
     }
 }

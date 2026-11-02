@@ -16,7 +16,6 @@ use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -24,6 +23,7 @@ use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 /**
@@ -34,6 +34,7 @@ use Tests\TestCase;
  */
 class BookingOutcomesTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     private Space $room;
@@ -143,10 +144,8 @@ class BookingOutcomesTest extends TestCase
 
         $this->closeElapsed();
 
-        $this->assertDatabaseHas(NotificationLog::class, [
-            'user_id' => $booking->user_id,
-            'template_key' => 'booking.lapsed',
-        ]);
+        $this->assertSame(1, $this->notices($booking->user_id, 'booking.lapsed')->count()
+            + $this->notices($booking->user_id, 'booking.lapsed_no_refund')->count());
     }
 
     // ---------------------------------------------------------------

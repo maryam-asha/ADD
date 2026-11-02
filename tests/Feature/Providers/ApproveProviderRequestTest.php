@@ -3,7 +3,6 @@
 namespace Tests\Feature\Providers;
 
 use App\Domain\Identity\Enums\CompanyStatus;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
@@ -16,9 +15,12 @@ use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
 use Laravel\Sanctum\Sanctum;
 use Spatie\Permission\Models\Role;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 
 class ApproveProviderRequestTest extends ProviderTestCase
 {
+    use ReadsNotices;
+
     private Provider $provider;
 
     private User $account;
@@ -59,7 +61,7 @@ class ApproveProviderRequestTest extends ProviderTestCase
         $this->assertSame(ProviderRequestStatus::Approved, $request->status);
         $this->assertSame($membership->id, $request->result_id);
         $this->assertSame($admin->id, $request->reviewed_by);
-        $this->assertTrue(NotificationLog::query()->where('user_id', $this->account->id)->where('template_key', 'provider.request_approved')->exists());
+        $this->assertTrue($this->notices($this->account, 'provider.request_approved')->isNotEmpty());
     }
 
     public function test_an_assignment_whose_company_got_a_subscription_meanwhile_stays_pending(): void
@@ -160,7 +162,7 @@ class ApproveProviderRequestTest extends ProviderTestCase
         $request->refresh();
         $this->assertSame(ProviderRequestStatus::Rejected, $request->status);
         $this->assertSame('No contract yet', $request->rejection_reason);
-        $this->assertTrue(NotificationLog::query()->where('user_id', $this->account->id)->where('template_key', 'provider.request_rejected')->exists());
+        $this->assertTrue($this->notices($this->account, 'provider.request_rejected')->isNotEmpty());
     }
 
     public function test_the_admin_queue_lists_pending_requests_by_default(): void

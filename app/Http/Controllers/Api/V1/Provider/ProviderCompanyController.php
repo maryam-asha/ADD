@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Provider;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\CompanyNotifier;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\MembershipResolver;
@@ -24,7 +25,10 @@ class ProviderCompanyController extends Controller
 {
     use ActsForProvider, LogsSensitiveActions;
 
-    public function __construct(private readonly MembershipResolver $memberships) {}
+    public function __construct(
+        private readonly MembershipResolver $memberships,
+        private readonly CompanyNotifier $notices,
+    ) {}
 
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -53,6 +57,7 @@ class ProviderCompanyController extends Controller
         abort_unless($company->members()->where('users.id', $user->id)->exists(), 404);
 
         $company->members()->detach($user->id);
+        $this->notices->removed($company, $user);
 
         $this->logSensitiveAction('company_member_removed_by_provider', $company, ['user_id' => $user->id]);
 

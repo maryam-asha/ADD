@@ -77,7 +77,7 @@ class PushLanguageTest extends TestCase
         $this->assertCount(2, $logs);
         $this->assertSame('Booking Approved', $logs['en']->payload['title']);
         $this->assertStringContainsString('Room A', $logs['en']->payload['body']);
-        $this->assertSame('تمت الموافقة على الحجز', $logs['ar']->payload['title']);
+        $this->assertSame('تمت الموافقة على حجزك', $logs['ar']->payload['title']);
     }
 
     public function test_device_without_language_uses_account_language(): void

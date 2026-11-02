@@ -11,7 +11,6 @@ use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Pricing\Enums\PricingPurpose;
@@ -69,6 +68,7 @@ class BookingBatchCreationService
         private readonly QuoteRecorder $recorder,
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
+        private readonly PendingBookingNotice $pendingNotice,
     ) {}
 
     /**
@@ -285,7 +285,7 @@ class BookingBatchCreationService
                 $this->recorder->record($row['quote'], $booking, $member, PricingPurpose::Booking);
 
                 if ($status === BookingStatus::Pending) {
-                    $this->notifyOperations();
+                    $this->pendingNotice->send($booking);
                 }
 
                 $created[] = $booking;
@@ -441,17 +441,5 @@ class BookingBatchCreationService
             'reason' => str_contains($messageKey, '.') ? substr($messageKey, strrpos($messageKey, '.') + 1) : $messageKey,
             'message_key' => $messageKey,
         ];
-    }
-
-    private function notifyOperations(): void
-    {
-        User::role(['operations', 'admin'])->get()->each(function (User $recipient) {
-            NotificationLog::create([
-                'user_id' => $recipient->id,
-                'channel' => 'push',
-                'template_key' => 'booking.pending_approval',
-                'status' => 'sent',
-            ]);
-        });
     }
 }

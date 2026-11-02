@@ -5,7 +5,6 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\PlanDiscountService;
 use Illuminate\Support\Facades\DB;
@@ -20,6 +19,7 @@ class BookingApprovalService
     public function __construct(
         private readonly BookingRefunder $refunder,
         private readonly PlanDiscountService $discounts,
+        private readonly BookingNotifier $notifier,
     ) {}
 
     public function approve(Booking $booking, User $operator): void
@@ -33,7 +33,7 @@ class BookingApprovalService
                 'approved_at' => now(),
             ])->save();
 
-            $this->notify($locked->user_id, 'booking.approved');
+            $this->notifier->approved($locked);
         });
     }
 
@@ -53,13 +53,14 @@ class BookingApprovalService
                 'approved_at' => now(),
             ])->save();
 
+            $refunded = $this->refunder->quote($locked)['points'];
             $this->refunder->refund($locked, 'Booking rejection refund');
 
             // The usage this booking consumed is returned once it no
             // longer holds a charge (docs/decisions/plan-discounts-design.md).
             $this->discounts->voidFor($locked);
 
-            $this->notify($locked->user_id, 'booking.rejected');
+            $this->notifier->rejected($locked, $refunded);
         });
     }
 
@@ -89,9 +90,10 @@ class BookingApprovalService
                 'approved_at' => now(),
             ])->save();
 
+            $refunded = $this->refunder->quote($locked)['points'];
             $this->refunder->refund($locked, 'Booking lapsed unreviewed refund');
             $this->discounts->voidFor($locked);
-            $this->notify($locked->user_id, 'booking.lapsed');
+            $this->notifier->lapsed($locked, $refunded);
 
             return true;
         });
@@ -106,15 +108,5 @@ class BookingApprovalService
         }
 
         return $locked;
-    }
-
-    private function notify(int $userId, string $templateKey): void
-    {
-        NotificationLog::create([
-            'user_id' => $userId,
-            'channel' => 'push',
-            'template_key' => $templateKey,
-            'status' => 'sent',
-        ]);
     }
 }

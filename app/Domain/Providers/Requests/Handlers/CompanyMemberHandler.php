@@ -3,6 +3,7 @@
 namespace App\Domain\Providers\Requests\Handlers;
 
 use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\CompanyNotifier;
 use App\Domain\Providers\Models\CompanyInvitation;
 use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Providers\Requests\ProviderRequestHandler;
@@ -15,6 +16,8 @@ use App\Domain\Providers\Requests\ProviderRequestHandler;
  */
 class CompanyMemberHandler implements ProviderRequestHandler
 {
+    public function __construct(private readonly CompanyNotifier $notices) {}
+
     public function handle(ProviderRequest $request, User $reviewer, array $overrides): ?int
     {
         $company = $request->company;
@@ -25,6 +28,7 @@ class CompanyMemberHandler implements ProviderRequestHandler
         if ($user !== null && $user->hasRole('member')) {
             if (! $company->members()->where('users.id', $user->id)->exists()) {
                 $company->members()->attach($user->id, ['door_access_enabled' => $door, 'is_admin' => false]);
+                $this->notices->joined($company, $user);
             }
 
             return $user->id;

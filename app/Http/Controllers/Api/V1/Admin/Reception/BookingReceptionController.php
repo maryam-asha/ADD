@@ -12,6 +12,7 @@ use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingCheckInService;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
+use App\Domain\Booking\Services\BookingNotifier;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
@@ -197,15 +198,18 @@ class BookingReceptionController extends Controller
         return response()->json(['message' => __('api.reception.checked_out')]);
     }
 
-    public function cancel(Booking $booking, BookingCancellationService $cancellations): JsonResponse
+    public function cancel(Booking $booking, BookingCancellationService $cancellations, BookingNotifier $notices): JsonResponse
     {
         try {
-            $cancellations->cancel($booking);
+            $refunded = $cancellations->cancel($booking);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
         $this->logSensitiveAction('booking_cancelled', $booking);
+
+        // The desk cancelled it, not the member: news to them.
+        $notices->cancelled($booking, $refunded);
 
         return response()->json(['message' => __('api.reception.cancelled')]);
     }

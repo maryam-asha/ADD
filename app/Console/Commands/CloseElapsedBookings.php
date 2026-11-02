@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingApprovalService;
+use App\Domain\Booking\Services\BookingNotifier;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -21,7 +22,8 @@ use Throwable;
  * - A confirmed booking nobody checked into is a no-show once it ends. What
  *   was paid stays paid; what was not is no longer owed — a no-show is not a
  *   payable status. One conditional update: it writes nothing but the status,
- *   and a check-in after end_at is refused, so nothing can race it.
+ *   and a check-in after end_at is refused, so nothing can race it. Each
+ *   member is told theirs was missed.
  */
 class CloseElapsedBookings extends Command
 {
@@ -29,7 +31,7 @@ class CloseElapsedBookings extends Command
 
     protected $description = 'Lapse bookings still awaiting approval at their start, and mark ended bookings nobody checked into as no-shows.';
 
-    public function handle(BookingApprovalService $approvals): int
+    public function handle(BookingApprovalService $approvals, BookingNotifier $notices): int
     {
         $lapsed = 0;
 
@@ -50,11 +52,19 @@ class CloseElapsedBookings extends Command
                 }
             });
 
-        $noShows = Booking::query()
+        $missed = fn () => Booking::query()
             ->where('status', BookingStatus::Confirmed)
             ->whereNull('checked_in_at')
-            ->where('end_at', '<=', now())
+            ->where('end_at', '<=', now());
+
+        // Read first, to tell each member theirs was missed.
+        $missedBookings = $missed()->with(['space', 'user'])->get();
+
+        $noShows = $missed()
+            ->whereKey($missedBookings->modelKeys())
             ->update(['status' => BookingStatus::NoShow->value, 'updated_at' => now()]);
+
+        $missedBookings->each(fn (Booking $booking) => $notices->noShow($booking));
 
         if ($lapsed > 0 || $noShows > 0) {
             $this->info("Lapsed {$lapsed} undecided booking(s); marked {$noShows} no-show(s).");

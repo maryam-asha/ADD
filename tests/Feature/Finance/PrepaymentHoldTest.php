@@ -13,7 +13,6 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Finance\Services\SyncPaymentStatus;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -25,6 +24,7 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Http;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 /**
@@ -35,6 +35,7 @@ use Tests\TestCase;
  */
 class PrepaymentHoldTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     private const TERMINAL = '99990001';
@@ -131,12 +132,12 @@ class PrepaymentHoldTest extends TestCase
         User::factory()->create()->assignRole('operations');
         $hold = $this->hold($member, requiresApproval: true);
 
-        $this->assertSame(0, NotificationLog::where('template_key', 'booking.pending_approval')->count());
+        $this->assertSame(0, $this->allNotices('booking.pending_approval')->count());
 
         app(PayableCheckout::class)->pay(PaymentPurpose::Booking, $hold, $member, 'wallet');
 
         $this->assertSame(BookingStatus::Pending, $hold->refresh()->status);
-        $this->assertSame(1, NotificationLog::where('template_key', 'booking.pending_approval')->count());
+        $this->assertSame(1, $this->allNotices('booking.pending_approval')->count());
     }
 
     public function test_choosing_cash_releases_the_hold_unpaid(): void
@@ -200,7 +201,7 @@ class PrepaymentHoldTest extends TestCase
         $this->assertSame(BookingStatus::Cancelled, Booking::findOrFail($stale->id)->status);
         $this->assertSame(BookingStatus::Cancelled, $stale->status);
         $this->assertNotNull(Booking::findOrFail($stale->id)->payment_due_at);
-        $this->assertSame(0, NotificationLog::where('template_key', 'booking.pending_approval')->count());
+        $this->assertSame(0, $this->allNotices('booking.pending_approval')->count());
     }
 
     private function registrationHold(User $member): EventAttendee

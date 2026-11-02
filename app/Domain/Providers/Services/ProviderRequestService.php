@@ -2,7 +2,7 @@
 
 namespace App\Domain\Providers\Services;
 
-use App\Domain\Identity\Models\NotificationLog;
+use App\Domain\Identity\Enums\NotificationAudience;
 use App\Domain\Identity\Models\User;
 use App\Domain\Invoicing\Data\InvoiceTerms;
 use App\Domain\Invoicing\Exceptions\InvoicingException;
@@ -13,6 +13,8 @@ use App\Domain\Providers\Exceptions\ProviderRequestException;
 use App\Domain\Providers\Models\Provider;
 use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Providers\Requests\ProviderRequestHandlers;
+use App\Http\Middleware\SetLocaleFromHeader;
+use App\Services\Notification\NotificationService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
@@ -27,6 +29,7 @@ class ProviderRequestService
     public function __construct(
         private readonly ProviderRequestHandlers $handlers,
         private readonly InvoiceIssuer $invoices,
+        private readonly NotificationService $notifications,
     ) {}
 
     public function submit(Provider $provider, User $submitter, ProviderRequestType $type, ?int $companyId, array $payload): ProviderRequest
@@ -174,21 +177,31 @@ class ProviderRequestService
         }
     }
 
-    /** The provider's accounts and whoever submitted (a company admin, for company_admin). */
+    /**
+     * The provider's accounts, in their portal, and whoever else submitted
+     * it (a company admin, for company_admin) in the app — what the request
+     * was for, and the reason when it was turned down.
+     */
     private function notify(ProviderRequest $request, string $templateKey): void
     {
-        $recipients = $request->provider->users()->pluck('users.id')
-            ->push($request->submitted_by)
-            ->filter()
-            ->unique();
+        // What it was for, per language: its type, and its company when it has one.
+        $subject = [];
+        foreach (SetLocaleFromHeader::SUPPORTED_LOCALES as $locale) {
+            $type = __('notifications.provider.request_types.'.$request->type->value, [], $locale);
+            $subject[$locale] = $request->company === null
+                ? $type
+                : __('notifications.provider.request_subject_with_company', ['type' => $type, 'company' => $request->company->legal_name], $locale);
+        }
 
-        foreach ($recipients as $userId) {
-            NotificationLog::create([
-                'user_id' => $userId,
-                'channel' => 'push',
-                'template_key' => $templateKey,
-                'status' => 'sent',
-            ]);
+        $params = ['subject' => $subject, 'reason' => (string) $request->rejection_reason];
+        $target = ['target_type' => 'provider_request', 'target_id' => (string) $request->id];
+
+        $accounts = $request->provider->users()->where('users.status', 'active')->get();
+        $this->notifications->sendToUsers($accounts, $templateKey, $params, $target, NotificationAudience::Provider);
+
+        $submitter = $request->submitter;
+        if ($submitter !== null && ! $accounts->contains($submitter)) {
+            $this->notifications->sendToUser($submitter, $templateKey, $params, $target);
         }
     }
 

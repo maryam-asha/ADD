@@ -4,16 +4,36 @@ return [
 
     'booking' => [
         'pending_approval' => [
-            'title' => 'Booking Pending Approval',
-            'body' => 'New booking request for :space by :member_name requires approval.',
+            'title' => 'Booking awaiting your approval',
+            'body' => ':member requested :space on :date at :time.',
         ],
         'approved' => [
             'title' => 'Booking Approved',
-            'body' => 'Your booking for :space on :date has been approved.',
+            'body' => 'Your booking for :space on :date at :time is confirmed.',
         ],
         'rejected' => [
-            'title' => 'Booking Rejected',
-            'body' => 'Your booking for :space has been rejected. Reason: :reason',
+            'title' => 'Your booking was not approved',
+            'body' => 'Your booking for :space on :date was declined, and :points points were returned to your wallet.',
+        ],
+        'rejected_no_refund' => [
+            'title' => 'Your booking was not approved',
+            'body' => 'Your booking for :space on :date was declined.',
+        ],
+        'lapsed' => [
+            'title' => 'Your booking was not confirmed',
+            'body' => 'Your booking for :space started before it was approved, and the amount was returned to your wallet.',
+        ],
+        'lapsed_no_refund' => [
+            'title' => 'Your booking was not confirmed',
+            'body' => 'Your booking for :space started before it was approved.',
+        ],
+        'payment_expired' => [
+            'title' => 'Booking cancelled for non-payment',
+            'body' => 'The time to pay for your booking of :space ran out, and the slot is now free for others.',
+        ],
+        'no_show' => [
+            'title' => 'You missed your booking',
+            'body' => 'Your booking for :space on :date ended without a check-in.',
         ],
         'reminder' => [
             'title' => 'Upcoming Booking Reminder',
@@ -24,23 +44,31 @@ return [
             'body' => 'Your booking for :space has been extended until :end_time.',
         ],
         'cancelled' => [
-            'title' => 'Booking Cancelled',
-            'body' => 'Your booking for :space has been cancelled and refunded to your wallet.',
+            'title' => 'Your booking was cancelled',
+            'body' => 'The ADD team cancelled your booking for :space on :date, and :points points were returned to your wallet.',
+        ],
+        'cancelled_no_refund' => [
+            'title' => 'Your booking was cancelled',
+            'body' => 'The ADD team cancelled your booking for :space on :date.',
         ],
         'affected_by_maintenance' => [
-            'title' => 'Booking Affected by Maintenance',
-            'body' => ':space has entered emergency maintenance. Operations will contact you regarding your booking.',
+            'title' => 'Booking affected by maintenance',
+            'body' => ':space entered emergency maintenance, and our team will contact you about your booking.',
         ],
     ],
 
     'access' => [
         'passcode_ready' => [
-            'title' => 'Access Code Ready',
-            'body' => 'Your passcode for :space is :code (or unlock via the app).',
+            'title' => 'Your access code is ready',
+            'body' => 'Your door code for :space is ready from :from to :to. Open the app to see it.',
         ],
-        'revoked_maintenance' => [
-            'title' => 'Access Revoked',
-            'body' => 'Access passcode for :space has been revoked due to maintenance.',
+        'revoked' => [
+            'title' => 'Access code stopped',
+            'body' => 'Your door code for :space was stopped for emergency maintenance.',
+        ],
+        'office_opened' => [
+            'title' => 'Your office is ready',
+            'body' => 'The door of :space is open to you from today.',
         ],
         'grace_expiring' => [
             'title' => 'Access Window Ending Soon',
@@ -103,16 +131,28 @@ return [
 
     'company' => [
         'member_joined' => [
-            'title' => 'Added to Company',
-            'body' => 'You have been added to the team of :company at ADD.',
+            'title' => 'Added to :company',
+            'body' => 'You are now part of the :company team at ADD.',
         ],
-        'door_access_changed' => [
-            'title' => 'Door Access Updated',
-            'body' => 'Your door access for :company office doors has been :status.',
+        'member_removed' => [
+            'title' => 'Removed from :company',
+            'body' => 'You are no longer part of the :company team.',
+        ],
+        'door_access_granted' => [
+            'title' => 'Door access updated',
+            'body' => 'You can now open the :company office doors.',
+        ],
+        'door_access_revoked' => [
+            'title' => 'Door access updated',
+            'body' => 'You can no longer open the :company office doors.',
         ],
         'admin_assigned' => [
-            'title' => 'Admin Role Assigned',
-            'body' => 'You have been granted administrator rights for :company.',
+            'title' => 'You now manage :company',
+            'body' => 'You can now manage :company, its members and its wallet.',
+        ],
+        'admin_removed' => [
+            'title' => 'Admin rights removed',
+            'body' => 'You no longer manage :company.',
         ],
     ],
 
@@ -145,14 +185,17 @@ return [
         ],
     ],
 
-    'ticket' => [
-        'created' => [
-            'title' => 'Service Ticket Received',
-            'body' => 'Ticket #:ticket_id has been created for your request.',
-        ],
+    'service_request' => [
         'status_updated' => [
-            'title' => 'Service Ticket Updated',
-            'body' => 'Your ticket #:ticket_id status is now :status.',
+            'title' => 'Update on your request',
+            'body' => 'Your :service request is now :status.',
+        ],
+        'statuses' => [
+            'pending' => 'pending',
+            'in_progress' => 'in progress',
+            'resolved' => 'resolved',
+            'rejected' => 'rejected',
+            'cancelled' => 'cancelled',
         ],
     ],
 
@@ -184,6 +227,14 @@ return [
             'title' => 'Reserved Package Released',
             'body' => 'The package you chose to pay for at reception was not paid in time and has been released.',
         ],
+        'failed' => [
+            'title' => 'Payment not completed',
+            'body' => 'Your payment for :purpose did not go through, and nothing was charged. You can try again.',
+        ],
+        'reversed' => [
+            'title' => 'Payment reversed',
+            'body' => 'Your payment for :purpose of :points points was reversed. Contact us with any question.',
+        ],
         'purposes' => [
             'wallet_top_up' => 'a wallet top-up',
             'plan_purchase' => 'a package',
@@ -200,16 +251,37 @@ return [
             'title' => 'Payment Due',
             'body' => 'Your seat at :event is confirmed. Pay :points points before the event to be let in.',
         ],
+        'registration_approved' => [
+            'title' => 'Registration accepted',
+            'body' => 'Your seat at :event on :date is confirmed.',
+        ],
+        'registration_rejected' => [
+            'title' => 'Registration not accepted',
+            'body' => 'Sorry, your registration for :event was not accepted.',
+        ],
+        'registration_expired' => [
+            'title' => 'Registration expired',
+            'body' => 'Your registration for :event was not paid in time, and the seat was released.',
+        ],
     ],
 
     'provider' => [
         'request_approved' => [
             'title' => 'Request approved',
-            'body' => 'Your request has been approved.',
+            'body' => 'ADD approved your request: :subject.',
         ],
         'request_rejected' => [
             'title' => 'Request rejected',
-            'body' => 'Your request has been rejected.',
+            'body' => 'ADD rejected your request: :subject. Reason: :reason',
+        ],
+        // What a request was for, as :subject: its type, and its company when it has one.
+        'request_subject_with_company' => ':type for :company',
+        'request_types' => [
+            'company_member' => 'adding an employee',
+            'company_admin' => 'a company admin',
+            'plan_design' => 'a plan design',
+            'plan_assignment' => 'a plan assignment',
+            'wallet_top_up' => 'a wallet top-up',
         ],
     ],
 

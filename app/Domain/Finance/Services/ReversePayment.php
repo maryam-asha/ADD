@@ -7,6 +7,7 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PaymentNotifier;
 use App\Domain\Identity\Models\User;
 use App\Events\Finance\PaymentReversed;
 use Illuminate\Support\Facades\Cache;
@@ -34,7 +35,10 @@ class ReversePayment
 {
     use LogsSensitiveActions;
 
-    public function __construct(private readonly PaymentMethodRegistry $registry) {}
+    public function __construct(
+        private readonly PaymentMethodRegistry $registry,
+        private readonly PaymentNotifier $notifier,
+    ) {}
 
     /**
      * @throws UnknownPaymentMethodException when the payment's method is not a gateway
@@ -84,6 +88,8 @@ class ReversePayment
                 ])->save();
 
                 event(new PaymentReversed($payment));
+
+                $this->notifier->reversed($payment);
             });
 
             $this->logSensitiveAction('payment_reversed', $payment, [

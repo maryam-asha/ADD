@@ -2,7 +2,9 @@
 
 namespace App\Services\Notification;
 
+use App\Domain\Settings\Services\SettingService;
 use App\Http\Middleware\SetLocaleFromHeader;
+use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\Lang;
 
 /**
@@ -69,6 +71,23 @@ final class NotificationText
         }
 
         return $lines;
+    }
+
+    /** A day as members read it: in the business's own timezone. */
+    public static function localDate(CarbonInterface $at): string
+    {
+        return self::local($at)->format('Y-m-d');
+    }
+
+    /** A time of day as members read it: in the business's own timezone. */
+    public static function localTime(CarbonInterface $at): string
+    {
+        return self::local($at)->format('H:i');
+    }
+
+    private static function local(CarbonInterface $at): CarbonInterface
+    {
+        return $at->copy()->setTimezone(app(SettingService::class)->get('app.timezone', 'Asia/Damascus'));
     }
 
     /**

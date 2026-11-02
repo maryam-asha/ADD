@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1\Admin;
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Identity\Services\CompanyNotifier;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\StoreCompanyMemberRequest;
 use App\Http\Requests\Admin\UpdateCompanyMemberAdminRequest;
@@ -23,6 +24,8 @@ use Illuminate\Http\Response;
 class CompanyMemberController extends Controller
 {
     use LogsSensitiveActions;
+
+    public function __construct(private readonly CompanyNotifier $notices) {}
 
     public function index(Company $company): AnonymousResourceCollection
     {
@@ -46,6 +49,8 @@ class CompanyMemberController extends Controller
             'is_admin' => $request->boolean('is_admin'),
         ]);
 
+        $this->notices->joined($company, $membership);
+
         // attach() is a raw insert, not an Eloquent create() — Laravel's
         // usual wasRecentlyCreated-based auto-201 doesn't fire here, so it's
         // set explicitly instead of relying on that implicit detection.
@@ -56,9 +61,13 @@ class CompanyMemberController extends Controller
 
     public function updateDoorAccess(UpdateCompanyMemberRequest $request, Company $company, User $user): JsonResponse
     {
+        $before = $this->notices->flags($company, $user)['door_access_enabled'] ?? null;
+
         $company->members()->updateExistingPivot($user->id, [
             'door_access_enabled' => $request->validated('door_access_enabled'),
         ]);
+
+        $this->notices->doorAccessChanged($company, $user, $before, $request->boolean('door_access_enabled'), $request->user());
 
         $this->logSensitiveAction('company_member_door_access_changed', $company, [
             'user_id' => $user->id,
@@ -79,9 +88,13 @@ class CompanyMemberController extends Controller
      */
     public function updateAdmin(UpdateCompanyMemberAdminRequest $request, Company $company, User $user): JsonResponse
     {
+        $before = $this->notices->flags($company, $user)['is_admin'] ?? null;
+
         $company->members()->updateExistingPivot($user->id, [
             'is_admin' => $request->validated('is_admin'),
         ]);
+
+        $this->notices->adminChanged($company, $user, $before, $request->boolean('is_admin'), $request->user());
 
         $this->logSensitiveAction('company_member_admin_changed', $company, [
             'user_id' => $user->id,
@@ -93,7 +106,9 @@ class CompanyMemberController extends Controller
 
     public function destroy(Company $company, User $user): Response
     {
-        $company->members()->detach($user->id);
+        if ($company->members()->detach($user->id) > 0) {
+            $this->notices->removed($company, $user);
+        }
 
         $this->logSensitiveAction('company_member_removed', $company, ['user_id' => $user->id]);
 

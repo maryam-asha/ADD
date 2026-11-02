@@ -39,7 +39,7 @@ class NotificationRenderingTest extends TestCase
         app(NotificationService::class)->sendToUser($this->member, 'booking.approved', ['space' => 'Room A']);
 
         $this->assertSame('Booking Approved', $this->inbox('en')['title']);
-        $this->assertSame('تمت الموافقة على الحجز', $this->inbox('ar')['title']);
+        $this->assertSame('تمت الموافقة على حجزك', $this->inbox('ar')['title']);
         $this->assertSame('booking.approved', $this->inbox('en')['template_key']);
     }
 

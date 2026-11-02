@@ -8,6 +8,8 @@ use App\Domain\Services\Enums\LocationSource;
 use App\Domain\Services\Enums\RequestStatus;
 use App\Domain\Services\Models\ServiceRequest;
 use App\Domain\Services\Models\ServiceType;
+use App\Services\Notification\NotificationService;
+use App\Services\Notification\NotificationText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -22,6 +24,7 @@ class ServiceRequestService
 {
     public function __construct(
         private readonly FormSubmissionService $forms,
+        private readonly NotificationService $notifications,
     ) {}
 
     /**
@@ -70,6 +73,8 @@ class ServiceRequestService
             ]);
         }
 
+        $before = $serviceRequest->status;
+
         $serviceRequest->update([
             'status' => $newStatus,
             'resolution_note' => $resolutionNote ?? $serviceRequest->resolution_note,
@@ -78,6 +83,16 @@ class ServiceRequestService
             'processed_at' => $newStatus->isTerminal() ? now() : null,
         ]);
 
-        return $serviceRequest->fresh('serviceType', 'user', 'branch', 'space', 'formAnswers.field');
+        $updated = $serviceRequest->fresh('serviceType', 'user', 'branch', 'space', 'formAnswers.field');
+
+        // Moved on: the member hears its new status. A note alone is not news.
+        if ($before !== $newStatus && $updated->user !== null) {
+            $this->notifications->sendToUser($updated->user, 'service_request.status_updated', [
+                'service' => $updated->serviceType?->name ?? '',
+                'status' => NotificationText::translations('notifications.service_request.statuses.'.$newStatus->value),
+            ], ['target_type' => 'service_request', 'target_id' => (string) $updated->id]);
+        }
+
+        return $updated;
     }
 }

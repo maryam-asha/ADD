@@ -12,7 +12,6 @@ use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -21,10 +20,12 @@ use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 class BookingApprovalServiceTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     private BookingApprovalService $approvals;
@@ -60,7 +61,7 @@ class BookingApprovalServiceTest extends TestCase
         $this->assertNotNull($booking->approved_at);
         $this->assertSame(
             1,
-            NotificationLog::where('user_id', $booking->user_id)->where('template_key', 'booking.approved')->count()
+            $this->notices($booking->user_id, 'booking.approved')->count()
         );
     }
 
@@ -93,7 +94,7 @@ class BookingApprovalServiceTest extends TestCase
         $this->assertNotNull($booking->approved_at);
         $this->assertSame(
             1,
-            NotificationLog::where('user_id', $booking->user_id)->where('template_key', 'booking.rejected')->count()
+            $this->notices($booking->user_id, 'booking.rejected_no_refund')->count()
         );
     }
 
@@ -131,6 +132,7 @@ class BookingApprovalServiceTest extends TestCase
 
         $this->assertNotNull($refund);
         $this->assertSame(100, (int) $refund->amount);
+        $this->assertSame(100, $this->assertNoticed($member, 'booking.rejected')->data['params']['points']);
     }
 
     public function test_approving_an_already_decided_booking_fails(): void

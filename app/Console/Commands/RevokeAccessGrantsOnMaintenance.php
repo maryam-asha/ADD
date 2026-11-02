@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Access\Services\AccessNotifier;
 use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
@@ -14,15 +16,16 @@ class RevokeAccessGrantsOnMaintenance extends Command
 
     protected $description = 'Revoke every issued/activated access grant for a lock on any space currently under maintenance.';
 
-    public function handle(PasscodeIssuanceService $issuance): int
+    public function handle(PasscodeIssuanceService $issuance, AccessNotifier $notices): int
     {
         Space::query()
             ->where('status', OperationalStatus::Maintenance)
             ->whereHas('devices', fn ($q) => $q->where('type', 'lock'))
-            ->chunkById(100, function ($spaces) use ($issuance) {
+            ->chunkById(100, function ($spaces) use ($issuance, $notices) {
                 foreach ($spaces as $space) {
                     try {
-                        $issuance->revokeForSpace($space);
+                        // Each member whose booking code just stopped hears why.
+                        $issuance->revokeForSpace($space)->each(fn (AccessGrant $grant) => $notices->revoked($grant));
                     } catch (\Throwable $e) {
                         Log::error('Failed to revoke access grants for a space in maintenance', [
                             'space_id' => $space->id, 'error' => $e->getMessage(),

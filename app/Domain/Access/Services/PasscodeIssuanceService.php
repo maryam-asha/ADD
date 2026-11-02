@@ -19,6 +19,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -140,15 +141,20 @@ class PasscodeIssuanceService
         $this->arrivals->forGrant($activated, SessionStartSource::Reception);
     }
 
-    public function revokeForSpace(Space $space): void
+    /**
+     * @return Collection<int, AccessGrant> the grants this call revoked
+     */
+    public function revokeForSpace(Space $space): Collection
     {
         $lock = $this->lockFor($space);
 
-        AccessGrant::query()
+        return AccessGrant::query()
             ->where('lock_id', $lock->id)
             ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
             ->get()
-            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $lock));
+            ->map(fn (AccessGrant $grant) => $this->revoke($grant, $lock))
+            ->filter()
+            ->values();
     }
 
     /**
@@ -199,7 +205,11 @@ class PasscodeIssuanceService
         return $count;
     }
 
-    private function revoke(AccessGrant $grant, Device $lock): void
+    /**
+     * @return AccessGrant|null the grant, revoked by this call; null when it
+     *                          was no longer live
+     */
+    private function revoke(AccessGrant $grant, Device $lock): ?AccessGrant
     {
         $revoked = DB::transaction(function () use ($grant) {
             $locked = AccessGrant::query()->whereKey($grant->getKey())->lockForUpdate()->firstOrFail();
@@ -214,10 +224,12 @@ class PasscodeIssuanceService
         });
 
         if ($revoked === null) {
-            return;
+            return null;
         }
 
         $this->deleteVendorPasscode($revoked, $lock);
+
+        return $revoked;
     }
 
     private function deleteVendorPasscode(AccessGrant $grant, Device $lock): void

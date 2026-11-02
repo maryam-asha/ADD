@@ -4,16 +4,36 @@ return [
 
     'booking' => [
         'pending_approval' => [
-            'title' => 'حجز جديد بانتظار الموافقة',
-            'body' => 'طلب حجز جديد لـ :space من قِبل :member_name يتطلب الموافقة.',
+            'title' => 'حجز بانتظار موافقتك',
+            'body' => ':member طلب :space يوم :date الساعة :time.',
         ],
         'approved' => [
-            'title' => 'تمت الموافقة على الحجز',
-            'body' => 'تمت الموافقة على حجزك لـ :space بتاريخ :date.',
+            'title' => 'تمت الموافقة على حجزك',
+            'body' => 'حجزك لـ :space يوم :date الساعة :time مؤكد.',
         ],
         'rejected' => [
-            'title' => 'تم رفض الحجز',
-            'body' => 'تم رفض حجزك لـ :space. السبب: :reason',
+            'title' => 'لم تتم الموافقة على حجزك',
+            'body' => 'رُفض حجزك لـ :space يوم :date، وأُعيد :points نقطة إلى محفظتك.',
+        ],
+        'rejected_no_refund' => [
+            'title' => 'لم تتم الموافقة على حجزك',
+            'body' => 'رُفض حجزك لـ :space يوم :date.',
+        ],
+        'lapsed' => [
+            'title' => 'لم يُؤكَّد حجزك',
+            'body' => 'حلّ موعد حجزك لـ :space قبل الموافقة عليه، وأُعيد المبلغ إلى محفظتك.',
+        ],
+        'lapsed_no_refund' => [
+            'title' => 'لم يُؤكَّد حجزك',
+            'body' => 'حلّ موعد حجزك لـ :space قبل الموافقة عليه.',
+        ],
+        'payment_expired' => [
+            'title' => 'أُلغي حجزك لعدم الدفع',
+            'body' => 'انتهت مهلة دفع حجزك لـ :space، وأصبح الموعد متاحاً لغيرك.',
+        ],
+        'no_show' => [
+            'title' => 'فاتك حجزك',
+            'body' => 'انتهى حجزك لـ :space يوم :date دون تسجيل حضور.',
         ],
         'reminder' => [
             'title' => 'تذكير بموعد حجزك',
@@ -24,23 +44,31 @@ return [
             'body' => 'تم تمديد حجزك لـ :space حتى :end_time.',
         ],
         'cancelled' => [
-            'title' => 'تم إلغاء الحجز',
-            'body' => 'تم إلغاء حجزك لـ :space واسترجاع المبلغ إلى محفظتك.',
+            'title' => 'تم إلغاء حجزك',
+            'body' => 'ألغى فريق ADD حجزك لـ :space يوم :date، وأُعيد :points نقطة إلى محفظتك.',
+        ],
+        'cancelled_no_refund' => [
+            'title' => 'تم إلغاء حجزك',
+            'body' => 'ألغى فريق ADD حجزك لـ :space يوم :date.',
         ],
         'affected_by_maintenance' => [
             'title' => 'حجزك متأثر بأعمال صيانة',
-            'body' => 'نعتذر، دخلت المساحة :space أعمال صيانة طارئة وسيتواصل معك فريق العمليات بخصوص حجزك.',
+            'body' => 'دخلت :space صيانة طارئة، وسيتواصل معك فريقنا بخصوص حجزك.',
         ],
     ],
 
     'access' => [
         'passcode_ready' => [
-            'title' => 'رمز الوصول جاهز',
-            'body' => 'رمز فتح قفل :space هو :code (أو يمكنك فتح الباب عبر التطبيق).',
+            'title' => 'رمز دخولك جاهز',
+            'body' => 'رمز باب :space جاهز من :from حتى :to. افتح التطبيق لعرضه.',
         ],
-        'revoked_maintenance' => [
-            'title' => 'تم إبطال رمز الوصول',
-            'body' => 'تم إبطال رمز الدخول لـ :space مؤقتاً لدواعي الصيانة.',
+        'revoked' => [
+            'title' => 'أُوقف رمز الدخول',
+            'body' => 'أُوقف رمز باب :space بسبب صيانة طارئة.',
+        ],
+        'office_opened' => [
+            'title' => 'مكتبك جاهز',
+            'body' => 'أصبح باب :space متاحاً لك من اليوم.',
         ],
         'grace_expiring' => [
             'title' => 'اقتراب نهاية وقت الوصول',
@@ -103,16 +131,28 @@ return [
 
     'company' => [
         'member_joined' => [
-            'title' => 'تمت إضافتك لشركة',
-            'body' => 'تمت إضافتك إلى فريق شركة :company في ADD.',
+            'title' => 'تمت إضافتك إلى :company',
+            'body' => 'أصبحت عضواً في فريق :company في ADD.',
         ],
-        'door_access_changed' => [
-            'title' => 'تحديث صلاحية فتح الأبواب',
-            'body' => 'تم :status صلاحية فتح أبواب مكاتب شركة :company.',
+        'member_removed' => [
+            'title' => 'أُزلت من :company',
+            'body' => 'لم تعد عضواً في فريق :company.',
+        ],
+        'door_access_granted' => [
+            'title' => 'تحديث صلاحية الأبواب',
+            'body' => 'تم منحك صلاحية فتح أبواب مكاتب :company.',
+        ],
+        'door_access_revoked' => [
+            'title' => 'تحديث صلاحية الأبواب',
+            'body' => 'أُلغيت صلاحيتك لفتح أبواب مكاتب :company.',
         ],
         'admin_assigned' => [
-            'title' => 'تعيينك كمدير شركة',
-            'body' => 'تم منحك صلاحيات إدارة شركة :company وأعضائها ومحفظتها.',
+            'title' => 'تعيينك مديراً لـ :company',
+            'body' => 'مُنحت صلاحيات إدارة :company وأعضائها ومحفظتها.',
+        ],
+        'admin_removed' => [
+            'title' => 'إلغاء إدارتك لـ :company',
+            'body' => 'لم تعد مديراً لـ :company.',
         ],
     ],
 
@@ -145,14 +185,17 @@ return [
         ],
     ],
 
-    'ticket' => [
-        'created' => [
-            'title' => 'تم استلام طلب الخدمة',
-            'body' => 'تم إنشاء التذكرة رقم #:ticket_id لمتابعة طلبك.',
-        ],
+    'service_request' => [
         'status_updated' => [
-            'title' => 'تحديث على طلب الخدمة',
-            'body' => 'أصبحت حالة التذكرة رقم #:ticket_id: :status.',
+            'title' => 'تحديث على طلبك',
+            'body' => 'أصبحت حالة طلب :service: :status.',
+        ],
+        'statuses' => [
+            'pending' => 'قيد الانتظار',
+            'in_progress' => 'قيد التنفيذ',
+            'resolved' => 'تم الحل',
+            'rejected' => 'مرفوض',
+            'cancelled' => 'ملغى',
         ],
     ],
 
@@ -184,6 +227,14 @@ return [
             'title' => 'تم إلغاء حجز الباقة',
             'body' => 'لم يتم دفع الباقة التي اخترت دفعها في الاستقبال خلال المهلة، وتم إلغاء حجزها.',
         ],
+        'failed' => [
+            'title' => 'لم تكتمل عملية الدفع',
+            'body' => 'لم تتم عملية الدفع مقابل :purpose، ولم يُخصم شيء. يمكنك المحاولة مجدداً.',
+        ],
+        'reversed' => [
+            'title' => 'تم عكس دفعة',
+            'body' => 'عُكست دفعتك مقابل :purpose بقيمة :points نقطة. تواصل معنا لأي استفسار.',
+        ],
         'purposes' => [
             'wallet_top_up' => 'شحن المحفظة',
             'plan_purchase' => 'باقة',
@@ -200,16 +251,37 @@ return [
             'title' => 'دفعة مستحقة',
             'body' => 'تم تأكيد مقعدك في :event. ادفع :points نقطة قبل الفعالية لتتمكن من الدخول.',
         ],
+        'registration_approved' => [
+            'title' => 'تم قبول تسجيلك',
+            'body' => 'مقعدك في :event يوم :date مؤكد.',
+        ],
+        'registration_rejected' => [
+            'title' => 'لم يُقبل تسجيلك',
+            'body' => 'نعتذر، لم يُقبل تسجيلك في :event.',
+        ],
+        'registration_expired' => [
+            'title' => 'انتهت مهلة تسجيلك',
+            'body' => 'لم يُدفع تسجيلك في :event خلال المهلة وأُلغي المقعد.',
+        ],
     ],
 
     'provider' => [
         'request_approved' => [
-            'title' => 'قُبل الطلب',
-            'body' => 'وُوفق على طلبك.',
+            'title' => 'تمت الموافقة على طلبك',
+            'body' => 'وافقت ADD على طلب :subject.',
         ],
         'request_rejected' => [
-            'title' => 'رُفض الطلب',
-            'body' => 'رُفض طلبك.',
+            'title' => 'رُفض طلبك',
+            'body' => 'رفضت ADD طلب :subject. السبب: :reason',
+        ],
+        // What a request was for, as :subject: its type, and its company when it has one.
+        'request_subject_with_company' => ':type لشركة :company',
+        'request_types' => [
+            'company_member' => 'إضافة موظف',
+            'company_admin' => 'تعيين مدير شركة',
+            'plan_design' => 'تصميم باقة',
+            'plan_assignment' => 'تفعيل باقة',
+            'wallet_top_up' => 'شحن المحفظة',
         ],
     ],
 

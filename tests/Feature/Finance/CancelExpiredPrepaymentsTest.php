@@ -8,7 +8,6 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\PayableCheckout;
-use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -22,6 +21,7 @@ use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 /**
@@ -32,6 +32,7 @@ use Tests\TestCase;
  */
 class CancelExpiredPrepaymentsTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     private const TERMINAL = '99990001';
@@ -117,7 +118,7 @@ class CancelExpiredPrepaymentsTest extends TestCase
         $hold->refresh();
         $this->assertSame(BookingStatus::Cancelled, $hold->status);
         $this->assertTrue($hold->cancelledAwaitingPayment());
-        $this->assertSame(1, NotificationLog::where('user_id', $member->id)->where('template_key', 'booking.prepayment_expired')->count());
+        $this->assertSame(1, $this->notices($member, 'booking.payment_expired')->count());
     }
 
     public function test_a_hold_whose_card_went_through_is_kept(): void
@@ -132,7 +133,7 @@ class CancelExpiredPrepaymentsTest extends TestCase
 
         $this->assertSame(BookingStatus::Confirmed, $hold->refresh()->status);
         $this->assertSame(PaymentState::Paid, $hold->payment_state);
-        $this->assertSame(0, NotificationLog::where('template_key', 'booking.prepayment_expired')->count());
+        $this->assertSame(0, $this->allNotices('booking.payment_expired')->count());
     }
 
     public function test_a_gateway_that_cannot_be_reached_does_not_keep_the_hold_alive(): void
@@ -178,7 +179,7 @@ class CancelExpiredPrepaymentsTest extends TestCase
         $this->assertSame(EventRegistrationStatus::Rejected, $attendee->status);
         $this->assertSame(__('api.event.prepayment_expired'), $attendee->rejection_reason);
         $this->assertFalse($attendee->status->holdsSeat());
-        $this->assertSame(1, NotificationLog::where('user_id', $member->id)->where('template_key', 'event.registration_prepayment_expired')->count());
+        $this->assertSame(1, $this->notices($member, 'event.registration_expired')->count());
     }
 
     public function test_a_live_registration_hold_is_left_alone(): void

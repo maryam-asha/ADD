@@ -56,7 +56,7 @@ class NotificationServiceTest extends TestCase
         $service->sendToUser($user, 'booking.approved', ['space' => 'غرفة أ']);
 
         $notification = $user->notifications()->first();
-        $this->assertEquals('تمت الموافقة على الحجز', $notification->data['title']);
+        $this->assertEquals('تمت الموافقة على حجزك', $notification->data['title']);
     }
 
     public function test_send_to_user_logs_push_notification(): void

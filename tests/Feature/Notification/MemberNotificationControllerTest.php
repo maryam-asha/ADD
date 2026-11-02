@@ -108,7 +108,7 @@ class MemberNotificationControllerTest extends TestCase
         Notification::assertSentTo($member, GeneralNotification::class, function ($notification) use ($member) {
             $data = $notification->toArray($member);
 
-            return $data['title'] === 'تمت الموافقة على الحجز'
+            return $data['title'] === 'تمت الموافقة على حجزك'
                 && str_contains($data['body'], 'غرفة أ');
         });
     }
