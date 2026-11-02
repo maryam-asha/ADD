@@ -47,6 +47,12 @@ class ProviderRequestService
             ->withProperties(['type' => $type->value, 'company_id' => $companyId])
             ->log('provider_request_submitted');
 
+        // Whoever may decide it hears of it.
+        $this->notifications->sendToHolders('provider-requests.approve', 'provider_request.submitted', [
+            'provider' => (string) $provider->name,
+            'subject' => $this->subject($request),
+        ], ['target_type' => 'provider_request', 'target_id' => (string) $request->id]);
+
         return $request;
     }
 
@@ -178,14 +184,15 @@ class ProviderRequestService
     }
 
     /**
-     * The provider's accounts, in their portal, and whoever else submitted
-     * it (a company admin, for company_admin) in the app — what the request
-     * was for, and the reason when it was turned down.
+     * What a request is for, per language: its type, and its company when it
+     * has one.
+     *
+     * @return array<string, string>
      */
-    private function notify(ProviderRequest $request, string $templateKey): void
+    private function subject(ProviderRequest $request): array
     {
-        // What it was for, per language: its type, and its company when it has one.
         $subject = [];
+
         foreach (SetLocaleFromHeader::SUPPORTED_LOCALES as $locale) {
             $type = __('notifications.provider.request_types.'.$request->type->value, [], $locale);
             $subject[$locale] = $request->company === null
@@ -193,7 +200,17 @@ class ProviderRequestService
                 : __('notifications.provider.request_subject_with_company', ['type' => $type, 'company' => $request->company->legal_name], $locale);
         }
 
-        $params = ['subject' => $subject, 'reason' => (string) $request->rejection_reason];
+        return $subject;
+    }
+
+    /**
+     * The provider's accounts, in their portal, and whoever else submitted
+     * it (a company admin, for company_admin) in the app — what the request
+     * was for, and the reason when it was turned down.
+     */
+    private function notify(ProviderRequest $request, string $templateKey): void
+    {
+        $params = ['subject' => $this->subject($request), 'reason' => (string) $request->rejection_reason];
         $target = ['target_type' => 'provider_request', 'target_id' => (string) $request->id];
 
         $accounts = $request->provider->users()->where('users.status', 'active')->get();

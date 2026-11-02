@@ -60,8 +60,34 @@ class ReminderRunner
             'plans_ended' => $this->plansEnded(),
             'leases_ending' => $this->leasesEndingSoon(),
             'invoices_overdue' => $this->invoicesOverdue(),
+            'overdue_digest' => $this->overdueDigest(),
             'sessions_unpaid' => $this->sessionsUnpaid(),
         ];
+    }
+
+    /**
+     * Staff: how many invoices are overdue, once a day from 09:00 local —
+     * not at midnight — and only when there are any.
+     *
+     * @return int the overdue invoices counted, or 0 before nine
+     */
+    private function overdueDigest(): int
+    {
+        $local = now()->setTimezone($this->settings->get('app.timezone', 'Asia/Damascus'));
+
+        if ($local->hour < 9) {
+            return 0;
+        }
+
+        $count = Invoice::query()->overdue()->count();
+
+        if ($count > 0) {
+            $this->notifications->sendToHoldersOnce('invoices.view', 'invoice.overdue_digest:'.$local->toDateString(), 'invoice.overdue_digest', [
+                'count' => $count,
+            ], ['target_type' => 'invoices', 'target_id' => 'overdue']);
+        }
+
+        return $count;
     }
 
     /** Confirmed, starting within the half hour. */

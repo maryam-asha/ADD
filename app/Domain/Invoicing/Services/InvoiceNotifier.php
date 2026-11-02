@@ -8,11 +8,12 @@ use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Models\Provider;
 use App\Services\Notification\NotificationService;
+use App\Support\PlainAmount;
 
 /**
  * Who hears about an invoice: whoever pays it — a company's admins in the
- * app, or a provider's accounts in their portal. Told when it is issued, and
- * once when it is past its due date.
+ * app, or a provider's accounts in their portal. Told when it is issued,
+ * when a payment is recorded on it, and once when it is past its due date.
  */
 class InvoiceNotifier
 {
@@ -23,6 +24,15 @@ class InvoiceNotifier
         $this->tellPayer($invoice, 'invoice.issued', [
             'amount' => (string) $invoice->amount,
             'due' => $invoice->due_at?->toDateString() ?? '',
+        ]);
+    }
+
+    /** $amount: what was recorded, in the invoice's currency. */
+    public function paymentRecorded(Invoice $invoice, string $amount): void
+    {
+        $this->tellPayer($invoice, 'invoice.payment_recorded', [
+            'amount' => PlainAmount::of($amount),
+            'remaining' => PlainAmount::of($invoice->remaining()),
         ]);
     }
 

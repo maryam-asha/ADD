@@ -132,6 +132,21 @@ class NotificationService
     }
 
     /**
+     * sendToHolders(), once per holder and $dedupeKey — a staff reminder
+     * found on every run (the overdue-invoice digest).
+     */
+    public function sendToHoldersOnce(string $permission, string $dedupeKey, string $templateKey, array $placeholders = [], array $extraData = []): void
+    {
+        try {
+            $holders = User::permission($permission)->where('status', 'active')->get();
+        } catch (PermissionDoesNotExist) {
+            return;
+        }
+
+        $this->sendToUsersOnce($holders, $dedupeKey, $templateKey, $placeholders, $extraData, NotificationAudience::Staff);
+    }
+
+    /**
      * Broadcast a notification to every active user.
      */
     public function broadcast(string $templateKey, array $placeholders = [], array $extraData = []): void

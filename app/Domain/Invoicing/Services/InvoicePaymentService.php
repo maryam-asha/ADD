@@ -16,7 +16,10 @@ use Illuminate\Support\Facades\DB;
  */
 class InvoicePaymentService
 {
-    public function __construct(private readonly InvoiceMoney $money) {}
+    public function __construct(
+        private readonly InvoiceMoney $money,
+        private readonly InvoiceNotifier $notices,
+    ) {}
 
     /** @param  array{amount: string, currency: string, method: string, receipt_number?: ?string, paid_at: string}  $data */
     public function record(Invoice $invoice, array $data, User $by): InvoicePayment
@@ -72,6 +75,9 @@ class InvoicePaymentService
             activity()->causedBy($by)->performedOn($locked)
                 ->withProperties(['payment_id' => $payment->id, 'amount' => $amount, 'received' => $data['amount'].' '.$data['currency']])
                 ->log('invoice_payment_recorded');
+
+            // Whoever pays it hears what was recorded and what is left.
+            $this->notices->paymentRecorded($locked, $amount);
 
             return $payment;
         });

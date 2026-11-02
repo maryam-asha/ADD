@@ -42,6 +42,19 @@ class PaymentNotifier
     }
 
     /**
+     * Staff, not the member: a card payment the gateway accepted that does
+     * not match our record, held until someone who may reverse payments
+     * looks at it.
+     */
+    public function needsReview(Payment $payment): void
+    {
+        $this->notifications->sendToHolders('payments.reverse', 'payment.needs_review', [
+            'id' => (string) $payment->reference,
+            'points' => (int) ($payment->points_to_credit ?: $payment->amount_points),
+        ], ['target_type' => 'payment', 'target_id' => (string) $payment->id]);
+    }
+
+    /**
      * @param  array<string, mixed>  $placeholders
      */
     private function send(Payment $payment, string $template, array $placeholders): void

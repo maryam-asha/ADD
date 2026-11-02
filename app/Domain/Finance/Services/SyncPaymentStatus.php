@@ -178,6 +178,8 @@ class SyncPaymentStatus
             'reason' => $reason,
         ]);
 
+        $this->notifier->needsReview($payment);
+
         return $payment;
     }
 

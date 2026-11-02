@@ -33,6 +33,7 @@ class RenewalRunner
         private readonly MembershipActivationService $activations,
         private readonly SettingService $settings,
         private readonly MembershipNotifier $notices,
+        private readonly RenewalNotifier $renewalNotices,
     ) {}
 
     /** @return array{memberships_renewed: int, memberships_stopped: int, leases_extended: int, leases_stopped: int, balances_granted: int} */
@@ -147,6 +148,9 @@ class RenewalRunner
 
         $subject->update(['renewal_stop_reason' => $reason]);
         activity()->performedOn($subject)->withProperties(['reason' => $reason->value])->log('renewal_stopped');
+
+        // Told when the reason changes, like the log: not every hour.
+        $this->renewalNotices->stopped($subject, $reason);
     }
 
     private function advanceDays(): int

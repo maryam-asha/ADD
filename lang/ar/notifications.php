@@ -90,8 +90,8 @@ return [
             'body' => 'تم تأكيد وصولك إلى فرع :branch. نهارك سعيد ومثمر!',
         ],
         'forgotten_session_alert' => [
-            'title' => 'تنبيه جلسة غير مغلقة',
-            'body' => 'جلسة مفتوحة للعضو :member_name تم إغلاق فوترتها تلقائياً عند منتصف الليل.',
+            'title' => 'جلسة أُغلقت تلقائياً',
+            'body' => 'أُغلقت جلسة :member في :space لعدم تسجيل الخروج.',
         ],
         'session_settled' => [
             'title' => 'تم تسوية الجلسة والخروج',
@@ -208,6 +208,10 @@ return [
     ],
 
     'service_request' => [
+        'submitted' => [
+            'title' => 'طلب خدمة جديد',
+            'body' => ':member طلب :service.',
+        ],
         'status_updated' => [
             'title' => 'تحديث على طلبك',
             'body' => 'أصبحت حالة طلب :service: :status.',
@@ -265,6 +269,44 @@ return [
             'title' => 'فاتورة متأخرة',
             'body' => 'تجاوزت الفاتورة :number موعد استحقاقها. المتبقي: :amount :currency.',
         ],
+        'overdue_digest' => [
+            'title' => 'فواتير متأخرة',
+            'body' => ':count فواتير تجاوزت موعد استحقاقها.',
+        ],
+        'payment_recorded' => [
+            'title' => 'تم تسجيل دفعة',
+            'body' => 'سُجّلت :amount :currency على الفاتورة :number. المتبقي :remaining.',
+        ],
+    ],
+
+    'renewal' => [
+        'done' => [
+            'title' => 'تم التجديد',
+            'body' => 'جُدّد :subject لشركة :company حتى :date.',
+        ],
+        'stopped' => [
+            'title' => 'توقف تجديد تلقائي',
+            'body' => 'توقف تجديد :subject لـ :company: :reason',
+        ],
+        // What was renewed, as :subject.
+        'subjects' => [
+            'membership' => 'باقة :plan',
+            'lease' => 'عقد :space',
+        ],
+    ],
+
+    'private_office' => [
+        'requested' => [
+            'title' => 'طلب مكتب خاص جديد',
+            'body' => ':provider طلب مكتباً خاصاً لـ :name.',
+        ],
+    ],
+
+    'exchange_rate' => [
+        'suggested' => [
+            'title' => 'سعر صرف مقترح',
+            'body' => 'سعر جديد لـ :currency: :rate. راجعه واعتمده.',
+        ],
     ],
 
     'lease' => [
@@ -295,6 +337,10 @@ return [
             'title' => 'لم تكتمل عملية الدفع',
             'body' => 'لم تتم عملية الدفع مقابل :purpose، ولم يُخصم شيء. يمكنك المحاولة مجدداً.',
         ],
+        'needs_review' => [
+            'title' => 'دفعة تحتاج مراجعة',
+            'body' => 'دفعة البطاقة رقم :id بقيمة :points نقطة تحتاج مراجعة يدوية.',
+        ],
         'reversed' => [
             'title' => 'تم عكس دفعة',
             'body' => 'عُكست دفعتك مقابل :purpose بقيمة :points نقطة. تواصل معنا لأي استفسار.',
@@ -314,6 +360,10 @@ return [
         'payment_due' => [
             'title' => 'دفعة مستحقة',
             'body' => 'تم تأكيد مقعدك في :event. ادفع :points نقطة قبل الفعالية لتتمكن من الدخول.',
+        ],
+        'registration_pending' => [
+            'title' => 'تسجيل بانتظار الموافقة',
+            'body' => ':member سجّل في :event.',
         ],
         'registration_approved' => [
             'title' => 'تم قبول تسجيلك',
@@ -337,7 +387,18 @@ return [
         ],
     ],
 
+    'provider_request' => [
+        'submitted' => [
+            'title' => 'طلب جديد من :provider',
+            'body' => 'طلب :subject.',
+        ],
+    ],
+
     'provider' => [
+        'employee_joined' => [
+            'title' => 'انضم موظف جديد',
+            'body' => 'انضم :name إلى :company.',
+        ],
         'request_approved' => [
             'title' => 'تمت الموافقة على طلبك',
             'body' => 'وافقت ADD على طلب :subject.',

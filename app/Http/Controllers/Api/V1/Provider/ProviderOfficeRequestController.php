@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\Provider\Concerns\ActsForProvider;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Provider\StoreProviderOfficeRequestRequest;
 use App\Http\Resources\PrivateOfficeRequestResource;
+use App\Services\Notification\NotificationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -35,7 +36,7 @@ class ProviderOfficeRequestController extends Controller
         );
     }
 
-    public function store(StoreProviderOfficeRequestRequest $request): JsonResponse|PrivateOfficeRequestResource
+    public function store(StoreProviderOfficeRequestRequest $request, NotificationService $notifications): JsonResponse|PrivateOfficeRequestResource
     {
         if ($request->filled('company_id')) {
             $company = Company::query()->find($request->integer('company_id'));
@@ -47,11 +48,20 @@ class ProviderOfficeRequestController extends Controller
             }
         }
 
-        return new PrivateOfficeRequestResource(PrivateOfficeRequest::create([
+        $provider = $this->provider($request);
+        $officeRequest = PrivateOfficeRequest::create([
             ...$request->validated(),
             'status' => PrivateOfficeRequestStatus::Requested,
-            'provider_id' => $this->provider($request)->id,
+            'provider_id' => $provider->id,
             'submitted_by' => $request->user()->id,
-        ]));
+        ]);
+
+        // Whoever reviews office requests hears of a new one.
+        $notifications->sendToHolders('private-office-requests.view', 'private_office.requested', [
+            'provider' => (string) $provider->name,
+            'name' => (string) $officeRequest->prospect_name,
+        ], ['target_type' => 'private_office_request', 'target_id' => (string) $officeRequest->id]);
+
+        return new PrivateOfficeRequestResource($officeRequest);
     }
 }

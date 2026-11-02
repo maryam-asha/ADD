@@ -34,6 +34,7 @@ class LeaseRenewalService
         private readonly AvailabilityService $availability,
         private readonly OfficeLeaseService $leases,
         private readonly SettingService $settings,
+        private readonly RenewalNotifier $renewalNotices,
     ) {}
 
     /**
@@ -108,6 +109,8 @@ class LeaseRenewalService
             'ends_on' => $extended->ends_on->toDateString(),
             'automatic' => $actor === null,
         ])->log('lease_renewed');
+
+        $this->renewalNotices->done($extended, $extended->ends_on->toDateString());
 
         $this->leases->closeDoor($extended);
         $this->leases->openDoor($extended->fresh());

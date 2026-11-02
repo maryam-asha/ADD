@@ -21,6 +21,7 @@ use App\Domain\Providers\Models\ProviderRequest;
 use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use App\Domain\Renewals\Exceptions\RenewalRefused;
+use App\Services\Notification\NotificationText;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -42,6 +43,7 @@ class MembershipRenewalService
         private readonly PayerStanding $standing,
         private readonly DedicatedDeskService $desks,
         private readonly MembershipNotifier $notices,
+        private readonly RenewalNotifier $renewalNotices,
     ) {}
 
     /** The plan-assignment request at the root of this subscription's chain, if any. */
@@ -167,6 +169,7 @@ class MembershipRenewalService
             $locked->update(['renewal_stop_reason' => null]);
 
             $this->notices->renewed($renewal->setRelation('plan', $locked->plan));
+            $this->renewalNotices->done($renewal, NotificationText::localDate($renewal->current_period_end));
 
             return $renewal;
         });

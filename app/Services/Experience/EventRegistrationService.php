@@ -253,6 +253,12 @@ class EventRegistrationService
 
             if ($status === EventRegistrationStatus::Pending) {
                 $successMessage = __('api.event.registration_pending');
+
+                // Whoever decides registrations hears of one waiting.
+                app(NotificationService::class)->sendToHolders('events.manage_attendees', 'event.registration_pending', [
+                    'member' => (string) $user->name,
+                    'event' => $lockedEvent->title,
+                ], ['target_type' => 'event', 'target_id' => (string) $lockedEvent->id]);
             } else {
                 $successMessage = $pointsDeducted > 0
                     ? __('api.event.registration_success_points', ['points' => $pointsDeducted])

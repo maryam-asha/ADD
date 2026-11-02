@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Services;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionSource;
 use App\Domain\Finance\Enums\ExchangeRateSuggestionStatus;
 use App\Domain\Finance\Models\ExchangeRateSuggestion;
+use App\Services\Notification\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -16,7 +17,10 @@ use Illuminate\Support\Facades\Log;
  */
 class ExchangeRateSuggestionIngestor
 {
-    public function __construct(private readonly SpTodayRateClient $client) {}
+    public function __construct(
+        private readonly SpTodayRateClient $client,
+        private readonly NotificationService $notifications,
+    ) {}
 
     public function run(): void
     {
@@ -57,13 +61,19 @@ class ExchangeRateSuggestionIngestor
                 ExchangeRateSuggestion::where('status', ExchangeRateSuggestionStatus::Pending)
                     ->update(['status' => ExchangeRateSuggestionStatus::Superseded]);
 
-                ExchangeRateSuggestion::create([
+                $suggestion = ExchangeRateSuggestion::create([
                     'source' => ExchangeRateSuggestionSource::SpToday,
                     'rate_usd_to_syp' => $sell,
                     'raw_payload' => $rates['raw'],
                     'fetched_at' => now(),
                     'status' => ExchangeRateSuggestionStatus::Pending,
                 ]);
+
+                // Whoever may set rates is asked to review it, once saved.
+                $this->notifications->sendToHolders('exchange-rates.create', 'exchange_rate.suggested', [
+                    'currency' => 'USD',
+                    'rate' => (string) $sell,
+                ], ['target_type' => 'exchange_rate_suggestion', 'target_id' => (string) $suggestion->id]);
             });
         } catch (\Throwable $e) {
             // The transaction rolls back atomically on its own — this catch

@@ -101,6 +101,12 @@ class CloseOverdueReceptionSessions extends Command
             return;
         }
 
+        // The desk hears of it too: a member who left without checking out.
+        $this->notifications->sendToHolders('reception.view', 'reception.forgotten_session_alert', [
+            'member' => (string) $closed->user->name,
+            'space' => $closed->space?->name ?? '',
+        ], ['session_type' => $closed->coworkingType(), 'session_id' => (string) $closed->id]);
+
         $owed = $closed->payment_state === PaymentState::Paid ? 0 : (int) $closed->price_points;
 
         $this->notifications->sendToUser(

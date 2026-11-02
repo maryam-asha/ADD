@@ -54,6 +54,12 @@ class ServiceRequestService
                 $this->forms->record($form, $request, $fieldValues, $member);
             }
 
+            // Whoever handles requests hears of a new one, once it is saved.
+            $this->notifications->sendToHolders('service-requests.update', 'service_request.submitted', [
+                'member' => (string) $member->name,
+                'service' => $type->name,
+            ], ['target_type' => 'service_request', 'target_id' => (string) $request->id]);
+
             return $request->load('serviceType', 'formAnswers.field', 'branch', 'space');
         });
     }

@@ -90,8 +90,8 @@ return [
             'body' => 'Your arrival at :branch has been confirmed. Have a productive day!',
         ],
         'forgotten_session_alert' => [
-            'title' => 'Forgotten Session Alert',
-            'body' => 'Unclosed session for :member_name was automatically billed at midnight.',
+            'title' => 'A session was closed automatically',
+            'body' => 'The session of :member at :space was closed because no check-out was recorded.',
         ],
         'session_settled' => [
             'title' => 'Session Checkout Complete',
@@ -208,6 +208,10 @@ return [
     ],
 
     'service_request' => [
+        'submitted' => [
+            'title' => 'New service request',
+            'body' => ':member requested :service.',
+        ],
         'status_updated' => [
             'title' => 'Update on your request',
             'body' => 'Your :service request is now :status.',
@@ -265,6 +269,44 @@ return [
             'title' => 'Overdue invoice',
             'body' => 'Invoice :number is past its due date. Remaining: :amount :currency.',
         ],
+        'overdue_digest' => [
+            'title' => 'Overdue invoices',
+            'body' => ':count invoices are past their due date.',
+        ],
+        'payment_recorded' => [
+            'title' => 'Payment recorded',
+            'body' => ':amount :currency was recorded on invoice :number. Remaining: :remaining.',
+        ],
+    ],
+
+    'renewal' => [
+        'done' => [
+            'title' => 'Renewed',
+            'body' => ':subject for :company was renewed until :date.',
+        ],
+        'stopped' => [
+            'title' => 'Auto-renewal stopped',
+            'body' => 'Renewing :subject for :company stopped: :reason',
+        ],
+        // What was renewed, as :subject.
+        'subjects' => [
+            'membership' => 'the :plan plan',
+            'lease' => 'the lease of :space',
+        ],
+    ],
+
+    'private_office' => [
+        'requested' => [
+            'title' => 'New private office request',
+            'body' => ':provider requested a private office for :name.',
+        ],
+    ],
+
+    'exchange_rate' => [
+        'suggested' => [
+            'title' => 'Suggested exchange rate',
+            'body' => 'A new rate for :currency: :rate. Review and approve it.',
+        ],
     ],
 
     'lease' => [
@@ -295,6 +337,10 @@ return [
             'title' => 'Payment not completed',
             'body' => 'Your payment for :purpose did not go through, and nothing was charged. You can try again.',
         ],
+        'needs_review' => [
+            'title' => 'Payment needs review',
+            'body' => 'Card payment :id of :points points needs a manual review.',
+        ],
         'reversed' => [
             'title' => 'Payment reversed',
             'body' => 'Your payment for :purpose of :points points was reversed. Contact us with any question.',
@@ -314,6 +360,10 @@ return [
         'payment_due' => [
             'title' => 'Payment Due',
             'body' => 'Your seat at :event is confirmed. Pay :points points before the event to be let in.',
+        ],
+        'registration_pending' => [
+            'title' => 'Registration awaiting approval',
+            'body' => ':member registered for :event.',
         ],
         'registration_approved' => [
             'title' => 'Registration accepted',
@@ -337,7 +387,18 @@ return [
         ],
     ],
 
+    'provider_request' => [
+        'submitted' => [
+            'title' => 'New request from :provider',
+            'body' => 'Request: :subject.',
+        ],
+    ],
+
     'provider' => [
+        'employee_joined' => [
+            'title' => 'A new employee joined',
+            'body' => ':name joined :company.',
+        ],
         'request_approved' => [
             'title' => 'Request approved',
             'body' => 'ADD approved your request: :subject.',

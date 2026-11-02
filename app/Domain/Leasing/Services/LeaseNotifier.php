@@ -2,6 +2,7 @@
 
 namespace App\Domain\Leasing\Services;
 
+use App\Domain\Identity\Enums\NotificationAudience;
 use App\Domain\Identity\Models\User;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Services\Notification\NotificationService;
@@ -32,12 +33,26 @@ class LeaseNotifier
         ]);
     }
 
-    /** Reminder, a month ahead, to the admins. Once per lease. */
+    /** Reminder, a month ahead, to the admins — and the provider managing the company, in its portal. Once per lease. */
     public function endingSoon(OfficeLease $lease): void
     {
-        $this->tell($this->members($lease, adminsOnly: true), $lease, 'lease.ending_soon', [
-            'date' => $lease->ends_on->toDateString(),
-        ], "lease.ending_soon:{$lease->id}");
+        $params = ['date' => $lease->ends_on->toDateString()];
+        $dedupeKey = "lease.ending_soon:{$lease->id}";
+
+        $this->tell($this->members($lease, adminsOnly: true), $lease, 'lease.ending_soon', $params, $dedupeKey);
+
+        $accounts = $lease->company?->provider?->users()->where('users.status', 'active')->get();
+
+        if ($accounts !== null && $accounts->isNotEmpty()) {
+            $this->notifications->sendToUsersOnce(
+                $accounts,
+                $dedupeKey,
+                'lease.ending_soon',
+                ['space' => $lease->space?->name ?? ''] + $params,
+                ['target_type' => 'office_lease', 'target_id' => (string) $lease->id],
+                NotificationAudience::Provider,
+            );
+        }
     }
 
     /**
