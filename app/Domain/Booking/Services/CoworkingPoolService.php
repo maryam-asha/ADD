@@ -17,6 +17,8 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanHourUsage;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
@@ -39,6 +41,8 @@ use Illuminate\Support\Facades\DB;
  */
 class CoworkingPoolService
 {
+    public function __construct(private readonly PlanAllowanceService $allowances) {}
+
     public function timeline(Branch $branch, CarbonInterface $from, CarbonInterface $to, ?PoolDemand $candidate = null): PoolTimeline
     {
         return $this->gather($branch, $from, $to, $candidate, baseOnly: false);
@@ -266,14 +270,27 @@ class CoworkingPoolService
         $memberships = $this->heldMemberships($branch, $from, $to);
         $renewing = $assumeRenewals ? $this->renewing($memberships) : [];
         $holds = [];
+        $now = CarbonImmutable::now()->utc();
+        $exhausted = $this->exhaustedByMembership($memberships, $now);
 
         foreach ($memberships as $membership) {
             $stretches = in_array($membership->id, $renewing, true)
                 ? $membership->plan->windowSegments(max($from, CarbonImmutable::instance($membership->current_period_start)->utc()), $to)
                 : $this->heldStretches($membership, $from, $to);
 
+            // Whoever has spent the hours of this cycle gives the seat back
+            // until the cycle renews (product owner, 2026-11-02).
+            $spent = count($exhausted[$membership->id] ?? []);
+            $cycleEnd = $spent > 0 ? $this->allowances->cycleFor($membership, $now)[1] : null;
+
             foreach ($stretches as [$start, $end]) {
-                $holds[] = ['membership' => $membership->id, 'start' => $start, 'end' => $end, 'seats' => $membership->seats];
+                foreach ($this->splitAt($start, $end, $now, $cycleEnd) as [$pieceStart, $pieceEnd, $inSpentCycle]) {
+                    $seats = $inSpentCycle ? max(0, $membership->seats - $spent) : $membership->seats;
+
+                    if ($seats > 0) {
+                        $holds[] = ['membership' => $membership->id, 'start' => $pieceStart, 'end' => $pieceEnd, 'seats' => $seats];
+                    }
+                }
             }
         }
 
@@ -301,7 +318,7 @@ class CoworkingPoolService
             $userIds[] = $candidate->user->id;
         }
 
-        $coveringOf = $this->coveringMemberships($memberships, array_values(array_unique($userIds)));
+        $coveringOf = $this->coveringMemberships($memberships, array_values(array_unique($userIds)), $exhausted);
         $held = $memberships->keyBy('id');
 
         $presences = $bookings->map(fn (Booking $booking) => [
@@ -310,14 +327,13 @@ class CoworkingPoolService
             'membership' => $coveringOf[$booking->user_id] ?? null,
         ])->all();
 
-        $now = CarbonImmutable::now()->utc();
-
         foreach ($walkIns as $walkIn) {
             $presences[] = [
                 'start' => $now,
                 'end' => $now->addSecond(),
-                // The membership stamped at check-in, when it holds seats here.
-                'membership' => $held->has($walkIn->membership_id)
+                // The membership stamped at check-in, when it holds seats here
+                // and its person has hours left this cycle.
+                'membership' => $held->has($walkIn->membership_id) && ! in_array($walkIn->user_id, $exhausted[$walkIn->membership_id] ?? [], true)
                     ? $walkIn->membership_id
                     : ($coveringOf[$walkIn->user_id] ?? null),
             ];
@@ -378,15 +394,21 @@ class CoworkingPoolService
      * first, else their company's — the order MembershipResolver uses, but
      * among the subscriptions held in this branch only.
      *
+     * A person who has spent their limited coworking hours this cycle is
+     * covered by nothing: their seat is given back until it renews.
+     *
      * @param  Collection<int, Membership>  $memberships
      * @param  list<int>  $userIds
+     * @param  array<int, list<int>>|null  $exhausted  membership id => spent user ids (exhaustedByMembership()), worked out when null
      * @return array<int, int> user id => membership id
      */
-    public function coveringMemberships(Collection $memberships, array $userIds): array
+    public function coveringMemberships(Collection $memberships, array $userIds, ?array $exhausted = null): array
     {
         if ($userIds === [] || $memberships->isEmpty()) {
             return [];
         }
+
+        $exhausted ??= $this->exhaustedByMembership($memberships, CarbonImmutable::now()->utc());
 
         $personal = $memberships
             ->where('owner_type', OwnerType::User)
@@ -420,7 +442,81 @@ class CoworkingPoolService
             }
         }
 
-        return $covering;
+        return array_filter(
+            $covering,
+            fn (int $membershipId, int $userId) => ! in_array($userId, $exhausted[$membershipId] ?? [], true),
+            ARRAY_FILTER_USE_BOTH,
+        );
+    }
+
+    /**
+     * The people who have spent all of a flexible plan's limited coworking
+     * hours in the cycle containing $at, per membership. Unlimited and
+     * dedicated plans never appear.
+     *
+     * @param  Collection<int, Membership>  $memberships
+     * @return array<int, list<int>> membership id => user ids
+     */
+    public function exhaustedByMembership(Collection $memberships, CarbonInterface $at): array
+    {
+        $exhausted = [];
+
+        foreach ($memberships as $membership) {
+            $plan = $membership->plan;
+
+            if ($plan?->coworking_seat !== CoworkingSeat::Flexible || $plan->coworking_hours === null) {
+                continue;
+            }
+
+            [$cycleStart, $cycleEnd] = $this->allowances->cycleFor($membership, $at);
+            $limit = (int) round((float) $plan->coworking_hours * 3600);
+
+            $users = PlanHourUsage::query()
+                ->where('membership_id', $membership->id)
+                ->whereNull('plan_space_hour_id')
+                ->where('cycle_start', '>=', $cycleStart)
+                ->where('cycle_start', '<', $cycleEnd)
+                ->groupBy('user_id')
+                ->havingRaw('SUM(seconds) >= ?', [$limit])
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+
+            if ($users !== []) {
+                $exhausted[$membership->id] = $users;
+            }
+        }
+
+        return $exhausted;
+    }
+
+    /**
+     * [$start, $end) cut at $now and $cycleEnd: each piece, and whether it
+     * lies in the spent cycle [$now, $cycleEnd).
+     *
+     * @return list<array{0: CarbonImmutable, 1: CarbonImmutable, 2: bool}>
+     */
+    private function splitAt(CarbonImmutable $start, CarbonImmutable $end, CarbonImmutable $now, ?CarbonImmutable $cycleEnd): array
+    {
+        if ($cycleEnd === null || $end->lessThanOrEqualTo($now) || $start->greaterThanOrEqualTo($cycleEnd)) {
+            return [[$start, $end, false]];
+        }
+
+        $pieces = [];
+        $spentFrom = max($start, $now);
+        $spentTo = min($end, $cycleEnd);
+
+        if ($start->lessThan($spentFrom)) {
+            $pieces[] = [$start, $spentFrom, false];
+        }
+
+        $pieces[] = [$spentFrom, $spentTo, true];
+
+        if ($spentTo->lessThan($end)) {
+            $pieces[] = [$spentTo, $end, false];
+        }
+
+        return $pieces;
     }
 
     /**
