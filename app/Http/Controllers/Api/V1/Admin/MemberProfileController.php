@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -15,8 +16,7 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanHourCoverageService;
-use App\Domain\Membership\Services\ResourceQuotaService;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Services\WalletHistoryService;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Services\Models\ServiceRequest;
@@ -60,8 +60,7 @@ class MemberProfileController extends Controller
         WalletService $wallets,
         OutstandingItems $outstanding,
         MembershipResolver $memberships,
-        PlanHourCoverageService $planHours,
-        ResourceQuotaService $quotas,
+        PlanAllowanceService $allowances,
         CurrencyConversionService $currencies,
     ): JsonResponse {
         $user->loadMissing(['roles', 'companies', 'personalProfile', 'professionalProfile', 'branches', 'deviceTokens', 'privacyPolicyConsents']);
@@ -73,7 +72,8 @@ class MemberProfileController extends Controller
 
         $owed = $outstanding->for($user->id, $currencies->baseCurrencyCode());
         $membership = $memberships->activeFor($user);
-        $grant = $planHours->hourGrantFor($membership);
+        $allowance = $membership === null ? null : $allowances->allowanceFor($membership, SpaceType::CoSpace);
+        $remaining = $allowance === null ? null : $allowances->remainingSeconds($membership, $user, $allowance, now());
 
         $openBooking = Booking::query()->with('space')->where('user_id', $user->id)
             ->whereNotNull('checked_in_at')->whereNull('checked_out_at')->latest('checked_in_at')->first();
@@ -108,7 +108,8 @@ class MemberProfileController extends Controller
                 'id' => $membership->id,
                 'plan' => $membership->plan?->translate('name'),
                 'period_end' => $this->local($membership->current_period_end),
-                'hours_remaining' => $grant === null ? null : $quotas->remainingFor($membership, $grant->resourceType),
+                // Null when the plan gives no coworking hours, or unlimited ones.
+                'hours_remaining' => $remaining === null ? null : round($remaining / 3600, 2),
             ],
             'open_session' => $open === null ? null : [
                 'type' => $open->coworkingType(),

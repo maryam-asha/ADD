@@ -9,8 +9,6 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
-use App\Domain\Membership\Services\PlanHourCoverageService;
-use App\Domain\Membership\Services\ResourceQuotaService;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
@@ -74,22 +72,43 @@ class SessionCoverageEvaluatorTest extends TestCase
         $this->assertSame(CoverageReason::PlanExpired, $this->evaluator->evaluate($member, now())->reason);
     }
 
-    public function test_a_plan_without_a_window_or_without_hours_does_not_cover(): void
+    /** A coworking plan with no window covers all day (product owner, 2026-11-02). */
+    public function test_a_coworking_plan_without_a_window_covers_all_day(): void
     {
-        $noWindow = User::factory()->create();
-        $this->subscribe($noWindow, $this->planWithHours(40, null, null));
-        $noHours = User::factory()->create();
-        $this->subscribe($noHours, Plan::factory()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']));
+        $member = User::factory()->create();
+        $this->subscribe($member, $this->planWithHours(40, null, null));
 
-        $this->assertSame(CoverageReason::PlanWithoutHours, $this->evaluator->evaluate($noWindow, now())->reason);
-        $this->assertSame(CoverageReason::PlanWithoutHours, $this->evaluator->evaluate($noHours, now())->reason);
+        $coverage = $this->evaluator->evaluate($member, now());
+
+        $this->assertTrue($coverage->isCovered());
+        $this->assertSame(40.0, $coverage->hoursRemaining);
+    }
+
+    public function test_an_unlimited_coworking_plan_covers_with_no_hour_figures(): void
+    {
+        $member = User::factory()->create();
+        $this->subscribe($member, Plan::factory()->coworking()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']));
+
+        $coverage = $this->evaluator->evaluate($member, now());
+
+        $this->assertTrue($coverage->isCovered());
+        $this->assertNull($coverage->hoursTotal);
+        $this->assertNull($coverage->hoursRemaining);
+    }
+
+    public function test_a_plan_without_coworking_does_not_cover(): void
+    {
+        $member = User::factory()->create();
+        $this->subscribe($member, Plan::factory()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']));
+
+        $this->assertSame(CoverageReason::PlanWithoutHours, $this->evaluator->evaluate($member, now())->reason);
     }
 
     public function test_used_up_hours_do_not_cover(): void
     {
         $member = User::factory()->create();
         $membership = $this->subscribe($member, $this->planWithHours(1));
-        app(ResourceQuotaService::class)->consume(app(PlanHourCoverageService::class)->hourGrantFor($membership), $membership, 1.0, $member);
+        $this->spendPlanHours($membership, $member, 1.0);
 
         $coverage = $this->evaluator->evaluate($member, now());
 

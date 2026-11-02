@@ -20,7 +20,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
-use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Pricing\Enums\PricingPurpose;
 use App\Domain\Pricing\Services\CouponLedger;
 use App\Domain\Pricing\Services\PriceQuoteService;
@@ -37,7 +37,7 @@ class SessionClosureService
         private readonly BusinessHoursService $businessHours,
         private readonly SettingService $settings,
         private readonly PointConversionService $points,
-        private readonly PlanHourCoverageService $planHours,
+        private readonly PlanAllowanceService $allowances,
         private readonly PriceQuoteService $quotes,
         private readonly QuoteRecorder $recorder,
         private readonly CouponLedger $couponLedger,
@@ -297,7 +297,7 @@ class SessionClosureService
         $block = $this->blockSeconds();
         $sessionLength = (int) (ceil(max(0, (int) $session->checked_in_at->diffInSeconds($checkedOutAt)) / $block) * $block);
 
-        return min($sessionLength, $this->planHours->coverableSeconds($membership, $session->checked_in_at, $checkedOutAt, $block));
+        return min($sessionLength, $this->allowances->coverableSeconds($membership, $session->user, $session->space, $session->checked_in_at, $checkedOutAt, $block));
     }
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
@@ -432,7 +432,15 @@ class SessionClosureService
             return 0;
         }
 
-        return $this->planHours->consume($membership, $session, $coverable);
+        $allowance = $this->allowances->allowanceFor($membership, $session->space->space_type, $session->space_id);
+
+        if ($allowance === null) {
+            return 0;
+        }
+
+        $this->allowances->record($membership, $session->user, $allowance, $session, $coverable, $session->checked_in_at);
+
+        return $coverable;
     }
 
     private function localTimeOfDay(CarbonInterface $instant): string

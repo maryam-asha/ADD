@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
@@ -13,8 +14,12 @@ use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Models\PlanFeature;
 use App\Domain\Membership\Models\PlanResourceGrant;
+use App\Domain\Membership\Models\PlanSpaceHour;
+use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
+use App\Domain\Membership\Support\CoworkingPlanClassifier;
+use App\Domain\Membership\ValueObjects\HourAllowance;
 use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -25,6 +30,7 @@ class PackageBrowseService
         private readonly PointConversionService $points,
         private readonly MembershipResolver $membershipResolver,
         private readonly ResourceQuotaService $resourceQuota,
+        private readonly PlanAllowanceService $allowances,
         private readonly PriceLabelPresenter $prices,
         private readonly OfferResolver $offers,
         private readonly PlanSavingCalculator $savings,
@@ -118,7 +124,7 @@ class PackageBrowseService
             'benefits_title' => __('api.package.benefits_title'),
             'benefits' => $this->defaultBenefits($capabilities),
             'discounts' => $plan ? $this->formatDiscounts($plan) : [],
-            'resources' => $plan ? $this->formatCurrentPlanResources($plan, $membership) : [],
+            'resources' => $plan ? $this->formatCurrentPlanResources($plan, $membership, $user) : [],
             'usage_title' => __('api.package.usage_title'),
             'balance_rollover_notice' => __('api.package.balance_rollover_notice'),
             'balances' => $plan ? $this->formatCurrentPlanUsage($plan, $membership, $user) : [],
@@ -462,9 +468,9 @@ class PackageBrowseService
      *
      * @return array<int, array<string, mixed>>
      */
-    private function formatCurrentPlanResources(Plan $plan, Membership $membership): array
+    private function formatCurrentPlanResources(Plan $plan, Membership $membership, User $user): array
     {
-        return $plan->resourceGrants->map(fn (PlanResourceGrant $g) => [
+        $grants = $plan->resourceGrants->map(fn (PlanResourceGrant $g) => [
             'id' => $g->id,
             'resource_type_id' => $g->resource_type_id,
             'slug' => $g->resourceType?->slug,
@@ -474,6 +480,40 @@ class PackageBrowseService
             'granted' => (float) $g->quantity,
             'remaining' => $g->resourceType ? $this->resourceQuota->remainingFor($membership, $g->resourceType) : null,
             'title' => $g->translate('description'),
-        ])->values()->all();
+        ]);
+
+        return $grants->concat($this->formatPlanHours($plan, $membership, $user))->values()->all();
+    }
+
+    /**
+     * The plan's hours — its coworking hours and each free-hours benefit —
+     * in the same shape the space-hours grant had before plans carried them
+     * (slug `space-hours`), so the app keeps showing them; now what is left
+     * is this person's, this cycle. `granted`/`remaining` are null when
+     * unlimited.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function formatPlanHours(Plan $plan, Membership $membership, User $user): array
+    {
+        $type = ResourceType::query()->where('slug', CoworkingPlanClassifier::LEGACY_HOURS_SLUG)->first();
+        $line = fn (?HourAllowance $allowance, ?array $title) => $allowance === null ? null : [
+            'id' => $allowance->row?->id,
+            'resource_type_id' => $type?->id,
+            'slug' => CoworkingPlanClassifier::LEGACY_HOURS_SLUG,
+            'name' => $type?->translate('name'),
+            'unit_label' => $type?->translate('unit_label'),
+            'icon' => $type?->icon,
+            'granted' => $allowance->hours,
+            'remaining' => ($left = $this->allowances->remainingSeconds($membership, $user, $allowance, now())) === null ? null : round($left / 3600, 2),
+            'title' => $title,
+        ];
+
+        $coworking = $plan->includesCoworking() ? $this->allowances->allowanceFor($membership, SpaceType::CoSpace) : null;
+
+        return array_values(array_filter([
+            $line($coworking, null),
+            ...$plan->spaceHours->map(fn (PlanSpaceHour $row) => $line(new HourAllowance($row, (float) $row->hours, false), $row->description))->all(),
+        ]));
     }
 }

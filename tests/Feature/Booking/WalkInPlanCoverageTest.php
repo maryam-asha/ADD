@@ -14,9 +14,8 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\ResourceConsumption;
-use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Services\PlanHourCoverageService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
@@ -47,7 +46,8 @@ class WalkInPlanCoverageTest extends TestCase
      */
     private function openSpace(int $hourlyRatePoints = 100): Space
     {
-        $space = Space::factory()->room()->create(['hourly_rate_points' => $hourlyRatePoints]);
+        // A coworking space: a plan's coworking hours cover coworking only.
+        $space = Space::factory()->create(['hourly_rate_points' => $hourlyRatePoints]);
 
         foreach (DayOfWeek::cases() as $day) {
             BusinessHour::factory()->create([
@@ -63,15 +63,7 @@ class WalkInPlanCoverageTest extends TestCase
 
     private function eveningPlanWithHours(float $grantedHours): Plan
     {
-        $plan = Plan::factory()->evening()->create();
-
-        $plan->resourceGrants()->create([
-            'resource_type_id' => ResourceType::where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->value('id'),
-            'quantity' => $grantedHours,
-            'order' => 0,
-        ]);
-
-        return $plan;
+        return Plan::factory()->evening()->coworking($grantedHours)->create();
     }
 
     private function memberOn(Plan $plan): User
@@ -159,7 +151,7 @@ class WalkInPlanCoverageTest extends TestCase
         $session->refresh();
         $this->assertSame(3600, $session->plan_covered_seconds);
         $this->assertSame('0', (string) $session->amount_owed);
-        $this->assertSame('1.00', (string) ResourceConsumption::where('membership_id', $session->membership_id)->value('quantity'));
+        $this->assertSame(3600, (int) PlanHourUsage::where('membership_id', $session->membership_id)->sum('seconds'));
     }
 
     /**
@@ -237,7 +229,7 @@ class WalkInPlanCoverageTest extends TestCase
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
 
         $membershipId = Membership::where('owner_id', $member->id)->value('id');
-        $this->assertSame('2.00', (string) ResourceConsumption::where('membership_id', $membershipId)->value('quantity'));
+        $this->assertSame(7200, (int) PlanHourUsage::where('membership_id', $membershipId)->sum('seconds'));
     }
 
     public function test_a_second_session_sees_the_quota_the_first_one_consumed(): void
@@ -275,16 +267,24 @@ class WalkInPlanCoverageTest extends TestCase
         $this->assertNull($session->payment_source);
     }
 
-    public function test_a_plan_without_an_access_window_covers_nothing(): void
+    /** A coworking plan with no window covers all day (product owner, 2026-11-02). */
+    public function test_a_coworking_plan_without_an_access_window_covers_all_day(): void
     {
         $space = $this->openSpace(100);
-        $plan = Plan::factory()->create(); // no window
-        $plan->resourceGrants()->create([
-            'resource_type_id' => ResourceType::where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->value('id'),
-            'quantity' => 40,
-            'order' => 0,
-        ]);
-        $member = $this->memberOn($plan);
+        $member = $this->memberOn(Plan::factory()->coworking(40)->create());
+        $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
+
+        $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
+
+        $session->refresh();
+        $this->assertSame('0', (string) $session->amount_owed);
+        $this->assertSame(7200, $session->plan_covered_seconds);
+    }
+
+    public function test_a_plan_without_coworking_covers_nothing(): void
+    {
+        $space = $this->openSpace(100);
+        $member = $this->memberOn(Plan::factory()->create());
         $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
 
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));

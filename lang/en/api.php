@@ -235,6 +235,7 @@ return [
         'already_cancelled' => 'This booking has already been cancelled.',
         'already_paid' => 'This booking or session has already been paid.',
         'outside_business_hours' => 'This action is not available outside business hours.',
+        'plan_hours_overdrawn' => 'The plan has no hours left for this.',
         'no_capacity' => 'This space has no available capacity right now.',
         'outside_plan_window' => "This session is outside your plan's hours and will be charged at the standard rate.",
         'plan_hours_exhausted' => 'Your plan hours are used up, so the remaining time is charged at the standard rate.',

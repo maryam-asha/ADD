@@ -10,8 +10,6 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
-use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Services\PlanHourCoverageService;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -52,7 +50,7 @@ class WalkInPlanNoticeTest extends TestCase
 
     private function openSpace(): Space
     {
-        $space = Space::factory()->room()->create(['capacity' => 5, 'hourly_rate_points' => 100]);
+        $space = Space::factory()->create(['capacity' => 5, 'hourly_rate_points' => 100]);
 
         foreach (DayOfWeek::cases() as $day) {
             BusinessHour::factory()->create([
@@ -68,12 +66,7 @@ class WalkInPlanNoticeTest extends TestCase
 
     private function memberOnEveningPlan(float $grantedHours = 40): User
     {
-        $plan = Plan::factory()->evening()->create();
-        $plan->resourceGrants()->create([
-            'resource_type_id' => ResourceType::where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->value('id'),
-            'quantity' => $grantedHours,
-            'order' => 0,
-        ]);
+        $plan = Plan::factory()->evening()->coworking($grantedHours)->create();
 
         $member = User::factory()->create();
 

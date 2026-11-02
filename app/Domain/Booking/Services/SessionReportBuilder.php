@@ -5,8 +5,8 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Membership\Models\ResourceConsumption;
-use App\Domain\Membership\Services\PlanHourCoverageService;
-use App\Domain\Membership\Services\ResourceQuotaService;
+use App\Domain\Membership\Services\PlanAllowanceService;
+use App\Domain\Membership\Support\CoworkingPlanClassifier;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
 
@@ -20,8 +20,7 @@ class SessionReportBuilder
 {
     public function __construct(
         private readonly AmountCalculator $amounts,
-        private readonly PlanHourCoverageService $planHours,
-        private readonly ResourceQuotaService $quotas,
+        private readonly PlanAllowanceService $allowances,
     ) {}
 
     /**
@@ -121,7 +120,7 @@ class SessionReportBuilder
     private function consumptionLines(Booking|WalkinSession $session): array
     {
         return $session->resourceConsumptions
-            ->reject(fn (ResourceConsumption $c) => $c->grant?->resourceType?->slug === PlanHourCoverageService::RESOURCE_TYPE_SLUG)
+            ->reject(fn (ResourceConsumption $c) => $c->grant?->resourceType?->slug === CoworkingPlanClassifier::LEGACY_HOURS_SLUG)
             ->map(fn (ResourceConsumption $c) => [
                 'kind' => 'resource_consumption',
                 'label' => $c->grant?->resourceType?->translate('name'),
@@ -145,16 +144,19 @@ class SessionReportBuilder
             return null;
         }
 
-        $grant = $this->planHours->hourGrantFor($session->membership);
+        $allowance = $this->allowances->allowanceFor($session->membership, $session->space->space_type, $session->space_id);
 
-        if ($grant === null) {
+        if ($allowance === null) {
             return null;
         }
+
+        $remaining = $this->allowances->remainingSeconds($session->membership, $session->user, $allowance, $session->checked_in_at);
 
         return [
             'name' => $session->membership->plan->translate('name'),
             'hours_used' => round($session->plan_covered_seconds / 3600, 2),
-            'hours_remaining' => $this->quotas->remainingFor($session->membership, $grant->resourceType),
+            // Null for an unlimited plan.
+            'hours_remaining' => $remaining === null ? null : round($remaining / 3600, 2),
         ];
     }
 }

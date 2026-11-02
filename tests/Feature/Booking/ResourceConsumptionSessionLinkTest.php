@@ -10,9 +10,9 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\ResourceConsumption;
 use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Services\PlanHourCoverageService;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -126,8 +126,8 @@ class ResourceConsumptionSessionLinkTest extends TestCase
 
         app(SessionClosureService::class)->closeOut($session, Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc());
 
-        $hours = ResourceConsumption::where('membership_id', $membership->id)->sole();
-        $this->assertTrue($hours->sessionable->is($session));
-        $this->assertSame(PlanHourCoverageService::RESOURCE_TYPE_SLUG, $hours->grant->resourceType->slug);
+        $hours = PlanHourUsage::where('membership_id', $membership->id)->sole();
+        $this->assertTrue($hours->usable->is($session));
+        $this->assertNull($hours->plan_space_hour_id);
     }
 }

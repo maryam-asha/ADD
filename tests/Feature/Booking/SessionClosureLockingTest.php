@@ -7,7 +7,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\SessionClosureService;
-use App\Domain\Membership\Models\ResourceConsumption;
+use App\Domain\Membership\Models\PlanHourUsage;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -58,7 +58,7 @@ class SessionClosureLockingTest extends TestCase
         $closures->closeOut(WalkinSession::find($session->id), now());
 
         $closed = $session->fresh();
-        $this->assertSame(1, ResourceConsumption::count()); // the plan absorbed the hour once
+        $this->assertSame(1, PlanHourUsage::count()); // the plan absorbed the hour once
 
         try {
             $closures->closeOut($stale, now()->subMinutes(30));
@@ -68,7 +68,7 @@ class SessionClosureLockingTest extends TestCase
             $this->assertSame(409, $e->status);
         }
 
-        $this->assertSame(1, ResourceConsumption::count());
+        $this->assertSame(1, PlanHourUsage::count());
         $session->refresh();
         $this->assertTrue($closed->checked_out_at->equalTo($session->checked_out_at));
         $this->assertSame((string) $closed->amount_owed, (string) $session->amount_owed);

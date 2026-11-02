@@ -12,8 +12,6 @@ use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Services\PlanHourCoverageService;
-use App\Domain\Membership\Services\ResourceQuotaService;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -243,7 +241,7 @@ class CoworkingSessionStartTest extends TestCase
     {
         $member = $this->actingAsMember();
         $membership = $this->subscribe($member, $this->planWithHours(1));
-        app(ResourceQuotaService::class)->consume(app(PlanHourCoverageService::class)->hourGrantFor($membership), $membership, 1.0, $member);
+        $this->spendPlanHours($membership, $member, 1.0);
 
         $this->scan()
             ->assertStatus(422)

@@ -5,8 +5,10 @@ namespace Tests\Support;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Foundation\Enums\DayOfWeek;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -14,8 +16,7 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
-use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Support\Security\Totp;
 use Carbon\CarbonInterface;
 use Illuminate\Testing\TestResponse;
@@ -79,21 +80,28 @@ trait InteractsWithCoworking
         return Kiosk::QR_PREFIX.':'.$kiosk->id.':'.app(Totp::class)->codeAt($secret, now()->getTimestamp() + $offsetSeconds);
     }
 
-    /** A plan with a coworking-hours grant. Needs ResourceTypeSeeder (space-hours). */
+    /** A flexible coworking plan with this many hours, inside the window. */
     protected function planWithHours(float $hours, ?string $windowStart = '08:00', ?string $windowEnd = '20:00'): Plan
     {
-        $plan = Plan::factory()->create([
+        return Plan::factory()->coworking($hours)->create([
             'access_window_start' => $windowStart,
             'access_window_end' => $windowEnd,
         ]);
+    }
 
-        $plan->resourceGrants()->create([
-            'resource_type_id' => ResourceType::where('slug', PlanHourCoverageService::RESOURCE_TYPE_SLUG)->value('id'),
-            'quantity' => $hours,
-            'order' => 0,
-        ]);
+    /** Spends $hours of $member's coworking hours on $membership, as a past walk-in would have. */
+    protected function spendPlanHours(Membership $membership, User $member, float $hours): void
+    {
+        $allowances = app(PlanAllowanceService::class);
 
-        return $plan;
+        $allowances->record(
+            $membership,
+            $member,
+            $allowances->allowanceFor($membership, SpaceType::CoSpace),
+            WalkinSession::factory()->create(['user_id' => $member->id, 'membership_id' => $membership->id]),
+            (int) round($hours * 3600),
+            now(),
+        );
     }
 
     protected function subscribe(User $member, Plan $plan, ?CarbonInterface $periodEnd = null): Membership

@@ -24,7 +24,8 @@ final class SessionCoverage
         public readonly ?CarbonImmutable $coveredUntil,
     ) {}
 
-    public static function covered(Plan $plan, float $hoursTotal, float $hoursRemaining, CarbonImmutable $coveredUntil): self
+    /** $hoursTotal and $hoursRemaining are null for an unlimited plan. */
+    public static function covered(Plan $plan, ?float $hoursTotal, ?float $hoursRemaining, CarbonImmutable $coveredUntil): self
     {
         return new self(CoverageStatus::Covered, null, $plan, $hoursTotal, $hoursRemaining, $coveredUntil);
     }

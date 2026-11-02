@@ -2,6 +2,7 @@
 
 namespace App\Domain\Membership\Services;
 
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\CoverageReason;
 use App\Domain\Membership\ValueObjects\SessionCoverage;
@@ -12,14 +13,13 @@ use Carbon\CarbonInterface;
  * Answers, before a coworking session starts, whether the member's plan
  * will cover it and why not (docs/decisions/coworking-self-service-sessions.md).
  * Read-only: it spends nothing. What is actually absorbed is still decided
- * at checkout by PlanHourCoverageService, exactly as before.
+ * at checkout by PlanAllowanceService.
  */
 class SessionCoverageEvaluator
 {
     public function __construct(
         private readonly MembershipResolver $memberships,
-        private readonly PlanHourCoverageService $planHours,
-        private readonly ResourceQuotaService $quotas,
+        private readonly PlanAllowanceService $allowances,
     ) {}
 
     public function evaluate(User $member, CarbonInterface $at): SessionCoverage
@@ -33,32 +33,42 @@ class SessionCoverageEvaluator
         }
 
         $plan = $membership->plan;
-        $grant = $this->planHours->hourGrantFor($membership);
+        $allowance = $this->allowances->allowanceFor($membership, SpaceType::CoSpace);
 
-        if ($grant === null) {
+        // The plan gives nothing on coworking: neither a seat nor hours.
+        if ($allowance === null) {
             return SessionCoverage::notCovered(CoverageReason::PlanWithoutHours, $plan);
         }
 
-        $total = (float) $grant->quantity;
-        $remaining = (float) ($this->quotas->remainingFor($membership, $grant->resourceType) ?? 0);
+        $at = CarbonImmutable::instance($at)->utc();
+        $remaining = $this->allowances->remainingSeconds($membership, $member, $allowance, $at);
 
-        if ($remaining <= 0) {
-            return SessionCoverage::notCovered(CoverageReason::HoursExhausted, $plan, $total, 0.0);
+        if ($remaining !== null && $remaining <= 0) {
+            return SessionCoverage::notCovered(CoverageReason::HoursExhausted, $plan, $allowance->hours, 0.0);
         }
 
-        $windowEnd = $plan->currentWindowEndsAt($at);
+        [, $cycleEnd] = $this->allowances->cycleFor($membership, $at);
+        $until = min($cycleEnd, CarbonImmutable::instance($membership->current_period_end)->utc());
 
-        if ($windowEnd === null) {
-            return SessionCoverage::notCovered(CoverageReason::OutsideWindow, $plan, $total, $remaining);
+        if ($allowance->windowed && $plan->hasAccessWindow()) {
+            $windowEnd = $plan->currentWindowEndsAt($at);
+
+            if ($windowEnd === null) {
+                return SessionCoverage::notCovered(CoverageReason::OutsideWindow, $plan, $allowance->hours, $this->hours($remaining));
+            }
+
+            $until = min($until, $windowEnd);
         }
 
-        $hoursRunOut = CarbonImmutable::instance($at)->utc()->addSeconds((int) floor($remaining * 3600));
+        if ($remaining !== null) {
+            $until = min($until, $at->addSeconds($remaining));
+        }
 
-        return SessionCoverage::covered(
-            $plan,
-            $total,
-            $remaining,
-            $windowEnd->lessThan($hoursRunOut) ? $windowEnd : $hoursRunOut,
-        );
+        return SessionCoverage::covered($plan, $allowance->hours, $this->hours($remaining), $until);
+    }
+
+    private function hours(?int $seconds): ?float
+    {
+        return $seconds === null ? null : round($seconds / 3600, 2);
     }
 }

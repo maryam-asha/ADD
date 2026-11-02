@@ -17,7 +17,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Services\MembershipResolver;
-use App\Domain\Membership\Services\PlanHourCoverageService;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Services\SessionCoverageEvaluator;
 use App\Domain\Membership\ValueObjects\SessionCoverage;
 use Illuminate\Support\Facades\DB;
@@ -27,7 +27,7 @@ class WalkInCapacityService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly MembershipResolver $memberships,
-        private readonly PlanHourCoverageService $planHours,
+        private readonly PlanAllowanceService $allowances,
         private readonly AvailabilityService $availability,
         private readonly SessionCoverageEvaluator $coverage,
         private readonly OpenCoworkingSessionLocator $openSessions,
@@ -84,12 +84,15 @@ class WalkInCapacityService
             // since nothing about their session changed.
             $plan = $membership?->plan;
 
-            if ($plan === null || ! $plan->hasAccessWindow()) {
+            if ($plan === null || ! $plan->hasAccessWindow()
+                || ! $this->allowances->allowanceFor($membership, $locked->space_type, $locked->id)?->windowed) {
                 return new WalkInStartResult($session, false);
             }
 
-            $applies = $this->planHours->coverableSeconds(
+            $applies = $this->allowances->coverableSeconds(
                 $membership,
+                $member,
+                $locked,
                 $session->checked_in_at,
                 $session->checked_in_at->copy()->addMinute(),
             ) > 0;
