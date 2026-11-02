@@ -5,6 +5,7 @@ namespace App\Domain\Booking\Services;
 use App\Domain\Booking\Models\Booking;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\NotificationText;
+use Carbon\CarbonInterface;
 
 /**
  * What a member — or the staff who decide it — is told about a booking:
@@ -48,6 +49,12 @@ class BookingNotifier
     public function noShow(Booking $booking): void
     {
         $this->tellMember($booking, 'booking.no_show');
+    }
+
+    /** Unpaid, and its member had not come by $releasedAt: the seat was let go. */
+    public function releasedNoShow(Booking $booking, CarbonInterface $releasedAt): void
+    {
+        $this->tellMember($booking, 'booking.released_no_show', ['deadline' => NotificationText::localTime($releasedAt)]);
     }
 
     public function affectedByMaintenance(Booking $booking): void

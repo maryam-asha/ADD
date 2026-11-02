@@ -35,6 +35,10 @@ return [
             'title' => 'You missed your booking',
             'body' => 'Your booking for :space on :date ended without a check-in.',
         ],
+        'released_no_show' => [
+            'title' => 'Your booking was released',
+            'body' => 'You had not arrived by :deadline, so your unpaid booking for :space on :date was cancelled and the seat released.',
+        ],
         'reminder' => [
             'title' => 'Your booking starts soon',
             'body' => 'Your booking at :space starts at :time. Scan the kiosk code when you arrive.',

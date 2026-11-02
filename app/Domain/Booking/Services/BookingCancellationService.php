@@ -3,8 +3,11 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
@@ -16,6 +19,7 @@ class BookingCancellationService
         private readonly SettingService $settings,
         private readonly PlanDiscountService $discounts,
         private readonly BookingRefunder $refunder,
+        private readonly CoworkingBookingPolicy $policy,
     ) {}
 
     /**
@@ -125,6 +129,38 @@ class BookingCancellationService
             $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
             if ($locked->status !== BookingStatus::AwaitingPayment) {
+                return false;
+            }
+
+            $this->markCancelled($locked);
+
+            return true;
+        });
+    }
+
+    /**
+     * An unpaid coworking booking its member has not come to, let go by the
+     * system once its share of time has passed (CoworkingBookingPolicy) so
+     * the seat is free for someone else. Nothing was paid, so no
+     * cancellation window applies. Re-checked under the row lock: one paid,
+     * checked in, or waited for by the member's own early walk-in since the
+     * caller read it stays.
+     *
+     * @return bool whether it was cancelled
+     */
+    public function releaseUnpaidNoShow(Booking $booking): bool
+    {
+        return DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->status !== BookingStatus::Confirmed
+                || $locked->payment_state !== PaymentState::Unpaid
+                || $locked->checked_in_at !== null
+                || $locked->space->space_type !== SpaceType::CoSpace
+                || ! $locked->end_at->isFuture()
+                || $this->policy->releaseAt($locked)->isFuture()
+                || $locked->pointsPaid() > 0
+                || WalkinSession::query()->open()->where('handover_booking_id', $locked->id)->exists()) {
                 return false;
             }
 

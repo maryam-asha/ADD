@@ -58,6 +58,13 @@ Schedule::command('kiosk:expire-stale-arrival-requests')->everyFiveMinutes()->wi
 Schedule::command('coworking:hand-over-early-sessions')->everyMinute()->withoutOverlapping();
 
 /*
+ * An unpaid coworking booking whose member has not come within the release
+ * share of its time (coworking.no_show_release_percent) is cancelled so the
+ * seat is free again, and the member is told. Paid bookings keep theirs.
+ */
+Schedule::command('bookings:release-unpaid-no-shows')->everyMinute()->withoutOverlapping();
+
+/*
  * External exchange-rate suggestion (docs/decisions/exchange-rate-external-suggestion.md)
  * — sp-today's nationwide USD/SYP quote, fetched once a day as a candidate
  * for an admin to review and accept; never written to exchange_rates
