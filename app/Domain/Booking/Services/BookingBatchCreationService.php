@@ -3,9 +3,11 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\BatchUnavailableException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\BookingCoverage;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Services\PointConversionService;
@@ -69,6 +71,7 @@ class BookingBatchCreationService
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
         private readonly PendingBookingNotice $pendingNotice,
+        private readonly BookingPlanCoverage $coverage,
     ) {}
 
     /**
@@ -139,8 +142,10 @@ class BookingBatchCreationService
             $failures = [];
             /** @var array<int, Collection<int, Booking>> $blocking */
             $blocking = [];
-            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, quote: PriceQuote}> $accepted */
+            /** @var list<array{index: int, space: Space, start: CarbonImmutable, end: CarbonImmutable, quote: PriceQuote, coverage: BookingCoverage}> $accepted */
             $accepted = [];
+            /** @var array<string, int> $reserved plan hours earmarked by earlier dates, by allowance and cycle */
+            $reserved = [];
 
             foreach ($normalized as $window) {
                 $space = $locked[$window['space_id']];
@@ -207,13 +212,31 @@ class BookingBatchCreationService
                     continue;
                 }
 
+                // The member's plan, as for one booking — counting the hours
+                // earlier dates of this batch have already earmarked.
+                $coverage = $this->coverage->for($member, $space, $window['start'], $window['end']);
+
+                if (($reserved[$coverage->allowanceKey ?? ''] ?? 0) > 0) {
+                    $coverage = $this->coverage->for($member, $space, $window['start'], $window['end'], $reserved[$coverage->allowanceKey]);
+                }
+
+                if ($this->availability->isFullyCoveredBySeat($coverage, $window['start'], $window['end'])) {
+                    $failures[] = $this->failure($window, 'api.booking.covered_by_plan');
+
+                    continue;
+                }
+
+                if ($coverage->allowanceKey !== null) {
+                    $reserved[$coverage->allowanceKey] = ($reserved[$coverage->allowanceKey] ?? 0) + $coverage->coveredSeconds;
+                }
+
                 // Priced as the single-booking path prices (PriceQuoteService),
                 // with the coupon on every date its limits still allow.
                 try {
-                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, $coupon, $inFlight);
+                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, $coupon, $inFlight, $coverage->coveredSeconds);
                 } catch (CouponRejectedException $e) {
                     $couponRejection ??= $e;
-                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, null, $inFlight);
+                    $quote = $this->quotes->forBooking($space, $window['start'], $window['end'], $member, null, $inFlight, $coverage->coveredSeconds);
                 }
 
                 $quote->earmark($inFlight);
@@ -224,6 +247,7 @@ class BookingBatchCreationService
                     'start' => $window['start'],
                     'end' => $window['end'],
                     'quote' => $quote,
+                    'coverage' => $coverage,
                 ];
             }
 
@@ -274,7 +298,12 @@ class BookingBatchCreationService
                     ...$row['quote']->attributes(),
                     'payment_state' => PaymentState::Unpaid,
                     'note' => $note,
+                    ...($row['quote']->finalPoints === 0 && $row['coverage']->coveredSeconds > 0
+                        ? ['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan, 'paid_at' => now()]
+                        : []),
                 ]);
+
+                $this->coverage->record($row['coverage'], $booking, $member);
 
                 if ($payingWallet !== null && $row['quote']->finalPoints > 0) {
                     $this->payments->pay($booking, $member, $payingWallet);

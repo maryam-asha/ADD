@@ -275,6 +275,7 @@ return [
         'duration_invalid_granularity' => "The booking duration must be a multiple of this space's slot granularity above the minimum.",
         'slot_unavailable' => 'This space is not available for the requested time.',
         'room_in_coworking_mode' => 'This room is part of the co-working space at that time, so it cannot be booked as a room.',
+        'covered_by_plan' => 'Your plan already holds a seat for you at this time.',
         'office_leased' => 'This office is leased to a company on that date, so it cannot be booked.',
         'buffer_conflict' => 'This booking is too close to another booking on this space.',
         'wallet_choice_required' => 'More than one wallet can cover this booking. Please choose one.',

@@ -3,10 +3,12 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\ValueObjects\BookingCoverage;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\SpaceBookingRules;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
@@ -50,6 +52,7 @@ class BookingCreationService
         private readonly PaymentMethodRegistry $methods,
         private readonly PrepaymentHold $holds,
         private readonly BookingCancellationService $cancellations,
+        private readonly BookingPlanCoverage $coverage,
     ) {}
 
     public function create(
@@ -130,11 +133,17 @@ class BookingCreationService
 
             $this->assertBufferRespected($existing, $startAt, $endAt, $rules);
 
+            // The member's plan: a coworking seat that already holds them
+            // this whole stretch refuses it; any hours it covers are not
+            // charged (product owner, 2026-11-02).
+            $coverage = $this->coverage->for($member, $locked, $startAt, $endAt);
+            $this->assertNotCoveredBySeat($coverage, $startAt, $endAt);
+
             // The list price, the better of the best automatic offer and the
             // member's plan discount (applied automatically, never an opt-in
             // — docs/decisions/plan-discounts-design.md), and the coupon on
             // top: PriceQuoteService, the one place a price is composed.
-            $quote = $this->quotes->forBooking($locked, $startAt, $endAt, $member, $coupon);
+            $quote = $this->quotes->forBooking($locked, $startAt, $endAt, $member, $coupon, coveredSeconds: $coverage->coveredSeconds);
             $finalPoints = $quote->finalPoints;
 
             // Decided before the booking is made, so a refusal (a wallet
@@ -174,7 +183,14 @@ class BookingCreationService
                 ...$quote->attributes(),
                 'payment_state' => PaymentState::Unpaid,
                 'note' => $note,
+                // Wholly covered by plan hours: nothing to pay, and it holds
+                // its seat like a paid booking (never released unpaid).
+                ...($finalPoints === 0 && $coverage->coveredSeconds > 0
+                    ? ['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan, 'paid_at' => now()]
+                    : []),
             ]);
+
+            $this->coverage->record($coverage, $booking, $member);
 
             if ($payingWallet !== null) {
                 $this->payments->pay($booking, $member, $payingWallet);
@@ -239,6 +255,13 @@ class BookingCreationService
 
         if (! $this->availability->isWithinAdvanceHorizon($start, $rules)) {
             throw new ReceptionActionException('api.booking.too_far_ahead');
+        }
+    }
+
+    private function assertNotCoveredBySeat(BookingCoverage $coverage, CarbonInterface $start, CarbonInterface $end): void
+    {
+        if ($this->availability->isFullyCoveredBySeat($coverage, $start, $end)) {
+            throw new ReceptionActionException('api.booking.covered_by_plan');
         }
     }
 

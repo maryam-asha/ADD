@@ -382,14 +382,15 @@ class BookingCreationServiceTest extends TestCase
     }
 
     /** The subscriber's booking sits in the seat their subscription holds. */
-    public function test_a_subscribers_own_booking_fits_in_the_seat_they_hold(): void
+    /** Their seat already holds them then: a booking would take a second one (product owner, 2026-11-02). */
+    public function test_a_subscribers_booking_inside_the_seat_they_hold_is_refused(): void
     {
         $space = $this->coSpace(['capacity' => 1]);
         $member = User::factory()->create();
-        Membership::factory()->create(['owner_id' => $member->id, 'branch_id' => $space->building->branch_id]);
+        Membership::factory()->create(['owner_id' => $member->id, 'branch_id' => $space->building->branch_id, 'current_period_start' => now()->subDay()]);
         [$start, $end] = $this->slot(14);
 
-        $this->assertInstanceOf(Booking::class, $this->creations->create($space, $member, $start, $end));
+        $this->assertRefused('api.booking.covered_by_plan', fn () => $this->creations->create($space, $member, $start, $end));
     }
 
     /** The people inside now are in the pool: a booking for now needs a seat left. */

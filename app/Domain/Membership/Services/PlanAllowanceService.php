@@ -109,9 +109,11 @@ class PlanAllowanceService
      * of it with no window), any of it for a free-hours benefit; never more
      * than is left this cycle. With $blockSeconds > 1, the covered time is
      * rounded up to whole blocks and the hours left spent only in whole
-     * blocks — a remainder smaller than a block stays.
+     * blocks — a remainder smaller than a block stays. $alreadySpent is
+     * time a caller has earmarked but not yet recorded (a batch of
+     * bookings priced before any is made).
      */
-    public function coverableSeconds(Membership $membership, User $user, Space $space, CarbonInterface $from, CarbonInterface $to, int $blockSeconds = 0): int
+    public function coverableSeconds(Membership $membership, User $user, Space $space, CarbonInterface $from, CarbonInterface $to, int $blockSeconds = 0, int $alreadySpent = 0): int
     {
         $allowance = $this->allowanceFor($membership, $space->space_type, $space->id);
 
@@ -131,6 +133,7 @@ class PlanAllowanceService
         }
 
         $remaining = $this->remainingSeconds($membership, $user, $allowance, $from);
+        $remaining = $remaining === null ? null : max(0, $remaining - $alreadySpent);
 
         if ($blockSeconds > 1) {
             $inReach = (int) (ceil($inReach / $blockSeconds) * $blockSeconds);

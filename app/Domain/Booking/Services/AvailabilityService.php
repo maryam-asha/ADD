@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\DayState;
 use App\Domain\Booking\Enums\SlotState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\SpaceCoworkingWindow;
+use App\Domain\Booking\ValueObjects\BookingCoverage;
 use App\Domain\Booking\ValueObjects\DayAvailability;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Booking\ValueObjects\PoolTimeline;
@@ -413,6 +414,17 @@ class AvailabilityService
     // ---------------------------------------------------------------
     // Office leases (docs/decisions/office-leases.md)
     // ---------------------------------------------------------------
+
+    /**
+     * Whether the member's own coworking seat already covers the whole of
+     * [$start, $end): their plan holds them a seat then, so a booking would
+     * only take a second one (product owner, 2026-11-02). A booking it
+     * covers in part is fine — the rest is paid.
+     */
+    public function isFullyCoveredBySeat(BookingCoverage $coverage, CarbonInterface $start, CarbonInterface $end): bool
+    {
+        return $coverage->seatCovered && $coverage->coveredSeconds >= (int) $start->diffInSeconds($end);
+    }
 
     /**
      * Whether a lease holds the office on any local day [$start, $end)

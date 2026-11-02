@@ -67,9 +67,14 @@ class PriceQuoteService
      *
      * @throws CouponRejectedException when `$coupon` cannot be used here
      */
-    public function forBooking(Space $space, CarbonInterface $start, CarbonInterface $end, ?User $member, ?Coupon $coupon = null, ?UsageInFlight $inFlight = null): PriceQuote
+    public function forBooking(Space $space, CarbonInterface $start, CarbonInterface $end, ?User $member, ?Coupon $coupon = null, ?UsageInFlight $inFlight = null, int $coveredSeconds = 0): PriceQuote
     {
         $inFlight ??= new UsageInFlight;
+
+        // What the member's plan hours cover is not charged: the rest is
+        // priced from the start over the billable length, as a closed
+        // session is (SessionClosureService::priceFor()).
+        $end = $coveredSeconds > 0 ? $start->copy()->addSeconds(max(0, (int) $start->diffInSeconds($end) - $coveredSeconds)) : $end;
 
         $list = $this->amounts->forRange($space, $start, $end);
         $offer = $this->offers->forSpace($space, $start, $end, $member, PricingPurpose::Booking, $inFlight);
