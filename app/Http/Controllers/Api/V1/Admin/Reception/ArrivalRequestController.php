@@ -63,7 +63,7 @@ class ArrivalRequestController extends Controller
             $notifications->sendToUser(
                 $arrivalRequest->user,
                 'coworking.session_started',
-                ['space' => $session->space->translate('name')],
+                ['space' => $session->space->name],
                 ['session_type' => $session->coworkingType(), 'session_id' => (string) $session->id],
             );
 

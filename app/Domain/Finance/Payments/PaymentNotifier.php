@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments;
 
 use App\Domain\Finance\Models\Payment;
 use App\Services\Notification\NotificationService;
+use App\Services\Notification\NotificationText;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -40,10 +41,9 @@ class PaymentNotifier
                 return;
             }
 
-            $locale = $member->preferred_language ?? config('app.locale');
-
+            // The purpose in every language: each reader sees their own.
             $this->notifications->sendToUser($member, $template, $placeholders + [
-                'purpose' => __('notifications.payment.purposes.'.$payment->purpose->value, [], $locale),
+                'purpose' => NotificationText::translations('notifications.payment.purposes.'.$payment->purpose->value),
             ], [
                 'payment_id' => $payment->id,
                 'purpose' => $payment->purpose->value,

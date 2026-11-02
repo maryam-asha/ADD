@@ -325,8 +325,9 @@ class DedicatedDeskAssignmentTest extends TestCase
     {
         Notification::fake();
         $this->desk();
-        $operator = User::factory()->create();
-        $operator->assignRole('operations');
+        // Whoever may tie desks (`memberships.create`) is told, by permission.
+        $operator = User::factory()->create(['status' => 'active']);
+        $operator->assignRole('admin');
         $member = $this->member();
         app(WalletService::class)->creditGeneral(
             app(WalletService::class)->walletFor(OwnerType::User, $member->id),

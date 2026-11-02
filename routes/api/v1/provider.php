@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
 use App\Http\Controllers\Api\V1\Provider\ProviderInvoiceController;
+use App\Http\Controllers\Api\V1\Provider\ProviderNotificationController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeLeaseController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeRequestController;
 use App\Http\Controllers\Api\V1\Provider\ProviderPlanController;
@@ -23,6 +24,12 @@ use Illuminate\Support\Facades\Route;
  */
 Route::get('profile', [ProviderProfileController::class, 'show']);
 Route::get('summary', [ProviderSummaryController::class, 'show']);
+
+// The account's own notices (provider audience).
+Route::get('notifications', [ProviderNotificationController::class, 'index']);
+Route::get('notifications/unread-count', [ProviderNotificationController::class, 'unreadCount']);
+Route::patch('notifications/{id}/read', [ProviderNotificationController::class, 'markAsRead']);
+Route::post('notifications/read-all', [ProviderNotificationController::class, 'markAllAsRead']);
 
 Route::get('companies', [ProviderCompanyController::class, 'index']);
 Route::get('companies/{company}', [ProviderCompanyController::class, 'show']);

@@ -48,7 +48,7 @@ class SessionEndRequestController extends Controller
         $notifications->sendToUser(
             $session->user,
             $paid ? 'coworking.session_ended' : 'coworking.session_ended_unpaid',
-            ['space' => $session->space->translate('name')],
+            ['space' => $session->space->name],
             ['session_type' => $session->coworkingType(), 'session_id' => (string) $session->id],
         );
 

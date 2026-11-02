@@ -135,20 +135,15 @@ class DedicatedDeskService
     }
 
     /**
-     * Tells operations and admins that a Dedicated Desk subscription arrived
-     * without a desk — one a member bought in the app — so someone ties one
-     * (the dashboard's "Dedicated desks" list).
+     * Tells whoever may tie desks (`memberships.create`, the permission of
+     * PUT memberships/{membership}/desks) that a Dedicated Desk subscription
+     * arrived without one — one a member bought in the app — so someone ties
+     * one (the dashboard's "Dedicated desks" list).
      */
     public function notifyStaffDeskNeeded(Membership $membership): void
     {
-        $staff = User::role(['operations', 'admin'])->where('status', 'active')->get();
-
-        if ($staff->isEmpty()) {
-            return;
-        }
-
-        app(NotificationService::class)->sendToUsers($staff, 'membership.desk_needed', [
-            'plan' => $membership->plan?->translate('name') ?? '#'.$membership->plan_id,
+        app(NotificationService::class)->sendToHolders('memberships.create', 'membership.desk_needed', [
+            'plan' => $membership->plan?->name ?? '#'.$membership->plan_id,
         ], [
             'membership_id' => $membership->id,
         ]);

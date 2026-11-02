@@ -149,6 +149,7 @@ class CoworkingSessionEndTest extends TestCase
     public function test_confirming_bills_up_to_the_moment_the_member_pressed(): void
     {
         [$member, $session] = $this->memberInSession();
+        $session->space->update(['name' => ['ar' => 'القاعة', 'en' => 'The hall']]);
         $this->requestEnd();
         $this->travel(20)->minutes(); // reception is busy
 
@@ -160,6 +161,8 @@ class CoworkingSessionEndTest extends TestCase
         $this->assertSame(SessionEndRequestStatus::Confirmed, SessionEndRequest::sole()->status);
         // Still owed: the push sends the member to choose how to pay.
         Notification::assertSentTo($member, GeneralNotification::class, fn (GeneralNotification $n) => $n->toArray($member)['template_key'] === 'coworking.session_ended_unpaid');
+        // The space travels in both languages: each reader sees their own.
+        Notification::assertSentTo($member, GeneralNotification::class, fn (GeneralNotification $n) => $n->toArray($member)['params']['space'] === ['ar' => 'القاعة', 'en' => 'The hall']);
     }
 
     /** Points that would cover it are not touched: the member chooses how to pay only after the desk confirms. */

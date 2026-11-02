@@ -361,8 +361,9 @@ class PaymentServiceTest extends TestCase
     public function test_a_dedicated_desk_plan_bought_by_card_still_tells_staff(): void
     {
         Notification::fake();
-        $operator = User::factory()->create();
-        $operator->assignRole('operations');
+        // Whoever may tie desks (`memberships.create`) is told, by permission.
+        $operator = User::factory()->create(['status' => 'active']);
+        $operator->assignRole('admin');
 
         $member = $this->member();
         $plan = Plan::factory()->dedicatedDesk()->create(['price_points' => 100, 'is_active' => true]);

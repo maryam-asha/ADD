@@ -2,30 +2,41 @@
 
 namespace App\Notifications;
 
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
+use App\Domain\Identity\Enums\NotificationAudience;
+use App\Notifications\Channels\InboxChannel;
+use App\Services\Notification\NotificationText;
 use Illuminate\Notifications\Notification;
 
-class GeneralNotification extends Notification implements ShouldQueue
+/**
+ * The one in-app notification, written to the inbox of its audience. Not
+ * queued: the host runs no worker, so a queued row would never be written.
+ *
+ * The row keeps the template key and its params, rendered in the reader's
+ * language when the inbox is read (NotificationResource). `title`/`body`
+ * are a snapshot in the account's language, shown only if the template is
+ * gone. A custom (broadcast) notice keeps its title and body per locale.
+ */
+class GeneralNotification extends Notification
 {
-    use Queueable;
-
+    /**
+     * @param  string|array<string, string>|null  $customTitle  per locale for a broadcast
+     * @param  string|array<string, string>|null  $customBody  per locale for a broadcast
+     */
     public function __construct(
         private readonly string $templateKey,
         private readonly array $placeholders = [],
         private readonly array $extraData = [],
-        private readonly ?string $customTitle = null,
-        private readonly ?string $customBody = null,
-    ) {
-        $this->onQueue(config('notifications.queue', 'notifications'));
-    }
+        private readonly string|array|null $customTitle = null,
+        private readonly string|array|null $customBody = null,
+        public readonly NotificationAudience $audience = NotificationAudience::Member,
+    ) {}
 
     /**
      * @return list<string>
      */
     public function via(mixed $notifiable): array
     {
-        return ['database'];
+        return [InboxChannel::class];
     }
 
     /**
@@ -33,13 +44,20 @@ class GeneralNotification extends Notification implements ShouldQueue
      */
     public function toArray(mixed $notifiable): array
     {
-        $locale = $notifiable->preferred_language ?? config('app.locale');
+        $data = ['template_key' => $this->templateKey];
 
-        return [
-            'template_key' => $this->templateKey,
-            'title' => $this->customTitle ?? __('notifications.'.$this->templateKey.'.title', $this->placeholders, $locale),
-            'body' => $this->customBody ?? __('notifications.'.$this->templateKey.'.body', $this->placeholders, $locale),
-            'data' => $this->extraData,
-        ];
+        if ($this->customTitle !== null || $this->customBody !== null) {
+            $data += ['title' => $this->customTitle, 'body' => $this->customBody];
+        } else {
+            $snapshot = NotificationText::render(
+                $this->templateKey,
+                $this->placeholders,
+                $notifiable->preferred_language ?? config('app.locale'),
+            );
+
+            $data += ['params' => $this->placeholders] + $snapshot;
+        }
+
+        return $data + ['data' => $this->extraData];
     }
 }

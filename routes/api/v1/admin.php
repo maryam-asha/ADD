@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
+use App\Http\Controllers\Api\V1\Admin\NotificationInboxController;
 use App\Http\Controllers\Api\V1\Admin\OfferReportController;
 use App\Http\Controllers\Api\V1\Admin\OfficeLeaseController;
 use App\Http\Controllers\Api\V1\Admin\PartnerController;
@@ -97,7 +98,8 @@ use Illuminate\Support\Facades\Route;
 // are also the only source of permission names: PermissionSyncService reads
 // them from the registered routes, so a permission that guards nothing
 // cannot exist. tests/Guards/AdminRoutesArePermissionGatedTest fails on a
-// route here without one — `me` and `media/upload` are the only exceptions.
+// route here without one — `me`, `media/upload` and the account's own
+// notifications inbox are the only exceptions.
 
 // An apiResource's verbs, each behind its module's permission: index/show →
 // `<module>.view`, store → `.create`, update → `.update`, destroy → `.delete`.
@@ -107,11 +109,16 @@ $permitted = fn (PendingResourceRegistration $resource, string $module): Pending
     ->middlewareFor('update', "permission:{$module}.update")
     ->middlewareFor('destroy', "permission:{$module}.delete");
 
-// The two routes with no resource of their own: the account's own record,
-// and the upload every content form uses. Any staff account — one holding
+// The routes with no resource of their own: the account's own record, the
+// upload every content form uses, and the account's own notifications (what
+// reaches it by the permissions it holds). Any staff account — one holding
 // at least one permission — reaches them (App\Http\Middleware\EnsureStaffAccount).
 Route::get('me', [CurrentUserController::class, 'show'])->middleware('staff');
 Route::post('media/upload', [MediaUploadController::class, 'upload'])->middleware('staff');
+Route::get('notifications', [NotificationInboxController::class, 'index'])->middleware('staff');
+Route::get('notifications/unread-count', [NotificationInboxController::class, 'unreadCount'])->middleware('staff');
+Route::patch('notifications/{id}/read', [NotificationInboxController::class, 'markAsRead'])->middleware('staff');
+Route::post('notifications/read-all', [NotificationInboxController::class, 'markAllAsRead'])->middleware('staff');
 
 // The member app's static pages: Privacy Policy, Terms of Use, Help & Support.
 Route::get('privacy-policy', [PrivacyPolicyController::class, 'show'])->middleware('permission:app-content.view');

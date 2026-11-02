@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Auth\Concerns;
 
+use App\Http\Middleware\SetLocaleFromHeader;
+
 /**
  * The optional FCM token an endpoint that opens a session accepts, so the app
  * can register its device for push in the same call instead of a separate
@@ -30,6 +32,11 @@ trait AcceptsDeviceToken
      */
     public function deviceDetails(): array
     {
-        return $this->safe()->only(['platform', 'device_id', 'app_version', 'build_number', 'os_version', 'device_model']);
+        // The language the app runs in, when it says so (its `lang` header):
+        // that device's pushes are written in it. Without one, the account's.
+        $language = strtolower((string) $this->header('lang'));
+
+        return $this->safe()->only(['platform', 'device_id', 'app_version', 'build_number', 'os_version', 'device_model'])
+            + (in_array($language, SetLocaleFromHeader::SUPPORTED_LOCALES, true) ? ['language' => $language] : []);
     }
 }

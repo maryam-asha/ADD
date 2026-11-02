@@ -26,12 +26,9 @@ class AdminNotificationController extends Controller
                 ->get(),
         };
 
+        // Both languages are kept: each reader sees the one their app asks for.
         foreach ($users as $user) {
-            $locale = $user->preferred_language ?? config('app.locale');
-            $title = $validated['title'][$locale] ?? $validated['title']['en'];
-            $body = $validated['body'][$locale] ?? $validated['body']['en'];
-
-            $this->notificationService->sendCustomToUser($user, $title, $body);
+            $this->notificationService->sendCustomToUser($user, $validated['title'], $validated['body']);
         }
 
         return response()->json(['message' => __('api.notification.broadcast_sent')]);

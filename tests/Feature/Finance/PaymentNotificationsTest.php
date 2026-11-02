@@ -115,6 +115,8 @@ class PaymentNotificationsTest extends TestCase
         $notification = Notification::sent($member, GeneralNotification::class)->first();
         $data = $notification->toArray($member);
         $this->assertSame(Payment::sole()->id, $data['data']['payment_id'] ?? $data['payment_id'] ?? null);
+        // The purpose travels in both languages: each reader sees their own.
+        $this->assertSame(['ar' => 'حجز', 'en' => 'a booking'], $data['params']['purpose']);
     }
 
     public function test_a_wallet_topped_up_at_reception_is_announced(): void
@@ -218,6 +220,10 @@ class PaymentNotificationsTest extends TestCase
         app(EventApprovalService::class)->approve(EventAttendee::sole(), $this->operator());
 
         $this->assertTold($member, 'event.payment_due');
+        $this->assertSame(
+            ['en' => 'Talk', 'ar' => 'محاضرة'],
+            Notification::sent($member, GeneralNotification::class)->last()->toArray($member)['params']['event'],
+        );
         // Paying is `events/{event_id}/register` with the ticket: the push names its event.
         $this->assertSame([
             'purpose' => 'event_registration',

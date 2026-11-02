@@ -258,7 +258,7 @@ class EventApprovalService
             }
 
             app(NotificationService::class)->sendToUser($member, 'event.payment_due', [
-                'event' => $event->translate('title', $member->preferred_language ?? config('app.locale')),
+                'event' => $event->title,
                 'points' => (int) $attendee->price_points,
             ], [
                 'purpose' => 'event_registration',

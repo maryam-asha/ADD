@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -95,6 +96,15 @@ class User extends Authenticatable
     public function notificationLogs(): HasMany
     {
         return $this->hasMany(NotificationLog::class);
+    }
+
+    /**
+     * Every inbox row of this account, whatever its audience — each inbox
+     * scopes with forAudience(). Overrides Notifiable's to carry `audience`.
+     */
+    public function notifications(): MorphMany
+    {
+        return $this->morphMany(InboxNotification::class, 'notifiable')->latest();
     }
 
     public function deviceTokens(): HasMany

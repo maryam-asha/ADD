@@ -24,7 +24,7 @@ class DeviceTokenService
      * What the app may report about the device alongside its token. A field it
      * leaves out keeps whatever was stored before.
      */
-    public const DETAILS = ['platform', 'device_id', 'app_version', 'build_number', 'os_version', 'device_model'];
+    public const DETAILS = ['platform', 'language', 'device_id', 'app_version', 'build_number', 'os_version', 'device_model'];
 
     /**
      * @param  array<string, mixed>  $details  any of DETAILS
@@ -124,6 +124,15 @@ class DeviceTokenService
             ->delete();
 
         $this->syncLegacyColumn($user);
+    }
+
+    /**
+     * The owner switched language on the device of this session: its pushes
+     * follow.
+     */
+    public function setSessionLanguage(int $accessTokenId, string $language): void
+    {
+        DeviceToken::where('access_token_id', $accessTokenId)->update(['language' => $language]);
     }
 
     /**

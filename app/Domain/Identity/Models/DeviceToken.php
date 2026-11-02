@@ -16,6 +16,7 @@ class DeviceToken extends Model
         'token',
         'device_id',
         'platform',
+        'language',
         'app_version',
         'build_number',
         'os_version',

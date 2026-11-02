@@ -15,9 +15,7 @@ return [
      */
     'channels' => ['push', 'database'],
 
-    /*
-     * Queue name for dispatching notifications.
-     */
-    'queue' => env('NOTIFICATION_QUEUE', 'notifications'),
+    // No queue: the host runs no worker, so notifications are delivered in
+    // the request, after commit (App\Services\Notification\NotificationService).
 
 ];
