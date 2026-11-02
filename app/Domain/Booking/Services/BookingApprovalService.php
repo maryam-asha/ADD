@@ -6,7 +6,6 @@ use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\User;
-use App\Domain\Membership\Services\PlanDiscountService;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -17,8 +16,8 @@ use Illuminate\Support\Facades\DB;
 class BookingApprovalService
 {
     public function __construct(
+        private readonly BookingPlanBenefits $planBenefits,
         private readonly BookingRefunder $refunder,
-        private readonly PlanDiscountService $discounts,
         private readonly BookingNotifier $notifier,
     ) {}
 
@@ -58,7 +57,7 @@ class BookingApprovalService
 
             // The usage this booking consumed is returned once it no
             // longer holds a charge (docs/decisions/plan-discounts-design.md).
-            $this->discounts->voidFor($locked);
+            $this->planBenefits->voidFor($locked);
 
             $this->notifier->rejected($locked, $refunded);
         });
@@ -92,7 +91,7 @@ class BookingApprovalService
 
             $refunded = $this->refunder->quote($locked)['points'];
             $this->refunder->refund($locked, 'Booking lapsed unreviewed refund');
-            $this->discounts->voidFor($locked);
+            $this->planBenefits->voidFor($locked);
             $this->notifier->lapsed($locked, $refunded);
 
             return true;

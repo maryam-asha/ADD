@@ -8,7 +8,6 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Enums\SpaceType;
-use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Settings\Services\SettingService;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
@@ -16,8 +15,8 @@ use Illuminate\Support\Facades\DB;
 class BookingCancellationService
 {
     public function __construct(
+        private readonly BookingPlanBenefits $planBenefits,
         private readonly SettingService $settings,
-        private readonly PlanDiscountService $discounts,
         private readonly BookingRefunder $refunder,
         private readonly CoworkingBookingPolicy $policy,
     ) {}
@@ -184,8 +183,9 @@ class BookingCancellationService
         $this->refunder->refund($locked, 'Booking cancellation refund');
 
         // The usage this booking consumed is returned once it no
-        // longer holds a charge (docs/decisions/plan-discounts-design.md).
-        $this->discounts->voidFor($locked);
+        // longer holds a charge (docs/decisions/plan-discounts-design.md),
+        // with the plan hours it took (BookingPlanBenefits).
+        $this->planBenefits->voidFor($locked);
 
         return $refunded;
     }
