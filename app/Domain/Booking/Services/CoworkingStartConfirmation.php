@@ -114,7 +114,7 @@ class CoworkingStartConfirmation
             return null;
         }
 
-        return $booking->start_at->lessThanOrEqualTo(now()->addMinutes(BookingCheckInService::EARLY_CHECK_IN_MINUTES))
+        return $booking->start_at->lessThanOrEqualTo(now()->addMinutes($this->checkIns->earlyWindowMinutesFor($booking)))
             ? $booking
             : null;
     }

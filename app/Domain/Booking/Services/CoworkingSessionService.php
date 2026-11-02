@@ -30,9 +30,6 @@ use Illuminate\Support\Facades\DB;
  */
 class CoworkingSessionService
 {
-    /** How long before its start a scan may check a booking in: the same window as every check-in. */
-    public const EARLY_CHECK_IN_MINUTES = BookingCheckInService::EARLY_CHECK_IN_MINUTES;
-
     /** How far ahead a room, office or hall booking turns a scan into a word to reception. */
     public const NON_COWORKING_ARRIVAL_MINUTES = 60;
 
@@ -53,6 +50,7 @@ class CoworkingSessionService
         private readonly OpenCoworkingSessionLocator $openSessions,
         private readonly ArrivalRequestService $arrivals,
         private readonly MembershipResolver $memberships,
+        private readonly BookingCheckInService $checkIns,
     ) {}
 
     /**
@@ -109,7 +107,7 @@ class CoworkingSessionService
             // confirms the member is here.
             $handoverBooking = null;
 
-            if ($booking !== null && $booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
+            if ($booking !== null && $booking->start_at->greaterThan(now()->addMinutes($this->checkIns->earlyWindowMinutesFor($booking)))) {
                 $handoverBooking = $booking;
                 $booking = null;
             }
@@ -181,7 +179,7 @@ class CoworkingSessionService
 
         return new ReceptionActionException('api.coworking.booking_too_early', 409, [
             'start' => $start->format('H:i'),
-            'from' => $start->copy()->subMinutes(self::EARLY_CHECK_IN_MINUTES)->format('H:i'),
+            'from' => $start->copy()->subMinutes($this->checkIns->earlyWindowMinutesFor($booking))->format('H:i'),
         ]);
     }
 

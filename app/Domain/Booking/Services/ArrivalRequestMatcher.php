@@ -18,7 +18,7 @@ use Carbon\CarbonInterface;
  * For the kiosk scan (docs/decisions/coworking-self-service-sessions.md) it
  * drives the check-in: CoworkingSessionService checks the matched booking
  * in, but only once it starts within
- * CoworkingSessionService::EARLY_CHECK_IN_MINUTES, a rule applied there, not
+ * BookingCheckInService::earlyWindowMinutesFor(), a rule applied there, not
  * here. Without a $space it matches across the whole branch.
  */
 class ArrivalRequestMatcher

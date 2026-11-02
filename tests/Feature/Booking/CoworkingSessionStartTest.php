@@ -285,12 +285,12 @@ class CoworkingSessionStartTest extends TestCase
     public function test_todays_coworking_booking_is_checked_in_instead_of_a_walk_in(): void
     {
         $member = $this->actingAsMember();
-        // Ten minutes out: inside the early check-in window.
+        // Starting now: a coworking booking has no early check-in window.
         $booking = Booking::factory()->create([
             'user_id' => $member->id,
             'space_id' => $this->space->id,
-            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00', 'Asia/Damascus')->utc(),
         ]);
 
         $this->scan()
@@ -303,7 +303,7 @@ class CoworkingSessionStartTest extends TestCase
         $this->confirmAtReception($member)->assertOk();
 
         $booking->refresh();
-        // Confirmed before the booking starts: its session still begins at its start.
+        // Confirmed as the booking starts: its session begins at its start.
         $this->assertTrue($booking->checked_in_at->equalTo($booking->start_at));
         $this->assertSame(SessionStartSource::Scan, $booking->checked_in_via);
         $this->assertSame($this->kiosk->id, $booking->kiosk_id);
@@ -316,8 +316,8 @@ class CoworkingSessionStartTest extends TestCase
         $booking = Booking::factory()->pending()->create([
             'user_id' => $member->id,
             'space_id' => $this->space->id,
-            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00', 'Asia/Damascus')->utc(),
         ]);
 
         $this->scan()->assertStatus(409)->assertExactJson(['message' => 'Your booking is awaiting approval. Please see reception.']);
@@ -333,8 +333,8 @@ class CoworkingSessionStartTest extends TestCase
             'space_id' => $this->space->id,
             'status' => BookingStatus::AwaitingPayment,
             'payment_due_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
-            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00', 'Asia/Damascus')->utc(),
         ]);
 
         $this->scan()->assertStatus(409)->assertExactJson(['message' => 'Your booking is waiting for its payment. Pay it in the app or at reception, then scan again.']);
@@ -464,8 +464,8 @@ class CoworkingSessionStartTest extends TestCase
         Booking::factory()->create([
             'user_id' => $member->id,
             'space_id' => $this->space->id,
-            'start_at' => Carbon::parse('2026-08-17 10:10', 'Asia/Damascus')->utc(),
-            'end_at' => Carbon::parse('2026-08-17 12:10', 'Asia/Damascus')->utc(),
+            'start_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc(),
+            'end_at' => Carbon::parse('2026-08-17 12:00', 'Asia/Damascus')->utc(),
         ]);
         $this->scan()->assertCreated();
 

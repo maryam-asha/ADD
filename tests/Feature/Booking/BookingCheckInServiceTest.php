@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\BookingCheckInService;
+use App\Domain\Foundation\Models\Space;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\Support\InteractsWithCoworking;
@@ -42,12 +43,12 @@ class BookingCheckInServiceTest extends TestCase
         $this->assertSame($kiosk->id, $booking->kiosk_id);
     }
 
-    /** Let in early, but the session begins when the booking does. */
+    /** A room lets its booking in early, but the session begins when the booking does. */
     public function test_an_early_check_in_is_recorded_at_the_booking_start(): void
     {
-        $space = $this->coworkingSpace();
+        $room = Space::factory()->room()->create(['building_id' => $this->coworkingSpace()->building_id]);
         $booking = Booking::factory()->create([
-            'space_id' => $space->id,
+            'space_id' => $room->id,
             'start_at' => now()->addMinutes(10),
             'end_at' => now()->addMinutes(70),
         ]);

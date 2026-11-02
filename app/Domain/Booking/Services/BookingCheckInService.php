@@ -20,8 +20,10 @@ use Carbon\CarbonInterface;
 class BookingCheckInService
 {
     /**
-     * How long before its start a booking may be checked in, from any door.
-     * A late arrival is always let in while the booking runs.
+     * How long before its start a room, office or hall booking may be
+     * checked in, from any door. A late arrival is always let in while the
+     * booking runs. Coworking bookings have no such window
+     * (earlyWindowMinutesFor()).
      */
     public const EARLY_CHECK_IN_MINUTES = 15;
 
@@ -70,7 +72,7 @@ class BookingCheckInService
             throw new ReceptionActionException('api.booking.check_in_ended', 409);
         }
 
-        if ($booking->start_at->greaterThan(now()->addMinutes(self::EARLY_CHECK_IN_MINUTES))) {
+        if ($booking->start_at->greaterThan(now()->addMinutes($this->earlyWindowMinutesFor($booking)))) {
             throw new ReceptionActionException('api.booking.check_in_too_early', 409);
         }
 
@@ -94,5 +96,16 @@ class BookingCheckInService
             'checked_in_via' => $via,
             'kiosk_id' => $kiosk?->id,
         ])->save();
+    }
+
+    /**
+     * How long before its start this booking may be checked in. None for a
+     * coworking booking: arriving early is a walk-in, billed from the
+     * arrival, that hands over to the booking at its start (product owner,
+     * 2026-11-02).
+     */
+    public function earlyWindowMinutesFor(Booking $booking): int
+    {
+        return $booking->space->space_type === SpaceType::CoSpace ? 0 : self::EARLY_CHECK_IN_MINUTES;
     }
 }

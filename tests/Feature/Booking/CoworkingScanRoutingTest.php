@@ -214,14 +214,14 @@ class CoworkingScanRoutingTest extends TestCase
         $this->assertNull($booking->fresh()->checked_in_at);
     }
 
-    public function test_an_early_arrival_confirmed_once_the_booking_is_near_checks_the_booking_in(): void
+    public function test_an_early_arrival_confirmed_once_the_booking_has_started_checks_the_booking_in(): void
     {
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->space, $member, '11:00', '13:00');
         $this->scan()->assertCreated();
 
-        Carbon::setTestNow($this->damascus('10:50'));
+        Carbon::setTestNow($this->damascus('11:00'));
         $this->confirmAtReception($member)->assertOk();
 
         $this->assertSame(0, WalkinSession::count());
@@ -252,7 +252,7 @@ class CoworkingScanRoutingTest extends TestCase
 
         $this->scan($kiosk, $secret)
             ->assertStatus(409)
-            ->assertExactJson(['message' => 'Your booking starts at 11:00. There is no free seat before then; you can scan from 10:45.']);
+            ->assertExactJson(['message' => 'Your booking starts at 11:00. There is no free seat before then; you can scan from 11:00.']);
         $this->assertSame(0, ArrivalRequest::count());
     }
 
