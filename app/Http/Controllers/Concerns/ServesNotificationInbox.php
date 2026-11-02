@@ -61,6 +61,6 @@ trait ServesNotificationInbox
             ->forAudience($this->inboxAudience())
             ->count();
 
-        return response()->json(['unread_count' => $count]);
+        return response()->json(['data' => ['unread_count' => $count]]);
     }
 }

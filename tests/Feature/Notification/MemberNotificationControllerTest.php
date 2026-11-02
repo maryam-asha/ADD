@@ -93,7 +93,7 @@ class MemberNotificationControllerTest extends TestCase
         $response = $this->getJson('/api/v1/member/notifications/unread-count');
 
         $response->assertOk();
-        $response->assertJson(['unread_count' => 1]);
+        $response->assertJson(['data' => ['unread_count' => 1]]);
     }
 
     public function test_notification_sent_in_user_preferred_language(): void

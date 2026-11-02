@@ -46,7 +46,7 @@ class NotificationInboxTest extends TestCase
 
         $this->getJson('/api/v1/admin/notifications/unread-count')
             ->assertOk()
-            ->assertJson(['unread_count' => 1]);
+            ->assertJson(['data' => ['unread_count' => 1]]);
     }
 
     public function test_provider_inbox_lists_only_provider_notices(): void
