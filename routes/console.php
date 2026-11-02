@@ -140,6 +140,15 @@ Schedule::command('leases:run-daily')->hourly()->withoutOverlapping();
 Schedule::command('renewals:run')->hourly()->withoutOverlapping();
 
 /*
+ * Reminders (docs/superpowers/plans/2026-11-02-notifications-phase-3.md):
+ * bookings starting and ending, events coming up, plans and leases ending,
+ * invoices overdue, sessions left unpaid. Every five minutes — the shortest
+ * window is ten minutes — and each reminder reaches a person once
+ * (notification_claims), however many runs find it.
+ */
+Schedule::command('notifications:send-reminders')->everyFiveMinutes()->withoutOverlapping();
+
+/*
  * HR (packages/add/hr): each enabled module's daily jobs — refreshing
  * employee statuses and revoking access once a termination's last day has
  * passed, and the HR alerts digest. The package lists them itself

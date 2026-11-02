@@ -32,22 +32,31 @@ class LeaseNotifier
         ]);
     }
 
+    /** Reminder, a month ahead, to the admins. Once per lease. */
+    public function endingSoon(OfficeLease $lease): void
+    {
+        $this->tell($this->members($lease, adminsOnly: true), $lease, 'lease.ending_soon', [
+            'date' => $lease->ends_on->toDateString(),
+        ], "lease.ending_soon:{$lease->id}");
+    }
+
     /**
      * @param  Collection<int, User>  $members
      * @param  array<string, mixed>  $params
+     * @param  string|null  $dedupeKey  a reminder's: sent once per member
      */
-    private function tell(Collection $members, OfficeLease $lease, string $templateKey, array $params): void
+    private function tell(Collection $members, OfficeLease $lease, string $templateKey, array $params, ?string $dedupeKey = null): void
     {
         if ($members->isEmpty()) {
             return;
         }
 
-        $this->notifications->sendToUsers(
-            $members,
-            $templateKey,
-            ['space' => $lease->space?->name ?? ''] + $params,
-            ['target_type' => 'office_lease', 'target_id' => (string) $lease->id],
-        );
+        $params = ['space' => $lease->space?->name ?? ''] + $params;
+        $target = ['target_type' => 'office_lease', 'target_id' => (string) $lease->id];
+
+        $dedupeKey === null
+            ? $this->notifications->sendToUsers($members, $templateKey, $params, $target)
+            : $this->notifications->sendToUsersOnce($members, $dedupeKey, $templateKey, $params, $target);
     }
 
     /** @return Collection<int, User> the company's admins, and with them its door holders */

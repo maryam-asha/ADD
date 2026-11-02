@@ -56,10 +56,25 @@ class MembershipNotifier
         ]);
     }
 
+    /** Reminder, once per plan and $stage (`7d`, `1d`). */
+    public function expiringSoon(Membership $membership, string $stage): void
+    {
+        $this->tell($membership, 'membership.expiring_soon', [
+            'date' => NotificationText::localDate($membership->current_period_end),
+        ], "membership.expiring_soon:{$membership->id}:{$stage}");
+    }
+
+    /** Reminder: its period is over and nothing follows it. Once per plan. */
+    public function expired(Membership $membership): void
+    {
+        $this->tell($membership, 'membership.expired', [], "membership.expired:{$membership->id}");
+    }
+
     /**
      * @param  array<string, mixed>  $params
+     * @param  string|null  $dedupeKey  a reminder's: sent once per holder
      */
-    private function tell(Membership $membership, string $templateKey, array $params = []): void
+    private function tell(Membership $membership, string $templateKey, array $params = [], ?string $dedupeKey = null): void
     {
         $holders = $this->holders($membership);
 
@@ -67,12 +82,12 @@ class MembershipNotifier
             return;
         }
 
-        $this->notifications->sendToUsers(
-            $holders,
-            $templateKey,
-            ['plan' => $membership->plan?->name ?? ''] + $params,
-            ['target_type' => 'membership', 'target_id' => (string) $membership->id],
-        );
+        $params = ['plan' => $membership->plan?->name ?? ''] + $params;
+        $target = ['target_type' => 'membership', 'target_id' => (string) $membership->id];
+
+        $dedupeKey === null
+            ? $this->notifications->sendToUsers($holders, $templateKey, $params, $target)
+            : $this->notifications->sendToUsersOnce($holders, $dedupeKey, $templateKey, $params, $target);
     }
 
     /** @return Collection<int, User> */

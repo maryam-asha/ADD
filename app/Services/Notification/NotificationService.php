@@ -68,6 +68,53 @@ class NotificationService
     }
 
     /**
+     * Send once per person and $dedupeKey — for reminders, which find the
+     * same subject on every run. The key is claimed first, and only a new
+     * claim sends, so two runs at once cannot both send. Returns whether it
+     * was sent.
+     */
+    public function sendToUserOnce(
+        User $user,
+        string $dedupeKey,
+        string $templateKey,
+        array $placeholders = [],
+        array $extraData = [],
+        NotificationAudience $audience = NotificationAudience::Member,
+    ): bool {
+        $claimed = DB::table('notification_claims')->insertOrIgnore([
+            'user_id' => $user->id,
+            'dedupe_key' => $dedupeKey,
+            'created_at' => now(),
+        ]);
+
+        if ($claimed === 0) {
+            return false;
+        }
+
+        $this->sendToUser($user, $templateKey, $placeholders, $extraData, $audience);
+
+        return true;
+    }
+
+    /**
+     * sendToUserOnce() for each of $users.
+     *
+     * @return int how many were sent
+     */
+    public function sendToUsersOnce(
+        Collection $users,
+        string $dedupeKey,
+        string $templateKey,
+        array $placeholders = [],
+        array $extraData = [],
+        NotificationAudience $audience = NotificationAudience::Member,
+    ): int {
+        return $users->filter(
+            fn (User $user) => $this->sendToUserOnce($user, $dedupeKey, $templateKey, $placeholders, $extraData, $audience),
+        )->count();
+    }
+
+    /**
      * Send a staff notice to every active account holding $permission —
      * through any role or directly, whatever the role is called — in the
      * dashboard. Never pick staff by role name.

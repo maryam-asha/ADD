@@ -10,8 +10,9 @@ use App\Domain\Providers\Models\Provider;
 use App\Services\Notification\NotificationService;
 
 /**
- * Who hears that an invoice was issued: whoever pays it — a company's admins
- * in the app, or a provider's accounts in their portal.
+ * Who hears about an invoice: whoever pays it — a company's admins in the
+ * app, or a provider's accounts in their portal. Told when it is issued, and
+ * once when it is past its due date.
  */
 class InvoiceNotifier
 {
@@ -19,31 +20,39 @@ class InvoiceNotifier
 
     public function issued(Invoice $invoice): void
     {
-        $params = [
-            'number' => '#'.$invoice->id,
+        $this->tellPayer($invoice, 'invoice.issued', [
             'amount' => (string) $invoice->amount,
-            'currency' => (string) $invoice->currency,
             'due' => $invoice->due_at?->toDateString() ?? '',
-        ];
-        $target = ['target_type' => 'invoice', 'target_id' => (string) $invoice->id];
+        ]);
+    }
 
-        if ($invoice->billed_to === Payer::Provider) {
-            $accounts = Provider::query()->find($invoice->provider_id)?->users()->where('users.status', 'active')->get();
+    /** Reminder: past its due date, with what is left to pay. Once per invoice. */
+    public function overdue(Invoice $invoice): void
+    {
+        $this->tellPayer($invoice, 'invoice.overdue', [
+            'amount' => $invoice->remaining(),
+        ], "invoice.overdue:{$invoice->id}");
+    }
 
-            if ($accounts !== null && $accounts->isNotEmpty()) {
-                $this->notifications->sendToUsers($accounts, 'invoice.issued', $params, $target, NotificationAudience::Provider);
-            }
+    /**
+     * @param  array<string, mixed>  $params
+     * @param  string|null  $dedupeKey  a reminder's: sent once per reader
+     */
+    private function tellPayer(Invoice $invoice, string $templateKey, array $params, ?string $dedupeKey = null): void
+    {
+        [$readers, $audience] = $invoice->billed_to === Payer::Provider
+            ? [Provider::query()->find($invoice->provider_id)?->users()->where('users.status', 'active')->get(), NotificationAudience::Provider]
+            : [Company::query()->find($invoice->company_id)?->members()->wherePivot('is_admin', true)->where('users.status', 'active')->get(), NotificationAudience::Member];
 
+        if ($readers === null || $readers->isEmpty()) {
             return;
         }
 
-        $admins = Company::query()->find($invoice->company_id)?->members()
-            ->wherePivot('is_admin', true)
-            ->where('users.status', 'active')
-            ->get();
+        $params = ['number' => '#'.$invoice->id, 'currency' => (string) $invoice->currency] + $params;
+        $target = ['target_type' => 'invoice', 'target_id' => (string) $invoice->id];
 
-        if ($admins !== null && $admins->isNotEmpty()) {
-            $this->notifications->sendToUsers($admins, 'invoice.issued', $params, $target);
-        }
+        $dedupeKey === null
+            ? $this->notifications->sendToUsers($readers, $templateKey, $params, $target, $audience)
+            : $this->notifications->sendToUsersOnce($readers, $dedupeKey, $templateKey, $params, $target, $audience);
     }
 }

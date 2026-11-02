@@ -36,8 +36,12 @@ return [
             'body' => 'Your booking for :space on :date ended without a check-in.',
         ],
         'reminder' => [
-            'title' => 'Upcoming Booking Reminder',
-            'body' => 'Your booking for :space starts in :minutes minutes.',
+            'title' => 'Your booking starts soon',
+            'body' => 'Your booking at :space starts at :time. Scan the kiosk code when you arrive.',
+        ],
+        'ending_soon' => [
+            'title' => 'Your booking ends in :minutes minutes',
+            'body' => 'Your booking at :space ends at :time. You can extend it in the app if the space is free.',
         ],
         'extended' => [
             'title' => 'Booking Extended',
@@ -138,12 +142,12 @@ return [
             'body' => 'Desk :desk in :space is yours.',
         ],
         'expiring_soon' => [
-            'title' => 'Plan Expiring Soon',
-            'body' => 'Your :plan_name subscription will expire in :days days.',
+            'title' => 'Your plan ends soon',
+            'body' => 'Your :plan plan ends on :date. Renew in the app to keep your balances.',
         ],
         'expired' => [
-            'title' => 'Plan Expired',
-            'body' => 'Your subscription to :plan_name has expired.',
+            'title' => 'Your plan has ended',
+            'body' => 'Your :plan plan has ended. Browse the plans to renew.',
         ],
     ],
 
@@ -246,6 +250,10 @@ return [
             'title' => 'Your session was closed automatically',
             'body' => 'Your session at :space was closed at :time because no check-out was recorded.',
         ],
+        'unpaid_reminder' => [
+            'title' => 'Unpaid session',
+            'body' => 'You still owe :points points for your session on :date. Tap to pay.',
+        ],
     ],
 
     'invoice' => [
@@ -253,12 +261,20 @@ return [
             'title' => 'New invoice',
             'body' => 'Invoice :number for :amount :currency was issued, due on :due.',
         ],
+        'overdue' => [
+            'title' => 'Overdue invoice',
+            'body' => 'Invoice :number is past its due date. Remaining: :amount :currency.',
+        ],
     ],
 
     'lease' => [
         'contracted' => [
             'title' => 'Office lease signed',
             'body' => 'The lease of :space starts on :start and ends on :end.',
+        ],
+        'ending_soon' => [
+            'title' => 'Your office lease ends soon',
+            'body' => 'The lease of :space ends on :date.',
         ],
         'ended' => [
             'title' => 'Office lease ended',
@@ -310,6 +326,14 @@ return [
         'registration_expired' => [
             'title' => 'Registration expired',
             'body' => 'Your registration for :event was not paid in time, and the seat was released.',
+        ],
+        'reminder' => [
+            'title' => 'Your event is coming up',
+            'body' => ':event starts on :date at :time at :location.',
+        ],
+        'reminder_without_location' => [
+            'title' => 'Your event is coming up',
+            'body' => ':event starts on :date at :time.',
         ],
     ],
 

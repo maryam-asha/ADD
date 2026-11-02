@@ -55,6 +55,21 @@ class BookingNotifier
         $this->tellMember($booking, 'booking.affected_by_maintenance');
     }
 
+    /** Reminder: it starts within the half hour. Sent once per booking. */
+    public function startingSoon(Booking $booking): void
+    {
+        $this->remindMember($booking, 'booking.reminder', "booking.reminder:{$booking->id}");
+    }
+
+    /** Reminder: the member is in it, and it ends within minutes. Sent once per booking. */
+    public function endingSoon(Booking $booking): void
+    {
+        $this->remindMember($booking, 'booking.ending_soon', "booking.ending_soon:{$booking->id}", [
+            'minutes' => max(1, (int) ceil(now()->diffInSeconds($booking->end_at, false) / 60)),
+            'time' => NotificationText::localTime($booking->end_at),
+        ]);
+    }
+
     /** Whoever may approve bookings (`reception.approve`), in the dashboard. */
     public function pendingApproval(Booking $booking): void
     {
@@ -78,6 +93,18 @@ class BookingNotifier
         }
 
         $this->notifications->sendToUser($member, $templateKey, $this->params($booking) + $extra, $this->target($booking));
+    }
+
+    /**
+     * @param  array<string, mixed>  $override  wins over the booking's own params
+     */
+    private function remindMember(Booking $booking, string $templateKey, string $dedupeKey, array $override = []): void
+    {
+        if ($booking->user === null) {
+            return;
+        }
+
+        $this->notifications->sendToUserOnce($booking->user, $dedupeKey, $templateKey, $override + $this->params($booking), $this->target($booking));
     }
 
     /** @return array<string, mixed> */
