@@ -3,10 +3,13 @@
 namespace App\Domain\Membership\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
+use Carbon\CarbonInterface;
 
 /**
  * Pure discount resolution and ledger-writing — no wallet knowledge, so it
@@ -15,6 +18,8 @@ use App\Domain\Membership\Models\PlanDiscountRedemption;
  */
 class PlanDiscountService
 {
+    public function __construct(private readonly PlanAllowanceService $allowances) {}
+
     /**
      * The single discount (if any) that applies to a booking of `$space`
      * under `$membership`'s plan. No stacking — at most one row is ever
@@ -29,9 +34,14 @@ class PlanDiscountService
      * has a PlanDiscountRedemption row yet for the ledger count below to
      * see, keyed by `plan_discount_id`.
      *
+     * Uses are counted for `$user` alone when given — an employee of a
+     * company plan has the limit to themselves — and only within the cycle
+     * containing `$at` (now by default): the whole period, or each month
+     * from the subscription's start (product owner, 2026-11-02).
+     *
      * @param  array<int, int>  $consumedInBatch
      */
-    public function resolveFor(Membership $membership, Space $space, array $consumedInBatch = []): ?PlanDiscount
+    public function resolveFor(Membership $membership, Space $space, array $consumedInBatch = [], ?User $user = null, ?CarbonInterface $at = null): ?PlanDiscount
     {
         $plan = $membership->plan;
 
@@ -58,7 +68,7 @@ class PlanDiscountService
             ->values();
 
         foreach ($candidates as $discount) {
-            if ($this->hasRemainingUsage($discount, $membership, $consumedInBatch)) {
+            if ($this->hasRemainingUsage($discount, $membership, $consumedInBatch, $user, $at ?? now())) {
                 return $discount;
             }
         }
@@ -81,36 +91,47 @@ class PlanDiscountService
     }
 
     /**
-     * Records that `$discount` priced `$booking`, whether the booking is
-     * paid now or later — the discounted price is its price either way.
-     * Must be called inside the same DB transaction that creates the
-     * booking.
+     * Records that `$discount` priced `$for` — a booking, paid now or
+     * later (the discounted price is its price either way), or a walk-in at
+     * its closure — for the person it belongs to. Must be called inside the
+     * transaction that prices it.
      */
-    public function redeem(PlanDiscount $discount, Membership $membership, Booking $booking, int $pointsDiscounted): void
+    public function redeem(PlanDiscount $discount, Membership $membership, Booking|WalkinSession $for, int $pointsDiscounted): void
     {
         PlanDiscountRedemption::create([
             'plan_discount_id' => $discount->id,
             'membership_id' => $membership->id,
-            'booking_id' => $booking->id,
+            'user_id' => $for->user_id,
+            'booking_id' => $for instanceof Booking ? $for->id : null,
+            'walkin_session_id' => $for instanceof WalkinSession ? $for->id : null,
             'points_discounted' => $pointsDiscounted,
         ]);
     }
 
-    public function voidFor(Booking $booking): void
+    public function voidFor(Booking|WalkinSession $for): void
     {
-        PlanDiscountRedemption::where('booking_id', $booking->id)->delete();
+        PlanDiscountRedemption::query()
+            ->where($for instanceof Booking ? 'booking_id' : 'walkin_session_id', $for->id)
+            ->delete();
     }
 
     /**
      * @param  array<int, int>  $consumedInBatch
      */
-    private function hasRemainingUsage(PlanDiscount $discount, Membership $membership, array $consumedInBatch = []): bool
+    private function hasRemainingUsage(PlanDiscount $discount, Membership $membership, array $consumedInBatch, ?User $user, CarbonInterface $at): bool
     {
         if ($discount->usage_limit === null) {
             return true;
         }
 
-        $used = $discount->redemptions()->where('membership_id', $membership->id)->count()
+        [$cycleStart, $cycleEnd] = $this->allowances->cycleFor($membership, $at);
+
+        $used = $discount->redemptions()
+            ->where('membership_id', $membership->id)
+            ->when($user !== null, fn ($query) => $query->where('user_id', $user->id))
+            ->where('created_at', '>=', $cycleStart)
+            ->where('created_at', '<', $cycleEnd)
+            ->count()
             + ($consumedInBatch[$discount->id] ?? 0);
 
         return $used < $discount->usage_limit;

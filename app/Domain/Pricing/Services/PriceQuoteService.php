@@ -78,7 +78,7 @@ class PriceQuoteService
         $planPrice = $list;
         $membership = $member !== null ? $this->memberships->activeFor($member) : null;
 
-        if ($membership !== null && ($discount = $this->planDiscounts->resolveFor($membership, $space, $inFlight->planDiscounts())) !== null) {
+        if ($membership !== null && ($discount = $this->planDiscounts->resolveFor($membership, $space, $inFlight->planDiscounts(), $member, $start)) !== null) {
             $planPrice = $this->planDiscounts->apply($list, $discount);
         }
 
@@ -143,8 +143,15 @@ class PriceQuoteService
     {
         $space = $session->space;
         $offerRow = $this->ledger->offerFor($session);
-        $planRedemption = $session instanceof Booking
-            ? PlanDiscountRedemption::query()->where('booking_id', $session->id)->first()
+        $planRedemption = PlanDiscountRedemption::query()
+            ->where($session instanceof Booking ? 'booking_id' : 'walkin_session_id', $session->id)
+            ->first();
+
+        // A walk-in is priced only at its closure: a plan discount on its
+        // space (a coworking discount, product owner 2026-11-02) applies
+        // then, counted for its person in the cycle it started in.
+        $walkInDiscount = $session instanceof WalkinSession && $planRedemption === null && $offerRow === null
+            ? $this->walkInPlanDiscount($session)
             : null;
 
         // Its locked offer; else, with no plan discount either, the best
@@ -152,16 +159,25 @@ class PriceQuoteService
         // closure (QuoteRecorder::reprice).
         $offer = match (true) {
             $offerRow !== null => new OfferPrice($offerRow->coupon, $this->offers->priceSpace($space, $from, $to, CouponTerms::fromLedger($offerRow)), null),
-            $planRedemption !== null => null,
+            $planRedemption !== null, $walkInDiscount !== null => null,
             default => $this->offers->forSpace($space, $from, $to, $session->user, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession, new UsageInFlight),
         };
 
         return $this->atLockedTerms(
             $this->amounts->forRange($space, $from, $to),
             $offer,
-            $offer === null ? $planRedemption?->discount : null,
+            $offer === null ? ($planRedemption?->discount ?? $walkInDiscount) : null,
             $this->ledger->couponFor($session),
         );
+    }
+
+    private function walkInPlanDiscount(WalkinSession $session): ?PlanDiscount
+    {
+        $membership = $session->membership ?? ($session->user !== null ? $this->memberships->activeFor($session->user) : null);
+
+        return $membership === null
+            ? null
+            : $this->planDiscounts->resolveFor($membership, $session->space, [], $session->user, $session->checked_in_at);
     }
 
     /**

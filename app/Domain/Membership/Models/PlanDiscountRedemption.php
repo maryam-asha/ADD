@@ -3,6 +3,7 @@
 namespace App\Domain\Membership\Models;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -19,7 +20,9 @@ class PlanDiscountRedemption extends Model
     protected $fillable = [
         'plan_discount_id',
         'membership_id',
+        'user_id',
         'booking_id',
+        'walkin_session_id',
         'points_discounted',
     ];
 
@@ -38,6 +41,12 @@ class PlanDiscountRedemption extends Model
     public function membership(): BelongsTo
     {
         return $this->belongsTo(Membership::class);
+    }
+
+    /** The walk-in a coworking discount priced, when it was not a booking. */
+    public function walkinSession(): BelongsTo
+    {
+        return $this->belongsTo(WalkinSession::class);
     }
 
     public function booking(): BelongsTo

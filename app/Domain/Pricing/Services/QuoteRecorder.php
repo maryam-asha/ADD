@@ -3,6 +3,7 @@
 namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\PlanDiscountRedemption;
@@ -127,6 +128,23 @@ class QuoteRecorder
         if ($record instanceof Booking && $quote->appliedPlanDiscount() !== null) {
             PlanDiscountRedemption::query()->where('booking_id', $record->id)->update(['points_discounted' => $quote->automaticPoints]);
             $this->ledger->resize($this->ledger->planDiscountFor($record), $quote->listPoints, $quote->automaticPoints);
+        }
+
+        // A walk-in priced with a plan discount at its closure: that is its
+        // one use of it, recorded like a booking's at creation.
+        if ($record instanceof WalkinSession && ($discount = $quote->appliedPlanDiscount()) !== null && $member !== null) {
+            $membership = $record->membership ?? $this->memberships->activeFor($member);
+
+            if ($membership !== null && ! PlanDiscountRedemption::query()->where('walkin_session_id', $record->id)->exists()) {
+                $this->planDiscounts->redeem($discount, $membership, $record, $quote->automaticPoints);
+                $this->ledger->write($record, $member, $purpose, DiscountKind::PlanDiscount, [
+                    'plan_discount_id' => $discount->id,
+                    'discount_type' => CouponDiscountType::Percentage,
+                    'discount_value' => $discount->percentage,
+                    'base_points' => $quote->listPoints,
+                    'points' => $quote->automaticPoints,
+                ]);
+            }
         }
 
         if ($quote->appliedCoupon() !== null) {
