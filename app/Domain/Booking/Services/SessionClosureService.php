@@ -42,6 +42,7 @@ class SessionClosureService
         private readonly QuoteRecorder $recorder,
         private readonly CouponLedger $couponLedger,
         private readonly CoworkingBookingPolicy $policy,
+        private readonly BookingPlanCoverage $bookingCoverage,
     ) {}
 
     /**
@@ -203,9 +204,10 @@ class SessionClosureService
                 : ['points' => (int) $session->price_points, 'covered_seconds' => 0, 'already_paid' => true];
         }
 
-        $covered = $session instanceof WalkinSession && $session->membership !== null
-            ? $this->coverableBlocks($session, $session->membership, $at)
-            : 0;
+        $covered = match (true) {
+            $session instanceof WalkinSession => $session->membership !== null ? $this->coverableBlocks($session, $session->membership, $at) : 0,
+            default => $this->bookingCoverableBlocks($session, $at),
+        };
 
         // The same price finalizeClosure() bills, from the same quote.
         $points = $this->priceFor($session, $at, $covered)->finalPoints;
@@ -246,7 +248,7 @@ class SessionClosureService
      * halls keep their existing rules. Nothing when it closes at or before
      * its end: leaving early is never refunded.
      */
-    private function overstayPoints(Booking $booking, CarbonInterface $checkedOutAt): int
+    private function overstayPoints(Booking $booking, CarbonInterface $checkedOutAt, bool $spendPlanHours = false): int
     {
         $over = (int) $booking->end_at->diffInSeconds($checkedOutAt, false);
 
@@ -255,7 +257,16 @@ class SessionClosureService
         }
 
         $block = $this->blockSeconds();
-        $billed = (int) (ceil($over / $block) * $block);
+
+        // Plan hours left cover the overstay first, as for any session.
+        $covered = $this->bookingCoverage->coverOverstay($booking, $booking->end_at, $checkedOutAt, $block, $spendPlanHours);
+        $billable = $over - $covered;
+
+        if ($billable <= 0) {
+            return 0;
+        }
+
+        $billed = (int) (ceil($billable / $block) * $block);
 
         return $this->quotes->forSession($booking, $booking->end_at, $booking->end_at->copy()->addSeconds($billed))->finalPoints;
     }
@@ -300,6 +311,21 @@ class SessionClosureService
         return min($sessionLength, $this->allowances->coverableSeconds($membership, $session->user, $session->space, $session->checked_in_at, $checkedOutAt, $block));
     }
 
+    /** An unpaid booking's plan cover at closure, spending nothing (the quote): never more than its rounded length. */
+    private function bookingCoverableBlocks(Booking $booking, CarbonInterface $at): int
+    {
+        $from = $this->billingStartFor($booking);
+
+        return min($this->roundedLength($from, $at), $this->bookingCoverage->coverableFor($booking, $from, $at, $this->blockSeconds()));
+    }
+
+    private function roundedLength(CarbonInterface $from, CarbonInterface $to): int
+    {
+        $block = $this->blockSeconds();
+
+        return (int) (ceil(max(0, (int) $from->diffInSeconds($to)) / $block) * $block);
+    }
+
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
         $coveredSeconds = $this->consumePlanCoverage($session, $checkedOutAt);
@@ -334,7 +360,12 @@ class SessionClosureService
             $attributes += $quote->attributes();
         } elseif ($repriced) {
             $attributes += $this->repriceUnpaidBooking($session, $points) + ['list_price_points' => $quote->listPoints];
-        } elseif (($overstay = $this->overstayPoints($session, $checkedOutAt)) > 0) {
+
+            // The plan covered all of it: nothing is owed.
+            if ($points === 0 && $coveredSeconds > 0) {
+                $attributes += ['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan, 'paid_at' => now()];
+            }
+        } elseif (($overstay = $this->overstayPoints($session, $checkedOutAt, true)) > 0) {
             // Paid for its own window; the time past it is owed on top.
             $price = (int) $session->price_points + $overstay;
             $attributes['price_points'] = $price;
@@ -416,7 +447,19 @@ class SessionClosureService
      */
     private function consumePlanCoverage(Booking|WalkinSession $session, CarbonInterface $checkedOutAt): int
     {
-        if (! $session instanceof WalkinSession || $session->membership_id === null) {
+        // An unpaid booking is billed for the stretch it used, so its plan
+        // hours are settled on that stretch; a paid one keeps what it took
+        // (its overstay is covered in overstayPoints()).
+        if ($session instanceof Booking) {
+            return $session->payment_state === PaymentState::Paid
+                ? 0
+                : min(
+                    $this->roundedLength($this->billingStartFor($session), $checkedOutAt),
+                    $this->bookingCoverage->settle($session, $this->billingStartFor($session), $checkedOutAt, $this->blockSeconds()),
+                );
+        }
+
+        if ($session->membership_id === null) {
             return 0;
         }
 
