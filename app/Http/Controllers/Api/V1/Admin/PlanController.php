@@ -28,12 +28,12 @@ class PlanController extends AdminResourceController
 
     protected function applyIndexFilters(Builder $query, Request $request): void
     {
-        $query->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']);
+        $query->with(['planModule', 'balances', 'features', 'discounts', 'spaceHours', 'resourceGrants.resourceType']);
     }
 
     public function show(int $id): JsonResource
     {
-        $plan = Plan::with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType'])->findOrFail($id);
+        $plan = Plan::with(['planModule', 'balances', 'features', 'discounts', 'spaceHours', 'resourceGrants.resourceType'])->findOrFail($id);
 
         return new PlanResource($plan);
     }
@@ -42,12 +42,15 @@ class PlanController extends AdminResourceController
     {
         $plan = $plans->create($request->validated());
 
-        return new PlanResource($plan->load(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']));
+        return new PlanResource($plan->load(['planModule', 'balances', 'features', 'discounts', 'spaceHours', 'resourceGrants.resourceType']));
     }
 
-    public function update(UpdatePlanRequest $request, Plan $plan): JsonResponse
+    public function update(UpdatePlanRequest $request, Plan $plan, PlanCreationService $plans): JsonResponse
     {
-        $validated = $request->validated();
+        $validated = $plans->withCoworkingTerms($request->validated());
+        $hasSpaceHours = array_key_exists('space_hours', $validated);
+        $spaceHoursData = $validated['space_hours'] ?? [];
+        unset($validated['space_hours']);
         $hasBalances = array_key_exists('balances', $validated);
         $hasFeatures = array_key_exists('features', $validated);
         $hasDiscounts = array_key_exists('discounts', $validated);
@@ -58,7 +61,7 @@ class PlanController extends AdminResourceController
         $resourceGrantsData = $validated['resource_grants'] ?? [];
         unset($validated['balances'], $validated['features'], $validated['discounts'], $validated['resource_grants']);
 
-        DB::transaction(function () use ($plan, $validated, $hasBalances, $balancesData, $hasFeatures, $featuresData, $hasDiscounts, $discountsData, $hasResourceGrants, $resourceGrantsData) {
+        DB::transaction(function () use ($plan, $validated, $hasBalances, $balancesData, $hasFeatures, $featuresData, $hasDiscounts, $discountsData, $hasResourceGrants, $resourceGrantsData, $hasSpaceHours, $spaceHoursData) {
             $plan->update($validated);
 
             if ($hasBalances) {
@@ -83,6 +86,15 @@ class PlanController extends AdminResourceController
                 $plan->resourceGrants()->delete();
                 if (! empty($resourceGrantsData)) {
                     $plan->resourceGrants()->createMany($resourceGrantsData);
+                }
+            }
+
+            // Replaced whole, like balances: hours already spent stay in
+            // plan_hour_usages (the row link is nulled, never cascaded).
+            if ($hasSpaceHours) {
+                $plan->spaceHours()->delete();
+                if (! empty($spaceHoursData)) {
+                    $plan->spaceHours()->createMany($spaceHoursData);
                 }
             }
         });

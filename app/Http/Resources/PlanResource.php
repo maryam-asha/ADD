@@ -31,6 +31,10 @@ class PlanResource extends JsonResource
             'subtitle' => $this->subtitle,
             'is_subscription' => $this->is_subscription,
             'duration_days' => $this->duration_days,
+            // Whether and how it includes coworking; hours null is unlimited.
+            'coworking_seat' => $this->coworking_seat?->value,
+            'coworking_hours' => $this->coworking_hours,
+            'allowance_cycle' => $this->allowance_cycle?->value,
             'access_window_start' => $this->access_window_start,
             'access_window_end' => $this->access_window_end,
             'is_active' => $this->is_active,
@@ -58,6 +62,14 @@ class PlanResource extends JsonResource
                 'is_included' => $f->is_included,
                 'order' => $f->order,
             ])),
+            'space_hours' => $this->whenLoaded('spaceHours', fn () => $this->spaceHours->map(fn ($h) => [
+                'id' => $h->id,
+                'space_id' => $h->space_id,
+                'space_type' => $h->space_type?->value,
+                'hours' => $h->hours,
+                'description' => $h->description,
+                'order' => $h->order,
+            ])->values()),
             'discounts' => $this->whenLoaded('discounts', fn () => $this->discounts->map(fn ($d) => [
                 'id' => $d->id,
                 'percentage' => (int) $d->percentage,

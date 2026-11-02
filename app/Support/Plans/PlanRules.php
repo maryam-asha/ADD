@@ -3,6 +3,8 @@
 namespace App\Support\Plans;
 
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Membership\Enums\AllowanceCycle;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Support\TranslatableField;
 use Illuminate\Validation\Rule;
@@ -38,8 +40,17 @@ final class PlanRules
                 'reference_space_id' => ['nullable', 'integer', 'exists:spaces,id'],
                 'reference_units' => ['nullable', 'integer', 'min:1', 'required_with:reference_plan_id,reference_space_id'],
                 'duration_days' => ['required', 'integer', 'min:1'],
-                'access_window_start' => ['nullable', 'date_format:H:i', 'required_with:access_window_end'],
-                'access_window_end' => ['nullable', 'date_format:H:i', 'required_with:access_window_start'],
+                // Whether and how it includes coworking (product owner,
+                // 2026-11-02). Optional for a provider's design, which may
+                // still send the old space-hours grant instead
+                // (PlanCreationService::withCoworkingTerms()).
+                'coworking_seat' => ['sometimes', Rule::enum(CoworkingSeat::class)],
+                // None is unlimited; only a flexible seat counts hours.
+                'coworking_hours' => ['nullable', 'numeric', 'min:0.5', 'max:9999', 'prohibited_unless:coworking_seat,flexible'],
+                'allowance_cycle' => ['sometimes', Rule::enum(AllowanceCycle::class)],
+                // The daily coworking window; none is all day.
+                'access_window_start' => ['nullable', 'date_format:H:i', 'required_with:access_window_end', 'prohibited_if:coworking_seat,none'],
+                'access_window_end' => ['nullable', 'date_format:H:i', 'required_with:access_window_start', 'prohibited_if:coworking_seat,none'],
                 'is_active' => ['nullable', 'boolean'],
                 'is_public' => ['nullable', 'boolean'],
                 'order' => ['nullable', 'integer', 'min:0'],
@@ -74,6 +85,17 @@ final class PlanRules
                 'discounts.*.description.en' => ['nullable', 'string'],
                 'discounts.*.is_active' => ['nullable', 'boolean'],
                 'discounts.*.order' => ['nullable', 'integer', 'min:0'],
+
+                // Free hours on a space or a space type — one benefit per
+                // target, beside discounts (PlanBenefitTargets).
+                'space_hours' => ['nullable', 'array'],
+                'space_hours.*.space_id' => ['nullable', 'integer', 'exists:spaces,id', 'required_without:space_hours.*.space_type', 'prohibits:space_hours.*.space_type'],
+                'space_hours.*.space_type' => ['nullable', Rule::enum(SpaceType::class)],
+                'space_hours.*.hours' => ['required', 'numeric', 'min:0.5', 'max:9999'],
+                'space_hours.*.description' => ['nullable', 'array'],
+                'space_hours.*.description.ar' => ['nullable', 'string'],
+                'space_hours.*.description.en' => ['nullable', 'string'],
+                'space_hours.*.order' => ['nullable', 'integer', 'min:0'],
 
                 'resource_grants' => ['nullable', 'array'],
                 'resource_grants.*.resource_type_id' => ['required', 'integer', 'exists:resource_types,id'],
