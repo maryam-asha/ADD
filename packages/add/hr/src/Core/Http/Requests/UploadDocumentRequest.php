@@ -3,6 +3,7 @@
 namespace Add\Hr\Core\Http\Requests;
 
 use Add\Hr\Core\Models\DocumentType;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -32,7 +33,7 @@ class UploadDocumentRequest extends FormRequest
                 'mimes:'.implode(',', (array) config('hr.documents.mimes')),
                 'max:'.(int) config('hr.documents.max_kb'),
             ],
-            'issued_on' => ['nullable', 'date', 'before_or_equal:today'],
+            'issued_on' => ['nullable', 'date', 'before_or_equal:'.LocalDay::today()->toDateString()],
             'expires_on' => ['nullable', Rule::requiredIf((bool) $type?->has_expiry), 'date'],
             'notes' => ['nullable', 'string', 'max:500'],
         ];

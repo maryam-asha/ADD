@@ -8,6 +8,7 @@ use Add\Hr\Core\Enums\EmployeeStatus;
 use Add\Hr\Core\Models\OrgUnit;
 use Add\Hr\Core\Models\Position;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\RecordingProvisioner;
 use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
@@ -15,6 +16,7 @@ use Add\Hr\Tests\TestCase;
 class TerminationTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     private RecordingProvisioner $provisioner;
 
@@ -205,5 +207,51 @@ class TerminationTest extends TestCase
             'contract' => ['type' => 'open_ended'],
             'assignment' => ['org_unit_id' => OrgUnit::factory()->create()->id, 'employment_type' => 'full_time', 'work_mode' => 'on_site'],
         ])->assertStatus(422)->assertJsonPath('message', __('hr::core.rehire_not_allowed'));
+    }
+
+    public function test_the_daily_command_works_on_the_organisations_day(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $leaver = $this->hireEmployee();
+        $this->terminate($leaver->id, '2026-03-10')->assertCreated();
+        $starter = $this->hireEmployee(['hired_on' => '2026-03-11']);
+        $this->assertSame(EmployeeStatus::Upcoming, $starter->fresh()->status);
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $this->artisan('hr:refresh-statuses')->assertSuccessful();
+
+        $this->assertSame([$leaver->id], $this->provisioner->deprovisioned);
+        $this->assertSame(EmployeeStatus::Terminated, $leaver->fresh()->status);
+        $this->assertSame(EmployeeStatus::Active, $starter->fresh()->status);
+    }
+
+    public function test_a_termination_dated_the_organisations_yesterday_deprovisions_at_once(): void
+    {
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $employee = $this->hireEmployee();
+
+        $this->terminate($employee->id, '2026-03-10')->assertCreated();
+
+        $this->assertSame([$employee->id], $this->provisioner->deprovisioned);
+        $this->assertNotNull($employee->fresh()->access_revoked_at);
+    }
+
+    public function test_rehire_opens_on_the_organisations_day_after_the_last(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $employee = $this->hireEmployee();
+        $this->terminate($employee->id, '2026-03-10')->assertCreated();
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+
+        $this->postJson("/api/hr/employees/{$employee->id}/events", [
+            'type' => 'rehire',
+            'effective_on' => '2026-03-11',
+            'contract' => ['type' => 'open_ended'],
+            'assignment' => ['org_unit_id' => OrgUnit::factory()->create()->id, 'employment_type' => 'full_time', 'work_mode' => 'on_site'],
+        ])->assertCreated();
     }
 }

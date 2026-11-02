@@ -3,15 +3,18 @@
 namespace Add\Hr\Tests\Feature\Leave;
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\OrgUnit;
+use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Leave\Models\CoverageRule;
 use Add\Hr\Leave\Models\Holiday;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Tests\Concerns\BuildsLeave;
 use Add\Hr\Tests\Concerns\HiresStaff;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -24,6 +27,7 @@ class LeaveRequestTest extends TestCase
 {
     use BuildsLeave;
     use HiresStaff;
+    use TravelsOnTheOrganisationsClock;
 
     private Employee $manager;
 
@@ -303,5 +307,52 @@ class LeaveRequestTest extends TestCase
         $this->getJson("/api/hr/leave-calendar?from=2026-03-01&to=2026-03-31&org_unit_id={$unit}")->assertOk()
             ->assertJsonCount(1, 'data')
             ->assertJsonPath('data.0.employee.id', $this->employee->id);
+    }
+
+    public function test_approved_leave_has_started_on_the_organisations_first_day(): void
+    {
+        $id = $this->submit(['starts_on' => '2026-03-03', 'ends_on' => '2026-03-04'])->json('data.id');
+        $this->approveAsManager($id);
+
+        // 01:00 on 3 March locally, still 2 March in UTC.
+        $this->travelToLocal('2026-03-03 01:00');
+        $this->actingAsEmployee($this->employee);
+
+        $this->postJson("/api/hr/me/leave/requests/{$id}/cancel")
+            ->assertUnprocessable()->assertJsonPath('message', __('hr::leave.already_started'));
+        $this->assertSame(8.0, $this->balanceOf($this->employee, $this->annual));
+    }
+
+    public function test_balances_list_the_policies_in_force_on_the_organisations_day(): void
+    {
+        $special = $this->leaveType();
+        $this->policy($special, ['effective_from' => '2026-03-03']);
+
+        // 01:00 on 3 March locally, still 2 March in UTC.
+        $this->travelToLocal('2026-03-03 01:00');
+        $this->actingAsEmployee($this->employee);
+
+        $this->getJson('/api/hr/me/leave/balances')->assertOk()
+            ->assertJsonCount(2, 'data')
+            ->assertJsonPath('data.1.leave_type.id', $special->id);
+    }
+
+    public function test_the_team_calendar_follows_reporting_lines_on_the_organisations_day(): void
+    {
+        $newcomer = $this->staff();
+        $this->giveBalance($newcomer, $this->annual, 5);
+        $this->submit(['starts_on' => '2026-03-10', 'ends_on' => '2026-03-10'], $newcomer)->assertCreated();
+        app(EmploymentLifecycleService::class)->record($newcomer, EmploymentEventType::AssignmentChange, [
+            'effective_on' => '2026-03-03',
+            'assignment' => ['manager_id' => $this->manager->id],
+        ], null);
+
+        // 01:00 on 3 March locally, still 2 March in UTC.
+        $this->travelToLocal('2026-03-03 01:00');
+        $this->actingAsEmployee($this->manager);
+
+        $this->getJson('/api/hr/me/team/leave?from=2026-03-01&to=2026-03-31')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.employee.id', $newcomer->id);
     }
 }

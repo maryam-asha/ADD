@@ -42,6 +42,23 @@ class ReportsTest extends TestCase
             ->assertJsonPath('data.summary', ['missing' => 3]);
     }
 
+    public function test_the_dashboard_reads_alerts_on_the_organisations_calendar_day(): void
+    {
+        // The application runs in UTC and the organisation at +03:00, whose
+        // midnight is 21:00 UTC the day before; 10:00 on 15 June locally.
+        config(['hr.timezone' => 'Asia/Damascus']);
+        $this->travelTo('2026-06-15 07:00:00');
+        // A probation ending on the last day of the 21-day window.
+        $this->hireEmployee(['contract' => ['probation_ends_on' => '2026-07-06']]);
+        $this->actingAs($this->user([Abilities::REPORTS_VIEW]));
+
+        $named = $this->getJson('/api/hr/reports/dashboard?as_of=2026-06-15')->assertOk()
+            ->assertJsonPath('data.alerts.by_type.probation_ending', 1)->json('data.alerts');
+        $this->getJson('/api/hr/reports/dashboard')->assertOk()
+            ->assertJsonPath('data.as_of', '2026-06-15')
+            ->assertJsonPath('data.alerts', $named);
+    }
+
     public function test_the_dashboard_shows_pay_only_to_payroll_readers(): void
     {
         $this->actingAs($this->user([Abilities::REPORTS_VIEW]));

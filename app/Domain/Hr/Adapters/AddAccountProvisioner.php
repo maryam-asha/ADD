@@ -8,6 +8,7 @@ use Add\Hr\Support\HrException;
 use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Services\AccountCreationService;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Every ADD employee is an ADD ID (config hr.require_user).
@@ -77,16 +78,19 @@ class AddAccountProvisioner implements AccountProvisioner
             return $existing->id;
         }
 
+        // Only a new account needs these, so only here can it be told — and
+        // on the field, for the hire form (or the candidate's hire dialog)
+        // to show it there.
         if (! $email) {
-            HrException::fail('api.hr.work_email_required');
+            throw ValidationException::withMessages(['work_email' => __('api.hr.work_email_required')]);
         }
 
         if (! $phone) {
-            HrException::fail('api.hr.phone_required');
+            throw ValidationException::withMessages(['phone' => __('api.hr.phone_required')]);
         }
 
         if (! preg_match('/^\+[1-9]\d{1,14}$/', $phone)) {
-            HrException::fail('api.hr.phone_invalid');
+            throw ValidationException::withMessages(['phone' => __('api.hr.phone_invalid')]);
         }
 
         $name = $person['name'] ?? null;

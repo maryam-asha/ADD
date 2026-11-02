@@ -7,6 +7,7 @@ use Add\Hr\Leave\Enums\LedgerKind;
 use Add\Hr\Leave\Models\LeavePolicy;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Leave\Services\LeaveLedger;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 
 /**
@@ -42,7 +43,7 @@ trait BuildsLeave
 
     protected function giveBalance(Employee $employee, LeaveType $type, float $amount, ?string $on = null): void
     {
-        $day = CarbonImmutable::parse($on ?? CarbonImmutable::today()->toDateString());
+        $day = CarbonImmutable::parse($on ?? LocalDay::today()->toDateString());
 
         app(LeaveLedger::class)->record($employee, $type, LedgerKind::Opening, $amount, $day, $day->year);
     }

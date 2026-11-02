@@ -6,6 +6,7 @@ use Add\Hr\Authorization\Abilities;
 use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Models\EmployeeDocument;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Storage;
 class DocumentUploadTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -120,5 +122,19 @@ class DocumentUploadTest extends TestCase
         $this->deleteJson("/api/hr/document-types/{$id}")
             ->assertStatus(409)
             ->assertJsonPath('message', __('hr::core.document_type_in_use'));
+    }
+
+    public function test_a_document_issued_on_the_organisations_today_is_accepted(): void
+    {
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $employee = $this->hireEmployee();
+        $this->actingAsWith([Abilities::DOCUMENTS_MANAGE]);
+
+        $this->postJson("/api/hr/employees/{$employee->id}/documents", [
+            'document_type_id' => DocumentType::factory()->create()->id,
+            'file' => UploadedFile::fake()->create('doc.pdf', 10, 'application/pdf'),
+            'issued_on' => '2026-03-11',
+        ])->assertCreated();
     }
 }

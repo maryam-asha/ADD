@@ -12,6 +12,7 @@ use Add\Hr\Contracts\BenefitFulfiller;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -37,11 +38,15 @@ class BenefitGranter
     ) {}
 
     /**
+     * `$month` may come in the organisation's timezone (the command, the
+     * run endpoint); it is read as a calendar month, so its 1st compares
+     * with hire dates as a day, not as an instant.
+     *
      * @return array{granted: int, fulfilled: int, failed: int}
      */
     public function run(CarbonImmutable $month): array
     {
-        $month = $month->startOfMonth();
+        $month = LocalDay::of($month)->startOfMonth();
         $grants = $this->grantMonth($month, $this->dueBenefits($month), $this->employedOn($month));
 
         foreach ($grants as $index => $grant) {
@@ -69,7 +74,7 @@ class BenefitGranter
      */
     public function grantFor(Employee $employee, CarbonImmutable $month, Collection $benefits): Collection
     {
-        $month = $month->startOfMonth();
+        $month = LocalDay::of($month)->startOfMonth();
         $due = $benefits->filter(fn (Benefit $benefit) => $benefit->is_active && $benefit->frequency->dueIn($month, $benefit->grant_month));
 
         return $employee->isEmployedOn($month) ? $this->grantMonth($month, $due, collect([$employee])) : collect();

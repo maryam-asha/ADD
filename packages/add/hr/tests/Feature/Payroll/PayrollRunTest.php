@@ -10,6 +10,7 @@ use Add\Hr\Payroll\Models\PayrollRun;
 use Add\Hr\Support\Decimal;
 use Add\Hr\Tests\Concerns\BuildsPayroll;
 use Add\Hr\Tests\Concerns\HiresStaff;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\RecordingNotifier;
 use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
@@ -22,6 +23,7 @@ class PayrollRunTest extends TestCase
 {
     use BuildsPayroll;
     use HiresStaff;
+    use TravelsOnTheOrganisationsClock;
 
     private Employee $manager;
 
@@ -311,5 +313,34 @@ class PayrollRunTest extends TestCase
         $this->actingAs($this->officer);
         $this->postJson('/api/hr/pay-components', ['code' => 'x', 'name' => ['ar' => 'س'], 'kind' => 'earning', 'calculator' => 'fixed'])->assertForbidden();
         $this->getJson('/api/hr/loans')->assertForbidden();
+    }
+
+    public function test_a_loan_request_reads_the_organisations_day(): void
+    {
+        $this->pay($this->employee, ['basic' => 1500, 'transport' => 100], '2026-05-01');
+
+        // 01:00 on 1 May locally, still 30 April in UTC.
+        $this->travelToLocal('2026-05-01 01:00');
+        $this->actingAsEmployee($this->employee);
+
+        // March is now before last month.
+        $this->postJson('/api/hr/me/loans', ['amount' => 300, 'currency' => 'USD', 'installments' => 3, 'first_month' => '2026-03'])
+            ->assertUnprocessable()->assertJsonPath('message', __('hr::payroll.loan_month_closed'));
+        // May's raise sets the cap (2 × 1500), and the first installment is next month's.
+        $this->postJson('/api/hr/me/loans', ['amount' => 2800, 'currency' => 'USD', 'installments' => 4])
+            ->assertCreated()
+            ->assertJsonPath('data.first_month', '2026-06');
+    }
+
+    public function test_the_salary_certificate_states_the_pay_of_the_organisations_day(): void
+    {
+        $this->pay($this->employee, ['basic' => 1500, 'transport' => 100], '2026-05-01');
+
+        // 01:00 on 1 May locally, still 30 April in UTC.
+        $this->travelToLocal('2026-05-01 01:00');
+        $this->actingAsEmployee($this->employee);
+
+        $pay = $this->getJson('/api/hr/me/certificates/salary')->assertOk()->json('data.monthly_pay');
+        $this->assertSame('1500', collect($pay)->firstWhere('code', 'basic')['amount']);
     }
 }

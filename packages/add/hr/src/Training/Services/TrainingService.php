@@ -7,6 +7,7 @@ use Add\Hr\Contracts\HrClock;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Training\Enums\EnrollmentStatus;
 use Add\Hr\Training\Enums\SessionStatus;
 use Add\Hr\Training\Models\Certification;
@@ -176,6 +177,6 @@ class TrainingService
 
     private function today(): CarbonImmutable
     {
-        return CarbonImmutable::now($this->clock->timezone())->startOfDay();
+        return LocalDay::today($this->clock);
     }
 }

@@ -67,23 +67,51 @@ class HrRecruitmentTest extends TestCase
 
     public function test_a_hired_candidate_gets_a_dashboard_account(): void
     {
-        $this->apply('sara@example.test')->assertCreated();
-        $application = Application::query()->sole();
-        $application->update(['stage' => 'offer']);
-        $application->offers()->create(['start_on' => now()->addWeek()->toDateString(), 'status' => 'accepted']);
+        $application = $this->acceptedOffer();
+        $this->actAsRecruiter();
 
-        Role::create(['name' => 'recruiter', 'guard_name' => 'web'])
-            ->givePermissionTo(['hr.recruitment.view', 'hr.recruitment.manage', 'hr.employees.create']);
-        $recruiter = User::factory()->create();
-        $recruiter->assignRole('recruiter');
-        Sanctum::actingAs($recruiter, ['*']);
-
+        // The candidate brings only a personal email; the dashboard account
+        // needs a work one, and the client is told on that field.
         $this->postJson("/api/v1/hr/applications/{$application->id}/hire")->assertUnprocessable()
-            ->assertJsonPath('message', __('api.hr.work_email_required'));
+            ->assertJsonPath('message', __('api.validation.failed'))
+            ->assertJsonPath('errors.work_email.0', __('api.hr.work_email_required'));
+        $this->postJson("/api/v1/hr/applications/{$application->id}/hire", ['work_email' => 'not-an-email'])->assertUnprocessable()
+            ->assertJsonValidationErrors('work_email');
+        $this->assertDatabaseCount('hr_employees', 1);
+
         $this->postJson("/api/v1/hr/applications/{$application->id}/hire", ['work_email' => 'sara@add.test'])->assertCreated();
 
         $this->assertNotNull(User::query()->where('email', 'sara@add.test')->where('phone', '+963944123456')->first());
         $this->assertSame('hired', $application->fresh()->stage);
         $this->assertSame('filled', Requisition::query()->sole()->status->value);
+    }
+
+    public function test_a_candidate_who_already_has_an_account_is_hired_onto_it_without_a_work_email(): void
+    {
+        $member = User::factory()->create(['phone' => '+963944123456']);
+        $application = $this->acceptedOffer();
+        $this->actAsRecruiter();
+
+        $this->postJson("/api/v1/hr/applications/{$application->id}/hire")->assertCreated()
+            ->assertJsonPath('data.user_id', $member->id);
+    }
+
+    private function acceptedOffer(): Application
+    {
+        $this->apply('sara@example.test')->assertCreated();
+        $application = Application::query()->sole();
+        $application->update(['stage' => 'offer']);
+        $application->offers()->create(['start_on' => now()->addWeek()->toDateString(), 'status' => 'accepted']);
+
+        return $application;
+    }
+
+    private function actAsRecruiter(): void
+    {
+        Role::create(['name' => 'recruiter', 'guard_name' => 'web'])
+            ->givePermissionTo(['hr.recruitment.view', 'hr.recruitment.manage', 'hr.employees.create']);
+        $recruiter = User::factory()->create();
+        $recruiter->assignRole('recruiter');
+        Sanctum::actingAs($recruiter, ['*']);
     }
 }

@@ -10,7 +10,7 @@ use Add\Hr\Core\Http\Resources\EmployeeSummaryResource;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Hr;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -39,7 +39,7 @@ class EmployeeController extends Controller
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->integer('org_unit_id'), fn ($q, $unitId) => $q->whereHas(
                 'assignments',
-                fn ($a) => $a->activeOn(CarbonImmutable::today())->where('org_unit_id', $unitId),
+                fn ($a) => $a->activeOn(LocalDay::today())->where('org_unit_id', $unitId),
             ))
             ->when($request->query('q'), fn ($q, string $term) => $q->where(
                 fn ($w) => $w->where('employee_number', 'like', "%{$term}%")

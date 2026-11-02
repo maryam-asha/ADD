@@ -8,12 +8,14 @@ use Add\Hr\Core\Models\Position;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Tests\Concerns\BuildsLeave;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 
 class LeaveSettingsTest extends TestCase
 {
     use BuildsLeave;
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     public function test_leave_types_are_read_with_view_and_written_with_settings(): void
     {
@@ -137,5 +139,24 @@ class LeaveSettingsTest extends TestCase
 
         $this->actingAsWith([]);
         $this->getJson("/api/hr/employees/{$employee->id}/leave-balances")->assertForbidden();
+    }
+
+    public function test_an_adjustment_is_dated_on_the_organisations_day(): void
+    {
+        // 01:00 on 1 January locally, still 31 December in UTC.
+        $this->travelToLocal('2027-01-01 01:00');
+        $this->actingAsWith([Abilities::LEAVE_MANAGE, Abilities::LEAVE_VIEW]);
+        $type = $this->leaveType();
+        $this->policy($type);
+        $employee = $this->hireEmployee();
+
+        $this->postJson("/api/hr/employees/{$employee->id}/leave-adjustments", [
+            'leave_type_id' => $type->id, 'kind' => 'opening', 'amount' => 5, 'notes' => 'go-live balance',
+        ])->assertCreated()
+            ->assertJsonPath('data.effective_on', '2027-01-01')
+            ->assertJsonPath('data.period_year', 2027);
+        $this->postJson("/api/hr/employees/{$employee->id}/leave-adjustments", [
+            'leave_type_id' => $type->id, 'kind' => 'adjustment', 'amount' => 1, 'effective_on' => '2027-01-01', 'notes' => 'correction',
+        ])->assertCreated();
     }
 }

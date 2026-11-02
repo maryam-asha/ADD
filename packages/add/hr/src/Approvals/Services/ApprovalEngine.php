@@ -15,7 +15,7 @@ use Add\Hr\Audit\HrAudit;
 use Add\Hr\Contracts\HrNotifier;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\HrException;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -149,7 +149,7 @@ class ApprovalEngine
         $delegated = ApprovalDelegation::query()
             ->where('delegator_employee_id', $step->approver_employee_id)
             ->where('delegate_employee_id', $me->id)
-            ->activeOn(CarbonImmutable::today(), $request->request_type)
+            ->activeOn(LocalDay::today(), $request->request_type)
             ->exists();
 
         return $delegated ? DecisionSource::Delegate : null;
@@ -165,7 +165,7 @@ class ApprovalEngine
     {
         $me = Employee::forUser($user);
         $userId = $user->getAuthIdentifier();
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
 
         $abilities = ApprovalStep::query()
             ->where('status', StepStatus::Pending->value)

@@ -8,7 +8,7 @@ use Add\Hr\Leave\Enums\LedgerKind;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Leave\Models\LedgerEntry;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -89,7 +89,7 @@ class LeaveLedger
     {
         $employee = $request->employee;
         $type = $request->leaveType;
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
         $left = (float) $request->amount;
 
         foreach ($this->buckets($employee, $type, $today) as $year => $remaining) {
@@ -125,7 +125,7 @@ class LeaveLedger
 
         foreach ($byYear as $year => $net) {
             if ((float) $net < 0) {
-                $this->record($request->employee, $request->leaveType, LedgerKind::Reversal, -(float) $net, CarbonImmutable::today(), (int) $year, [
+                $this->record($request->employee, $request->leaveType, LedgerKind::Reversal, -(float) $net, LocalDay::today(), (int) $year, [
                     'leave_request_id' => $request->id,
                     'created_by' => $actorId,
                 ]);
@@ -135,7 +135,7 @@ class LeaveLedger
 
     private function recordUsage(LeaveRequest $request, float $amount, int $year, int|string|null $actorId): void
     {
-        $this->record($request->employee, $request->leaveType, LedgerKind::Usage, $amount, CarbonImmutable::today(), $year, [
+        $this->record($request->employee, $request->leaveType, LedgerKind::Usage, $amount, LocalDay::today(), $year, [
             'leave_request_id' => $request->id,
             'created_by' => $actorId,
         ]);
@@ -149,6 +149,6 @@ class LeaveLedger
         return LedgerEntry::query()
             ->where('employee_id', $employee->id)
             ->where('leave_type_id', $type->id)
-            ->where('effective_on', '<=', ($asOf ?? CarbonImmutable::today())->toDateString());
+            ->where('effective_on', '<=', ($asOf ?? LocalDay::today())->toDateString());
     }
 }

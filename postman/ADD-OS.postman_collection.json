@@ -31346,7 +31346,7 @@
                                                 "employees"
                                             ]
                                         },
-                                        "description": "hr.employees.create. Someone with no account: name, phone (E.164) and work_email make one, with no role and a link sent to choose a password. An account already holding that phone or email is linked instead. 422 with api.hr.work_email_required / phone_required / phone_invalid when a new account lacks one.",
+                                        "description": "hr.employees.create. Someone with no account: name, phone (E.164) and work_email make one, with no role and a link sent to choose a password. An account already holding that phone or email is linked instead. When a new account lacks one: 422 with errors.work_email (api.hr.work_email_required) or errors.phone (api.hr.phone_required / phone_invalid), so the form can show it on the field.",
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n  \"name\": {\n    \"ar\": \"\u0639\u0645\u0631 \u0627\u0644\u0634\u0627\u0645\u064a\",\n    \"en\": \"Omar Shami\"\n  },\n  \"phone\": \"+963933190664\",\n  \"work_email\": \"omar@add.sy\",\n  \"gender\": \"male\",\n  \"date_of_birth\": \"1998-04-02\",\n  \"hired_on\": \"2026-10-01\",\n  \"contract\": {\n    \"type\": \"open_ended\",\n    \"probation_ends_on\": \"2026-12-31\"\n  },\n  \"assignment\": {\n    \"org_unit_id\": \"{{hr_org_unit_id}}\",\n    \"position_id\": \"{{hr_position_id}}\",\n    \"work_location_id\": \"{{branch_id}}\",\n    \"employment_type\": \"full_time\",\n    \"work_mode\": \"on_site\"\n  }\n}",
@@ -39049,7 +39049,7 @@
                                                 "hire"
                                             ]
                                         },
-                                        "description": "Needs an accepted offer and hr.employees.create. The hire is pre-filled from the application (name, phone, personal email, the offer's start date, the requisition's unit, position, grade and manager); anything sent wins. The offer's pay lines become the first compensation. In ADD a work_email is required for the dashboard account. 201 with the employee.",
+                                        "description": "Needs an accepted offer and hr.employees.create. The hire is pre-filled from the application (name, phone, personal email, the offer's start date, the requisition's unit, position, grade and manager); anything sent wins. The offer's pay lines become the first compensation. The candidate's email is personal, so in ADD send work_email whenever the candidate's phone belongs to no ADD account: it becomes the new account's email, which is how they sign in to the dashboard. Without it: 422 with errors.work_email (api.hr.work_email_required); not an email: 422 with errors.work_email. When the phone (or the work_email) already belongs to an account, the candidate is hired onto that account and work_email is not needed. To hire onto a chosen account instead, send user_id (from Find accounts) and no work_email. 201 with the employee.",
                                         "body": {
                                             "mode": "raw",
                                             "raw": "{\n  \"work_email\": \"omar.haddad@add.sy\",\n  \"contract\": {\n    \"probation_ends_on\": \"2027-02-28\"\n  }\n}",
@@ -39059,7 +39059,71 @@
                                                 }
                                             }
                                         }
-                                    }
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "Work email missing",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Content-Type",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/hr/applications/1/hire",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "hr",
+                                                        "applications",
+                                                        "1",
+                                                        "hire"
+                                                    ]
+                                                },
+                                                "body": {
+                                                    "mode": "raw",
+                                                    "raw": "{\n  \"contract\": {\n    \"probation_ends_on\": \"2027-02-28\"\n  }\n}",
+                                                    "options": {
+                                                        "raw": {
+                                                            "language": "json"
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "status": "Unprocessable Content",
+                                            "code": 422,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"message\": \"\u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a \u0627\u0644\u0645\u064f\u0631\u0633\u0644\u0629 \u063a\u064a\u0631 \u0635\u0627\u0644\u062d\u0629.\",\n  \"errors\": {\n    \"work_email\": [\n      \"\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0648\u0638\u0641 \u0627\u0644\u062c\u062f\u064a\u062f \u064a\u062d\u062a\u0627\u062c \u0628\u0631\u064a\u062f\u0627\u064b \u0645\u0624\u0633\u0633\u064a\u0627\u064b\u060c \u0641\u0628\u0647 \u064a\u062f\u062e\u0644 \u0625\u0644\u0649 \u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0645.\"\n    ]\n  }\n}"
+                                        }
+                                    ]
                                 }
                             ]
                         },

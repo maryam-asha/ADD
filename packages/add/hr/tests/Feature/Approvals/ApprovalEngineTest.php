@@ -8,9 +8,12 @@ use Add\Hr\Approvals\Services\ApprovalEngine;
 use Add\Hr\Approvals\Services\ApprovalTypes;
 use Add\Hr\Authorization\Abilities;
 use Add\Hr\Contracts\HrNotifier;
+use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\OrgUnit;
+use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresStaff;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\RecordingApprovalHandler;
 use Add\Hr\Tests\Fixtures\RecordingNotifier;
 use Add\Hr\Tests\Fixtures\User;
@@ -19,6 +22,7 @@ use Add\Hr\Tests\TestCase;
 class ApprovalEngineTest extends TestCase
 {
     use HiresStaff;
+    use TravelsOnTheOrganisationsClock;
 
     private RecordingNotifier $notifier;
 
@@ -323,5 +327,47 @@ class ApprovalEngineTest extends TestCase
 
         $this->getJson('/api/hr/approval-flows')->assertForbidden();
         $this->getJson('/api/hr/approval-requests')->assertForbidden();
+    }
+
+    public function test_a_delegation_runs_on_the_organisations_days(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $manager = $this->staff();
+        $deputy = $this->staff();
+        $request = $this->submit($this->reportOf($manager));
+        $this->actingAsEmployee($manager);
+        $this->postJson('/api/hr/me/delegations', ['delegate_employee_id' => $deputy->id, 'starts_on' => '2026-03-05', 'ends_on' => '2026-03-10'])->assertCreated();
+        $this->postJson('/api/hr/me/delegations', ['delegate_employee_id' => $deputy->id, 'starts_on' => '2026-03-11', 'ends_on' => '2026-03-12'])->assertCreated();
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+
+        $this->getJson('/api/hr/me/delegations')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.starts_on', '2026-03-11');
+        $this->postJson('/api/hr/me/delegations', ['delegate_employee_id' => $deputy->id, 'starts_on' => '2026-03-10', 'ends_on' => '2026-03-12'])
+            ->assertUnprocessable()->assertJsonValidationErrors('starts_on');
+        $this->actingAsEmployee($deputy);
+        $this->getJson('/api/hr/me/approvals')->assertOk()->assertJsonCount(1, 'data');
+        $this->postJson("/api/hr/me/approvals/{$request->id}/approve")->assertOk();
+        $this->assertSame('delegate', $request->steps()->first()->decided_via->value);
+    }
+
+    public function test_an_approver_whose_last_day_has_passed_is_skipped_from_the_organisations_next_day(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $manager = $this->staff();
+        $employee = $this->reportOf($manager);
+        app(EmploymentLifecycleService::class)->record($manager, EmploymentEventType::Termination, [
+            'effective_on' => '2026-03-10',
+            'reason' => 'resignation',
+        ], null);
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $step = $this->submit($employee)->steps()->first();
+
+        $this->assertNull($step->approver_employee_id);
+        $this->assertSame(Abilities::APPROVALS_MANAGE, $step->approver_ability);
     }
 }

@@ -3,13 +3,17 @@
 namespace Add\Hr\Tests\Feature\Core;
 
 use Add\Hr\Authorization\Abilities;
+use Add\Hr\Core\Enums\EmploymentEventType;
 use Add\Hr\Core\Models\OrgUnit;
+use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\TestCase;
 
 class EmployeeReadUpdateTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -105,5 +109,37 @@ class EmployeeReadUpdateTest extends TestCase
         $this->getJson("/api/hr/employees/{$employee->id}")
             ->assertJsonCount(2, 'data.contacts')
             ->assertJsonPath('data.dependents.0.date_of_birth', '2020-05-01');
+    }
+
+    public function test_the_list_shows_units_on_the_organisations_day(): void
+    {
+        $this->travelToLocal('2026-03-01 12:00');
+        $sales = OrgUnit::factory()->create();
+        $cafe = OrgUnit::factory()->create();
+        $employee = $this->hireEmployee(['assignment' => ['org_unit_id' => $sales->id]]);
+        app(EmploymentLifecycleService::class)->record($employee, EmploymentEventType::Transfer, [
+            'effective_on' => '2026-03-11',
+            'assignment' => ['org_unit_id' => $cafe->id],
+        ], null);
+
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+
+        $this->getJson("/api/hr/employees?org_unit_id={$cafe->id}")->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.org_unit.id', $cafe->id);
+        $this->getJson("/api/hr/employees?org_unit_id={$sales->id}")->assertOk()->assertJsonCount(0, 'data');
+    }
+
+    public function test_birth_dates_are_checked_against_the_organisations_day(): void
+    {
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        $employee = $this->hireEmployee();
+
+        $this->putJson("/api/hr/employees/{$employee->id}/dependents", ['dependents' => [
+            ['name' => 'ابن', 'relation' => 'child', 'date_of_birth' => '2026-03-11'],
+        ]])->assertOk();
+        $this->patchJson("/api/hr/employees/{$employee->id}", ['date_of_birth' => '2026-03-10'])->assertOk();
     }
 }

@@ -14,6 +14,7 @@ use Add\Hr\Performance\Models\Review;
 use Add\Hr\Performance\Models\ReviewCycle;
 use Add\Hr\Support\Decimal;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
@@ -164,6 +165,6 @@ class ReviewCycleService
 
     private function today(): CarbonImmutable
     {
-        return CarbonImmutable::now($this->clock->timezone())->startOfDay();
+        return LocalDay::today($this->clock);
     }
 }

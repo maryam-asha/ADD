@@ -16,6 +16,7 @@ use Add\Hr\Core\Models\Position;
 use Add\Hr\Core\PersonFields;
 use Add\Hr\Hr;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Arr;
@@ -135,7 +136,7 @@ class EmploymentLifecycleService
         DB::transaction(function () use ($employee) {
             $employee = Employee::query()->lockForUpdate()->findOrFail($employee->id);
 
-            if ($employee->access_revoked_at !== null || $employee->isEmployedOn(CarbonImmutable::today())) {
+            if ($employee->access_revoked_at !== null || $employee->isEmployedOn(LocalDay::today())) {
                 return;
             }
 
@@ -153,7 +154,7 @@ class EmploymentLifecycleService
      */
     public function refreshStatus(Employee $employee): void
     {
-        $employee->status = $this->statuses->resolve($employee, CarbonImmutable::today());
+        $employee->status = $this->statuses->resolve($employee, LocalDay::today());
         $employee->save();
     }
 
@@ -328,7 +329,7 @@ class EmploymentLifecycleService
         $employee->save();
         EmployeeTerminated::dispatch($employee, $event);
 
-        if ($day < CarbonImmutable::today()->toDateString()) {
+        if ($day < LocalDay::today()->toDateString()) {
             $this->accounts->deprovision($employee);
             $employee->access_revoked_at = now();
             HrAudit::record('access_revoked', $employee);
@@ -348,7 +349,7 @@ class EmploymentLifecycleService
         // Only once the last working day has passed: a rehire rewrites the
         // employment's dates, which must not happen while it still runs.
         if ($employee->terminated_on === null
-            || $employee->terminated_on->toDateString() >= CarbonImmutable::today()->toDateString()
+            || $employee->terminated_on->toDateString() >= LocalDay::today()->toDateString()
             || $on->toDateString() <= $employee->terminated_on->toDateString()) {
             HrException::fail('hr::core.rehire_not_allowed');
         }
@@ -440,13 +441,7 @@ class EmploymentLifecycleService
                 HrException::fail('hr::core.position_unit_mismatch');
             }
 
-            $taken = Assignment::query()
-                ->where('position_id', $position->id)
-                ->openFrom($on)
-                ->when($employee, fn ($q) => $q->where('employee_id', '!=', $employee->id))
-                ->count();
-
-            if ($taken >= $position->headcount) {
+            if ($position->occupiedCount($on, $employee?->id) >= $position->headcount) {
                 HrException::fail('hr::core.position_full');
             }
         }

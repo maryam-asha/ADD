@@ -13,7 +13,7 @@ use Add\Hr\Payroll\Models\Compensation;
 use Add\Hr\Payroll\Models\Loan;
 use Add\Hr\Payroll\Models\Payslip;
 use Add\Hr\Payroll\Services\LoanService;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -73,7 +73,7 @@ class MyPayController extends Controller
     public function salaryCertificate(Request $request): JsonResponse
     {
         $employee = $this->employee($request);
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
         HrAudit::record('certificate_generated', $employee, ['kind' => 'salary']);
 
         $pay = Compensation::query()

@@ -13,6 +13,7 @@ use Add\Hr\Leave\Models\LeavePolicy;
 use Add\Hr\Leave\Models\LeaveRequest;
 use Add\Hr\Leave\Models\LeaveType;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Support\PlainNumber;
 use Add\Hr\Time\Services\ScheduleResolver;
 use Carbon\CarbonImmutable;
@@ -235,7 +236,7 @@ class LeaveService
      */
     public function balances(Employee $employee): Collection
     {
-        $today = CarbonImmutable::today();
+        $today = LocalDay::today();
 
         return LeaveType::query()->where('is_active', true)->orderBy('id')->get()
             ->map(function (LeaveType $type) use ($employee, $today) {
@@ -263,7 +264,7 @@ class LeaveService
 
     private function reverseApproved(LeaveRequest $request, int|string|null $actorId): void
     {
-        if ($request->starts_on->toDateString() <= CarbonImmutable::today()->toDateString()) {
+        if ($request->starts_on->toDateString() <= LocalDay::today()->toDateString()) {
             HrException::fail('hr::leave.already_started');
         }
 

@@ -10,6 +10,7 @@ use Add\Hr\Core\Models\DocumentType;
 use Add\Hr\Core\Services\AlertService;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\RecordingNotifier;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
 class AlertsTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -169,5 +171,18 @@ class AlertsTest extends TestCase
         $this->app->instance(HrNotifier::class, $notifier);
 
         return $notifier;
+    }
+
+    public function test_alerts_are_read_on_the_organisations_day(): void
+    {
+        // 01:00 on 11 March locally, still 10 March in UTC: a contract
+        // ending 10 April is 30 days away, inside its window.
+        $this->travelToLocal('2026-03-11 01:00');
+        $this->hireEmployee(['contract' => ['type' => 'fixed_term', 'ends_on' => '2026-04-10']]);
+        $this->actingAsWith([Abilities::ALERTS_VIEW]);
+
+        $this->getJson('/api/hr/alerts')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.days_left', 30);
     }
 }

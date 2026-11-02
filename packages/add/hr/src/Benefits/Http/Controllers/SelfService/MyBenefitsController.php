@@ -8,7 +8,7 @@ use Add\Hr\Benefits\Models\BenefitGrant;
 use Add\Hr\Benefits\Services\BenefitResolver;
 use Add\Hr\Contracts\HrClock;
 use Add\Hr\Core\Models\Employee;
-use Carbon\CarbonImmutable;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -24,7 +24,7 @@ class MyBenefitsController extends Controller
         $employee = Employee::forUser($request->user());
 
         return response()->json(['data' => [
-            'benefits' => $resolver->for($employee, CarbonImmutable::now($clock->timezone())->startOfDay())->map(fn (BenefitAssignment $held) => [
+            'benefits' => $resolver->for($employee, LocalDay::today($clock))->map(fn (BenefitAssignment $held) => [
                 'code' => $held->benefit->code,
                 'name' => $held->benefit->name,
                 'description' => $held->benefit->description,

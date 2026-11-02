@@ -8,6 +8,7 @@ use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Services\DocumentVault;
 use Add\Hr\Core\Services\EmploymentLifecycleService;
 use Add\Hr\Tests\Concerns\HiresEmployees;
+use Add\Hr\Tests\Concerns\TravelsOnTheOrganisationsClock;
 use Add\Hr\Tests\Fixtures\User;
 use Add\Hr\Tests\TestCase;
 use Illuminate\Http\UploadedFile;
@@ -16,6 +17,7 @@ use Illuminate\Support\Facades\Storage;
 class SelfServiceTest extends TestCase
 {
     use HiresEmployees;
+    use TravelsOnTheOrganisationsClock;
 
     protected function setUp(): void
     {
@@ -148,5 +150,17 @@ class SelfServiceTest extends TestCase
         $this->getJson('/api/hr/me')
             ->assertForbidden()
             ->assertJsonPath('message', __('hr::system.not_an_employee'));
+    }
+
+    public function test_the_team_is_read_on_the_organisations_day(): void
+    {
+        // 01:00 on 11 March locally, still 10 March in UTC.
+        $this->travelToLocal('2026-03-11 01:00');
+        [, $manager] = $this->signedInEmployee();
+        $starter = $this->hireEmployee(['hired_on' => '2026-03-11', 'assignment' => ['manager_id' => $manager->id]]);
+
+        $this->getJson('/api/hr/me/team')->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', $starter->id);
     }
 }

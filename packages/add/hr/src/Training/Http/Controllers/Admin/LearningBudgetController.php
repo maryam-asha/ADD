@@ -4,6 +4,7 @@ namespace Add\Hr\Training\Http\Controllers\Admin;
 
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\Decimal;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Training\Http\Resources\LearningRequestResource;
 use Add\Hr\Training\Models\BudgetEntry;
 use Add\Hr\Training\Models\LearningRequest;
@@ -24,7 +25,7 @@ class LearningBudgetController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $year = $request->integer('year') ?: (int) now()->year;
+        $year = $request->integer('year') ?: LocalDay::today()->year;
         $balances = BudgetEntry::query()->where('year', $year)
             ->selectRaw('employee_id, sum(amount) as balance')
             ->groupBy('employee_id')
@@ -46,7 +47,7 @@ class LearningBudgetController extends Controller
 
     public function show(Request $request, Employee $employee): JsonResponse
     {
-        $year = $request->integer('year') ?: (int) now()->year;
+        $year = $request->integer('year') ?: LocalDay::today()->year;
 
         return response()->json(['data' => [
             'year' => $year,

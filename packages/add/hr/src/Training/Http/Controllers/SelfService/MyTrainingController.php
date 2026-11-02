@@ -5,6 +5,7 @@ namespace Add\Hr\Training\Http\Controllers\SelfService;
 use Add\Hr\Contracts\HrClock;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Training\Enums\SessionStatus;
 use Add\Hr\Training\Http\Controllers\Admin\TrainingSessionController;
 use Add\Hr\Training\Http\Requests\LearningRequestRequest;
@@ -76,7 +77,7 @@ class MyTrainingController extends Controller
 
     public function budget(Request $request, LearningBudget $budget): JsonResponse
     {
-        $year = $request->integer('year') ?: (int) now()->year;
+        $year = $request->integer('year') ?: LocalDay::today()->year;
         $me = $this->me($request);
 
         return response()->json(['data' => [

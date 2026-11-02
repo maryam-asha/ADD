@@ -6,6 +6,7 @@ use Add\Hr\Core\Data\Alert;
 use Add\Hr\Core\Enums\AlertType;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Core\Models\EmployeeDocument;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Training\Models\Certification;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
@@ -25,7 +26,9 @@ class AlertService
      */
     public function current(?CarbonInterface $today = null): array
     {
-        $today = CarbonImmutable::parse($today ?? CarbonImmutable::today())->startOfDay();
+        // The day the caller means (by default the organisation's), read as
+        // DateOnly reads the dates it is compared with.
+        $today = $today === null ? LocalDay::today() : LocalDay::of($today);
         $day = $today->toDateString();
         $alerts = [];
 

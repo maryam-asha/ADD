@@ -4,6 +4,7 @@ namespace Add\Hr\Core;
 
 use Add\Hr\Core\Enums\Gender;
 use Add\Hr\Core\Enums\MaritalStatus;
+use Add\Hr\Support\LocalDay;
 use Illuminate\Validation\Rule;
 
 /**
@@ -35,7 +36,7 @@ final class PersonFields
     {
         return [
             'gender' => ['nullable', Rule::enum(Gender::class)],
-            'date_of_birth' => ['nullable', 'date', 'before:today'],
+            'date_of_birth' => ['nullable', 'date', 'before:'.LocalDay::today()->toDateString()],
             'nationality' => ['nullable', 'string', 'size:2'],
             'marital_status' => ['nullable', Rule::enum(MaritalStatus::class)],
             'personal_email' => ['nullable', 'email', 'max:255'],

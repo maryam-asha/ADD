@@ -7,11 +7,11 @@ use Add\Hr\Contracts\HrClock;
 use Add\Hr\Core\Models\Employee;
 use Add\Hr\Support\Decimal;
 use Add\Hr\Support\HrException;
+use Add\Hr\Support\LocalDay;
 use Add\Hr\Training\Enums\BudgetEntryKind;
 use Add\Hr\Training\Enums\LearningRequestStatus;
 use Add\Hr\Training\Models\BudgetEntry;
 use Add\Hr\Training\Models\LearningRequest;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -62,7 +62,7 @@ class LearningBudget
     public function allocate(int $year, string $amount, ?array $employeeIds, int|string|null $actorId): int
     {
         return DB::transaction(function () use ($year, $amount, $employeeIds, $actorId) {
-            $today = CarbonImmutable::now($this->clock->timezone())->startOfDay();
+            $today = LocalDay::today($this->clock);
             $allocated = BudgetEntry::query()->where('year', $year)->where('kind', BudgetEntryKind::Allocation->value)->pluck('employee_id')->all();
 
             $employees = Employee::query()
