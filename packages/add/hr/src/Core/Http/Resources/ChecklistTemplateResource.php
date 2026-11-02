@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Http\Resources;
 
+use Add\Hr\Core\Enums\ChecklistAssignee;
 use Add\Hr\Core\Models\ChecklistTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -20,7 +21,8 @@ class ChecklistTemplateResource extends JsonResource
             'id' => $this->id,
             'kind' => $this->kind->value,
             'name' => $this->name,
-            'items' => $this->items,
+            // Items saved before assignees existed are HR's.
+            'items' => array_map(fn (array $item) => [...$item, 'assignee' => $item['assignee'] ?? ChecklistAssignee::Hr->value], $this->items),
             'is_active' => $this->is_active,
         ];
     }

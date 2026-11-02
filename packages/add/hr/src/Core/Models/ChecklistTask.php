@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Models;
 
+use Add\Hr\Core\Enums\ChecklistAssignee;
 use Add\Hr\Core\Enums\ChecklistKind;
 use Add\Hr\Support\Casts\DateOnly;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class ChecklistTask extends Model
     protected $fillable = [
         'employee_id',
         'kind',
+        'assignee',
         'event_id',
         'title',
         'due_on',
@@ -28,6 +30,7 @@ class ChecklistTask extends Model
 
     protected $casts = [
         'kind' => ChecklistKind::class,
+        'assignee' => ChecklistAssignee::class,
         'title' => 'array',
         'due_on' => DateOnly::class,
         'completed_at' => 'datetime',

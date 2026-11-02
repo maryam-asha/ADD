@@ -2,6 +2,7 @@
 
 namespace Add\Hr\Core\Services;
 
+use Add\Hr\Core\Enums\ChecklistAssignee;
 use Add\Hr\Core\Enums\ChecklistKind;
 use Add\Hr\Core\Models\ChecklistTemplate;
 use Add\Hr\Core\Models\Employee;
@@ -22,6 +23,7 @@ class ChecklistService
             foreach ($template->items as $item) {
                 $employee->checklistTasks()->create([
                     'kind' => $kind,
+                    'assignee' => $item['assignee'] ?? ChecklistAssignee::Hr->value,
                     'event_id' => $event->id,
                     'title' => $item['title'],
                     'due_on' => $event->effective_on->addDays((int) ($item['due_offset_days'] ?? 0)),

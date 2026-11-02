@@ -32522,10 +32522,10 @@
                                                 "checklist-templates"
                                             ]
                                         },
-                                        "description": "due_offset_days counts from the event's date.",
+                                        "description": "due_offset_days counts from the event's date. Each item may say who does it: assignee \"hr\" (the default) or \"employee\", who then sees and ticks it on hr/me/tasks. On an offboarding template an employee item must be due on or before the last working day (due_offset_days <= 0): 422 on items.N.due_offset_days (hr::core.employee_task_after_last_day).",
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"kind\": \"onboarding\",\n  \"name\": {\n    \"ar\": \"\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0645\u0648\u0638\u0641 \u062c\u062f\u064a\u062f\"\n  },\n  \"items\": [\n    {\n      \"title\": {\n        \"ar\": \"\u0625\u0635\u062f\u0627\u0631 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0648\u0635\u0648\u0644\",\n        \"en\": \"Issue access card\"\n      },\n      \"due_offset_days\": 0\n    },\n    {\n      \"title\": {\n        \"ar\": \"\u0631\u0641\u0639 \u0627\u0644\u0648\u062b\u0627\u0626\u0642 \u0627\u0644\u0625\u0644\u0632\u0627\u0645\u064a\u0629\"\n      },\n      \"due_offset_days\": 7\n    }\n  ]\n}",
+                                            "raw": "{\n  \"kind\": \"onboarding\",\n  \"name\": {\n    \"ar\": \"\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0645\u0648\u0638\u0641 \u062c\u062f\u064a\u062f\"\n  },\n  \"items\": [\n    {\n      \"title\": {\n        \"ar\": \"\u0625\u0635\u062f\u0627\u0631 \u0628\u0637\u0627\u0642\u0629 \u0627\u0644\u0648\u0635\u0648\u0644\",\n        \"en\": \"Issue access card\"\n      },\n      \"due_offset_days\": 0\n    },\n    {\n      \"title\": {\n        \"ar\": \"\u0631\u0641\u0639 \u0627\u0644\u0648\u062b\u0627\u0626\u0642 \u0627\u0644\u0625\u0644\u0632\u0627\u0645\u064a\u0629\"\n      },\n      \"due_offset_days\": 7,\n      \"assignee\": \"employee\"\n    }\n  ]\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -32569,7 +32569,7 @@
                                                 "checklist"
                                             ]
                                         },
-                                        "description": ""
+                                        "description": "Each task carries assignee: \"hr\" or \"employee\" (the employee sees and ticks theirs on hr/me/tasks)."
                                     }
                                 },
                                 {
@@ -41951,6 +41951,330 @@
                                         },
                                         "description": "Direct reports today: employees whose current assignment names the caller as manager."
                                     }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Tasks",
+                            "item": [
+                                {
+                                    "name": "My tasks",
+                                    "request": {
+                                        "method": "GET",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/tasks",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "tasks"
+                                            ]
+                                        },
+                                        "description": "The onboarding and offboarding tasks HR gave me (template items with assignee \"employee\"): open ones first, soonest due first, then done ones. HR's own tasks, HR's notes and who ticked a task are not shown."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "My tasks",
+                                            "originalRequest": {
+                                                "method": "GET",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/hr/me/tasks",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "hr",
+                                                        "me",
+                                                        "tasks"
+                                                    ]
+                                                },
+                                                "description": "The onboarding and offboarding tasks HR gave me (template items with assignee \"employee\"): open ones first, soonest due first, then done ones. HR's own tasks, HR's notes and who ticked a task are not shown."
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"data\": [\n    {\n      \"id\": 14,\n      \"kind\": \"onboarding\",\n      \"title\": {\n        \"ar\": \"\u0648\u0642\u0651\u0639 \u0644\u0627\u0626\u062d\u0629 \u0627\u0644\u0639\u0645\u0644\",\n        \"en\": \"Sign the staff handbook\"\n      },\n      \"due_on\": \"2026-10-25\",\n      \"completed_at\": null\n    },\n    {\n      \"id\": 12,\n      \"kind\": \"onboarding\",\n      \"title\": {\n        \"ar\": \"\u0627\u0631\u0641\u0639 \u0635\u0648\u0631\u0629 \u0627\u0644\u0647\u0648\u064a\u0629\",\n        \"en\": \"Upload your ID\"\n      },\n      \"due_on\": \"2026-10-20\",\n      \"completed_at\": \"2026-10-19T10:12:00+03:00\"\n    }\n  ]\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Complete my task",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/tasks/1/complete",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "tasks",
+                                                "1",
+                                                "complete"
+                                            ]
+                                        },
+                                        "description": "Marks my task done. Ticking it again keeps the first time. 403 hr::core.not_your_task for a task that is HR's or someone else's."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "Done",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/hr/me/tasks/1/complete",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "hr",
+                                                        "me",
+                                                        "tasks",
+                                                        "1",
+                                                        "complete"
+                                                    ]
+                                                },
+                                                "description": "Marks my task done. Ticking it again keeps the first time. 403 hr::core.not_your_task for a task that is HR's or someone else's."
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"message\": \"\u0623\u064f\u0646\u062c\u0632\u062a \u0627\u0644\u0645\u0647\u0645\u0629.\"\n}"
+                                        },
+                                        {
+                                            "name": "Not mine",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/hr/me/tasks/1/complete",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "hr",
+                                                        "me",
+                                                        "tasks",
+                                                        "1",
+                                                        "complete"
+                                                    ]
+                                                },
+                                                "description": "Marks my task done. Ticking it again keeps the first time. 403 hr::core.not_your_task for a task that is HR's or someone else's."
+                                            },
+                                            "status": "Forbidden",
+                                            "code": 403,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"message\": \"\u0647\u0630\u0647 \u0627\u0644\u0645\u0647\u0645\u0629 \u0644\u064a\u0633\u062a \u0644\u0643.\"\n}"
+                                        }
+                                    ]
+                                },
+                                {
+                                    "name": "Reopen my task",
+                                    "request": {
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "currency",
+                                                "value": "{{currency}}",
+                                                "type": "text"
+                                            },
+                                            {
+                                                "key": "Accept",
+                                                "value": "application/json",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/hr/me/tasks/1/reopen",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "hr",
+                                                "me",
+                                                "tasks",
+                                                "1",
+                                                "reopen"
+                                            ]
+                                        },
+                                        "description": "Marks my task not done again. 403 hr::core.not_your_task as for complete."
+                                    },
+                                    "response": [
+                                        {
+                                            "name": "Reopened",
+                                            "originalRequest": {
+                                                "method": "POST",
+                                                "header": [
+                                                    {
+                                                        "key": "lang",
+                                                        "value": "{{lang}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "currency",
+                                                        "value": "{{currency}}",
+                                                        "type": "text"
+                                                    },
+                                                    {
+                                                        "key": "Accept",
+                                                        "value": "application/json",
+                                                        "type": "text"
+                                                    }
+                                                ],
+                                                "url": {
+                                                    "raw": "{{base_url}}/api/v1/hr/me/tasks/1/reopen",
+                                                    "host": [
+                                                        "{{base_url}}"
+                                                    ],
+                                                    "path": [
+                                                        "api",
+                                                        "v1",
+                                                        "hr",
+                                                        "me",
+                                                        "tasks",
+                                                        "1",
+                                                        "reopen"
+                                                    ]
+                                                },
+                                                "description": "Marks my task not done again. 403 hr::core.not_your_task as for complete."
+                                            },
+                                            "status": "OK",
+                                            "code": 200,
+                                            "_postman_previewlanguage": "json",
+                                            "header": [
+                                                {
+                                                    "key": "Content-Type",
+                                                    "value": "application/json"
+                                                }
+                                            ],
+                                            "cookie": [],
+                                            "body": "{\n  \"message\": \"\u0623\u064f\u0639\u064a\u062f \u0641\u062a\u062d \u0627\u0644\u0645\u0647\u0645\u0629.\"\n}"
+                                        }
+                                    ]
                                 }
                             ]
                         },
