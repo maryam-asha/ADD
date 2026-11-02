@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\LateArrivalBilling;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
@@ -39,6 +40,7 @@ class SessionClosureService
         private readonly PriceQuoteService $quotes,
         private readonly QuoteRecorder $recorder,
         private readonly CouponLedger $couponLedger,
+        private readonly CoworkingBookingPolicy $policy,
     ) {}
 
     /**
@@ -220,15 +222,34 @@ class SessionClosureService
      */
     private function priceFor(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, int $coveredSeconds): PriceQuote
     {
-        $billable = (int) $session->checked_in_at->diffInSeconds($checkedOutAt) - $coveredSeconds;
+        $from = $this->billingStartFor($session);
+        $billable = (int) $from->diffInSeconds($checkedOutAt) - $coveredSeconds;
 
         $block = $this->blockSeconds();
         $billed = $billable > 0 ? (int) (ceil($billable / $block) * $block) : 0;
 
-        // The billed stretch, from check-in: the record's locked offer or
+        // The billed stretch, from its start: the record's locked offer or
         // plan discount — or the best offer now — and its coupon terms
         // (PriceQuoteService, the one place a price is composed).
-        return $this->quotes->forSession($session, $session->checked_in_at, $session->checked_in_at->copy()->addSeconds($billed));
+        return $this->quotes->forSession($session, $from, $from->copy()->addSeconds($billed));
+    }
+
+    /**
+     * Where the bill starts: the check-in — except an unpaid booking whose
+     * member came late, billed from the booking's start when
+     * coworking.late_arrival_billing says so (CoworkingBookingPolicy). A
+     * paid booking keeps the price it was paid at either way.
+     */
+    private function billingStartFor(Booking|WalkinSession $session): CarbonInterface
+    {
+        if ($session instanceof Booking
+            && $session->payment_state === PaymentState::Unpaid
+            && $session->pointsPaid() === 0
+            && $this->policy->lateArrivalBilling() === LateArrivalBilling::BookingStart) {
+            return $session->start_at->min($session->checked_in_at);
+        }
+
+        return $session->checked_in_at;
     }
 
     /** The billing block, in seconds: `coworking.billing_increment_minutes`, 15 by default. */
