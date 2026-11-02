@@ -84,6 +84,11 @@ class MembershipActivationService
     /** @throws SeatPoolExhaustedException */
     private function assertSeatsIn(Branch $branch, Plan $plan, int $seats, CarbonInterface $periodStart, CarbonInterface $periodEnd): void
     {
+        // A plan without coworking holds no seat, so it needs none.
+        if (! $plan->includesCoworking()) {
+            return;
+        }
+
         $timeline = $this->pool->timeline(
             $branch,
             $periodStart,

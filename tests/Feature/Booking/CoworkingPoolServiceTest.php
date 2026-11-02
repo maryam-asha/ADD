@@ -123,6 +123,23 @@ class CoworkingPoolServiceTest extends TestCase
         $this->assertSame(6, $this->pool()->freeSeats($this->branch, $this->at('09:00'), $this->at('20:00')));
     }
 
+    /** Only a coworking plan holds a seat (product owner, 2026-11-02). */
+    public function test_a_non_coworking_subscription_holds_no_seat(): void
+    {
+        $this->coSpace(1);
+        $this->subscribe(User::factory()->create(), plan: Plan::factory()->notCoworking()->create());
+
+        $this->assertSame(1, $this->pool()->freeSeats($this->branch, $this->at('09:00'), $this->at('20:00')));
+    }
+
+    public function test_a_flexible_subscription_still_holds_its_seat(): void
+    {
+        $this->coSpace(1);
+        $this->subscribe(User::factory()->create(), plan: Plan::factory()->coworking()->create());
+
+        $this->assertSame(0, $this->pool()->freeSeats($this->branch, $this->at('09:00'), $this->at('20:00')));
+    }
+
     public function test_a_plan_with_hours_holds_its_seat_only_in_those_hours(): void
     {
         $this->coSpace(10);

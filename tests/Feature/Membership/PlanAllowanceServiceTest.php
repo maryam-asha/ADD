@@ -156,7 +156,7 @@ class PlanAllowanceServiceTest extends TestCase
     public function test_a_non_coworking_plan_with_three_coworking_hours_covers_three_hours_any_time(): void
     {
         $member = User::factory()->create();
-        $plan = Plan::factory()->create();
+        $plan = Plan::factory()->notCoworking()->create();
         $plan->spaceHours()->create(['space_type' => SpaceType::CoSpace, 'hours' => 3]);
         $m = $this->membership($plan, $member);
 
@@ -170,7 +170,7 @@ class PlanAllowanceServiceTest extends TestCase
     {
         $member = User::factory()->create();
         $room = Space::factory()->room()->create();
-        $plan = Plan::factory()->create();
+        $plan = Plan::factory()->notCoworking()->create();
         $plan->spaceHours()->create(['space_type' => SpaceType::Room, 'hours' => 2]);
         $plan->spaceHours()->create(['space_id' => $room->id, 'hours' => 5]);
         $m = $this->membership($plan, $member);
@@ -182,7 +182,7 @@ class PlanAllowanceServiceTest extends TestCase
     public function test_a_non_coworking_plan_without_a_coworking_benefit_covers_nothing(): void
     {
         $member = User::factory()->create();
-        $m = $this->membership(Plan::factory()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']), $member);
+        $m = $this->membership(Plan::factory()->notCoworking()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']), $member);
 
         $this->assertNull($this->allowances->allowanceFor($m, SpaceType::CoSpace));
         $this->assertSame(0, $this->cover($m, $member, $this->coworkingSpace(), '2026-08-17 10:00', '2026-08-17 12:00'));

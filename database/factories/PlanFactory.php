@@ -27,6 +27,10 @@ class PlanFactory extends Factory
             'is_subscription' => true,
             'price_points' => 500,
             'duration_days' => 30,
+            // The catalog's plans are coworking plans; a test plan is one
+            // too unless it asks for notCoworking().
+            'coworking_seat' => CoworkingSeat::Flexible,
+            'coworking_hours' => null,
             'access_window_start' => null,
             'access_window_end' => null,
             'is_active' => true,
@@ -56,6 +60,15 @@ class PlanFactory extends Factory
                 ['name' => ['en' => 'Dedicated Desk', 'ar' => 'مكتب مخصص'], 'order' => 2, 'is_active' => true],
             )->id,
             'coworking_seat' => CoworkingSeat::Dedicated,
+        ]);
+    }
+
+    /** A plan that does not include coworking: it holds no seat and covers no session. */
+    public function notCoworking(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'coworking_seat' => CoworkingSeat::None,
+            'coworking_hours' => null,
         ]);
     }
 

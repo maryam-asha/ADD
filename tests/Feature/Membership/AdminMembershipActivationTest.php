@@ -198,6 +198,19 @@ class AdminMembershipActivationTest extends TestCase
             ->assertJsonStructure(['message', 'first_shortfall_at']);
     }
 
+    /** A plan without coworking needs no seat (product owner, 2026-11-02). */
+    public function test_a_plan_without_coworking_is_activated_into_a_full_pool(): void
+    {
+        $this->actingAsAdmin();
+        $branch = $this->branchWithSeats(1);
+        Membership::factory()->create(['branch_id' => $branch->id]);
+
+        $this->postJson('/api/v1/admin/memberships', [
+            'plan_id' => Plan::factory()->notCoworking()->create()->id,
+            'user_id' => $this->makeMember()->id,
+        ])->assertCreated();
+    }
+
     /** Staff may sell past the pool by arrangement; the override is on record. */
     public function test_staff_can_override_a_full_pool_and_it_is_audited(): void
     {

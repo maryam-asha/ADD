@@ -284,7 +284,7 @@ class WalkInPlanCoverageTest extends TestCase
     public function test_a_plan_without_coworking_covers_nothing(): void
     {
         $space = $this->openSpace(100);
-        $member = $this->memberOn(Plan::factory()->create());
+        $member = $this->memberOn(Plan::factory()->notCoworking()->create());
         $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
 
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));
@@ -297,7 +297,7 @@ class WalkInPlanCoverageTest extends TestCase
     public function test_a_plan_with_a_window_but_no_hour_grant_covers_nothing(): void
     {
         $space = $this->openSpace(100);
-        $member = $this->memberOn(Plan::factory()->evening()->create());
+        $member = $this->memberOn(Plan::factory()->evening()->notCoworking()->create());
         $session = $this->sessionFor($member, $space, '2026-08-17 21:00');
 
         $this->closures->closeOut($session, $this->localToUtc('2026-08-17 23:00'));

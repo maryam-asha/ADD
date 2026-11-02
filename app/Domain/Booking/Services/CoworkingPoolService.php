@@ -12,6 +12,7 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
@@ -434,6 +435,9 @@ class CoworkingPoolService
             ->with('plan')
             ->where('branch_id', $branch->id)
             ->where('status', MembershipStatus::Active)
+            // Only a plan that includes coworking holds a seat; a coworking
+            // benefit on another plan never does (product owner, 2026-11-02).
+            ->whereHas('plan', fn ($plan) => $plan->where('coworking_seat', '!=', CoworkingSeat::None->value))
             ->where('current_period_start', '<', $to)
             ->where('current_period_end', '>', $from)
             ->where('current_period_end', '>=', now())

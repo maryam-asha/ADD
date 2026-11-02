@@ -23,7 +23,12 @@ class PlanCoworkingTermsSchemaTest extends TestCase
 
     public function test_a_plan_defaults_to_no_coworking_and_a_whole_period_cycle(): void
     {
-        $plan = Plan::factory()->create()->refresh();
+        $plan = Plan::query()->create([
+            'name' => ['en' => 'Printing'],
+            'is_subscription' => true,
+            'price_points' => 100,
+            'duration_days' => 30,
+        ])->refresh();
 
         $this->assertSame(CoworkingSeat::None, $plan->coworking_seat);
         $this->assertSame(AllowanceCycle::Period, $plan->allowance_cycle);

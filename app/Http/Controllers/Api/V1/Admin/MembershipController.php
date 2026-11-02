@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Api\V1\Admin;
 
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\DeskAssignmentRefusedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
-use App\Domain\Membership\Models\PlanModule;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipNotifier;
@@ -50,8 +50,8 @@ class MembershipController extends Controller
         $memberships = Membership::query()
             ->with(['plan.planModule', 'seatDesks'])
             ->when($request->boolean('dedicated'), fn (Builder $q) => $q->whereHas(
-                'plan.planModule',
-                fn (Builder $m) => $m->where('slug', PlanModule::DEDICATED_DESK),
+                'plan',
+                fn (Builder $plan) => $plan->where('coworking_seat', CoworkingSeat::Dedicated->value),
             ))
             ->when($request->boolean('live'), fn (Builder $q) => $q->live())
             ->when($request->boolean('without_desk'), fn (Builder $q) => $q->whereDoesntHave('seatDesks'))

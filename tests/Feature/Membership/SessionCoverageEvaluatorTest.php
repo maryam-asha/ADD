@@ -99,7 +99,7 @@ class SessionCoverageEvaluatorTest extends TestCase
     public function test_a_plan_without_coworking_does_not_cover(): void
     {
         $member = User::factory()->create();
-        $this->subscribe($member, Plan::factory()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']));
+        $this->subscribe($member, Plan::factory()->notCoworking()->create(['access_window_start' => '08:00', 'access_window_end' => '20:00']));
 
         $this->assertSame(CoverageReason::PlanWithoutHours, $this->evaluator->evaluate($member, now())->reason);
     }
