@@ -7,6 +7,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Membership\Services\MembershipNotifier;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Providers\Exceptions\ProviderRequestException;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -24,6 +25,7 @@ class PlanAssignmentHandler implements ProviderRequestHandler
     public function __construct(
         private readonly MembershipActivationService $activations,
         private readonly MembershipResolver $memberships,
+        private readonly MembershipNotifier $notices,
     ) {}
 
     public function handle(ProviderRequest $request, User $reviewer, array $overrides): ?int
@@ -55,6 +57,8 @@ class PlanAssignmentHandler implements ProviderRequestHandler
         } catch (SeatPoolExhaustedException) {
             throw new ProviderRequestException('api.membership.seat_pool_full');
         }
+
+        $this->notices->assigned($membership->setRelation('plan', $plan));
 
         return $membership->id;
     }

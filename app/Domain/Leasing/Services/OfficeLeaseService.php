@@ -39,6 +39,7 @@ class OfficeLeaseService
         private readonly PasscodeIssuanceService $passcodes,
         private readonly AvailabilityService $availability,
         private readonly AccessNotifier $notices,
+        private readonly LeaseNotifier $leaseNotices,
     ) {}
 
     /**
@@ -121,6 +122,8 @@ class OfficeLeaseService
             'space_id' => $lease->space_id,
             'private_office_request_id' => $lease->private_office_request_id,
         ])->log('lease_created');
+
+        $this->leaseNotices->contracted($lease);
 
         $this->openDoor($lease);
 
@@ -280,6 +283,8 @@ class OfficeLeaseService
             'terminated_on' => $terminatedOn,
             'reason' => $reason,
         ])->log('lease_terminated');
+
+        $this->leaseNotices->ended($lease, $terminatedOn);
 
         if ($terminatedOn <= now()->toDateString()) {
             $this->closeDoor($lease);

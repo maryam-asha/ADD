@@ -14,6 +14,7 @@ use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Membership\Services\MembershipNotifier;
 use App\Domain\Providers\Enums\Payer;
 use App\Domain\Providers\Enums\ProviderRequestType;
 use App\Domain\Providers\Models\ProviderRequest;
@@ -40,6 +41,7 @@ class MembershipRenewalService
         private readonly InvoiceIssuer $invoices,
         private readonly PayerStanding $standing,
         private readonly DedicatedDeskService $desks,
+        private readonly MembershipNotifier $notices,
     ) {}
 
     /** The plan-assignment request at the root of this subscription's chain, if any. */
@@ -163,6 +165,8 @@ class MembershipRenewalService
             $this->invoices->issueForMembershipRenewal($renewal, $payer, $this->sourceInvoice($locked)?->currency, $actor);
 
             $locked->update(['renewal_stop_reason' => null]);
+
+            $this->notices->renewed($renewal->setRelation('plan', $locked->plan));
 
             return $renewal;
         });

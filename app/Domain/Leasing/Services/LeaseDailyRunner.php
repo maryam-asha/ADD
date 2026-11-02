@@ -25,6 +25,7 @@ class LeaseDailyRunner
     public function __construct(
         private readonly InvoiceIssuer $invoices,
         private readonly OfficeLeaseService $leases,
+        private readonly LeaseNotifier $notices,
     ) {}
 
     /** @return array{invoices: int, doors_opened: int, ended: int, doors_closed: int} */
@@ -115,6 +116,7 @@ class LeaseDailyRunner
                         if ($changed === 1) {
                             activity()->performedOn($lease)->log('lease_ended');
                             $ended++;
+                            $this->notices->ended($lease, $lease->ends_on->addDay()->toDateString());
                         }
                     } catch (\Throwable $e) {
                         Log::error('Failed to end an expired office lease', [

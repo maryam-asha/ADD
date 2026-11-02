@@ -12,6 +12,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanModule;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Membership\Services\MembershipNotifier;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignMembershipDesksRequest;
@@ -66,7 +67,8 @@ class MembershipController extends Controller
     public function store(
         StoreAdminMembershipRequest $request,
         MembershipActivationService $activations,
-        MembershipResolver $resolver
+        MembershipResolver $resolver,
+        MembershipNotifier $notices,
     ): JsonResponse {
         $plan = Plan::findOrFail($request->validated('plan_id'));
 
@@ -105,6 +107,8 @@ class MembershipController extends Controller
             ], 422);
         }
 
+        $notices->assigned($membership->load('plan'));
+
         return response()->json([
             'data' => new MembershipResource($membership->load(['plan', 'seatDesks'])),
         ], 201);
@@ -118,12 +122,15 @@ class MembershipController extends Controller
         AssignMembershipDesksRequest $request,
         Membership $membership,
         DedicatedDeskService $desks,
+        MembershipNotifier $notices,
     ): JsonResponse {
         try {
             $desks->assign($membership, $request->validated('seat_desk_ids'));
         } catch (DeskAssignmentRefusedException $e) {
             throw ValidationException::withMessages(['seat_desk_ids' => __($e->reason)]);
         }
+
+        $notices->deskAssigned($membership->load('plan'));
 
         return response()->json(['message' => __('api.membership.desks_assigned')]);
     }

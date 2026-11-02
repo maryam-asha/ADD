@@ -101,8 +101,14 @@ return [
             'body' => 'تمت إضافة :amount :currency (:points نقطة) إلى محفظتك.',
         ],
         'company_allocated' => [
-            'title' => 'تم تخصيص رصيد لك',
-            'body' => 'قامت شركة :company بتخصيص :points نقطة لمحفظتك لاستخدامها في :category.',
+            'title' => 'وصلك رصيد من شركتك',
+            'body' => 'خصّصت :company لك :points نقطة لاستخدامها في :category.',
+        ],
+        'categories' => [
+            'general' => 'الاستخدام العام',
+            'cafe' => 'المقهى',
+            'printing_internet' => 'الطباعة والإنترنت',
+            'space_specific' => 'مساحة محددة',
         ],
         'points_expiring' => [
             'title' => 'نقاط تقترب من الانتهاء',
@@ -115,9 +121,21 @@ return [
             'title' => 'مكتب مخصص بانتظار الربط',
             'body' => 'اشترك عضو في :plan من التطبيق ويحتاج إلى ربط مقعد.',
         ],
-        'subscribed' => [
-            'title' => 'تم تفعيل الباقة',
-            'body' => 'أصبح اشتراكك في باقة :plan_name مفعّلاً الآن.',
+        'assigned' => [
+            'title' => 'تم تفعيل باقتك',
+            'body' => 'أصبحت باقة :plan مفعّلة لك من :start حتى :end.',
+        ],
+        'started' => [
+            'title' => 'بدأ اشتراكك',
+            'body' => 'بدأ اشتراكك في :plan اليوم وأُضيفت أرصدته إلى محفظتك.',
+        ],
+        'renewed' => [
+            'title' => 'تم تجديد الاشتراك',
+            'body' => 'جُدّد اشتراك :plan حتى :date.',
+        ],
+        'desk_assigned' => [
+            'title' => 'مكتبك المخصص جاهز',
+            'body' => 'خُصّص لك المكتب :desk في :space.',
         ],
         'expiring_soon' => [
             'title' => 'اقتراب موعد انتهاء الباقة',
@@ -215,6 +233,36 @@ return [
         'session_ended_unpaid' => [
             'title' => 'انتهت الجلسة',
             'body' => 'انتهت جلستك في :space. اضغط لاختيار طريقة الدفع.',
+        ],
+        'arrival_expired' => [
+            'title' => 'لم يُستلم طلبك',
+            'body' => 'لم يؤكد الاستقبال وصولك خلال المهلة. امسح الرمز مجدداً أو راجع المكتب.',
+        ],
+        'closed_by_system' => [
+            'title' => 'أُغلقت جلستك تلقائياً',
+            'body' => 'أُغلقت جلستك في :space الساعة :time لأن الخروج لم يُسجَّل. المستحق: :points نقطة.',
+        ],
+        'closed_by_system_no_charge' => [
+            'title' => 'أُغلقت جلستك تلقائياً',
+            'body' => 'أُغلقت جلستك في :space الساعة :time لأن الخروج لم يُسجَّل.',
+        ],
+    ],
+
+    'invoice' => [
+        'issued' => [
+            'title' => 'فاتورة جديدة',
+            'body' => 'صدرت الفاتورة :number بقيمة :amount :currency، وتستحق في :due.',
+        ],
+    ],
+
+    'lease' => [
+        'contracted' => [
+            'title' => 'تم توقيع عقد المكتب',
+            'body' => 'عقد :space يبدأ :start وينتهي :end.',
+        ],
+        'ended' => [
+            'title' => 'انتهى عقد المكتب',
+            'body' => 'تتوقف صلاحية باب :space من :date.',
         ],
     ],
 

@@ -38,6 +38,7 @@ class InvoiceIssuer
         private readonly ReceivedMoneyConverter $money,
         private readonly CurrencyConversionService $currencies,
         private readonly SettingService $settings,
+        private readonly InvoiceNotifier $notices,
     ) {}
 
     /** Null for request types that bill nothing. */
@@ -131,6 +132,9 @@ class InvoiceIssuer
             'amount_overridden' => $terms->amount !== null,
             'due_overridden' => $terms->dueAt !== null,
         ])->log('invoice_issued');
+
+        // Whoever pays it hears of it, once the caller's transaction commits.
+        $this->notices->issued($invoice);
 
         return $invoice;
     }

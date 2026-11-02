@@ -368,7 +368,13 @@ class DedicatedDeskAssignmentTest extends TestCase
         $this->postJson('/api/v1/member/memberships', ['plan_id' => Plan::factory()->create(['price_points' => 500])->id])
             ->assertCreated();
 
-        Notification::assertNothingSent();
+        // Staff hear of no desk to tie (the member staff activated is told
+        // their plan is on — that is theirs, not staff's).
+        User::all()->each(fn (User $user) => Notification::assertNotSentTo(
+            $user,
+            GeneralNotification::class,
+            fn (GeneralNotification $n) => $n->toArray($user)['template_key'] === 'membership.desk_needed',
+        ));
     }
 
     /** Reception sees the desk a dedicated member sits at, next to their session. */

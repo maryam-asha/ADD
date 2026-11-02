@@ -15,10 +15,12 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 class CloseOverdueReceptionSessionsCommandTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     protected function tearDown(): void
@@ -55,6 +57,11 @@ class CloseOverdueReceptionSessionsCommandTest extends TestCase
         $this->assertNotNull($session->checked_out_at);
         $this->assertSame(TerminationSource::Auto, $session->termination_source);
         $this->assertSame('20:00', $session->checked_out_at->copy()->setTimezone('Asia/Damascus')->format('H:i'));
+
+        // The member hears why their session closed, and what it came to.
+        $notice = $this->assertNoticed($session->user_id, 'coworking.closed_by_system');
+        $this->assertSame('20:00', $notice->data['params']['time']);
+        $this->assertSame((int) $session->price_points, $notice->data['params']['points']);
     }
 
     public function test_a_confirmed_booking_still_open_past_closing_is_auto_closed(): void

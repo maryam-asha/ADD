@@ -3,11 +3,14 @@
 namespace App\Console\Commands;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Settings\Services\SettingService;
+use App\Services\Notification\NotificationService;
+use App\Services\Notification\NotificationText;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -23,8 +26,11 @@ class CloseOverdueReceptionSessions extends Command
 
     protected $description = "Auto-close any booking/walk-in session still checked in past its branch's closing time.";
 
-    public function handle(SessionClosureService $closures, SettingService $settings): int
+    private NotificationService $notifications;
+
+    public function handle(SessionClosureService $closures, SettingService $settings, NotificationService $notifications): int
     {
+        $this->notifications = $notifications;
         $timezone = $settings->get('app.timezone', 'Asia/Damascus');
         $now = Carbon::now($timezone);
 
@@ -74,6 +80,8 @@ class CloseOverdueReceptionSessions extends Command
                 $session,
                 $pending !== null && $pending->requested_at->lessThan($closingInstant) ? $pending->requested_at : $closingInstant,
             );
+
+            $this->tellMember($session->fresh(['space', 'user']));
         } catch (ReceptionActionException $e) {
             // Refused under autoClose()'s lock — typically closed at the desk
             // or by a confirmed end request since this run read the page.
@@ -81,5 +89,29 @@ class CloseOverdueReceptionSessions extends Command
             report($e);
             $this->warn("Skipped {$session->coworkingType()} #{$session->id}: {$e->messageKey}");
         }
+    }
+
+    /**
+     * The member hears why their session closed without them and what it
+     * came to — nothing about money when nothing is owed (paid, or covered).
+     */
+    private function tellMember(Booking|WalkinSession $closed): void
+    {
+        if ($closed->user === null) {
+            return;
+        }
+
+        $owed = $closed->payment_state === PaymentState::Paid ? 0 : (int) $closed->price_points;
+
+        $this->notifications->sendToUser(
+            $closed->user,
+            $owed > 0 ? 'coworking.closed_by_system' : 'coworking.closed_by_system_no_charge',
+            [
+                'space' => $closed->space?->name ?? '',
+                'time' => NotificationText::localTime($closed->checked_out_at),
+                'points' => $owed,
+            ],
+            ['session_type' => $closed->coworkingType(), 'session_id' => (string) $closed->id],
+        );
     }
 }

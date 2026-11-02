@@ -19,10 +19,12 @@ use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Tests\Feature\Notification\Concerns\ReadsNotices;
 use Tests\TestCase;
 
 class ArrivalRequestTest extends TestCase
 {
+    use ReadsNotices;
     use RefreshDatabase;
 
     protected function setUp(): void
@@ -184,5 +186,10 @@ class ArrivalRequestTest extends TestCase
         $this->assertSame(ArrivalRequestStatus::Expired, $stale->fresh()->status);
         $this->assertSame(ArrivalRequestStatus::Pending, $fresh->fresh()->status);
         $this->assertSame(ArrivalRequestStatus::Confirmed, $alreadyConfirmed->fresh()->status);
+
+        // Only the member left waiting is told to scan again or see the desk.
+        $this->assertNoticed($stale->user_id, 'coworking.arrival_expired');
+        $this->assertNotNoticed($fresh->user_id, 'coworking.arrival_expired');
+        $this->assertNotNoticed($alreadyConfirmed->user_id, 'coworking.arrival_expired');
     }
 }

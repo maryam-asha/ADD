@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Identity\Models\Company;
+use App\Domain\Identity\Services\CompanyNotifier;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -29,7 +30,7 @@ class CompanyWalletAllocationController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function store(StoreWalletAllocationRequest $request, Company $company, WalletService $wallets): JsonResponse
+    public function store(StoreWalletAllocationRequest $request, Company $company, WalletService $wallets, CompanyNotifier $notices): JsonResponse
     {
         Gate::authorize('manageMembers', $company);
 
@@ -64,6 +65,8 @@ class CompanyWalletAllocationController extends Controller
         } catch (InsufficientBalanceException) {
             return response()->json(['message' => __('api.wallet.insufficient_balance')], 422);
         }
+
+        $notices->walletAllocated($company, $allocation, $request->user());
 
         return response()->json([
             'data' => [

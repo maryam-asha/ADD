@@ -101,8 +101,14 @@ return [
             'body' => 'Your wallet has been credited with :amount :currency (:points points).',
         ],
         'company_allocated' => [
-            'title' => 'Points Allocated',
-            'body' => ':company allocated :points points to your wallet for :category.',
+            'title' => 'Credit from your company',
+            'body' => ':company gave you :points points to use for :category.',
+        ],
+        'categories' => [
+            'general' => 'general use',
+            'cafe' => 'the café',
+            'printing_internet' => 'printing and internet',
+            'space_specific' => 'a specific space',
         ],
         'points_expiring' => [
             'title' => 'Points Expiring Soon',
@@ -115,9 +121,21 @@ return [
             'title' => 'Dedicated desk to assign',
             'body' => 'A member subscribed to :plan in the app and needs a desk assigned.',
         ],
-        'subscribed' => [
-            'title' => 'Plan Activated',
-            'body' => 'Your subscription to :plan_name is now active.',
+        'assigned' => [
+            'title' => 'Your plan is active',
+            'body' => 'Your :plan plan is active from :start to :end.',
+        ],
+        'started' => [
+            'title' => 'Your plan has started',
+            'body' => 'Your :plan plan started today, and its balances were added to your wallet.',
+        ],
+        'renewed' => [
+            'title' => 'Plan renewed',
+            'body' => 'Your :plan plan was renewed until :date.',
+        ],
+        'desk_assigned' => [
+            'title' => 'Your dedicated desk is ready',
+            'body' => 'Desk :desk in :space is yours.',
         ],
         'expiring_soon' => [
             'title' => 'Plan Expiring Soon',
@@ -215,6 +233,36 @@ return [
         'session_ended_unpaid' => [
             'title' => 'Session Ended',
             'body' => 'Your session at :space has ended. Tap to choose how to pay.',
+        ],
+        'arrival_expired' => [
+            'title' => 'Your arrival was not confirmed',
+            'body' => 'Reception did not confirm your arrival in time. Scan the code again or visit the desk.',
+        ],
+        'closed_by_system' => [
+            'title' => 'Your session was closed automatically',
+            'body' => 'Your session at :space was closed at :time because no check-out was recorded. Due: :points points.',
+        ],
+        'closed_by_system_no_charge' => [
+            'title' => 'Your session was closed automatically',
+            'body' => 'Your session at :space was closed at :time because no check-out was recorded.',
+        ],
+    ],
+
+    'invoice' => [
+        'issued' => [
+            'title' => 'New invoice',
+            'body' => 'Invoice :number for :amount :currency was issued, due on :due.',
+        ],
+    ],
+
+    'lease' => [
+        'contracted' => [
+            'title' => 'Office lease signed',
+            'body' => 'The lease of :space starts on :start and ends on :end.',
+        ],
+        'ended' => [
+            'title' => 'Office lease ended',
+            'body' => 'Access to :space stops from :date.',
         ],
     ],
 

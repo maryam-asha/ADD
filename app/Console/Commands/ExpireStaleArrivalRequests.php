@@ -7,6 +7,7 @@ use App\Domain\Booking\Events\ArrivalRequestResolved;
 use App\Domain\Booking\Events\CoworkingStartExpired;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Settings\Services\SettingService;
+use App\Services\Notification\NotificationService;
 use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Console\Command;
 
@@ -29,7 +30,7 @@ class ExpireStaleArrivalRequests extends Command
 
     protected $description = 'Mark pending arrival requests older than the configured window as expired.';
 
-    public function handle(SettingService $settings, RealtimeBroadcaster $realtime): int
+    public function handle(SettingService $settings, RealtimeBroadcaster $realtime, NotificationService $notifications): int
     {
         $minutes = (int) $settings->get('kiosk.arrival_request_expiry_minutes', 30);
 
@@ -38,7 +39,7 @@ class ExpireStaleArrivalRequests extends Command
             ->where('requested_at', '<', now()->subMinutes($minutes))
             // By id, not offset: each row leaves the filter as it expires.
             ->lazyById()
-            ->each(function (ArrivalRequest $request) use ($realtime) {
+            ->each(function (ArrivalRequest $request) use ($realtime, $notifications) {
                 $expired = ArrivalRequest::query()
                     ->whereKey($request->id)
                     ->where('status', ArrivalRequestStatus::Pending->value)
@@ -53,6 +54,13 @@ class ExpireStaleArrivalRequests extends Command
                 }
 
                 $realtime->send(new ArrivalRequestResolved($request, ArrivalRequestStatus::Expired));
+
+                // The member may have left the screen: a push says what to do next.
+                if ($request->user !== null) {
+                    $notifications->sendToUser($request->user, 'coworking.arrival_expired', [], [
+                        'arrival_request_id' => (string) $request->id,
+                    ]);
+                }
             });
 
         return self::SUCCESS;

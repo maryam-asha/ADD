@@ -8,6 +8,7 @@ use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\MembershipActivationService;
+use App\Domain\Membership\Services\MembershipNotifier;
 use App\Domain\Renewals\Enums\RenewalStopReason;
 use App\Domain\Renewals\Exceptions\RenewalException;
 use App\Domain\Renewals\Exceptions\RenewalRefused;
@@ -31,6 +32,7 @@ class RenewalRunner
         private readonly LeaseRenewalService $leases,
         private readonly MembershipActivationService $activations,
         private readonly SettingService $settings,
+        private readonly MembershipNotifier $notices,
     ) {}
 
     /** @return array{memberships_renewed: int, memberships_stopped: int, leases_extended: int, leases_stopped: int, balances_granted: int} */
@@ -125,6 +127,7 @@ class RenewalRunner
                     try {
                         if ($this->activations->grantDueBalances($membership)) {
                             $granted++;
+                            $this->notices->started($membership);
                         }
                     } catch (\Throwable $e) {
                         Log::error('Failed to grant a renewal its plan balances', ['membership_id' => $membership->id, 'error' => $e->getMessage()]);
