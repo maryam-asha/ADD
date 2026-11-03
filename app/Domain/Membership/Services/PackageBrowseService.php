@@ -4,22 +4,17 @@ namespace App\Domain\Membership\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanBalance;
 use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Models\PlanFeature;
 use App\Domain\Membership\Models\PlanResourceGrant;
-use App\Domain\Membership\Models\PlanSpaceHour;
-use App\Domain\Membership\Models\ResourceType;
-use App\Domain\Membership\Models\Wallet;
-use App\Domain\Membership\Models\WalletTransaction;
-use App\Domain\Membership\Support\CoworkingPlanClassifier;
-use App\Domain\Membership\ValueObjects\HourAllowance;
 use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -29,11 +24,11 @@ class PackageBrowseService
     public function __construct(
         private readonly PointConversionService $points,
         private readonly MembershipResolver $membershipResolver,
-        private readonly ResourceQuotaService $resourceQuota,
         private readonly PlanAllowanceService $allowances,
         private readonly PriceLabelPresenter $prices,
         private readonly OfferResolver $offers,
         private readonly PlanSavingCalculator $savings,
+        private readonly CurrentMembershipStats $stats,
     ) {}
 
     /**
@@ -83,51 +78,48 @@ class PackageBrowseService
     }
 
     /**
+     * memberships/current: whose plan it is, its period and this cycle, and
+     * one list of cards to draw (CurrentMembershipStats).
+     *
      * @return array<string, mixed>
      */
     private function formatCurrentPlan(Membership $membership, User $user): array
     {
         $plan = $membership->plan;
-        $planName = $plan ? ($plan->translate('name') ?? 'Plan') : 'Plan';
-
-        $expiryFormatted = $membership->current_period_end->format('M d, Y');
-        $cycleStart = $membership->current_period_start->format('M d');
-        $cycleEnd = $membership->current_period_end->format('M d, Y');
-
-        $capabilities = $plan ? $this->resolvePlanCapabilities($plan) : [];
+        [$cycleStart, $cycleEnd] = $this->allowances->cycleFor($membership, now());
+        $isCompany = $membership->owner_type === OwnerType::Company;
 
         return [
-            'id' => $plan?->id,
             'membership_id' => $membership->id,
-            'name' => $planName,
-            'module' => $plan?->planModule ? [
-                'id' => $plan->planModule->id,
-                'name' => $plan->planModule->translate('name'),
-                'slug' => $plan->planModule->slug,
-                'icon' => $plan->planModule->icon,
-            ] : null,
-            'tag' => __('api.package.current_plan_tag'),
-            'status' => 'active',
-            'status_label' => __('api.space.statuses.active'),
-            'is_active' => true,
-            'current_period_start' => $membership->current_period_start->toIso8601String(),
-            'current_period_end' => $membership->current_period_end->toIso8601String(),
-            // A Dedicated Desk subscription's desks by the code on them — an
-            // empty list until staff tie one; null for any other plan
-            // (docs/decisions/coworking-seat-pool.md).
-            'desks' => $plan?->isDedicatedDesk()
-                ? $membership->seatDesks()->orderBy('seats_desks.id')->get()
-                    ->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values()->all()
+            'via' => $isCompany ? 'company' : 'personal',
+            'company' => $isCompany
+                ? ['id' => $membership->owner_id, 'name' => Company::query()->whereKey($membership->owner_id)->value('legal_name')]
                 : null,
-            'validity_text' => __('api.package.active_until', ['date' => $expiryFormatted]),
-            'billing_cycle_text' => __('api.package.billing_cycle', ['start' => $cycleStart, 'end' => $cycleEnd]),
-            'benefits_title' => __('api.package.benefits_title'),
-            'benefits' => $this->defaultBenefits($capabilities),
-            'discounts' => $plan ? $this->formatDiscounts($plan) : [],
-            'resources' => $plan ? $this->formatCurrentPlanResources($plan, $membership, $user) : [],
-            'usage_title' => __('api.package.usage_title'),
-            'balance_rollover_notice' => __('api.package.balance_rollover_notice'),
-            'balances' => $plan ? $this->formatCurrentPlanUsage($plan, $membership, $user) : [],
+            'plan' => [
+                'id' => $plan?->id,
+                'name' => $plan?->translate('name'),
+                'module' => $plan?->planModule ? [
+                    'id' => $plan->planModule->id,
+                    'name' => $plan->planModule->translate('name'),
+                    'slug' => $plan->planModule->slug,
+                    'icon' => $plan->planModule->icon,
+                ] : null,
+                'seat' => ($plan?->coworking_seat ?? CoworkingSeat::None)->value,
+                // A Dedicated Desk subscription's desks by the code on them — an
+                // empty list until staff tie one; null for any other plan
+                // (docs/decisions/coworking-seat-pool.md).
+                'desks' => $plan?->isDedicatedDesk()
+                    ? $membership->seatDesks()->orderBy('seats_desks.id')->get()
+                        ->map(fn ($desk) => ['code' => $desk->code, 'label' => $desk->label])->values()->all()
+                    : null,
+            ],
+            'period' => [
+                'start' => $membership->current_period_start->toIso8601String(),
+                'end' => $membership->current_period_end->toIso8601String(),
+                'cycle_start' => $cycleStart->toIso8601String(),
+                'cycle_end' => $cycleEnd->toIso8601String(),
+            ],
+            'stats' => $this->stats->for($membership, $user),
         ];
     }
 
@@ -155,22 +147,6 @@ class PackageBrowseService
      * @param  array<string, bool>  $capabilities
      * @return array<int, array<string, mixed>>
      */
-    private function defaultBenefits(array $capabilities): array
-    {
-        $all = [
-            'cafe' => ['key' => 'cafe_access', 'title' => __('api.package.benefits.cafe_access'), 'subtitle' => __('api.package.benefits.included'), 'icon' => 'coffee'],
-            'printing' => ['key' => 'printing_credits', 'title' => __('api.package.benefits.printing_credits'), 'subtitle' => __('api.package.benefits.included'), 'icon' => 'printer'],
-            'meeting' => ['key' => 'meeting_rooms', 'title' => __('api.package.benefits.meeting_rooms'), 'subtitle' => __('api.package.benefits.included'), 'icon' => 'users'],
-            'discounts' => ['key' => 'member_discounts', 'title' => __('api.package.benefits.member_discounts'), 'subtitle' => __('api.package.benefits.included'), 'icon' => 'percent'],
-        ];
-
-        return collect($all)->only(array_keys(array_filter($capabilities)))->values()->all();
-    }
-
-    /**
-     * @param  array<string, bool>  $capabilities
-     * @return array<int, array<string, mixed>>
-     */
     private function defaultTags(array $capabilities): array
     {
         $all = [
@@ -181,97 +157,6 @@ class PackageBrowseService
         ];
 
         return collect($all)->only(array_keys(array_filter($capabilities)))->values()->all();
-    }
-
-    /**
-     * Per-category usage for "Your Usage This Cycle": `granted` is what the
-     * plan credited this membership period (`source = SubscriptionGrant`,
-     * `created_at >= current_period_start`), `used` is everything spent from
-     * that category in the same window, `remaining = granted - used`. This
-     * is a cycle-scoped display figure, not `WalletService`'s general
-     * spendable-now balance (which also folds in top-ups/gifts and expiry
-     * eligibility) — the two can differ if a member also received a manual
-     * top-up in the same category.
-     *
-     * `space_specific` (Meeting Rooms) is displayed in **hours**, not
-     * dollars: `hourly_rate_points` is per-space and not fixed, so there is
-     * no universal points→hours rate, but the product already grants and
-     * describes this category in hour counts 1:1 (e.g. PlanSeeder's "Meeting
-     * Room Hours", amount_points=80) — this keeps that same convention
-     * rather than inventing a real conversion.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function formatCurrentPlanUsage(Plan $plan, Membership $membership, User $user): array
-    {
-        $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $user->id)->first();
-        if (! $wallet) {
-            return [];
-        }
-
-        $categories = $plan->balances->pluck('category')->unique();
-
-        return $categories->map(function (WalletTransactionCategory $category) use ($plan, $membership, $wallet) {
-            $balanceRow = $plan->balances->firstWhere('category', $category);
-            $isHours = $category === WalletTransactionCategory::SpaceSpecific;
-
-            $grantedPoints = (int) WalletTransaction::query()
-                ->where('wallet_id', $wallet->id)
-                ->where('category', $category)
-                ->where('source', WalletTransactionSource::SubscriptionGrant)
-                ->where('created_at', '>=', $membership->current_period_start)
-                ->sum('amount');
-
-            $usedPoints = (int) abs(WalletTransaction::query()
-                ->where('wallet_id', $wallet->id)
-                ->where('category', $category)
-                ->where('amount', '<', 0)
-                ->where('created_at', '>=', $membership->current_period_start)
-                ->sum('amount'));
-
-            $remainingPoints = max(0, $grantedPoints - $usedPoints);
-            $percentageUsed = $grantedPoints > 0 ? (int) round(($usedPoints / $grantedPoints) * 100) : 0;
-
-            $format = fn (int $points) => $isHours
-                ? (string) $points
-                : sprintf('$%.2f', (float) $this->points->pointsToUsd($points));
-
-            $categoryKey = match ($category) {
-                WalletTransactionCategory::Cafe => 'cafe',
-                WalletTransactionCategory::PrintingInternet => 'printing',
-                WalletTransactionCategory::SpaceSpecific => 'meeting',
-                default => 'general',
-            };
-
-            $unitLabel = $isHours ? __('api.package.units.hours') : null;
-            $amountLabel = fn (string $formatted) => $isHours ? "{$formatted} {$unitLabel}" : $formatted;
-
-            return [
-                'category' => $category->value,
-                'title' => $balanceRow?->translate('description') ?? __('api.package.balances.'.$categoryKey),
-                'unit' => $isHours ? 'hours' : 'usd',
-                'granted' => $isHours ? $grantedPoints : (float) $this->points->pointsToUsd($grantedPoints),
-                'used' => $isHours ? $usedPoints : (float) $this->points->pointsToUsd($usedPoints),
-                'remaining' => $isHours ? $remainingPoints : (float) $this->points->pointsToUsd($remainingPoints),
-                'percentage_used' => $percentageUsed,
-                'formatted_granted' => $amountLabel($format($grantedPoints)),
-                'formatted_used' => $amountLabel($format($usedPoints)),
-                'formatted_remaining' => $amountLabel($format($remainingPoints)),
-                'remaining_label' => __('api.package.remaining_label', ['amount' => $amountLabel($format($remainingPoints))]),
-                // Backward-compatible aliases: `amount`/`formatted` used to be
-                // the only fields this array exposed (the live remaining
-                // balance) — kept so an existing consumer reading just those
-                // two keys still gets a sensible current value.
-                'amount' => $isHours ? $remainingPoints : (float) $this->points->pointsToUsd($remainingPoints),
-                'formatted' => $format($remainingPoints),
-                'icon' => match ($category) {
-                    WalletTransactionCategory::Cafe => 'coffee',
-                    WalletTransactionCategory::PrintingInternet => 'printer',
-                    WalletTransactionCategory::SpaceSpecific => 'users',
-                    default => 'wallet',
-                },
-            ];
-        })->values()->all();
     }
 
     /**
@@ -458,63 +343,5 @@ class PackageBrowseService
             'usage_limit' => $d->usage_limit,
             'icon' => 'percent',
         ])->values()->all();
-    }
-
-    /**
-     * `remaining` is a live, per-membership read (ResourceQuotaService),
-     * unlike `discounts`/`balances_grant` above which just reflect general
-     * plan configuration — the current plan's grants are the one place a
-     * member can see what they've actually used so far.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function formatCurrentPlanResources(Plan $plan, Membership $membership, User $user): array
-    {
-        $grants = $plan->resourceGrants->map(fn (PlanResourceGrant $g) => [
-            'id' => $g->id,
-            'resource_type_id' => $g->resource_type_id,
-            'slug' => $g->resourceType?->slug,
-            'name' => $g->resourceType?->translate('name'),
-            'unit_label' => $g->resourceType?->translate('unit_label'),
-            'icon' => $g->resourceType?->icon,
-            'granted' => (float) $g->quantity,
-            'remaining' => $g->resourceType ? $this->resourceQuota->remainingFor($membership, $g->resourceType) : null,
-            'title' => $g->translate('description'),
-        ]);
-
-        return $grants->concat($this->formatPlanHours($plan, $membership, $user))->values()->all();
-    }
-
-    /**
-     * The plan's hours — its coworking hours and each free-hours benefit —
-     * in the same shape the space-hours grant had before plans carried them
-     * (slug `space-hours`), so the app keeps showing them; now what is left
-     * is this person's, this cycle. An unlimited allowance gets no line.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function formatPlanHours(Plan $plan, Membership $membership, User $user): array
-    {
-        $type = ResourceType::query()->where('slug', CoworkingPlanClassifier::LEGACY_HOURS_SLUG)->first();
-        // Limited allowances only: the line has always carried numbers, and
-        // an unlimited allowance has none to give it.
-        $line = fn (?HourAllowance $allowance, ?array $title) => $allowance === null || $allowance->isUnlimited() ? null : [
-            'id' => $allowance->row?->id,
-            'resource_type_id' => $type?->id,
-            'slug' => CoworkingPlanClassifier::LEGACY_HOURS_SLUG,
-            'name' => $type?->translate('name'),
-            'unit_label' => $type?->translate('unit_label'),
-            'icon' => $type?->icon,
-            'granted' => $allowance->hours,
-            'remaining' => ($left = $this->allowances->remainingSeconds($membership, $user, $allowance, now())) === null ? null : round($left / 3600, 2),
-            'title' => $title,
-        ];
-
-        $coworking = $plan->includesCoworking() ? $this->allowances->allowanceFor($membership, SpaceType::CoSpace) : null;
-
-        return array_values(array_filter([
-            $line($coworking, null),
-            ...$plan->spaceHours->map(fn (PlanSpaceHour $row) => $line(new HourAllowance($row, (float) $row->hours, false), $row->description))->all(),
-        ]));
     }
 }

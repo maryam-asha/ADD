@@ -583,19 +583,13 @@ return [
             'packages' => 'Packages',
             'my_subscription' => 'My Subscription',
         ],
-        'current_plan_tag' => 'YOUR CURRENT PLAN',
-        'active_until' => 'Active until :date',
         'renew_plan' => 'Renew Plan',
         'change_plan' => 'Change Plan',
         'current_plan' => 'Current Plan',
         'select_plan' => 'Select Plan',
         'view_details' => 'View details',
-        'benefits_title' => 'Plan Benefits',
         'expires_on' => 'Expires :date',
         'points_unit' => 'pts',
-        'billing_cycle' => 'Current cycle: :start – :end',
-        'usage_title' => 'Your Usage This Cycle',
-        'balance_rollover_notice' => 'Any granted balance ends with the billing cycle and does not roll over.',
         'remaining_label' => ':amount remaining',
         // memberships/current: one card per figure (CurrentMembershipStats).
         'stats' => [
@@ -610,13 +604,6 @@ return [
             'uses_count' => 'Used :count times',
             'left_of' => ':remaining of :total left',
             'everywhere' => 'all spaces',
-        ],
-        'benefits' => [
-            'cafe_access' => 'Café Access',
-            'printing_credits' => 'Printing Credits',
-            'meeting_rooms' => 'Meeting Rooms',
-            'member_discounts' => 'Member Discounts',
-            'included' => 'Included',
         ],
         'balances' => [
             'cafe' => 'Café Balance',

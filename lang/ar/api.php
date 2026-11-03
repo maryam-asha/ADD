@@ -571,19 +571,13 @@ return [
             'packages' => 'الباقات',
             'my_subscription' => 'اشتراكي',
         ],
-        'current_plan_tag' => 'باقتك الحالية',
-        'active_until' => 'نشط حتى :date',
         'renew_plan' => 'تجديد الباقة',
         'change_plan' => 'تغيير الباقة',
         'current_plan' => 'الباقة الحالية',
         'select_plan' => 'اختيار الباقة',
         'view_details' => 'عرض التفاصيل',
-        'benefits_title' => 'مزايا الباقة',
         'expires_on' => 'ينتهي في :date',
         'points_unit' => 'نقطة',
-        'billing_cycle' => 'الدورة الحالية: :start – :end',
-        'usage_title' => 'استخدامك خلال هذه الدورة',
-        'balance_rollover_notice' => 'أي رصيد ممنوح ينتهي بنهاية الدورة الفوترية ولا يُرحّل للدورة التالية.',
         'remaining_label' => 'المتبقي: :amount',
         // memberships/current: بطاقة لكل رقم (CurrentMembershipStats).
         'stats' => [
@@ -598,13 +592,6 @@ return [
             'uses_count' => 'استُخدم :count مرة',
             'left_of' => 'متبقٍ :remaining من :total',
             'everywhere' => 'كل المساحات',
-        ],
-        'benefits' => [
-            'cafe_access' => 'دخول الكافيه',
-            'printing_credits' => 'رصيد الطباعة',
-            'meeting_rooms' => 'غرف الاجتماعات',
-            'member_discounts' => 'خصومات الأعضاء',
-            'included' => 'مشمول',
         ],
         'balances' => [
             'cafe' => 'رصيد الكافيه',
