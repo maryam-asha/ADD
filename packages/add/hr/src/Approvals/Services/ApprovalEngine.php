@@ -344,7 +344,13 @@ class ApprovalEngine
 
         $employee = $request->employee;
         $key = $approve ? 'request_approved' : 'request_rejected';
-        DB::afterCommit(fn () => $this->notifier->notifyEmployee($employee, $key, ['request_id' => $request->id]));
+        DB::afterCommit(fn () => $this->notifier->notifyEmployee($employee, $key, ['request_id' => $request->id], self::target($request)));
+    }
+
+    /** @return array{target_type: string, target_id: string} the request a notice about it opens */
+    private static function target(ApprovalRequest $request): array
+    {
+        return ['target_type' => 'hr_approval_request', 'target_id' => (string) $request->id];
     }
 
     private function activate(ApprovalRequest $request, ApprovalStep $step): void
@@ -366,19 +372,20 @@ class ApprovalEngine
         $approverId = $step->approver_employee_id;
         $ability = $step->approver_ability;
         $placeholders = ['request_id' => $request->id];
+        $target = self::target($request);
 
-        DB::afterCommit(function () use ($approverId, $ability, $key, $placeholders) {
+        DB::afterCommit(function () use ($approverId, $ability, $key, $placeholders, $target) {
             if ($approverId !== null) {
                 $approver = Employee::query()->find($approverId);
 
                 if ($approver !== null) {
-                    $this->notifier->notifyEmployee($approver, $key, $placeholders);
+                    $this->notifier->notifyEmployee($approver, $key, $placeholders, $target);
                 }
 
                 return;
             }
 
-            $this->notifier->notifyHolders($ability, $key, $placeholders);
+            $this->notifier->notifyHolders($ability, $key, $placeholders, $target);
         });
     }
 

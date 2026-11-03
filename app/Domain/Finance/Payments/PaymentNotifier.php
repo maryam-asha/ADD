@@ -2,7 +2,11 @@
 
 namespace App\Domain\Finance\Payments;
 
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Retail\Models\ItemSale;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\NotificationText;
 use Illuminate\Support\Facades\DB;
@@ -69,12 +73,27 @@ class PaymentNotifier
             // The purpose in every language: each reader sees their own.
             $this->notifications->sendToUser($member, $template, $placeholders + [
                 'purpose' => NotificationText::translations('notifications.payment.purposes.'.$payment->purpose->value),
-            ], [
-                'payment_id' => $payment->id,
-                'purpose' => $payment->purpose->value,
-                'payable_type' => $payment->payable_type,
-                'payable_id' => $payment->payable_id,
-            ]);
+            ], $this->target($payment));
         });
+    }
+
+    /**
+     * What the payment paid for, so opening the notice opens that: the
+     * booking (an extension's too), the walk-in session, the event registered
+     * for, the sale. A top-up or a plan bought has nothing else to open, so
+     * the payment is its own object.
+     *
+     * @return array{target_type: string, target_id: string}
+     */
+    private function target(Payment $payment): array
+    {
+        $payable = $payment->payable_type === null ? null : $payment->payable;
+
+        return match (true) {
+            $payable instanceof Booking, $payable instanceof WalkinSession => $payable->notificationTarget(),
+            $payable instanceof EventAttendee => ['target_type' => 'event', 'target_id' => (string) $payable->event_id],
+            $payable instanceof ItemSale => ['target_type' => 'item_sale', 'target_id' => (string) $payable->id],
+            default => ['target_type' => 'payment', 'target_id' => (string) $payment->id],
+        };
     }
 }

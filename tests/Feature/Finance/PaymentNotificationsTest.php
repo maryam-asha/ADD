@@ -115,7 +115,8 @@ class PaymentNotificationsTest extends TestCase
         $this->assertTold($member, 'payment.received');
         $notification = Notification::sent($member, GeneralNotification::class)->first();
         $data = $notification->toArray($member);
-        $this->assertSame(Payment::sole()->id, $data['data']['payment_id'] ?? $data['payment_id'] ?? null);
+        // It opens what was paid for: the booking.
+        $this->assertSame(['target_type' => 'booking', 'target_id' => (string) $booking->id], $data['data']);
         // The purpose travels in both languages: each reader sees their own.
         $this->assertSame(['ar' => 'حجز', 'en' => 'a booking'], $data['params']['purpose']);
     }
@@ -131,7 +132,8 @@ class PaymentNotificationsTest extends TestCase
 
         $this->assertTold($member, 'payment.received');
         $data = Notification::sent($member, GeneralNotification::class)->first()->toArray($member);
-        $this->assertSame(Payment::sole()->id, $data['data']['payment_id'] ?? $data['payment_id'] ?? null);
+        // A top-up has nothing else to open: the payment is its own object.
+        $this->assertSame(['target_type' => 'payment', 'target_id' => (string) Payment::sole()->id], $data['data']);
     }
 
     public function test_a_company_wallet_topped_up_at_reception_tells_nobody(): void
@@ -286,13 +288,11 @@ class PaymentNotificationsTest extends TestCase
             ['en' => 'Talk', 'ar' => 'محاضرة'],
             Notification::sent($member, GeneralNotification::class)->last()->toArray($member)['params']['event'],
         );
-        // Paying is `events/{event_id}/register` with the ticket: the push names its event.
-        $this->assertSame([
-            'purpose' => 'event_registration',
-            'payable_type' => 'event_attendee',
-            'payable_id' => EventAttendee::sole()->id,
-            'event_id' => $event->id,
-        ], $this->toldData($member, 'event.payment_due'));
+        // Paying is `events/{event_id}/register` with the ticket: the push opens its event.
+        $this->assertSame(
+            ['target_type' => 'event', 'target_id' => (string) $event->id],
+            $this->toldData($member, 'event.payment_due'),
+        );
     }
 
     public function test_a_seat_confirmed_at_registration_to_be_paid_in_cash_names_its_event(): void
@@ -312,8 +312,9 @@ class PaymentNotificationsTest extends TestCase
 
         $this->postJson("/api/v1/member/events/{$event->id}/register", ['payment_method' => 'cash'])->assertCreated();
 
-        $data = $this->toldData($member, 'event.payment_due');
-        $this->assertSame($event->id, $data['event_id']);
-        $this->assertSame(EventAttendee::sole()->id, $data['payable_id']);
+        $this->assertSame(
+            ['target_type' => 'event', 'target_id' => (string) $event->id],
+            $this->toldData($member, 'event.payment_due'),
+        );
     }
 }

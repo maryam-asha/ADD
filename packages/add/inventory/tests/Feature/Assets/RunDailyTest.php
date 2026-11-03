@@ -30,8 +30,18 @@ class RunDailyTest extends TestCase
         $this->artisan('inventory:run-daily')->assertSuccessful();
 
         $this->assertSame([
-            ['ability' => Abilities::ASSETS_MAINTENANCE, 'key' => 'maintenance_due', 'placeholders' => ['asset' => $projector->code, 'title' => 'Filter', 'date' => '2026-10-28']],
-            ['ability' => Abilities::ASSETS_MAINTENANCE, 'key' => 'warranty_ending', 'placeholders' => ['asset' => $projector->code, 'date' => '2026-11-10']],
+            [
+                'ability' => Abilities::ASSETS_MAINTENANCE,
+                'key' => 'maintenance_due',
+                'placeholders' => ['asset' => $projector->code, 'title' => 'Filter', 'date' => '2026-10-28'],
+                'target' => ['target_type' => 'inventory_asset', 'target_id' => (string) $projector->id],
+            ],
+            [
+                'ability' => Abilities::ASSETS_MAINTENANCE,
+                'key' => 'warranty_ending',
+                'placeholders' => ['asset' => $projector->code, 'date' => '2026-11-10'],
+                'target' => ['target_type' => 'inventory_asset', 'target_id' => (string) $projector->id],
+            ],
         ], $notifier->sent);
     }
 

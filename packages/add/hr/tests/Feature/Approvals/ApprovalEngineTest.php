@@ -79,7 +79,12 @@ class ApprovalEngineTest extends TestCase
         $this->postJson("/api/hr/me/approvals/{$request->id}/approve")->assertOk();
         $this->assertSame('pending', $request->refresh()->status->value);
         $this->assertSame(2, $request->current_step);
-        $this->assertSame([[Abilities::LEAVE_MANAGE, 'approval_pending', ['request_id' => $request->id]]], $this->notifier->calls);
+        $this->assertSame([[
+            Abilities::LEAVE_MANAGE,
+            'approval_pending',
+            ['request_id' => $request->id],
+            ['target_type' => 'hr_approval_request', 'target_id' => (string) $request->id],
+        ]], $this->notifier->calls);
 
         $this->actingAsEmployee($hr);
         $this->getJson('/api/hr/me/approvals')->assertOk()->assertJsonCount(1, 'data')
@@ -146,7 +151,12 @@ class ApprovalEngineTest extends TestCase
         $step = $request->steps()->first();
         $this->assertNull($step->approver_employee_id);
         $this->assertSame(Abilities::APPROVALS_MANAGE, $step->approver_ability);
-        $this->assertSame([[Abilities::APPROVALS_MANAGE, 'approval_pending', ['request_id' => $request->id]]], $this->notifier->calls);
+        $this->assertSame([[
+            Abilities::APPROVALS_MANAGE,
+            'approval_pending',
+            ['request_id' => $request->id],
+            ['target_type' => 'hr_approval_request', 'target_id' => (string) $request->id],
+        ]], $this->notifier->calls);
     }
 
     public function test_a_unit_head_step_skips_to_the_parent_head_when_the_requester_heads_the_unit(): void

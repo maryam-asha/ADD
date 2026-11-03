@@ -152,7 +152,7 @@ class AlertsTest extends TestCase
 
         $this->artisan('hr:alerts')->assertSuccessful();
 
-        $this->assertSame([[Abilities::ALERTS_VIEW, 'alerts_digest', ['count' => 1]]], $notifier->calls);
+        $this->assertSame([[Abilities::ALERTS_VIEW, 'alerts_digest', ['count' => 1], ['target_type' => 'hr_alerts']]], $notifier->calls);
     }
 
     public function test_command_is_silent_without_alerts(): void

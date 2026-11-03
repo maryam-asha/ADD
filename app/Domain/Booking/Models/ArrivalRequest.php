@@ -45,6 +45,17 @@ class ArrivalRequest extends Model
         return $this->purpose === ArrivalRequestPurpose::CoworkingStart;
     }
 
+    /**
+     * What a notice about this request (refused, or expired unanswered) names
+     * as its object.
+     *
+     * @return array{target_type: string, target_id: string}
+     */
+    public function notificationTarget(): array
+    {
+        return ['target_type' => 'arrival_request', 'target_id' => (string) $this->id];
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

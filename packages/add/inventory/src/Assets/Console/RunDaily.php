@@ -33,7 +33,7 @@ class RunDaily extends Command
                     'asset' => (string) $schedule->asset->code,
                     'title' => $schedule->title,
                     'date' => $schedule->next_due_on->toDateString(),
-                ]);
+                ], ['target_type' => 'inventory_asset', 'target_id' => (string) $schedule->asset->id]);
                 $schedule->update(['alerted_for' => $schedule->next_due_on]);
                 $due++;
             });
@@ -51,7 +51,7 @@ class RunDaily extends Command
                 $notifier->notifyHolders(Abilities::ASSETS_MAINTENANCE, 'warranty_ending', [
                     'asset' => (string) $asset->code,
                     'date' => $asset->warranty_until->toDateString(),
-                ]);
+                ], ['target_type' => 'inventory_asset', 'target_id' => (string) $asset->id]);
                 $asset->update(['warranty_alerted_at' => now()]);
                 $ending++;
             });

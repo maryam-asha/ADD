@@ -44,12 +44,13 @@ class SessionEndRequestController extends Controller
         $paid = $closed->payment_state === PaymentState::Paid || (int) $closed->price_points <= 0;
 
         // Still owed: the push opens the session for the member to choose
-        // how to pay (POST member/coworking-sessions/{type}/{id}/pay).
+        // how to pay (POST member/coworking-sessions/{type}/{id}/pay, where
+        // a `booking` target is type booking and a `walkin_session` walkin).
         $notifications->sendToUser(
             $session->user,
             $paid ? 'coworking.session_ended' : 'coworking.session_ended_unpaid',
             ['space' => $session->space->name],
-            ['session_type' => $session->coworkingType(), 'session_id' => (string) $session->id],
+            $session->notificationTarget(),
         );
 
         // Ended and paid, or ended with money still owed — what the desk

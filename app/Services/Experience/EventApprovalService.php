@@ -261,13 +261,7 @@ class EventApprovalService
             app(NotificationService::class)->sendToUser($member, 'event.payment_due', [
                 'event' => $event->title,
                 'points' => (int) $attendee->price_points,
-            ], [
-                'purpose' => 'event_registration',
-                'payable_type' => $attendee->getMorphClass(),
-                'payable_id' => $attendee->id,
-                // Paying is `events/{event_id}/register` with the ticket.
-                'event_id' => $attendee->event_id,
-            ]);
+            ], ['target_type' => 'event', 'target_id' => (string) $attendee->event_id]); // paying is events/{id}/register with the ticket
         });
     }
 }

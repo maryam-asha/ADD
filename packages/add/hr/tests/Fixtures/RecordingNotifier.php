@@ -10,20 +10,20 @@ use Add\Hr\Core\Models\Employee;
  */
 class RecordingNotifier implements HrNotifier
 {
-    /** @var list<array{0: string, 1: string, 2: array<string, mixed>}> */
+    /** @var list<array{0: string, 1: string, 2: array<string, mixed>, 3: array<string, string>}> */
     public array $calls = [];
 
-    /** @var list<array{0: int, 1: string, 2: array<string, mixed>}> */
+    /** @var list<array{0: int, 1: string, 2: array<string, mixed>, 3: array<string, string>}> */
     public array $employeeCalls = [];
 
-    public function notifyHolders(string $ability, string $key, array $placeholders = []): void
+    public function notifyHolders(string $ability, string $key, array $placeholders = [], array $target = []): void
     {
-        $this->calls[] = [$ability, $key, $placeholders];
+        $this->calls[] = [$ability, $key, $placeholders, $target];
     }
 
-    public function notifyEmployee(Employee $employee, string $key, array $placeholders = []): void
+    public function notifyEmployee(Employee $employee, string $key, array $placeholders = [], array $target = []): void
     {
-        $this->employeeCalls[] = [$employee->id, $key, $placeholders];
+        $this->employeeCalls[] = [$employee->id, $key, $placeholders, $target];
     }
 
     /**

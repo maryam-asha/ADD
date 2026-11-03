@@ -59,7 +59,7 @@ class BenefitGranter
         $failed = $count(BenefitGrantStatus::Failed);
 
         if ($failed > 0) {
-            $this->notifier->notifyHolders(Abilities::BENEFITS_MANAGE, 'benefit_grants_failed', ['count' => $failed, 'month' => $month->format('Y-m')]);
+            $this->notifier->notifyHolders(Abilities::BENEFITS_MANAGE, 'benefit_grants_failed', ['count' => $failed, 'month' => $month->format('Y-m')], ['target_type' => 'hr_benefit_grants']);
         }
 
         return ['granted' => $grants->count(), 'fulfilled' => $count(BenefitGrantStatus::Fulfilled), 'failed' => $failed];
@@ -108,7 +108,7 @@ class BenefitGranter
                     'benefit_en' => $grant->benefit->name['en'] ?? $grant->benefit->name['ar'] ?? '',
                     'amount' => $grant->amount,
                     'unit' => (string) $grant->unit,
-                ]));
+                ], ['target_type' => 'hr_benefit_grant', 'target_id' => (string) $grant->id]));
 
                 return $grant;
             });
