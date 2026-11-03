@@ -2,6 +2,9 @@
 
 namespace Tests\Feature\Membership;
 
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
@@ -10,11 +13,13 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\AllowanceCycle;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
@@ -22,6 +27,7 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -36,6 +42,8 @@ class OnePersonalPlanTest extends TestCase
 
     private Plan $next;
 
+    private Space $seats;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -43,7 +51,7 @@ class OnePersonalPlanTest extends TestCase
         $this->seed(SettingSeeder::class);
         Cache::forget('default_branch_id');
         $branch = Branch::factory()->create(['is_default' => true]);
-        Space::factory()->create(['building_id' => Building::factory()->create(['branch_id' => $branch->id])->id, 'capacity' => 10]);
+        $this->seats = Space::factory()->create(['building_id' => Building::factory()->create(['branch_id' => $branch->id])->id, 'capacity' => 10]);
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->utc());
         $this->next = Plan::factory()->create(['price_points' => 1000, 'duration_days' => 30, 'is_subscription' => true]);
     }
@@ -150,6 +158,82 @@ class OnePersonalPlanTest extends TestCase
         $open = collect($this->withHeader('lang', 'en')->getJson('/api/v1/member/packages')->assertOk()->json('data'))->firstWhere('id', $this->next->id);
         $this->assertTrue($open['can_subscribe']);
         $this->assertNull($open['subscribe_blocked_reason']);
+    }
+
+    public function test_buying_after_spent_hours_ends_the_old_plan(): void
+    {
+        $member = $this->member();
+        $old = $this->hold($member, Plan::factory()->coworking(10)->create());
+        $this->spend($old, $member, 36000);
+
+        $new = Membership::query()->findOrFail($this->buy($member)->assertCreated()->json('data.id'));
+
+        $this->assertFalse($old->fresh()->isLive());
+        $this->assertFalse((bool) $old->fresh()->auto_renew);
+        $this->assertSame($new->id, app(MembershipResolver::class)->activeFor($member)->id);
+        $this->getJson('/api/v1/member/memberships/current')->assertJsonPath('data.membership_id', $new->id);
+    }
+
+    public function test_the_old_plans_cafe_balance_is_gone(): void
+    {
+        $member = $this->member();
+        $old = $this->hold($member, Plan::factory()->coworking(10)->create());
+        $this->spend($old, $member, 36000);
+        $wallet = Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail();
+        app(WalletService::class)->creditCategorized($wallet, WalletTransactionCategory::Cafe, '200', WalletTransactionSource::SubscriptionGrant, $old->current_period_end, null, [], 'Cafe');
+        $this->next->balances()->create(['category' => WalletTransactionCategory::Cafe, 'amount_points' => 50]);
+
+        $this->buy($member)->assertCreated();
+
+        $this->assertSame(50, app(WalletService::class)->categoryBalance($wallet->fresh(), $member, WalletTransactionCategory::Cafe));
+    }
+
+    public function test_a_card_purchase_ends_the_old_plan_when_it_is_fulfilled(): void
+    {
+        config([
+            'paymera.base_url' => 'https://egate-t.paymera.test',
+            'paymera.api_key' => 'test-api-key',
+            'paymera.terminal_id' => '99990001',
+            'paymera.currency' => 'USD',
+            'paymera.default_lang' => 'en',
+        ]);
+        Http::fake(['*/api/create-payment' => Http::response([
+            'ErrorMessage' => 'Success',
+            'ErrorCode' => 0,
+            'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1'],
+        ])]);
+        $member = $this->member();
+        $old = $this->hold($member, Plan::factory()->coworking(10)->create());
+        $this->spend($old, $member, 36000);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/memberships', ['plan_id' => $this->next->id, 'payment_method' => 'paymera'])
+            ->assertCreated();
+
+        // The hours come back before the card is accepted: the paid plan
+        // still replaces the old one rather than running beside it.
+        PlanHourUsage::query()->where('membership_id', $old->id)->delete();
+        $payment = Payment::sole();
+        $payment->forceFill(['status' => PaymentStatus::Accepted])->save();
+        app(PaymentService::class)->fulfilAcceptedGatewayPayment($payment);
+
+        $this->assertSame(1, Membership::query()->where('owner_type', OwnerType::User)->where('owner_id', $member->id)->live()->count());
+        $this->assertFalse($old->fresh()->isLive());
+    }
+
+    public function test_the_old_plans_seat_is_free_again(): void
+    {
+        $this->seats->update(['capacity' => 1]);
+        $branchId = $this->seats->building->branch_id;
+        $member = $this->member();
+        $old = $this->hold($member, Plan::factory()->coworking(10)->create());
+        $old->forceFill(['branch_id' => $branchId])->save();
+        $this->spend($old, $member, 36000);
+
+        $new = Membership::query()->findOrFail($this->buy($member)->assertCreated()->json('data.id'));
+
+        $this->assertSame($branchId, $new->branch_id);
+        $this->assertSame(1, Membership::query()->where('branch_id', $branchId)->live()->count());
     }
 
     private function member(): User

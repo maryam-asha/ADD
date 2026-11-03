@@ -154,6 +154,12 @@ class MembershipActivationService
             // seat decision locks, so two sales cannot both take the last seat.
             $branch = $branchId === null ? null : Branch::query()->whereKey($branchId)->lockForUpdate()->first();
 
+            // One personal plan at a time: the one this replaces ends now,
+            // before the seat check, so its seat is the new plan's to take.
+            if ($ownerType === OwnerType::User && $startsAt === null) {
+                $this->endPreviousPersonal($ownerId);
+            }
+
             if ($branch !== null && ! $overrideCapacity) {
                 $this->assertSeatsIn($branch, $plan, $seats, $periodStart, $periodEnd);
             }
@@ -225,6 +231,42 @@ class MembershipActivationService
 
             return true;
         });
+    }
+
+    /**
+     * Ends the member's live personal plans at once (product owner,
+     * 2026-11-03): no renewal, and the balances they granted expire with
+     * them. Nothing is refunded. Who may buy is PlanPurchaseEligibility's
+     * question; this only keeps two personal plans from ever being live
+     * together, whatever path paid for the new one.
+     */
+    private function endPreviousPersonal(int $userId): void
+    {
+        $live = Membership::query()
+            ->where('owner_type', OwnerType::User)
+            ->where('owner_id', $userId)
+            ->live()
+            ->lockForUpdate()
+            ->get();
+
+        if ($live->isEmpty()) {
+            return;
+        }
+
+        $wallet = Wallet::query()->where('owner_type', OwnerType::User)->where('owner_id', $userId)->first();
+        $now = now();
+
+        foreach ($live as $membership) {
+            if ($wallet !== null) {
+                $wallet->transactions()
+                    ->where('source', WalletTransactionSource::SubscriptionGrant)
+                    ->where('expires_at', $membership->current_period_end)
+                    ->update(['expires_at' => $now]);
+            }
+
+            // A second back: live() counts its last instant as live.
+            $membership->forceFill(['current_period_end' => $now->copy()->subSecond(), 'auto_renew' => false])->save();
+        }
     }
 
     private function grantPlanBalances(Plan $plan, Membership $membership, Wallet $wallet): void
