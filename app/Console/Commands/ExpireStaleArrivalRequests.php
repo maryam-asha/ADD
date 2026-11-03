@@ -57,9 +57,7 @@ class ExpireStaleArrivalRequests extends Command
 
                 // The member may have left the screen: a push says what to do next.
                 if ($request->user !== null) {
-                    $notifications->sendToUser($request->user, 'coworking.arrival_expired', [], [
-                        'arrival_request_id' => (string) $request->id,
-                    ]);
+                    $notifications->sendToUser($request->user, 'coworking.arrival_expired', [], $request->notificationTarget());
                 }
             });
 

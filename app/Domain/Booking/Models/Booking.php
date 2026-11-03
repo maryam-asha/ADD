@@ -241,6 +241,17 @@ class Booking extends Model
         return 'booking';
     }
 
+    /**
+     * What a notice about this booking — or its coworking session — names as
+     * its object, so the app and the dashboard open this booking.
+     *
+     * @return array{target_type: string, target_id: string}
+     */
+    public function notificationTarget(): array
+    {
+        return ['target_type' => 'booking', 'target_id' => (string) $this->id];
+    }
+
     /** Bookings checked in before scan check-in existed have no value; reception did those. */
     public function startSource(): SessionStartSource
     {

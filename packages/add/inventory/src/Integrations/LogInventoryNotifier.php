@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Log;
 
 class LogInventoryNotifier implements InventoryNotifier
 {
-    public function notifyHolders(string $ability, string $key, array $placeholders = []): void
+    public function notifyHolders(string $ability, string $key, array $placeholders = [], array $target = []): void
     {
-        Log::info("inventory notification {$key} for holders of {$ability}", $placeholders);
+        Log::info("inventory notification {$key} for holders of {$ability}", $placeholders + $target);
     }
 }

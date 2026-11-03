@@ -19,17 +19,17 @@ class AddHrNotifier implements HrNotifier
 {
     public function __construct(private readonly NotificationService $notifications) {}
 
-    public function notifyHolders(string $ability, string $key, array $placeholders = []): void
+    public function notifyHolders(string $ability, string $key, array $placeholders = [], array $target = []): void
     {
-        $this->notifications->sendToHolders($ability, "hr.{$key}", $placeholders);
+        $this->notifications->sendToHolders($ability, "hr.{$key}", $placeholders, $target);
     }
 
-    public function notifyEmployee(Employee $employee, string $key, array $placeholders = []): void
+    public function notifyEmployee(Employee $employee, string $key, array $placeholders = [], array $target = []): void
     {
         $user = $employee->user_id === null ? null : User::query()->find($employee->user_id);
 
         if ($user !== null) {
-            $this->notifications->sendToUser($user, "hr.{$key}", $placeholders, audience: NotificationAudience::forAccount($user));
+            $this->notifications->sendToUser($user, "hr.{$key}", $placeholders, $target, NotificationAudience::forAccount($user));
         }
     }
 }

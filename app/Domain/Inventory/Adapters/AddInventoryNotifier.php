@@ -14,8 +14,8 @@ class AddInventoryNotifier implements InventoryNotifier
 {
     public function __construct(private readonly NotificationService $notifications) {}
 
-    public function notifyHolders(string $ability, string $key, array $placeholders = []): void
+    public function notifyHolders(string $ability, string $key, array $placeholders = [], array $target = []): void
     {
-        $this->notifications->sendToHolders($ability, "inventory.{$key}", $placeholders);
+        $this->notifications->sendToHolders($ability, "inventory.{$key}", $placeholders, $target);
     }
 }

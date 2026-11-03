@@ -22,7 +22,7 @@ class SiteInquiryController extends Controller
                 'sender_name' => $inquiry->name,
                 'subject' => $inquiry->subject ?: 'General Inquiry',
             ],
-            ['inquiry_id' => $inquiry->id]
+            ['target_type' => 'inquiry', 'target_id' => (string) $inquiry->id]
         );
 
         return response()->json([

@@ -59,7 +59,7 @@ class TrainingService
 
             if (! $self) {
                 $placeholders = $this->placeholders($session);
-                DB::afterCommit(fn () => $this->notifier->notifyEmployee($employee, 'training_enrolled', $placeholders));
+                DB::afterCommit(fn () => $this->notifier->notifyEmployee($employee, 'training_enrolled', $placeholders, $this->target($session)));
             }
 
             return $enrollment;
@@ -102,7 +102,8 @@ class TrainingService
             HrAudit::record('training_session_cancelled', $session, ['enrollments' => $enrolled->count()]);
 
             $placeholders = $this->placeholders($session);
-            DB::afterCommit(fn () => $enrolled->each(fn (Enrollment $enrollment) => $this->notifier->notifyEmployee($enrollment->employee, 'training_cancelled', $placeholders)));
+            $target = $this->target($session);
+            DB::afterCommit(fn () => $enrolled->each(fn (Enrollment $enrollment) => $this->notifier->notifyEmployee($enrollment->employee, 'training_cancelled', $placeholders, $target)));
 
             return $session;
         });
@@ -173,6 +174,14 @@ class TrainingService
             'course_en' => $session->course->title['en'] ?? $session->course->title['ar'] ?? '',
             'starts_on' => $session->starts_on->toDateString(),
         ];
+    }
+
+    /**
+     * @return array{target_type: string, target_id: string} the session a notice about it opens
+     */
+    private function target(TrainingSession $session): array
+    {
+        return ['target_type' => 'hr_training_session', 'target_id' => (string) $session->id];
     }
 
     private function today(): CarbonImmutable

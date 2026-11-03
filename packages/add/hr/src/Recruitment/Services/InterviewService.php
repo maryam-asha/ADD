@@ -60,7 +60,8 @@ class InterviewService
                 'at' => $interview->scheduled_at->copy()->setTimezone($this->clock->timezone())->format('Y-m-d H:i'),
             ];
             $interviewers = $interview->interviewers()->get();
-            DB::afterCommit(fn () => $interviewers->each(fn (Employee $interviewer) => $this->notifier->notifyEmployee($interviewer, 'interview_scheduled', $placeholders)));
+            $target = ['target_type' => 'hr_application', 'target_id' => (string) $application->id];
+            DB::afterCommit(fn () => $interviewers->each(fn (Employee $interviewer) => $this->notifier->notifyEmployee($interviewer, 'interview_scheduled', $placeholders, $target)));
 
             return $interview;
         });

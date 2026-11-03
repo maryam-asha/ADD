@@ -159,7 +159,7 @@ class PayrollRunService
         $payslips = $approved->payslips()->with('employee')->get();
         DB::afterCommit(fn () => $payslips->each(fn ($payslip) => $this->notifier->notifyEmployee($payslip->employee, 'payslip_issued', [
             'month' => $approved->monthStart()->format('Y-m'),
-        ])));
+        ], ['target_type' => 'hr_payslip', 'target_id' => (string) $payslip->id])));
 
         return $approved;
     }

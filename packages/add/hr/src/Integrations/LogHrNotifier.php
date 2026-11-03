@@ -12,13 +12,13 @@ use Illuminate\Support\Facades\Log;
  */
 class LogHrNotifier implements HrNotifier
 {
-    public function notifyHolders(string $ability, string $key, array $placeholders = []): void
+    public function notifyHolders(string $ability, string $key, array $placeholders = [], array $target = []): void
     {
-        Log::info('[hr] notification', ['ability' => $ability, 'key' => $key, 'placeholders' => $placeholders]);
+        Log::info('[hr] notification', ['ability' => $ability, 'key' => $key, 'placeholders' => $placeholders, 'target' => $target]);
     }
 
-    public function notifyEmployee(Employee $employee, string $key, array $placeholders = []): void
+    public function notifyEmployee(Employee $employee, string $key, array $placeholders = [], array $target = []): void
     {
-        Log::info('[hr] notification', ['employee' => $employee->id, 'key' => $key, 'placeholders' => $placeholders]);
+        Log::info('[hr] notification', ['employee' => $employee->id, 'key' => $key, 'placeholders' => $placeholders, 'target' => $target]);
     }
 }

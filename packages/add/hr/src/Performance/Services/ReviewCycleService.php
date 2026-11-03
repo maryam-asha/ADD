@@ -160,7 +160,9 @@ class ReviewCycleService
         $people = Employee::query()->whereIn('id', $cycle->reviews()->whereNotNull($column)->select($column))->get();
         $placeholders = ['cycle_ar' => $cycle->name['ar'] ?? '', 'cycle_en' => $cycle->name['en'] ?? $cycle->name['ar'] ?? ''];
 
-        DB::afterCommit(fn () => $people->each(fn (Employee $person) => $this->notifier->notifyEmployee($person, $key, $placeholders)));
+        $target = ['target_type' => 'hr_review_cycle', 'target_id' => (string) $cycle->id];
+
+        DB::afterCommit(fn () => $people->each(fn (Employee $person) => $this->notifier->notifyEmployee($person, $key, $placeholders, $target)));
     }
 
     private function today(): CarbonImmutable

@@ -64,7 +64,7 @@ class ArrivalRequestController extends Controller
                 $arrivalRequest->user,
                 'coworking.session_started',
                 ['space' => $session->space->name],
-                ['session_type' => $session->coworkingType(), 'session_id' => (string) $session->id],
+                $session->notificationTarget(),
             );
 
             return response()->json(['message' => __('api.kiosk.arrival_request_confirmed')]);
@@ -129,7 +129,7 @@ class ArrivalRequestController extends Controller
 
         // The member is waiting in the app for a session that will not start.
         if ($arrivalRequest->isCoworkingStart()) {
-            $notifications->sendToUser($arrivalRequest->user, 'coworking.start_rejected');
+            $notifications->sendToUser($arrivalRequest->user, 'coworking.start_rejected', [], $arrivalRequest->notificationTarget());
             $realtime->send(new CoworkingStartRejected($arrivalRequest));
         }
 

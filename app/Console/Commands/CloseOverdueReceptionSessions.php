@@ -105,7 +105,7 @@ class CloseOverdueReceptionSessions extends Command
         $this->notifications->sendToHolders('reception.view', 'reception.forgotten_session_alert', [
             'member' => (string) $closed->user->name,
             'space' => $closed->space?->name ?? '',
-        ], ['session_type' => $closed->coworkingType(), 'session_id' => (string) $closed->id]);
+        ], $closed->notificationTarget());
 
         $owed = $closed->payment_state === PaymentState::Paid ? 0 : (int) $closed->price_points;
 
@@ -117,7 +117,7 @@ class CloseOverdueReceptionSessions extends Command
                 'time' => NotificationText::localTime($closed->checked_out_at),
                 'points' => $owed,
             ],
-            ['session_type' => $closed->coworkingType(), 'session_id' => (string) $closed->id],
+            $closed->notificationTarget(),
         );
     }
 }

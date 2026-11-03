@@ -208,7 +208,7 @@ class ReminderRunner
             $this->notifications->sendToUserOnce($session->user, "coworking.unpaid_reminder:{$type}:{$session->id}", 'coworking.unpaid_reminder', [
                 'points' => (int) $session->price_points,
                 'date' => NotificationText::localDate($session->checked_out_at),
-            ], ['session_type' => $type, 'session_id' => (string) $session->id]);
+            ], $session->notificationTarget());
         };
 
         return $this->each($unpaid(WalkinSession::query()), $remind)

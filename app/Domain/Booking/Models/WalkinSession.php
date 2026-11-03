@@ -131,6 +131,17 @@ class WalkinSession extends Model
         return 'walkin';
     }
 
+    /**
+     * What a notice about this session names as its object (its morph
+     * alias), so the app and the dashboard open this walk-in session.
+     *
+     * @return array{target_type: string, target_id: string}
+     */
+    public function notificationTarget(): array
+    {
+        return ['target_type' => 'walkin_session', 'target_id' => (string) $this->id];
+    }
+
     public function startSource(): SessionStartSource
     {
         return $this->started_via ?? SessionStartSource::Reception;

@@ -144,9 +144,7 @@ class DedicatedDeskService
     {
         app(NotificationService::class)->sendToHolders('memberships.create', 'membership.desk_needed', [
             'plan' => $membership->plan?->name ?? '#'.$membership->plan_id,
-        ], [
-            'membership_id' => $membership->id,
-        ]);
+        ], ['target_type' => 'membership', 'target_id' => (string) $membership->id]);
     }
 
     /** Whether a live subscription holds this desk. */

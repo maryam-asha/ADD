@@ -22,7 +22,7 @@ class SendAlerts extends Command
         $count = count($alerts->current());
 
         if ($count > 0) {
-            $notifier->notifyHolders(Abilities::ALERTS_VIEW, 'alerts_digest', ['count' => $count]);
+            $notifier->notifyHolders(Abilities::ALERTS_VIEW, 'alerts_digest', ['count' => $count], ['target_type' => 'hr_alerts']);
         }
 
         $this->info("{$count} open HR alerts.");
