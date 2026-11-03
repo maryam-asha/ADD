@@ -61,6 +61,12 @@ class PayableCheckout
             throw new ReceptionActionException($payable instanceof Booking ? 'api.payment.booking_not_payable' : 'api.payment.registration_not_payable');
         }
 
+        // The member's latest choice is how the booking pays what it still
+        // owes when it closes (ClosedBookingSettlement).
+        if ($payable instanceof Booking && $payable->chosen_payment_method !== $method) {
+            $payable->forceFill(['chosen_payment_method' => $method])->save();
+        }
+
         $coupon = $this->couponToApply($payable, $couponCode);
 
         $outcome = null;

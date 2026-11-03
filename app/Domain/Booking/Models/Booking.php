@@ -15,6 +15,7 @@ use App\Domain\Booking\Enums\TerminationSource;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use Carbon\CarbonInterface;
@@ -41,6 +42,7 @@ class Booking extends Model
         'payment_source',
         'checked_in_at',
         'checked_in_via',
+        'ready_announced_at',
         'kiosk_id',
         'checked_out_at',
         'termination_source',
@@ -49,6 +51,7 @@ class Booking extends Model
         'list_price_points',
         'currency',
         'payment_method',
+        'chosen_payment_method',
         'paid_by',
         'paid_at',
         'cancelled_at',
@@ -69,6 +72,7 @@ class Booking extends Model
             'payment_source' => PaymentSource::class,
             'checked_in_at' => 'datetime',
             'checked_in_via' => SessionStartSource::class,
+            'ready_announced_at' => 'datetime',
             'checked_out_at' => 'datetime',
             'termination_source' => TerminationSource::class,
             'amount_owed' => PlainDecimal::class,
@@ -234,6 +238,12 @@ class Booking extends Model
     public function kiosk(): BelongsTo
     {
         return $this->belongsTo(Kiosk::class);
+    }
+
+    /** On a co-working space: a coworking session's booking, not a room's. */
+    public function isCoworking(): bool
+    {
+        return $this->space->space_type === SpaceType::CoSpace;
     }
 
     public function coworkingType(): string
