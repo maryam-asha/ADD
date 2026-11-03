@@ -15,10 +15,12 @@ use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Exceptions\AlreadySubscribedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Services\WalletService;
@@ -27,6 +29,7 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\SettingSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -234,6 +237,73 @@ class OnePersonalPlanTest extends TestCase
 
         $this->assertSame($branchId, $new->branch_id);
         $this->assertSame(1, Membership::query()->where('branch_id', $branchId)->live()->count());
+    }
+
+    public function test_activation_refuses_to_end_a_plan_that_still_has_hours(): void
+    {
+        // A second tap that passed the check before the first one's plan
+        // existed must not end that brand-new plan.
+        $member = $this->member();
+        $current = $this->hold($member, Plan::factory()->create());
+
+        try {
+            app(MembershipActivationService::class)->activate($this->next, OwnerType::User, $member->id, charge: false);
+            $this->fail('A plan with hours left was ended by a second purchase');
+        } catch (AlreadySubscribedException $e) {
+            $this->assertSame($current->id, $e->current->id);
+        }
+
+        $this->assertTrue($current->fresh()->isLive());
+        $this->assertSame(1, Membership::query()->where('owner_type', OwnerType::User)->where('owner_id', $member->id)->count());
+    }
+
+    public function test_a_card_paid_after_another_purchase_starts_when_that_plan_ends(): void
+    {
+        config([
+            'paymera.base_url' => 'https://egate-t.paymera.test',
+            'paymera.api_key' => 'test-api-key',
+            'paymera.terminal_id' => '99990001',
+            'paymera.currency' => 'USD',
+            'paymera.default_lang' => 'en',
+        ]);
+        Http::fake(['*/api/create-payment' => Http::response([
+            'ErrorMessage' => 'Success',
+            'ErrorCode' => 0,
+            'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-2/en', 'paymentId' => 'pay-2'],
+        ])]);
+        $member = $this->member();
+        $this->spend($this->hold($member, Plan::factory()->coworking(10)->create()), $member, 36000);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/memberships', ['plan_id' => $this->next->id, 'payment_method' => 'paymera'])->assertCreated();
+        $card = Payment::sole();
+
+        // Before the card is accepted, the member buys again with points.
+        Carbon::setTestNow(now()->addMinute());
+        $bought = Membership::query()->findOrFail($this->buy($member)->assertCreated()->json('data.id'));
+
+        $card->forceFill(['status' => PaymentStatus::Accepted])->save();
+        app(PaymentService::class)->fulfilAcceptedGatewayPayment($card->fresh());
+
+        $paid = Membership::query()->findOrFail($card->fresh()->membership_id);
+        $this->assertTrue($bought->fresh()->isLive());
+        $this->assertTrue($paid->current_period_start->equalTo($bought->current_period_end));
+        $this->assertSame(1, Membership::query()->where('owner_type', OwnerType::User)->where('owner_id', $member->id)->live()->count());
+    }
+
+    public function test_a_replaced_plan_is_not_announced_as_ended(): void
+    {
+        $member = $this->member();
+        $old = $this->hold($member, Plan::factory()->coworking(10)->create());
+        $this->spend($old, $member, 36000);
+
+        $new = Membership::query()->findOrFail($this->buy($member)->assertCreated()->json('data.id'));
+        $this->assertSame($old->id, $new->renewed_from_id);
+
+        Carbon::setTestNow(now()->addMinutes(5));
+        $this->artisan('notifications:send-reminders')->assertSuccessful();
+
+        $this->assertFalse(DB::table('notification_claims')->where('dedupe_key', "membership.expired:{$old->id}")->exists());
     }
 
     private function member(): User

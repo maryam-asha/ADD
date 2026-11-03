@@ -6,6 +6,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\AlreadySubscribedException;
 use App\Domain\Membership\Exceptions\DeskAssignmentRefusedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
@@ -107,6 +108,8 @@ class MembershipController extends Controller
                 'message' => __('api.membership.seat_pool_full'),
                 'first_shortfall_at' => $e->firstShortfall->toIso8601String(),
             ], 422);
+        } catch (AlreadySubscribedException $e) {
+            return response()->json(['message' => $eligibility->reason($e->current)], 422);
         }
 
         $notices->assigned($membership->load('plan'));

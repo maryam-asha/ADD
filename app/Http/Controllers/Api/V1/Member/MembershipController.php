@@ -15,6 +15,7 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\AlreadySubscribedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
@@ -219,6 +220,10 @@ class MembershipController extends Controller
             abort(422, __('api.wallet.insufficient_balance_for_plan'));
         } catch (SeatPoolExhaustedException) {
             return $this->seatPoolFull($plan, $ownerType, $ownerId);
+        } catch (AlreadySubscribedException $e) {
+            // A second tap that slipped past the check: refused under the
+            // lock, and the points it would have spent stay in the wallet.
+            return response()->json(['message' => app(PlanPurchaseEligibility::class)->reason($e->current)], 422);
         }
 
         $membership = Membership::query()->findOrFail($payment->membership_id);
