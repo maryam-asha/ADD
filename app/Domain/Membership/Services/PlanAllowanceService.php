@@ -90,9 +90,15 @@ class PlanAllowanceService
             return null;
         }
 
+        return max(0, (int) round($allowance->hours * 3600) - $this->spentSeconds($membership, $user, $allowance, $at));
+    }
+
+    /** Seconds $user spent of $allowance in the cycle containing $at — unlimited time included. */
+    public function spentSeconds(Membership $membership, User $user, HourAllowance $allowance, CarbonInterface $at): int
+    {
         [$start, $end] = $this->cycleFor($membership, $at);
 
-        $spent = (int) PlanHourUsage::query()
+        return (int) PlanHourUsage::query()
             ->where('membership_id', $membership->id)
             ->where('user_id', $user->id)
             ->where('allowance_kind', $allowance->kind())
@@ -100,8 +106,6 @@ class PlanAllowanceService
             ->where('cycle_start', '>=', $start)
             ->where('cycle_start', '<', $end)
             ->sum('seconds');
-
-        return max(0, (int) round($allowance->hours * 3600) - $spent);
     }
 
     /**
