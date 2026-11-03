@@ -591,6 +591,7 @@ return [
         'expires_on' => 'Expires :date',
         'points_unit' => 'pts',
         'remaining_label' => ':amount remaining',
+        'already_subscribed' => 'You already have an active plan until :date.',
         // memberships/current: one card per figure (CurrentMembershipStats).
         'stats' => [
             'period' => 'Plan period',

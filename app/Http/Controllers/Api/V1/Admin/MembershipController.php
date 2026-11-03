@@ -13,7 +13,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\DedicatedDeskService;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipNotifier;
-use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanPurchaseEligibility;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\AssignMembershipDesksRequest;
 use App\Http\Requests\Admin\IndexAdminMembershipRequest;
@@ -67,8 +67,8 @@ class MembershipController extends Controller
     public function store(
         StoreAdminMembershipRequest $request,
         MembershipActivationService $activations,
-        MembershipResolver $resolver,
         MembershipNotifier $notices,
+        PlanPurchaseEligibility $eligibility,
     ): JsonResponse {
         $plan = Plan::findOrFail($request->validated('plan_id'));
 
@@ -80,10 +80,12 @@ class MembershipController extends Controller
             $ownerId = (int) $request->validated('user_id');
         }
 
-        // An owner with a live membership would end up holding two at once,
-        // and MembershipResolver would silently pick whichever it saw first.
-        if ($resolver->activeForOwner($ownerType, $ownerId) !== null) {
-            return response()->json(['message' => __('api.admin.membership_already_active')], 422);
+        // One personal plan at a time (PlanPurchaseEligibility); a company keeps
+        // its own rule — nothing new while one is live.
+        if (($blocking = $eligibility->blockingFor($ownerType, $ownerId)) !== null) {
+            return response()->json(['message' => $ownerType === OwnerType::User
+                ? $eligibility->reason($blocking)
+                : __('api.admin.membership_already_active')], 422);
         }
 
         try {

@@ -579,6 +579,7 @@ return [
         'expires_on' => 'ينتهي في :date',
         'points_unit' => 'نقطة',
         'remaining_label' => 'المتبقي: :amount',
+        'already_subscribed' => 'لديك باقة سارية حتى :date',
         // memberships/current: بطاقة لكل رقم (CurrentMembershipStats).
         'stats' => [
             'period' => 'مدة الباقة',

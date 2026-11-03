@@ -29,7 +29,11 @@ class PackageBrowseService
         private readonly OfferResolver $offers,
         private readonly PlanSavingCalculator $savings,
         private readonly CurrentMembershipStats $stats,
+        private readonly PlanPurchaseEligibility $eligibility,
     ) {}
+
+    /** @var array<int, ?string> why each member may not subscribe now, by user id */
+    private array $blockedReasons = [];
 
     /**
      * The full package catalog (for the "Packages" tab) — every active
@@ -283,9 +287,14 @@ class PackageBrowseService
             : [];
 
         $tags = $this->defaultTags($this->resolvePlanCapabilities($plan));
+        $blockedReason = $this->subscribeBlockedReason($user);
 
         return [
             'id' => $plan->id,
+            // One personal plan at a time: the app disables "Subscribe" and
+            // says why, instead of waiting for the purchase's 422.
+            'can_subscribe' => $blockedReason === null,
+            'subscribe_blocked_reason' => $blockedReason,
             'name' => $name,
             'module' => $plan->planModule ? [
                 'id' => $plan->planModule->id,
@@ -319,6 +328,20 @@ class PackageBrowseService
                 : [],
             'is_current' => $isCurrent,
         ];
+    }
+
+    private function subscribeBlockedReason(?User $user): ?string
+    {
+        if ($user === null) {
+            return null;
+        }
+
+        if (! array_key_exists($user->id, $this->blockedReasons)) {
+            $blocking = $this->eligibility->blockingFor(OwnerType::User, $user->id);
+            $this->blockedReasons[$user->id] = $blocking === null ? null : $this->eligibility->reason($blocking);
+        }
+
+        return $this->blockedReasons[$user->id];
     }
 
     /**

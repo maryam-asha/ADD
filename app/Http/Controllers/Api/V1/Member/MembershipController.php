@@ -21,6 +21,7 @@ use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PackageBrowseService;
+use App\Domain\Membership\Services\PlanPurchaseEligibility;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
@@ -168,6 +169,7 @@ class MembershipController extends Controller
         StartPayment $card,
         CouponEligibility $coupons,
         PriceQuoteService $quotes,
+        PlanPurchaseEligibility $eligibility,
     ): JsonResponse {
         $plan = Plan::findOrFail($request->validated('plan_id'));
         $member = $request->user();
@@ -182,6 +184,11 @@ class MembershipController extends Controller
         } else {
             $ownerType = OwnerType::User;
             $ownerId = $member->id;
+
+            // Before any payment starts, card included: one plan at a time.
+            if (($blocking = $eligibility->blockingFor($ownerType, $ownerId)) !== null) {
+                return response()->json(['message' => $eligibility->reason($blocking)], 422);
+            }
         }
 
         // A coupon is checked — and the price known — before any method is
