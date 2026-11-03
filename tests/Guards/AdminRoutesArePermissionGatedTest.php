@@ -25,6 +25,8 @@ class AdminRoutesArePermissionGatedTest extends TestCase
         'GET api/v1/admin/notifications/unread-count',
         'PATCH api/v1/admin/notifications/{id}/read',
         'POST api/v1/admin/notifications/read-all',
+        'PUT api/v1/admin/device-token',
+        'DELETE api/v1/admin/device-token',
     ];
 
     public function test_every_admin_route_names_a_permission_except_the_staff_only_allowlist(): void

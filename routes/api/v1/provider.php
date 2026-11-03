@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\Provider\ProviderCompanyController;
+use App\Http\Controllers\Api\V1\Provider\ProviderDeviceTokenController;
 use App\Http\Controllers\Api\V1\Provider\ProviderInvoiceController;
 use App\Http\Controllers\Api\V1\Provider\ProviderNotificationController;
 use App\Http\Controllers\Api\V1\Provider\ProviderOfficeLeaseController;
@@ -25,11 +26,13 @@ use Illuminate\Support\Facades\Route;
 Route::get('profile', [ProviderProfileController::class, 'show']);
 Route::get('summary', [ProviderSummaryController::class, 'show']);
 
-// The account's own notices (provider audience).
+// The account's own notices (provider audience), and the browser they are pushed to.
 Route::get('notifications', [ProviderNotificationController::class, 'index']);
 Route::get('notifications/unread-count', [ProviderNotificationController::class, 'unreadCount']);
 Route::patch('notifications/{id}/read', [ProviderNotificationController::class, 'markAsRead']);
 Route::post('notifications/read-all', [ProviderNotificationController::class, 'markAllAsRead']);
+Route::put('device-token', [ProviderDeviceTokenController::class, 'update']);
+Route::delete('device-token', [ProviderDeviceTokenController::class, 'destroy']);
 
 Route::get('companies', [ProviderCompanyController::class, 'index']);
 Route::get('companies/{company}', [ProviderCompanyController::class, 'show']);
