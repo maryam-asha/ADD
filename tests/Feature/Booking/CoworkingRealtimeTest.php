@@ -8,6 +8,7 @@ use App\Domain\Booking\Events\ArrivalRequestCreated;
 use App\Domain\Booking\Events\ArrivalRequestResolved;
 use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Events\CoworkingSessionEnded;
+use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Events\CoworkingStartConfirmed;
 use App\Domain\Booking\Events\CoworkingStartExpired;
 use App\Domain\Booking\Events\CoworkingStartRejected;
@@ -61,6 +62,7 @@ class CoworkingRealtimeTest extends TestCase
         CoworkingStartRejected::class,
         CoworkingStartExpired::class,
         CoworkingSessionEnded::class,
+        CoworkingSessionPaid::class,
         CoworkingPaymentAtReception::class,
         SessionEndRequestCreated::class,
         SessionEndRequestCancelled::class,
@@ -346,6 +348,23 @@ class CoworkingRealtimeTest extends TestCase
         Event::assertDispatched(CoworkingPaymentAtReception::class, fn (CoworkingPaymentAtReception $e) => $this->onChannel($e, 'private-reception')
             && $e->broadcastAs() === 'coworking.pay_at_reception'
             && $e->broadcastWith() === ['session_type' => 'walkin', 'session_id' => $session->id, 'member_id' => $member->id]);
+    }
+
+    /** The desk took the cash: the member's card waiting for the payment goes. */
+    public function test_settling_an_ended_session_tells_the_member(): void
+    {
+        [$member, $session] = $this->memberInSession();
+        $this->requestEnd()->assertCreated();
+        $this->actingAsOperations();
+        $this->postJson('/api/v1/admin/reception/session-end-requests/'.SessionEndRequest::sole()->id.'/confirm')->assertOk();
+        Event::fake(self::EVENTS);
+
+        $this->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", ['payment_method' => 'cash'])->assertOk();
+
+        Event::assertDispatchedTimes(CoworkingSessionPaid::class, 1);
+        Event::assertDispatched(CoworkingSessionPaid::class, fn (CoworkingSessionPaid $e) => $this->onChannel($e, "private-member.{$member->id}")
+            && $e->broadcastAs() === 'coworking.session_paid'
+            && $e->broadcastWith() === ['session_type' => 'walkin', 'session_id' => $session->id]);
     }
 
     /** The data is saved before the socket server is called; its failure is logged and the answer stands. */

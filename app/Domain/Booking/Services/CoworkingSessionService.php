@@ -200,6 +200,37 @@ class CoworkingSessionService
     }
 
     /**
+     * The member's newest ended session on a coworking space that still owes
+     * money — what the home card keeps showing, pay button and all, until it
+     * is paid. Owing is what the payment block calls `unpaid`
+     * (PaymentStatePresenter): a price left, less what a booking has already
+     * had paid for it.
+     */
+    public function owingSessionFor(User $member): Booking|WalkinSession|null
+    {
+        $newestOwing = fn (Builder $query) => $query
+            ->where('user_id', $member->id)
+            ->whereNotNull('checked_in_at')
+            ->whereNotNull('checked_out_at')
+            ->where('payment_state', PaymentState::Unpaid->value)
+            ->where('price_points', '>', 0)
+            ->whereHas('space', fn (Builder $space) => $space->where('space_type', SpaceType::CoSpace))
+            ->latest('checked_out_at')
+            ->first();
+
+        $booking = $newestOwing(Booking::query());
+
+        if ($booking !== null && $booking->price_points <= $booking->pointsPaid()) {
+            $booking = null;
+        }
+
+        return collect([$newestOwing(WalkinSession::query()), $booking])
+            ->filter()
+            ->sortByDesc(fn (Booking|WalkinSession $session) => $session->checked_out_at->getTimestamp())
+            ->first();
+    }
+
+    /**
      * The member's ended sessions on a coworking space — walk-ins and
      * checked-in bookings alike, as OpenCoworkingSessionLocator counts them —
      * newest first, one list paged across both tables. Each page holds the

@@ -19,6 +19,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Services\Models\ServiceType;
 use App\Domain\Services\Services\ServiceCatalogService;
 use App\Support\Enums\EventRegistrationStatus;
+use App\Support\Presenters\PaymentStatePresenter;
 use App\Support\Time\LocalTime;
 use BackedEnum;
 use Carbon\CarbonInterface;
@@ -41,6 +42,7 @@ class MemberHomeService
         private readonly ServiceCatalogService $catalog,
         private readonly BookingPresentationService $presentation,
         private readonly EventBrowseService $events,
+        private readonly PaymentStatePresenter $payments,
         private readonly LocalTime $time,
     ) {}
 
@@ -76,7 +78,9 @@ class MemberHomeService
         return [
             'greeting' => $this->greeting($member, $localNow, $locale),
             'unread_notifications' => $member->unreadNotifications()->count(),
-            'active_session' => $session === null ? $this->awaitingSession($member, $locale) : $this->session($session, $locale),
+            'active_session' => $session === null
+                ? $this->awaitingSession($member, $locale) ?? $this->owingSession($member, $locale)
+                : $this->session($session, $locale),
             'banners' => $this->banners($locale),
             'today' => $this->today($member, $session, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
@@ -120,6 +124,8 @@ class MemberHomeService
             'requested_at' => null,
             'checked_in_at' => $this->time->toLocal($session->checked_in_at)?->toIso8601String(),
             'end_requested' => $session->pendingEndRequest !== null,
+            'checked_out_at' => null,
+            'payment' => null,
         ];
     }
 
@@ -150,6 +156,44 @@ class MemberHomeService
             'requested_at' => $this->time->toLocal($request->requested_at)?->toIso8601String(),
             'checked_in_at' => null,
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
+        ];
+    }
+
+    /**
+     * The same card once reception has closed the session and money is
+     * still owed (state awaiting_payment), so the member can still pay
+     * after the running card is gone: `payment` is the block every session
+     * shows (PaymentStatePresenter — `pending` while a card payment is in
+     * flight) and paying is POST member/coworking-sessions/{type}/{id}/pay.
+     * Cash leaves no record until the desk takes it, so the card stays
+     * until then. Null when nothing is owed.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function owingSession(User $member, string $locale): ?array
+    {
+        $session = $this->sessions->owingSessionFor($member);
+
+        if ($session === null) {
+            return null;
+        }
+
+        $session->loadMissing('space.building.branch');
+
+        return [
+            'state' => 'awaiting_payment',
+            'type' => $session->coworkingType(),
+            'id' => $session->id,
+            'arrival_request_id' => null,
+            'space' => $this->space($session->space, $locale),
+            'branch' => $this->branch($session->space->building?->branch, $locale),
+            'requested_at' => null,
+            'checked_in_at' => $this->time->toLocal($session->checked_in_at)?->toIso8601String(),
+            'end_requested' => false,
+            'checked_out_at' => $this->time->toLocal($session->checked_out_at)?->toIso8601String(),
+            'payment' => $this->payments->for($session, $member),
         ];
     }
 

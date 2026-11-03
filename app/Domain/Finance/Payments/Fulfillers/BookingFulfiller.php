@@ -10,6 +10,7 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PrepaymentHold;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
  * Paying for a booking. Its price is fixed when it is made (`price_points`,
@@ -21,11 +22,12 @@ class BookingFulfiller extends SessionPaymentFulfiller
 {
     public function __construct(
         PaymentMethodRegistry $methods,
+        RealtimeBroadcaster $realtime,
         private readonly AmountCalculator $amounts,
         private readonly PointConversionService $points,
         private readonly PrepaymentHold $holds,
     ) {
-        parent::__construct($methods);
+        parent::__construct($methods, $realtime);
     }
 
     public function purpose(): PaymentPurpose
