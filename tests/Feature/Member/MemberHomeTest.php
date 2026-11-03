@@ -5,6 +5,7 @@ namespace Tests\Feature\Member;
 use App\Domain\Booking\Enums\ArrivalRequestPurpose;
 use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\ArrivalRequest;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -12,6 +13,9 @@ use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Experience\Models\EventSession;
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
@@ -131,6 +135,8 @@ class MemberHomeTest extends TestCase
             'requested_at' => null,
             'checked_in_at' => '2026-10-13T08:35:00+03:00',
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
         ]);
     }
 
@@ -159,7 +165,111 @@ class MemberHomeTest extends TestCase
             'requested_at' => '2026-10-13T09:58:00+03:00',
             'checked_in_at' => null,
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
         ]);
+    }
+
+    /** Reception closed it and money is owed: the card stays, to pay from, until it is paid. */
+    public function test_an_ended_session_still_owed_stays_the_card_on_top_until_paid(): void
+    {
+        $openSpace = $this->openSpace();
+        $session = WalkinSession::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'checked_in_at' => now()->subMinutes(90),
+            'checked_out_at' => now()->subMinutes(5),
+            'price_points' => 300,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+
+        $card = $this->home()->json('data.active_session');
+
+        $this->assertSame('awaiting_payment', $card['state']);
+        $this->assertSame(['walkin', $session->id], [$card['type'], $card['id']]);
+        $this->assertSame(['id' => $openSpace->id, 'name' => 'Open Space', 'type' => 'co_space'], $card['space']);
+        $this->assertSame(['2026-10-13T08:30:00+03:00', '2026-10-13T09:55:00+03:00'], [$card['checked_in_at'], $card['checked_out_at']]);
+        $this->assertSame(['unpaid', 300], [$card['payment']['state'], $card['payment']['amount_points']]);
+        $this->assertNull($card['arrival_request_id']);
+        $this->assertFalse($card['end_requested']);
+
+        $session->forceFill(['payment_state' => PaymentState::Paid, 'paid_at' => now()])->save();
+
+        $this->home()->assertJsonPath('data.active_session', null);
+    }
+
+    public function test_a_closed_booking_owes_only_what_was_not_paid_when_it_was_made(): void
+    {
+        $openSpace = $this->openSpace();
+        $booking = Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'status' => BookingStatus::Completed,
+            'start_at' => now()->subHours(2),
+            'end_at' => now()->subHour(),
+            'checked_in_at' => now()->subHours(2),
+            'checked_out_at' => now()->subMinutes(30),
+            'price_points' => 250,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+        $this->acceptedPayment($booking, 200);
+
+        $this->home()
+            ->assertJsonPath('data.active_session.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_session.type', 'booking')
+            ->assertJsonPath('data.active_session.payment.amount_points', 50);
+
+        $this->acceptedPayment($booking, 50);
+
+        $this->home()->assertJsonPath('data.active_session', null);
+    }
+
+    public function test_a_session_that_owes_nothing_or_is_not_coworking_is_no_card(): void
+    {
+        $ended = ['user_id' => $this->member->id, 'checked_in_at' => now()->subHours(2), 'checked_out_at' => now()->subHour()];
+        // The plan covered it in full.
+        WalkinSession::factory()->create([...$ended, 'space_id' => $this->openSpace()->id, 'price_points' => 0, 'payment_state' => PaymentState::Unpaid]);
+        WalkinSession::factory()->create([...$ended, 'space_id' => $this->openSpace()->id, 'price_points' => 300, 'payment_state' => PaymentState::Paid]);
+        // A room is not a coworking session.
+        WalkinSession::factory()->create([...$ended, 'space_id' => $this->room->id, 'price_points' => 300, 'payment_state' => PaymentState::Unpaid]);
+
+        $this->home()->assertJsonPath('data.active_session', null);
+    }
+
+    public function test_a_running_session_is_the_card_even_while_an_older_one_is_owed(): void
+    {
+        $openSpace = $this->openSpace();
+        WalkinSession::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'checked_in_at' => now()->subDay(),
+            'checked_out_at' => now()->subDay()->addHours(2),
+            'price_points' => 300,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+        $running = WalkinSession::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'checked_in_at' => now()->subMinutes(10),
+        ]);
+
+        $this->home()
+            ->assertJsonPath('data.active_session.state', 'active')
+            ->assertJsonPath('data.active_session.id', $running->id);
+    }
+
+    private function openSpace(): Space
+    {
+        return Space::factory()->create([
+            'building_id' => $this->room->building_id,
+            'space_type' => SpaceType::CoSpace,
+            'name' => ['en' => 'Open Space', 'ar' => 'المساحة المفتوحة'],
+        ]);
+    }
+
+    private function acceptedPayment(Booking $booking, int $points): void
+    {
+        Payment::factory()->forPayable($booking)->create(['purpose' => PaymentPurpose::Booking, 'status' => PaymentStatus::Accepted, 'settled_at' => now(), 'amount_points' => $points, 'user_id' => $this->member->id]);
     }
 
     public function test_an_arrival_request_for_a_room_is_not_a_session_card(): void

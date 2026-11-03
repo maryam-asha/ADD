@@ -8,6 +8,7 @@ use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Services\PointConversionService;
+use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
  * Paying what a coworking (walk-in) session owes once it has closed. Its
@@ -18,9 +19,10 @@ class WalkinSessionFulfiller extends SessionPaymentFulfiller
 {
     public function __construct(
         PaymentMethodRegistry $methods,
+        RealtimeBroadcaster $realtime,
         private readonly PointConversionService $points,
     ) {
-        parent::__construct($methods);
+        parent::__construct($methods, $realtime);
     }
 
     public function purpose(): PaymentPurpose

@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments\Fulfillers;
 
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -12,6 +13,7 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
  * What a booking and a walk-in have in common once they are paid for: both
@@ -19,10 +21,17 @@ use App\Domain\Membership\Enums\WalletTransactionCategory;
  * general), and both record on themselves how they were paid — the same
  * `payment_state` / `payment_source` / `payment_method` / `paid_at` /
  * `paid_by` columns reception's settle-payment has always written.
+ *
+ * A session paid once it has closed tells the member's app
+ * (CoworkingSessionPaid), whichever way the money came — the home card
+ * waiting for it goes. A booking paid when it is made has no such card.
  */
 abstract class SessionPaymentFulfiller implements PaymentFulfiller
 {
-    public function __construct(protected readonly PaymentMethodRegistry $methods) {}
+    public function __construct(
+        protected readonly PaymentMethodRegistry $methods,
+        private readonly RealtimeBroadcaster $realtime,
+    ) {}
 
     public function walletCategory(): WalletTransactionCategory
     {
@@ -31,13 +40,19 @@ abstract class SessionPaymentFulfiller implements PaymentFulfiller
 
     public function fulfil(Payment $payment): void
     {
-        $this->session($payment)->forceFill([
+        $session = $this->session($payment);
+
+        $session->forceFill([
             'payment_state' => PaymentState::Paid,
             'payment_source' => $this->sourceFor($payment),
             'payment_method' => $this->ledgerMethodFor($payment),
             'paid_at' => now(),
             'paid_by' => $payment->received_by,
         ])->save();
+
+        if ($session->checked_out_at !== null) {
+            $this->realtime->send(new CoworkingSessionPaid($session));
+        }
     }
 
     abstract protected function session(Payment $payment): Booking|WalkinSession;
