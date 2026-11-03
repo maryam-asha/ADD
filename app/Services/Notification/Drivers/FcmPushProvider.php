@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Log;
 use Kreait\Firebase\Contract\Messaging;
 use Kreait\Firebase\Messaging\CloudMessage;
 use Kreait\Firebase\Messaging\Notification;
+use Kreait\Firebase\Messaging\WebPushConfig;
 
 class FcmPushProvider implements PushProvider
 {
@@ -49,6 +50,31 @@ class FcmPushProvider implements PushProvider
             }
         } catch (\Throwable $e) {
             Log::error('[FCM] Multicast failed', [
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        return $results;
+    }
+
+    public function sendDataToDevices(array $tokens, array $data): array
+    {
+        $results = array_fill_keys($tokens, false);
+
+        try {
+            // High urgency: a browser delivers it at once rather than when
+            // convenient. A day's TTL: a notice older than that is stale.
+            $message = CloudMessage::new()
+                ->withData($data)
+                ->withWebPushConfig(WebPushConfig::fromArray(['headers' => ['Urgency' => 'high', 'TTL' => '86400']]));
+
+            $report = $this->messaging->sendMulticast($message, $tokens);
+
+            foreach ($report->successes()->getItems() as $success) {
+                $results[$success->target()->value()] = true;
+            }
+        } catch (\Throwable $e) {
+            Log::error('[FCM] Data multicast failed', [
                 'error' => $e->getMessage(),
             ]);
         }
