@@ -2,6 +2,7 @@
 
 namespace App\Services\Notification;
 
+use App\Domain\Identity\Enums\DeviceSurface;
 use App\Domain\Identity\Enums\NotificationAudience;
 use App\Domain\Identity\Enums\NotificationChannel;
 use App\Domain\Identity\Enums\NotificationStatus;
@@ -12,8 +13,10 @@ use App\Notifications\GeneralNotification;
 use App\Services\Realtime\RealtimeBroadcaster;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as BaseCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 use LogicException;
 use Spatie\Permission\Exceptions\PermissionDoesNotExist;
 
@@ -32,8 +35,9 @@ class NotificationService
 
     /**
      * Send a notification to a single user: a row in the inbox of its
-     * audience, and — for a member — a push to every device, each in its own
-     * language.
+     * audience, and a push to every device of that audience — the app for a
+     * member, the dashboard browsers for staff and provider — each in its
+     * own language.
      */
     public function sendToUser(
         User $user,
@@ -154,7 +158,7 @@ class NotificationService
         $users = User::where('status', 'active')
             ->where(function ($query) {
                 $query->whereNotNull('fcm_token')
-                    ->orWhereHas('deviceTokens');
+                    ->orWhereHas('deviceTokens', fn ($devices) => $devices->where('surface', DeviceSurface::App));
             })
             ->get();
 
@@ -179,19 +183,27 @@ class NotificationService
     }
 
     /**
-     * The inbox row, the push (member audience only — the app is the
-     * member's inbox), and the nudge to the reader's open screens, once the
-     * caller's transaction has committed.
+     * The inbox row, the push — a member's to the app, a staff or provider
+     * notice to the account's dashboard browsers — and the nudge to the
+     * reader's open screens, once the caller's transaction has committed.
      *
      * @param  Closure(string): array{title: string, body: string}  $textFor  the push text in one locale
      */
     private function deliver(User $user, GeneralNotification $notification, Closure $textFor, array $pushData): void
     {
         DB::afterCommit(function () use ($user, $notification, $textFor, $pushData) {
+            // Set here, not by the notifier, so the push can name the inbox
+            // row a click on it opens.
+            $notification->id ??= (string) Str::uuid();
             $user->notify($notification);
 
             if ($notification->audience === NotificationAudience::Member) {
                 $this->sendPush($user, $textFor, $pushData);
+            } else {
+                $this->sendDashboardPush($user, $textFor, $pushData + [
+                    'notification_id' => $notification->id,
+                    'audience' => $notification->audience->value,
+                ]);
             }
 
             $this->realtime->send(new NotificationCreated($user->id, $notification->audience));
@@ -218,26 +230,99 @@ class NotificationService
     }
 
     /**
-     * Every device of the account, each in its own language: the one it was
-     * last used in, else the account's.
+     * Every app device of the account, each in its own language: the one it
+     * was last used in, else the account's.
      *
      * @param  Closure(string): array{title: string, body: string}  $textFor  the text in one locale
      */
     private function sendPush(User $user, Closure $textFor, array $data): void
     {
-        $accountLanguage = $user->preferred_language ?? config('app.locale');
-
-        $byLanguage = $user->deviceTokens()->get(['token', 'language'])
-            ->groupBy(fn (DeviceToken $device) => $device->language ?? $accountLanguage)
-            ->map(fn ($devices) => $devices->pluck('token')->all());
+        $byLanguage = $this->tokensByLanguage($user, DeviceSurface::App);
 
         if ($byLanguage->isEmpty() && ! empty($user->fcm_token)) {
-            $byLanguage = collect([$accountLanguage => [$user->fcm_token]]);
+            $byLanguage = collect([$this->accountLanguage($user) => [$user->fcm_token]]);
         }
 
         foreach ($byLanguage as $language => $tokens) {
             $this->pushTo($user, $tokens, (string) $language, $textFor((string) $language), $data);
         }
+    }
+
+    /**
+     * Every dashboard browser of the account, each in its own language, as a
+     * data-only message: the browser shows it only when no dashboard tab is
+     * in view, where the bell already has it. FCM data values are strings.
+     *
+     * @param  Closure(string): array{title: string, body: string}  $textFor  the text in one locale
+     */
+    private function sendDashboardPush(User $user, Closure $textFor, array $data): void
+    {
+        $data = array_map(
+            fn ($value) => is_scalar($value) ? (string) $value : (string) json_encode($value),
+            array_filter($data, fn ($value) => $value !== null),
+        );
+
+        foreach ($this->tokensByLanguage($user, DeviceSurface::Dashboard) as $language => $tokens) {
+            $text = $textFor((string) $language);
+            $message = ['title' => $text['title'], 'body' => $text['body']] + $data;
+
+            try {
+                $results = $this->pushProvider->sendDataToDevices($tokens, $message);
+                $this->logPush($user, $data, in_array(true, $results, true) ? NotificationStatus::Sent : NotificationStatus::Failed, [
+                    'title' => $text['title'],
+                    'body' => $text['body'],
+                    'data' => $data,
+                    'device_count' => count($tokens),
+                    'language' => (string) $language,
+                    'surface' => DeviceSurface::Dashboard->value,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('[NotificationService] Dashboard push failed', [
+                    'user_id' => $user->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                $this->logPush($user, $data, NotificationStatus::Failed, [
+                    'title' => $text['title'],
+                    'body' => $text['body'],
+                    'data' => $data,
+                    'language' => (string) $language,
+                    'surface' => DeviceSurface::Dashboard->value,
+                ], $e->getMessage());
+            }
+        }
+    }
+
+    /**
+     * @return BaseCollection<string, list<string>>
+     */
+    private function tokensByLanguage(User $user, DeviceSurface $surface): BaseCollection
+    {
+        $accountLanguage = $this->accountLanguage($user);
+
+        return $user->deviceTokens()->where('surface', $surface)->get(['token', 'language'])
+            ->groupBy(fn (DeviceToken $device) => $device->language ?? $accountLanguage)
+            ->map(fn ($devices) => $devices->pluck('token')->all());
+    }
+
+    private function accountLanguage(User $user): string
+    {
+        return $user->preferred_language ?? config('app.locale');
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     */
+    private function logPush(User $user, array $data, NotificationStatus $status, array $payload, ?string $error = null): void
+    {
+        NotificationLog::create([
+            'user_id' => $user->id,
+            'channel' => NotificationChannel::Push,
+            'template_key' => $data['template_key'] ?? 'custom',
+            'status' => $status,
+            'payload' => $payload,
+            'error_message' => $error,
+        ]);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
+use App\Domain\Identity\Enums\DeviceSurface;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\UpdateDeviceTokenRequest;
 use App\Services\Notification\DeviceTokenService;
@@ -38,7 +39,7 @@ class MemberDeviceTokenController extends Controller
         if ($token) {
             $this->devices->forget($user, $token);
         } else {
-            $this->devices->forgetAll($user);
+            $this->devices->forgetAll($user, DeviceSurface::App);
         }
 
         return response()->json(['message' => __('api.notification.device_token_removed')]);

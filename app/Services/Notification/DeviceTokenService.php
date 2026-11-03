@@ -2,6 +2,7 @@
 
 namespace App\Services\Notification;
 
+use App\Domain\Identity\Enums\DeviceSurface;
 use App\Domain\Identity\Models\DeviceToken;
 use App\Domain\Identity\Models\User;
 use App\Services\Auth\TokenPair;
@@ -27,14 +28,18 @@ class DeviceTokenService
     public const DETAILS = ['platform', 'language', 'device_id', 'app_version', 'build_number', 'os_version', 'device_model'];
 
     /**
+     * A dashboard browser's token has no session of its own to follow (the
+     * dashboard signs in with a cookie): the browser forgets it at sign-out,
+     * and it never becomes the legacy `users.fcm_token`, which is the app's.
+     *
      * @param  array<string, mixed>  $details  any of DETAILS
      */
-    public function register(User $user, string $token, array $details = [], ?int $accessTokenId = null): void
+    public function register(User $user, string $token, array $details = [], ?int $accessTokenId = null, DeviceSurface $surface = DeviceSurface::App): void
     {
         $details = array_filter(Arr::only($details, self::DETAILS), fn ($value) => $value !== null && $value !== '');
         $deviceId = $details['device_id'] ?? null;
 
-        DB::transaction(function () use ($user, $token, $details, $deviceId, $accessTokenId) {
+        DB::transaction(function () use ($user, $token, $details, $deviceId, $accessTokenId, $surface) {
             // One account per token and per install: whoever held either before
             // stops getting pushes on this device.
             $elsewhere = DeviceToken::where('user_id', '!=', $user->id)
@@ -52,7 +57,7 @@ class DeviceTokenService
 
             // The install's own row when it has one, so a token Firebase
             // rotated replaces the old one rather than sitting beside it.
-            $device = $deviceId ? $user->deviceTokens()->where('device_id', $deviceId)->first() : null;
+            $device = $deviceId ? $user->deviceTokens()->where('surface', $surface)->where('device_id', $deviceId)->first() : null;
             $device ??= $user->deviceTokens()->where('token', $token)->first();
 
             // Any other row of this account still holding the token (unique per account).
@@ -62,10 +67,12 @@ class DeviceTokenService
                 ->delete();
 
             ($device ?? $user->deviceTokens()->make())
-                ->fill(['token' => $token, 'last_used_at' => now()] + $details + array_filter(['access_token_id' => $accessTokenId]))
+                ->fill(['token' => $token, 'surface' => $surface, 'last_used_at' => now()] + $details + array_filter(['access_token_id' => $accessTokenId]))
                 ->save();
 
-            $user->forceFill(['fcm_token' => $token])->save();
+            if ($surface === DeviceSurface::App) {
+                $user->forceFill(['fcm_token' => $token])->save();
+            }
         });
     }
 
@@ -84,18 +91,26 @@ class DeviceTokenService
         $this->register($pair->user, $token, $details, $pair->accessTokenId);
     }
 
-    public function forget(User $user, string $token): void
+    public function forget(User $user, string $token, DeviceSurface $surface = DeviceSurface::App): void
     {
-        $user->deviceTokens()->where('token', $token)->delete();
+        $user->deviceTokens()->where('token', $token)->where('surface', $surface)->delete();
 
-        $this->syncLegacyColumn($user);
+        if ($surface === DeviceSurface::App) {
+            $this->syncLegacyColumn($user);
+        }
     }
 
-    public function forgetAll(User $user): void
+    /**
+     * Every device of the account, or only those of one surface: the app
+     * forgetting its own leaves the dashboard browsers alone.
+     */
+    public function forgetAll(User $user, ?DeviceSurface $surface = null): void
     {
-        $user->deviceTokens()->delete();
+        $user->deviceTokens()->when($surface, fn ($query) => $query->where('surface', $surface))->delete();
 
-        $user->forceFill(['fcm_token' => null])->save();
+        if ($surface !== DeviceSurface::Dashboard) {
+            $user->forceFill(['fcm_token' => null])->save();
+        }
     }
 
     /**
@@ -146,7 +161,7 @@ class DeviceTokenService
     private function syncLegacyColumn(User $user): void
     {
         $user->forceFill([
-            'fcm_token' => $user->deviceTokens()->latest('id')->value('token'),
+            'fcm_token' => $user->deviceTokens()->where('surface', DeviceSurface::App)->latest('id')->value('token'),
         ])->save();
     }
 }

@@ -30,4 +30,14 @@ class MockPushProvider implements PushProvider
 
         return array_fill_keys($fcmTokens, true);
     }
+
+    public function sendDataToDevices(array $tokens, array $data): array
+    {
+        Log::info('[MockPush] Data multi device', [
+            'tokens' => $tokens,
+            'data' => $data,
+        ]);
+
+        return array_fill_keys($tokens, true);
+    }
 }

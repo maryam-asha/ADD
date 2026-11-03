@@ -2,6 +2,7 @@
 
 namespace App\Domain\Identity\Models;
 
+use App\Domain\Identity\Enums\DeviceSurface;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -16,6 +17,7 @@ class DeviceToken extends Model
         'token',
         'device_id',
         'platform',
+        'surface',
         'language',
         'app_version',
         'build_number',
@@ -27,6 +29,7 @@ class DeviceToken extends Model
     protected function casts(): array
     {
         return [
+            'surface' => DeviceSurface::class,
             'last_used_at' => 'datetime',
         ];
     }
