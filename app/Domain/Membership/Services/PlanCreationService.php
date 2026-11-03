@@ -4,6 +4,7 @@ namespace App\Domain\Membership\Services;
 
 use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Models\Plan;
+use App\Domain\Membership\Models\PlanModule;
 use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Membership\Support\CoworkingPlanClassifier;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,7 @@ class PlanCreationService
     /** @param  array<string, mixed>  $validated  PlanRules-shaped */
     public function create(array $validated): Plan
     {
-        $validated = $this->withCoworkingTerms($validated, defaultToFlexible: true);
+        $validated = $this->withModuleFromSeat($this->withCoworkingTerms($validated, defaultToFlexible: true));
         $balances = $validated['balances'] ?? [];
         $features = $validated['features'] ?? [];
         $discounts = $validated['discounts'] ?? [];
@@ -51,6 +52,25 @@ class PlanCreationService
 
             return $plan;
         });
+    }
+
+    /**
+     * The plan's module, set from its seat whatever was sent with it
+     * (PlanModule::slugForSeat()) — staff choose the seat, not the module.
+     *
+     * @param  array<string, mixed>  $validated
+     * @return array<string, mixed>
+     */
+    public function withModuleFromSeat(array $validated): array
+    {
+        if (! array_key_exists('coworking_seat', $validated)) {
+            return $validated;
+        }
+
+        $slug = PlanModule::slugForSeat(CoworkingSeat::from($validated['coworking_seat']));
+        $validated['plan_module_id'] = $slug === null ? null : PlanModule::query()->where('slug', $slug)->value('id');
+
+        return $validated;
     }
 
     /**

@@ -47,7 +47,7 @@ class PlanController extends AdminResourceController
 
     public function update(UpdatePlanRequest $request, Plan $plan, PlanCreationService $plans): JsonResponse
     {
-        $validated = $plans->withCoworkingTerms($request->validated());
+        $validated = $plans->withModuleFromSeat($plans->withCoworkingTerms($request->validated()));
         $hasSpaceHours = array_key_exists('space_hours', $validated);
         $spaceHoursData = $validated['space_hours'] ?? [];
         unset($validated['space_hours']);
