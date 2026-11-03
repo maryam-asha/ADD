@@ -15,12 +15,14 @@ use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Exceptions\AlreadySubscribedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Services\MembershipActivationService;
 use App\Domain\Membership\Services\MembershipResolver;
 use App\Domain\Membership\Services\PackageBrowseService;
+use App\Domain\Membership\Services\PlanPurchaseEligibility;
 use App\Domain\Pricing\Models\Coupon;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
@@ -168,6 +170,7 @@ class MembershipController extends Controller
         StartPayment $card,
         CouponEligibility $coupons,
         PriceQuoteService $quotes,
+        PlanPurchaseEligibility $eligibility,
     ): JsonResponse {
         $plan = Plan::findOrFail($request->validated('plan_id'));
         $member = $request->user();
@@ -182,6 +185,11 @@ class MembershipController extends Controller
         } else {
             $ownerType = OwnerType::User;
             $ownerId = $member->id;
+
+            // Before any payment starts, card included: one plan at a time.
+            if (($blocking = $eligibility->blockingFor($ownerType, $ownerId)) !== null) {
+                return response()->json(['message' => $eligibility->reason($blocking)], 422);
+            }
         }
 
         // A coupon is checked — and the price known — before any method is
@@ -212,6 +220,10 @@ class MembershipController extends Controller
             abort(422, __('api.wallet.insufficient_balance_for_plan'));
         } catch (SeatPoolExhaustedException) {
             return $this->seatPoolFull($plan, $ownerType, $ownerId);
+        } catch (AlreadySubscribedException $e) {
+            // A second tap that slipped past the check: refused under the
+            // lock, and the points it would have spent stay in the wallet.
+            return response()->json(['message' => app(PlanPurchaseEligibility::class)->reason($e->current)], 422);
         }
 
         $membership = Membership::query()->findOrFail($payment->membership_id);

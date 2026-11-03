@@ -6,10 +6,12 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Services\CoworkingPoolService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Exceptions\AlreadySubscribedException;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
@@ -47,6 +49,7 @@ class MembershipActivationService
         private readonly MembershipBranchResolver $branches,
         private readonly CoworkingPoolService $pool,
         private readonly DedicatedDeskService $desks,
+        private readonly PlanPurchaseEligibility $eligibility,
     ) {}
 
     /**
@@ -140,13 +143,23 @@ class MembershipActivationService
         array $auditProperties = [],
         ?CarbonInterface $startsAt = null,
         array $attributes = [],
+        ?CarbonInterface $approvedAt = null,
     ): Membership {
         if ($ownerType === OwnerType::User && $seats !== 1) {
             throw new \InvalidArgumentException('A member\'s own subscription holds exactly one seat.');
         }
 
-        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds, $auditProperties, $startsAt, $attributes) {
+        return DB::transaction(function () use ($plan, $ownerType, $ownerId, $charge, $auditAction, $branchId, $seats, $overrideCapacity, $deskIds, $auditProperties, $startsAt, $attributes, $approvedAt) {
             $branchId ??= $this->branches->branchFor($ownerType, $ownerId);
+
+            // One personal plan at a time: the one this replaces ends now,
+            // before the seat check, so its seat is the new plan's to take —
+            // or, paid for before another plan was bought, this one follows it.
+            if ($ownerType === OwnerType::User && $startsAt === null) {
+                [$startsAt, $follows] = $this->makeRoomForPersonal($ownerId, $approvedAt);
+                $attributes += $follows === null ? [] : ['renewed_from_id' => $follows];
+            }
+
             $periodStart = $startsAt !== null ? $startsAt->copy() : now();
             $periodEnd = $periodStart->copy()->addDays($plan->duration_days);
 
@@ -225,6 +238,71 @@ class MembershipActivationService
 
             return true;
         });
+    }
+
+    /**
+     * Makes room for a member's new personal plan (product owner,
+     * 2026-11-03): the live one it replaces ends at once, with no renewal,
+     * and the balances it granted expire with it. Nothing is refunded.
+     *
+     * Bought now ($approvedAt null — wallet, staff): every live personal
+     * plan must be replaceable under this lock, or the purchase is refused,
+     * so a second tap cannot end the plan the first one just bought.
+     * Paid for earlier ($approvedAt — a card or a cash hold settled later):
+     * the plans live when it was opened were approved for replacement then
+     * and end now; a plan bought after it is left alone, and the new one
+     * starts when that ends.
+     *
+     * @return array{0: ?CarbonInterface, 1: ?int} when the new plan starts (null: now), and the membership it follows
+     */
+    private function makeRoomForPersonal(int $userId, ?CarbonInterface $approvedAt): array
+    {
+        $live = Membership::query()
+            ->with('plan')
+            ->where('owner_type', OwnerType::User)
+            ->where('owner_id', $userId)
+            ->live()
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+
+        if ($live->isEmpty()) {
+            return [null, null];
+        }
+
+        if ($approvedAt === null) {
+            $user = User::query()->findOrFail($userId);
+            $blocking = $live->first(fn (Membership $m) => ! $this->eligibility->isReplaceable($m, $user));
+
+            if ($blocking !== null) {
+                throw new AlreadySubscribedException($blocking);
+            }
+        }
+
+        [$later, $replaced] = $approvedAt === null
+            ? [collect(), $live]
+            : $live->partition(fn (Membership $m) => $m->created_at->greaterThan($approvedAt));
+
+        $wallet = Wallet::query()->where('owner_type', OwnerType::User)->where('owner_id', $userId)->first();
+        $now = now();
+
+        foreach ($replaced as $membership) {
+            if ($wallet !== null) {
+                $wallet->transactions()
+                    ->where('source', WalletTransactionSource::SubscriptionGrant)
+                    ->where('expires_at', $membership->current_period_end)
+                    ->update(['expires_at' => $now]);
+            }
+
+            // A second back: live() counts its last instant as live.
+            $membership->forceFill(['current_period_end' => $now->copy()->subSecond(), 'auto_renew' => false])->save();
+        }
+
+        $follows = $later->sortBy('current_period_end')->last();
+
+        return $follows !== null
+            ? [$follows->current_period_end->copy(), $follows->id]
+            : [null, $replaced->last()?->id];
     }
 
     private function grantPlanBalances(Plan $plan, Membership $membership, Wallet $wallet): void

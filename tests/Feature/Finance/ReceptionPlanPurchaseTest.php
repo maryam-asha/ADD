@@ -171,11 +171,12 @@ class ReceptionPlanPurchaseTest extends TestCase
     public function test_an_owner_with_a_live_membership_is_refused_and_nothing_is_written(): void
     {
         $member = $this->member();
-        Membership::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
+        $live = Membership::factory()->create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]);
 
+        // A member's own plan says until when (one personal plan at a time).
         $this->sell(['plan_id' => $this->plan->id, 'user_id' => $member->id, 'payment_method' => 'cash'])
             ->assertStatus(422)
-            ->assertJsonPath('message', __('api.admin.membership_already_active', [], 'en'));
+            ->assertJsonPath('message', __('api.package.already_subscribed', ['date' => $live->current_period_end->timezone('Asia/Damascus')->format('d/m/Y')], 'en'));
 
         $this->assertSame(0, Payment::count());
         $this->assertSame(0, WalletTransaction::count());

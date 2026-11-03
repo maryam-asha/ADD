@@ -18,7 +18,7 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
-use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanPurchaseEligibility;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
@@ -60,19 +60,23 @@ class PlanPurchaseController extends Controller
         StorePlanPurchaseRequest $request,
         PaymentService $payments,
         WalletService $wallets,
-        MembershipResolver $memberships,
         CouponEligibility $coupons,
         CouponLedger $ledger,
         CouponOutcomePresenter $outcomes,
         AppliedDiscountPresenter $discounts,
+        PlanPurchaseEligibility $eligibility,
     ): JsonResponse {
         $plan = Plan::query()->findOrFail($request->validated('plan_id'));
         [$ownerType, $ownerId] = $this->owner($request);
         $code = $request->validated('coupon_code');
         $coupon = $code !== null ? $coupons->resolve($code) : null;
 
-        if ($memberships->activeForOwner($ownerType, $ownerId) !== null) {
-            return response()->json(['message' => __('api.admin.membership_already_active')], 422);
+        // One personal plan at a time (PlanPurchaseEligibility); a company keeps
+        // its own rule — nothing new while one is live.
+        if (($blocking = $eligibility->blockingFor($ownerType, $ownerId)) !== null) {
+            return response()->json(['message' => $ownerType === OwnerType::User
+                ? $eligibility->reason($blocking)
+                : __('api.admin.membership_already_active')], 422);
         }
 
         // As reception's other settlements: an account that never had a

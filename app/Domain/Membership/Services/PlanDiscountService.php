@@ -130,17 +130,25 @@ class PlanDiscountService
             return true;
         }
 
+        $used = $this->usesFor($discount, $membership, $user, $at) + ($consumedInBatch[$discount->id] ?? 0);
+
+        return $used < $discount->usage_limit;
+    }
+
+    /**
+     * How many times `$discount` priced something for `$user` (anyone on
+     * the membership when null) in the cycle containing `$at`.
+     */
+    public function usesFor(PlanDiscount $discount, Membership $membership, ?User $user, CarbonInterface $at): int
+    {
         [$cycleStart, $cycleEnd] = $this->allowances->cycleFor($membership, $at);
 
-        $used = $discount->redemptions()
+        return $discount->redemptions()
             ->where('membership_id', $membership->id)
             ->when($user !== null, fn ($query) => $query->where('user_id', $user->id))
             ->where('counted_at', '>=', $cycleStart)
             ->where('counted_at', '<', $cycleEnd)
-            ->count()
-            + ($consumedInBatch[$discount->id] ?? 0);
-
-        return $used < $discount->usage_limit;
+            ->count();
     }
 
     private function specificity(PlanDiscount $discount): int

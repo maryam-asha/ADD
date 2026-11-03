@@ -447,8 +447,8 @@ class DedicatedDeskAssignmentTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->getJson('/api/v1/member/memberships/current')
             ->assertOk()
-            ->assertJsonPath('data.desks.0.code', $desk->code)
-            ->assertJsonPath('data.desks.0.label', $desk->label);
+            ->assertJsonPath('data.plan.desks.0.code', $desk->code)
+            ->assertJsonPath('data.plan.desks.0.label', $desk->label);
     }
 
     public function test_a_dedicated_subscription_without_a_desk_shows_an_empty_list(): void
@@ -462,7 +462,7 @@ class DedicatedDeskAssignmentTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->getJson('/api/v1/member/memberships/current')
             ->assertOk()
-            ->assertJsonPath('data.desks', []);
+            ->assertJsonPath('data.plan.desks', []);
     }
 
     public function test_a_flexi_subscription_has_no_desks_at_all(): void
@@ -474,7 +474,7 @@ class DedicatedDeskAssignmentTest extends TestCase
         Sanctum::actingAs($member, ['*']);
         $this->getJson('/api/v1/member/memberships/current')
             ->assertOk()
-            ->assertJsonPath('data.desks', null);
+            ->assertJsonPath('data.plan.desks', null);
     }
 
     /**

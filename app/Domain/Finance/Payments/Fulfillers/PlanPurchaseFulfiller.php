@@ -6,6 +6,7 @@ use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
@@ -89,6 +90,10 @@ class PlanPurchaseFulfiller implements PaymentFulfiller
             // What was actually paid, a sale or coupon included — not the
             // plan's list price activation would otherwise record.
             auditProperties: ['charged' => true, 'payment_id' => $payment->id, 'price_points' => (int) $payment->amount_points],
+            // Points are spent as they are checked; any other method was
+            // checked when it was opened, and a plan bought since then is
+            // left alone (MembershipActivationService::makeRoomForPersonal()).
+            approvedAt: $payment->method === WalletMethod::KEY ? null : $payment->created_at,
         );
 
         // Activation tells staff about a desk-less Dedicated Desk plan only
