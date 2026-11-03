@@ -30,6 +30,14 @@ class UpdatePlanRequest extends StorePlanRequest
                 'distinct',
                 Rule::exists('plan_discounts', 'id')->where('plan_id', $planId),
             ],
+            // A free-hours row named by id is kept, so the hours spent on it
+            // stay counted against it.
+            'space_hours.*.id' => [
+                'sometimes',
+                'integer',
+                'distinct',
+                Rule::exists('plan_space_hours', 'id')->where('plan_id', $planId),
+            ],
         ]);
     }
 }

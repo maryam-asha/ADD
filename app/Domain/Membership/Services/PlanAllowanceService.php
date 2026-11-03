@@ -95,7 +95,8 @@ class PlanAllowanceService
         $spent = (int) PlanHourUsage::query()
             ->where('membership_id', $membership->id)
             ->where('user_id', $user->id)
-            ->where('plan_space_hour_id', $allowance->row?->id)
+            ->where('allowance_kind', $allowance->kind())
+            ->when($allowance->row !== null, fn ($query) => $query->where('plan_space_hour_id', $allowance->row->id))
             ->where('cycle_start', '>=', $start)
             ->where('cycle_start', '<', $end)
             ->sum('seconds');
@@ -167,6 +168,7 @@ class PlanAllowanceService
             'membership_id' => $membership->id,
             'user_id' => $user->id,
             'plan_space_hour_id' => $allowance->row?->id,
+            'allowance_kind' => $allowance->kind(),
             'usable_type' => $usable->getMorphClass(),
             'usable_id' => $usable->getKey(),
             'cycle_start' => $this->cycleFor($membership, $at)[0],

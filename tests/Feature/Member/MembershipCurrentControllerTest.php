@@ -65,6 +65,22 @@ class MembershipCurrentControllerTest extends TestCase
         return $member;
     }
 
+    /** Review I7: the app gets a coworking-hours line only with real numbers in it. */
+    public function test_coworking_hours_show_as_a_resource_only_when_limited(): void
+    {
+        $member = $this->actingAsMember();
+        $plan = Plan::factory()->coworking()->create();
+        Membership::factory()->create(['plan_id' => $plan->id, 'owner_id' => $member->id, 'current_period_start' => now()->subDay()]);
+
+        $lines = collect($this->getJson('/api/v1/member/memberships/current')->assertOk()->json('data.resources'));
+        $this->assertCount(0, $lines->where('slug', 'space-hours'));
+
+        $plan->update(['coworking_hours' => 20]);
+        $line = collect($this->getJson('/api/v1/member/memberships/current')->assertOk()->json('data.resources'))->firstWhere('slug', 'space-hours');
+        $this->assertEquals(20, $line['granted']);
+        $this->assertEquals(20, $line['remaining']);
+    }
+
     public function test_unauthenticated_user_cannot_access_current_membership(): void
     {
         $response = $this->getJson('/api/v1/member/memberships/current');

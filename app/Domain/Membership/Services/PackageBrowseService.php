@@ -489,15 +489,16 @@ class PackageBrowseService
      * The plan's hours — its coworking hours and each free-hours benefit —
      * in the same shape the space-hours grant had before plans carried them
      * (slug `space-hours`), so the app keeps showing them; now what is left
-     * is this person's, this cycle. `granted`/`remaining` are null when
-     * unlimited.
+     * is this person's, this cycle. An unlimited allowance gets no line.
      *
      * @return list<array<string, mixed>>
      */
     private function formatPlanHours(Plan $plan, Membership $membership, User $user): array
     {
         $type = ResourceType::query()->where('slug', CoworkingPlanClassifier::LEGACY_HOURS_SLUG)->first();
-        $line = fn (?HourAllowance $allowance, ?array $title) => $allowance === null ? null : [
+        // Limited allowances only: the line has always carried numbers, and
+        // an unlimited allowance has none to give it.
+        $line = fn (?HourAllowance $allowance, ?array $title) => $allowance === null || $allowance->isUnlimited() ? null : [
             'id' => $allowance->row?->id,
             'resource_type_id' => $type?->id,
             'slug' => CoworkingPlanClassifier::LEGACY_HOURS_SLUG,

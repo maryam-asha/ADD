@@ -4,6 +4,7 @@ namespace App\Domain\Pricing\Services;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\BookingPlanCoverage;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Models\Space;
@@ -25,6 +26,7 @@ class CouponPreview
     public function __construct(
         private readonly PriceQuoteService $quotes,
         private readonly CouponApplication $application,
+        private readonly BookingPlanCoverage $planCoverage,
     ) {}
 
     /**
@@ -40,7 +42,7 @@ class CouponPreview
      */
     public function bookingWindow(User $member, Coupon $coupon, Space $space, CarbonInterface $start, CarbonInterface $end): PriceQuote
     {
-        return $this->quotes->forBooking($space, $start, $end, $member, $coupon);
+        return $this->quotes->forBooking($space, $start, $end, $member, $coupon, coveredSeconds: $this->planCoverage->for($member, $space, $start, $end)->coveredSeconds);
     }
 
     /**

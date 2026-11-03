@@ -23,6 +23,7 @@ class PlanDiscountRedemption extends Model
         'user_id',
         'booking_id',
         'walkin_session_id',
+        'counted_at',
         'points_discounted',
     ];
 
@@ -30,6 +31,7 @@ class PlanDiscountRedemption extends Model
     {
         return [
             'points_discounted' => 'integer',
+            'counted_at' => 'datetime',
         ];
     }
 

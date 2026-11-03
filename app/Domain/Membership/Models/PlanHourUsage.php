@@ -22,6 +22,7 @@ class PlanHourUsage extends Model
         'membership_id',
         'user_id',
         'plan_space_hour_id',
+        'allowance_kind',
         'usable_type',
         'usable_id',
         'cycle_start',

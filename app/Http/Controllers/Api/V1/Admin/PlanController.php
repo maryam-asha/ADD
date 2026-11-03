@@ -89,17 +89,39 @@ class PlanController extends AdminResourceController
                 }
             }
 
-            // Replaced whole, like balances: hours already spent stay in
-            // plan_hour_usages (the row link is nulled, never cascaded).
             if ($hasSpaceHours) {
-                $plan->spaceHours()->delete();
-                if (! empty($spaceHoursData)) {
-                    $plan->spaceHours()->createMany($spaceHoursData);
-                }
+                $this->reconcileSpaceHours($plan, $spaceHoursData);
             }
         });
 
         return response()->json(['message' => __('api.admin.plan_updated')]);
+    }
+
+    /**
+     * Free-hours rows named by `id` are edited in place and the rest
+     * created; one left out is deleted. Kept in place so the hours already
+     * spent on a row stay counted against it — a removed row's usage keeps
+     * its `allowance_kind`, so it is never read as coworking hours.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    private function reconcileSpaceHours(Plan $plan, array $rows): void
+    {
+        $kept = [];
+
+        foreach ($rows as $data) {
+            $id = $data['id'] ?? null;
+            unset($data['id']);
+
+            if ($id !== null) {
+                $plan->spaceHours()->whereKey($id)->firstOrFail()->update($data);
+                $kept[] = $id;
+            } else {
+                $kept[] = $plan->spaceHours()->create($data)->id;
+            }
+        }
+
+        $plan->spaceHours()->whereNotIn('id', $kept)->delete();
     }
 
     /**

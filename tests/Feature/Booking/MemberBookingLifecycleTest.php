@@ -16,6 +16,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Settings\Enums\SettingValueType;
@@ -503,7 +504,12 @@ class MemberBookingLifecycleTest extends TestCase
     {
         $member = $this->actingAsMember();
         $space = $this->openSpace(['space_type' => SpaceType::CoSpace, 'capacity' => 1, 'is_lockable' => false]);
-        $held = Membership::factory()->create(['branch_id' => $space->building->branch_id]);
+        // Held from 15:00: a booking from 14:00 is only partly the seat's, so
+        // it is not refused as already covered (product owner, 2026-11-02).
+        $held = Membership::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'plan_id' => Plan::factory()->coworking()->create(['access_window_start' => '15:00', 'access_window_end' => '20:00'])->id,
+        ]);
         $preview = fn () => $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', [
             'space_id' => $space->id,
             'start_at' => '2026-08-17 14:00',

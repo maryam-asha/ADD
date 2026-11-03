@@ -11,6 +11,8 @@ use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\ResourceType;
+use App\Domain\Membership\Services\PlanAllowanceService;
+use App\Domain\Membership\Services\PlanCreationService;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -149,6 +151,18 @@ class PlanCoworkingTermsApiTest extends TestCase
         $this->assertSame(0, $plan->resourceGrants()->count());
     }
 
+    /** Review I6: a design that states no terms (a provider's) keeps holding seats, as every plan did before. */
+    public function test_a_design_with_no_terms_and_no_hours_grant_is_an_unlimited_flexible_plan(): void
+    {
+        $payload = $this->payload();
+        unset($payload['coworking_seat'], $payload['coworking_hours'], $payload['allowance_cycle']);
+
+        $plan = app(PlanCreationService::class)->create($payload);
+
+        $this->assertSame(CoworkingSeat::Flexible, $plan->refresh()->coworking_seat);
+        $this->assertNull($plan->coworking_hours);
+    }
+
     public function test_update_replaces_and_clears_space_hours(): void
     {
         $id = $this->postJson('/api/v1/admin/plans', $this->payload([
@@ -160,6 +174,35 @@ class PlanCoworkingTermsApiTest extends TestCase
 
         $this->putJson("/api/v1/admin/plans/{$id}", $this->payload(['space_hours' => []]))->assertOk();
         $this->assertSame(0, Plan::find($id)->spaceHours()->count());
+    }
+
+    /** Review C1: saving a plan must not turn free-hours use into coworking-hours use. */
+    public function test_saving_a_plan_keeps_hours_spent_on_its_benefits_apart_from_coworking(): void
+    {
+        $id = $this->postJson('/api/v1/admin/plans', $this->payload([
+            'coworking_hours' => 20,
+            'space_hours' => [['space_type' => 'room', 'hours' => 5]],
+        ]))->assertCreated()->json('data.id');
+        $plan = Plan::query()->findOrFail($id);
+        $member = User::factory()->create();
+        $membership = Membership::factory()->create(['plan_id' => $plan->id, 'owner_id' => $member->id, 'current_period_start' => now()->subDay()]);
+        $allowances = app(PlanAllowanceService::class);
+        $rooms = $allowances->allowanceFor($membership, SpaceType::Room);
+        $allowances->record($membership, $member, $rooms, WalkinSession::factory()->create(['user_id' => $member->id]), 5 * 3600, now());
+
+        $row = $plan->spaceHours()->sole();
+        $this->putJson("/api/v1/admin/plans/{$id}", $this->payload([
+            'price_points' => 600,
+            'space_hours' => [['id' => $row->id, 'space_type' => 'room', 'hours' => 5]],
+        ]))->assertOk();
+
+        $this->assertSame($row->id, $plan->spaceHours()->sole()->id);
+        $this->assertSame(0, $allowances->remainingSeconds($membership->refresh(), $member, $allowances->allowanceFor($membership, SpaceType::Room), now()));
+        $this->assertSame(20 * 3600, $allowances->remainingSeconds($membership, $member, $allowances->allowanceFor($membership, SpaceType::CoSpace), now()));
+
+        // Removing the benefit leaves coworking untouched too.
+        $this->putJson("/api/v1/admin/plans/{$id}", $this->payload(['space_hours' => []]))->assertOk();
+        $this->assertSame(20 * 3600, $allowances->remainingSeconds($membership->refresh(), $member, $allowances->allowanceFor($membership, SpaceType::CoSpace), now()));
     }
 
     public function test_switching_a_plan_off_coworking_keeps_its_usage_history(): void

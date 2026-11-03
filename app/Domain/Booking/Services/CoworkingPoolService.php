@@ -282,10 +282,11 @@ class CoworkingPoolService
             // until the cycle renews (product owner, 2026-11-02).
             $spent = count($exhausted[$membership->id] ?? []);
             $cycleEnd = $spent > 0 ? $this->allowances->cycleFor($membership, $now)[1] : null;
+            $spentSeats = $spent > 0 ? $this->seatsLeftWhenSpent($membership, $spent) : $membership->seats;
 
             foreach ($stretches as [$start, $end]) {
                 foreach ($this->splitAt($start, $end, $now, $cycleEnd) as [$pieceStart, $pieceEnd, $inSpentCycle]) {
-                    $seats = $inSpentCycle ? max(0, $membership->seats - $spent) : $membership->seats;
+                    $seats = $inSpentCycle ? $spentSeats : $membership->seats;
 
                     if ($seats > 0) {
                         $holds[] = ['membership' => $membership->id, 'start' => $pieceStart, 'end' => $pieceEnd, 'seats' => $seats];
@@ -473,7 +474,7 @@ class CoworkingPoolService
 
             $users = PlanHourUsage::query()
                 ->where('membership_id', $membership->id)
-                ->whereNull('plan_space_hour_id')
+                ->where('allowance_kind', 'coworking')
                 ->where('cycle_start', '>=', $cycleStart)
                 ->where('cycle_start', '<', $cycleEnd)
                 ->groupBy('user_id')
@@ -482,12 +483,32 @@ class CoworkingPoolService
                 ->map(fn ($id) => (int) $id)
                 ->all();
 
+            // A company's former employee no longer counts against its seats.
+            if ($users !== [] && $membership->owner_type === OwnerType::Company) {
+                $users = DB::table('company_user')->where('company_id', $membership->owner_id)->whereIn('user_id', $users)->pluck('user_id')->map(fn ($id) => (int) $id)->all();
+            }
+
             if ($users !== []) {
                 $exhausted[$membership->id] = $users;
             }
         }
 
         return $exhausted;
+    }
+
+    /**
+     * The seats a subscription still holds once $spent of its people have
+     * spent their hours. A company's seats are shared, so they stay held as
+     * long as enough employees still have hours to fill them; only the
+     * shortfall is given back (a person's own subscription: their seat).
+     */
+    private function seatsLeftWhenSpent(Membership $membership, int $spent): int
+    {
+        $people = $membership->owner_type === OwnerType::Company
+            ? DB::table('company_user')->where('company_id', $membership->owner_id)->count()
+            : 1;
+
+        return max(0, max($membership->seats - $spent, min($membership->seats, $people - $spent)));
     }
 
     /**

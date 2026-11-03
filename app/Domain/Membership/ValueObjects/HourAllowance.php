@@ -22,6 +22,12 @@ final class HourAllowance
         return $this->hours === null;
     }
 
+    /** `coworking` for the plan's own hours, `space` for a free-hours benefit — PlanHourUsage::allowance_kind. */
+    public function kind(): string
+    {
+        return $this->row === null ? 'coworking' : 'space';
+    }
+
     /** The plan's own coworking hours, which come with a seat. */
     public function isCoworkingSeat(): bool
     {

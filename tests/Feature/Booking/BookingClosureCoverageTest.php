@@ -5,6 +5,7 @@ namespace Tests\Feature\Booking;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -15,11 +16,13 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\AllowanceCycle;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanHourUsage;
+use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
@@ -108,6 +111,33 @@ class BookingClosureCoverageTest extends TestCase
 
         $this->assertSame(1800, $this->spent($booking));
         $this->assertSame($this->price($space, '16:30', '18:30'), (int) $booking->price_points);
+    }
+
+    /** Review (minor 3): a booking crossing a monthly cycle boundary closes, its hours counted where they were used. */
+    public function test_a_booking_crossing_a_cycle_boundary_closes_and_counts_its_hours_in_the_new_cycle(): void
+    {
+        $space = $this->coSpace();
+        $plan = Plan::factory()->coworking(1)->create(['allowance_cycle' => AllowanceCycle::Monthly]);
+        $member = User::factory()->create();
+        $membership = Membership::create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => Carbon::parse('2026-07-17 10:30', 'Asia/Damascus')->utc(),
+            'current_period_end' => Carbon::parse('2026-07-17 10:30', 'Asia/Damascus')->utc()->addDays(90),
+        ]);
+        // The cycle ending 17 Aug 10:30 is spent.
+        $allowances = app(PlanAllowanceService::class);
+        $allowances->record($membership, $member, $allowances->allowanceFor($membership, SpaceType::CoSpace), WalkinSession::factory()->create(['user_id' => $member->id]), 3600, $this->local('09:00'));
+        $booking = app(BookingCreationService::class)->create($space, $member, $this->local('10:00'), $this->local('12:00'));
+
+        $booking = $this->closeAt($booking, '10:45', '12:00');
+
+        $this->assertNotNull($booking->checked_out_at);
+        $usage = PlanHourUsage::query()->where('usable_id', $booking->id)->where('usable_type', $booking->getMorphClass())->sole();
+        $this->assertSame(3600, $usage->seconds);
+        $this->assertTrue($usage->cycle_start->equalTo($this->local('10:30')));
     }
 
     public function test_a_paid_booking_overstaying_into_the_plan_window_owes_nothing_more(): void

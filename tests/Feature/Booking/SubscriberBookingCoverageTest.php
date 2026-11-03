@@ -24,6 +24,7 @@ use App\Domain\Pricing\Services\PriceQuoteService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
@@ -75,11 +76,12 @@ class SubscriberBookingCoverageTest extends TestCase
         return $this->open(Space::factory()->room()->create(['hourly_rate_points' => 100]));
     }
 
-    private function subscriber(Plan $plan): User
+    private function subscriber(Plan $plan, ?Space $seatIn = null): User
     {
         $member = User::factory()->create();
         Membership::create([
             'plan_id' => $plan->id,
+            'branch_id' => $seatIn?->building->branch_id,
             'owner_type' => OwnerType::User,
             'owner_id' => $member->id,
             'status' => MembershipStatus::Active,
@@ -113,10 +115,55 @@ class SubscriberBookingCoverageTest extends TestCase
     public function test_a_booking_inside_the_plan_window_is_refused(): void
     {
         $space = $this->coSpace();
-        $member = $this->subscriber($this->windowPlan());
+        $member = $this->subscriber($this->windowPlan(), $space);
 
         $this->assertRefused(fn () => $this->creations->create($space, $member, $this->local('10:00'), $this->local('12:00')));
         $this->assertSame(0, Booking::count());
+    }
+
+    /** Review I3: the seat a plan holds is in its own branch; elsewhere the member books like anyone. */
+    public function test_a_subscriber_may_book_coworking_at_another_branch(): void
+    {
+        $home = $this->coSpace();
+        $elsewhere = $this->coSpace();
+        $member = $this->subscriber($this->windowPlan(), $home);
+
+        $booking = $this->creations->create($elsewhere, $member, $this->local('10:00'), $this->local('12:00'));
+
+        $this->assertInstanceOf(Booking::class, $booking);
+    }
+
+    /** Review I4: the preview prices what the booking will charge. */
+    public function test_the_preview_prices_only_the_outside_hours(): void
+    {
+        $space = $this->coSpace();
+        $member = $this->subscriber($this->windowPlan(), $space);
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', [
+            'space_id' => $space->id,
+            'start_at' => '2026-08-17 16:00',
+            'end_at' => '2026-08-17 19:00',
+        ])->assertOk()
+            ->assertJsonPath('data.is_available', true)
+            ->assertJsonPath('data.breakdown.total.points', $this->priceOf($space, '16:00', '18:00'));
+    }
+
+    public function test_the_preview_says_a_covered_booking_is_unavailable(): void
+    {
+        $space = $this->coSpace();
+        $member = $this->subscriber($this->windowPlan(), $space);
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+
+        $this->withHeader('lang', 'en')->postJson('/api/v1/member/bookings/preview', [
+            'space_id' => $space->id,
+            'start_at' => '2026-08-17 10:00',
+            'end_at' => '2026-08-17 12:00',
+        ])->assertOk()
+            ->assertJsonPath('data.is_available', false)
+            ->assertJsonPath('data.unavailable_reason', __('api.booking.covered_by_plan', [], 'en'));
     }
 
     public function test_a_booking_overlapping_the_window_end_pays_only_the_outside_hours(): void
@@ -156,7 +203,7 @@ class SubscriberBookingCoverageTest extends TestCase
     public function test_a_dedicated_subscriber_is_refused_inside_the_window(): void
     {
         $space = $this->coSpace();
-        $member = $this->subscriber(Plan::factory()->create(['coworking_seat' => CoworkingSeat::Dedicated, 'access_window_start' => '09:00', 'access_window_end' => '17:00']));
+        $member = $this->subscriber(Plan::factory()->create(['coworking_seat' => CoworkingSeat::Dedicated, 'access_window_start' => '09:00', 'access_window_end' => '17:00']), $space);
 
         $this->assertRefused(fn () => $this->creations->create($space, $member, $this->local('10:00'), $this->local('11:00')));
     }
@@ -208,7 +255,7 @@ class SubscriberBookingCoverageTest extends TestCase
     public function test_a_batch_refuses_a_date_the_seat_covers(): void
     {
         $space = $this->coSpace();
-        $member = $this->subscriber($this->windowPlan());
+        $member = $this->subscriber($this->windowPlan(), $space);
 
         $this->expectException(BatchUnavailableException::class);
 

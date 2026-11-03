@@ -13,6 +13,7 @@ use App\Domain\Booking\Services\BookingBatchCreationService;
 use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
+use App\Domain\Booking\Services\BookingPlanCoverage;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -146,6 +147,7 @@ class BookingController extends Controller
         BookingPresentationService $presentation,
         PriceQuoteService $quotes,
         CouponEligibility $coupons,
+        BookingPlanCoverage $planCoverage,
     ): JsonResponse {
         $space = Space::with(['building.branch', 'zone.floor'])->findOrFail($request->validated('space_id'));
         $locale = app()->getLocale();
@@ -155,6 +157,8 @@ class BookingController extends Controller
 
         $rules = $availability->rulesFor($space);
         $existing = $availability->blockingBookings($space, $start, $end, $rules);
+        // What the member's plan covers, exactly as the POST works it out.
+        $coverage = $planCoverage->for($request->user(), $space, $start, $end);
 
         $unavailableKey = match (true) {
             ! $availability->acceptsBookings($space) => 'api.booking.space_not_bookable',
@@ -170,6 +174,7 @@ class BookingController extends Controller
                 $end,
                 $rules->timezone,
             ) => 'api.booking.office_leased',
+            $availability->isFullyCoveredBySeat($coverage, $start, $end) => 'api.booking.covered_by_plan',
             // A co_space's seat comes from its branch's pool, counted on the
             // member's subscription as the POST counts it; a room may be lent
             // to co-working (docs/decisions/coworking-seat-pool.md).
@@ -194,7 +199,7 @@ class BookingController extends Controller
 
         try {
             $coupon = $code !== null ? $coupons->resolve($code) : null;
-            $quote = $quotes->forBooking($space, $start, $end, $request->user(), $coupon);
+            $quote = $quotes->forBooking($space, $start, $end, $request->user(), $coupon, coveredSeconds: $coverage->coveredSeconds);
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }

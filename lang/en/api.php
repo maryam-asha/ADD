@@ -419,7 +419,7 @@ return [
         'reasons' => [
             'no_plan' => 'you have no active plan',
             'plan_expired' => 'your plan has expired',
-            'plan_without_hours' => 'your plan does not include coworking hours',
+            'plan_without_hours' => 'your plan does not include coworking',
             'hours_exhausted' => "your plan's hours are used up",
             'outside_window' => "it is outside your plan's hours",
         ],

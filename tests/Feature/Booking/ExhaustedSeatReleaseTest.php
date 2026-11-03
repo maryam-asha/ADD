@@ -123,6 +123,21 @@ class ExhaustedSeatReleaseTest extends TestCase
         $this->assertSame(1, $this->freeNow());
     }
 
+    /** Review I1: shared seats stay held while enough employees still have hours. */
+    public function test_a_company_keeps_its_seats_while_more_employees_than_seats_have_hours(): void
+    {
+        $this->space->update(['capacity' => 2]);
+        $company = Company::factory()->create();
+        $people = User::factory()->count(10)->create();
+        $company->members()->attach($people->modelKeys());
+        $m = $this->subscribe($company, Plan::factory()->coworking(2)->create(), seats: 2);
+
+        $this->spendAll($m, $people[0], 7200);
+        $this->spendAll($m, $people[1], 7200);
+
+        $this->assertSame(0, $this->freeNow());
+    }
+
     public function test_a_dedicated_desk_holds_its_seat_whatever_was_used(): void
     {
         $member = User::factory()->create();

@@ -18,7 +18,7 @@ class PlanCreationService
     /** @param  array<string, mixed>  $validated  PlanRules-shaped */
     public function create(array $validated): Plan
     {
-        $validated = $this->withCoworkingTerms($validated);
+        $validated = $this->withCoworkingTerms($validated, defaultToFlexible: true);
         $balances = $validated['balances'] ?? [];
         $features = $validated['features'] ?? [];
         $discounts = $validated['discounts'] ?? [];
@@ -57,12 +57,15 @@ class PlanCreationService
      * A design that does not state its coworking terms but still carries the
      * old space-hours resource grant — a provider's, made before plans had
      * their own terms — gets a flexible seat with those hours instead of the
-     * grant, as the conversion migration read every plan of that shape.
+     * grant, as the conversion migration read every plan of that shape. A
+     * new design with neither ($defaultToFlexible) is an unlimited flexible
+     * seat: every plan held seats before plans stated their terms, and a
+     * provider's client company needs its seats held.
      *
      * @param  array<string, mixed>  $validated
      * @return array<string, mixed>
      */
-    public function withCoworkingTerms(array $validated): array
+    public function withCoworkingTerms(array $validated, bool $defaultToFlexible = false): array
     {
         if (array_key_exists('coworking_seat', $validated)) {
             return $validated;
@@ -73,7 +76,9 @@ class PlanCreationService
         $legacy = $grants->first(fn (array $grant) => (int) ($grant['resource_type_id'] ?? 0) === (int) $hoursType);
 
         if ($hoursType === null || $legacy === null) {
-            return $validated;
+            return $defaultToFlexible
+                ? $validated + ['coworking_seat' => CoworkingSeat::Flexible->value, 'coworking_hours' => null]
+                : $validated;
         }
 
         $validated['coworking_seat'] = CoworkingSeat::Flexible->value;

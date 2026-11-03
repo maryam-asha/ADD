@@ -417,7 +417,7 @@ return [
         'reasons' => [
             'no_plan' => 'لا توجد لديك باقة فعّالة',
             'plan_expired' => 'انتهت صلاحية باقتك',
-            'plan_without_hours' => 'باقتك لا تتضمن ساعات عمل مشترك',
+            'plan_without_hours' => 'باقتك لا تشمل الكوركينغ',
             'hours_exhausted' => 'نفدت ساعات باقتك',
             'outside_window' => 'الوقت الحالي خارج أوقات باقتك',
         ],

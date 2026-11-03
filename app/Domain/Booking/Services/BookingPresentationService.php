@@ -47,6 +47,7 @@ class BookingPresentationService
         private readonly BookingExtensionPlanner $extensions,
         private readonly PriceLabelPresenter $prices,
         private readonly BookingRefunder $refunder,
+        private readonly BookingPlanCoverage $planCoverage,
     ) {}
 
     /**
@@ -71,7 +72,7 @@ class BookingPresentationService
     {
         $quote = $booking !== null
             ? $this->quotes->forExistingBooking($booking)
-            : $this->quotes->forBooking($space, $start, $end, $member, $coupon);
+            : $this->quotes->forBooking($space, $start, $end, $member, $coupon, coveredSeconds: $member !== null ? $this->planCoverage->for($member, $space, $start, $end)->coveredSeconds : 0);
 
         return $this->breakdownOf($quote, $space, $start, $end, $locale);
     }

@@ -52,7 +52,9 @@ class BookingPlanCoverage
             $membership,
             $allowance,
             $covered,
-            $allowance->isCoworkingSeat(),
+            // The seat a plan holds is in its own branch; elsewhere the
+            // member books like anyone (their hours may still apply).
+            $allowance->isCoworkingSeat() && $membership->branch_id !== null && $membership->branch_id === $space->building->branch_id,
             ($allowance->row?->id ?? 'coworking').'@'.$cycleStart->toIso8601String(),
         );
     }
@@ -80,7 +82,7 @@ class BookingPlanCoverage
     {
         $covered = $this->coverableFor($booking, $from, $to, $blockSeconds);
         $this->allowances->releaseFor($booking);
-        $this->spend($booking, $covered);
+        $this->spend($booking, $covered, $from);
 
         return $covered;
     }
@@ -101,7 +103,7 @@ class BookingPlanCoverage
         $covered = $this->allowances->coverableSeconds($membership, $booking->user, $booking->space, $from, $until, $blockSeconds);
 
         if ($spend) {
-            $this->spend($booking, $covered);
+            $this->spend($booking, $covered, $from);
         }
 
         return $covered;
@@ -121,7 +123,8 @@ class BookingPlanCoverage
         return [$membership, min(CarbonImmutable::instance($to)->utc(), CarbonImmutable::instance($membership->current_period_end)->utc())];
     }
 
-    private function spend(Booking $booking, int $seconds): void
+    /** Spends $seconds in the cycle containing $from — the instant they were worked out at, so the two agree. */
+    private function spend(Booking $booking, int $seconds, CarbonInterface $from): void
     {
         [$membership] = $this->context($booking, $booking->end_at);
         $allowance = $membership === null ? null : $this->allowances->allowanceFor($membership, $booking->space->space_type, $booking->space_id);
@@ -130,7 +133,7 @@ class BookingPlanCoverage
             return;
         }
 
-        $this->allowances->record($membership, $booking->user, $allowance, $booking, $seconds, $booking->start_at);
+        $this->allowances->record($membership, $booking->user, $allowance, $booking, $seconds, $from);
     }
 
     /** Spends the covered hours on the booking just made. */

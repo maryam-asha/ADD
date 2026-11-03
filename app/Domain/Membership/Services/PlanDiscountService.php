@@ -44,8 +44,12 @@ class PlanDiscountService
     public function resolveFor(Membership $membership, Space $space, array $consumedInBatch = [], ?User $user = null, ?CarbonInterface $at = null): ?PlanDiscount
     {
         $plan = $membership->plan;
+        $at ??= now();
 
-        if ($plan === null) {
+        // A plan's discount is for its own period: none on time after it ends.
+        if ($plan === null
+            || $at->lessThan($membership->current_period_start)
+            || $at->greaterThanOrEqualTo($membership->current_period_end)) {
             return null;
         }
 
@@ -68,7 +72,7 @@ class PlanDiscountService
             ->values();
 
         foreach ($candidates as $discount) {
-            if ($this->hasRemainingUsage($discount, $membership, $consumedInBatch, $user, $at ?? now())) {
+            if ($this->hasRemainingUsage($discount, $membership, $consumedInBatch, $user, $at)) {
                 return $discount;
             }
         }
@@ -104,6 +108,8 @@ class PlanDiscountService
             'user_id' => $for->user_id,
             'booking_id' => $for instanceof Booking ? $for->id : null,
             'walkin_session_id' => $for instanceof WalkinSession ? $for->id : null,
+            // Counted in the cycle of what it priced, not of today.
+            'counted_at' => $for instanceof Booking ? $for->start_at : $for->checked_in_at,
             'points_discounted' => $pointsDiscounted,
         ]);
     }
@@ -129,8 +135,8 @@ class PlanDiscountService
         $used = $discount->redemptions()
             ->where('membership_id', $membership->id)
             ->when($user !== null, fn ($query) => $query->where('user_id', $user->id))
-            ->where('created_at', '>=', $cycleStart)
-            ->where('created_at', '<', $cycleEnd)
+            ->where('counted_at', '>=', $cycleStart)
+            ->where('counted_at', '<', $cycleEnd)
             ->count()
             + ($consumedInBatch[$discount->id] ?? 0);
 

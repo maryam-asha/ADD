@@ -4,6 +4,7 @@ namespace Tests\Feature\Membership;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\SpaceType;
@@ -66,7 +67,7 @@ class PlanDiscountPerPersonTest extends TestCase
             'booking_id' => $booking->id,
             'points_discounted' => 10,
         ]);
-        $redemption->forceFill(['created_at' => Carbon::parse($at, 'Asia/Damascus')->utc()])->save();
+        $redemption->forceFill(['created_at' => Carbon::parse($at, 'Asia/Damascus')->utc(), 'counted_at' => Carbon::parse($at, 'Asia/Damascus')->utc()])->save();
     }
 
     private function resolve(Membership $m, User $user, Space $space, string $at = '2026-08-17 10:00'): ?PlanDiscount
@@ -102,6 +103,44 @@ class PlanDiscountPerPersonTest extends TestCase
 
         $this->assertNull($this->resolve($m, $member, $room, '2026-08-10 10:00'));
         $this->assertTrue($this->resolve($m, $member, $room, '2026-08-16 10:00')?->is($discount));
+    }
+
+    /** Review I2: uses count in the cycle of the booking, not the day it was made. */
+    public function test_bookings_made_ahead_count_against_the_month_they_fall_in(): void
+    {
+        $room = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        foreach (DayOfWeek::cases() as $day) {
+            BusinessHour::factory()->create(['branch_id' => $room->building->branch_id, 'day_of_week' => $day, 'open_time' => '08:00', 'close_time' => '22:00']);
+        }
+        $plan = Plan::factory()->notCoworking()->create(['allowance_cycle' => AllowanceCycle::Monthly]);
+        $plan->discounts()->create(['percentage' => 50, 'space_type' => SpaceType::Room, 'usage_limit' => 1]);
+        $member = User::factory()->create();
+        $this->membership($plan, $member, '2026-07-15 00:00');
+        $book = fn (string $date) => app(BookingCreationService::class)->create(
+            $room, $member, Carbon::parse("{$date} 10:00", 'Asia/Damascus')->utc(), Carbon::parse("{$date} 11:00", 'Asia/Damascus')->utc(),
+        );
+
+        // Made on 10 Aug (the cycle starting 15 Jul) for dates in the next one.
+        Carbon::setTestNow(Carbon::parse('2026-08-10 10:00', 'Asia/Damascus')->utc());
+        $first = $book('2026-08-20');
+        $second = $book('2026-08-21');
+        // Next month's cycle has its own use.
+        $nextMonth = $book('2026-09-20');
+
+        $this->assertSame(50, (int) $first->price_points);
+        $this->assertSame(100, (int) $second->price_points);
+        $this->assertSame(50, (int) $nextMonth->price_points);
+    }
+
+    public function test_a_booking_after_the_plan_ends_gets_no_plan_discount(): void
+    {
+        $room = Space::factory()->room()->create();
+        $plan = Plan::factory()->notCoworking()->create();
+        $plan->discounts()->create(['percentage' => 50, 'space_type' => SpaceType::Room]);
+        $member = User::factory()->create();
+        $m = $this->membership($plan, $member);
+
+        $this->assertNull($this->resolve($m, $member, $room, '2026-12-01 10:00'));
     }
 
     public function test_a_coworking_discount_prices_a_walk_in_and_is_recorded_against_it(): void
