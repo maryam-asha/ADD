@@ -297,10 +297,10 @@ class BookingExtensionOwedTest extends TestCase
     }
 
     /**
-     * Extended, then left early: what was already paid covers the time
-     * used, so the booking is paid again and nothing is owed.
+     * Extended, then left early: a room costs its booked price however long
+     * it was used, so the extension is still owed.
      */
-    public function test_an_extended_booking_left_before_the_extension_owes_nothing_more(): void
+    public function test_an_extended_room_left_before_the_extension_still_owes_it(): void
     {
         $member = $this->member();
         $booking = $this->booking($member);
@@ -312,7 +312,7 @@ class BookingExtensionOwedTest extends TestCase
         app(SessionClosureService::class)->closeOut($booking, Carbon::parse('2026-08-17 11:00', 'Asia/Damascus'));
 
         $booking->refresh();
-        $this->assertSame(PaymentState::Paid, $booking->payment_state);
-        $this->assertSame(0, $this->owedPoints($member));
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertSame(100, $this->owedPoints($member));
     }
 }

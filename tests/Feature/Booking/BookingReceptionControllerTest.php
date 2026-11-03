@@ -145,7 +145,8 @@ class BookingReceptionControllerTest extends TestCase
         ]);
 
         $response->assertOk()->assertExactJson(['message' => 'Checked out.']);
-        $this->assertSame('20', (string) $booking->fresh()->amount_owed);
+        // A room costs its booked hour, however long it was used.
+        $this->assertSame('10', (string) $booking->fresh()->amount_owed);
     }
 
     public function test_check_out_fails_if_entered_time_is_before_check_in(): void

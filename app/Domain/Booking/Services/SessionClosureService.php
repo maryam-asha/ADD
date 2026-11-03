@@ -43,6 +43,7 @@ class SessionClosureService
         private readonly CouponLedger $couponLedger,
         private readonly CoworkingBookingPolicy $policy,
         private readonly BookingPlanCoverage $bookingCoverage,
+        private readonly AmountCalculator $amounts,
     ) {}
 
     /**
@@ -196,6 +197,10 @@ class SessionClosureService
      */
     public function quote(Booking|WalkinSession $session, CarbonInterface $at): array
     {
+        if ($session instanceof Booking && ! $session->isCoworking()) {
+            return ['points' => $this->bookedPricePoints($session), 'covered_seconds' => 0, 'already_paid' => $session->payment_state === PaymentState::Paid];
+        }
+
         if ($session instanceof Booking && $session->payment_state === PaymentState::Paid) {
             $overstay = $this->overstayPoints($session, $at);
 
@@ -328,6 +333,12 @@ class SessionClosureService
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
+        if ($session instanceof Booking && ! $session->isCoworking()) {
+            $this->finalizeRoomClosure($session, $checkedOutAt, $source);
+
+            return;
+        }
+
         $coveredSeconds = $this->consumePlanCoverage($session, $checkedOutAt);
 
         // `amount_owed`/`currency` are the session's money-denominated record
@@ -399,13 +410,56 @@ class SessionClosureService
             $this->recorder->reprice($quote, $session, $session->user, $session instanceof Booking ? PricingPurpose::Booking : PricingPurpose::CoworkingSession);
         }
 
-        // An end request still waiting on this session is moot once it is
-        // closed — at the desk, by auto-close, or by a confirmation that
-        // already marked its own request before calling here.
+        $this->supersedePendingEnd($session, $attributes['checked_out_at']);
+    }
+
+    /**
+     * A room, office or hall is reserved for its whole booking, so it costs
+     * its booked price however long it was used: no repricing for arriving
+     * late or leaving early, no overstay, and the plan hours taken when it
+     * was made stand (product owner, 2026-11-03). Coworking bookings are
+     * billed for their time, above.
+     */
+    private function finalizeRoomClosure(Booking $booking, CarbonInterface $checkedOutAt, TerminationSource $source): void
+    {
+        $price = $this->bookedPricePoints($booking);
+        $paid = $booking->pointsPaid();
+
+        $attributes = [
+            'checked_out_at' => $checkedOutAt->copy()->setTimezone('UTC'),
+            'termination_source' => $source,
+            'price_points' => $price,
+            'amount_owed' => $this->points->pointsToUsd($price),
+            'currency' => 'USD',
+            'status' => BookingStatus::Completed,
+        ];
+
+        if ($booking->payment_state !== PaymentState::Paid && $paid > 0 && $paid >= $price) {
+            $attributes['payment_state'] = PaymentState::Paid;
+        }
+
+        $booking->forceFill($attributes)->save();
+
+        $this->supersedePendingEnd($booking, $attributes['checked_out_at']);
+    }
+
+    /** Rows made before `price_points` existed cost their booked window, as the booking fulfiller prices them. */
+    private function bookedPricePoints(Booking $booking): int
+    {
+        return $booking->price_points ?? $this->amounts->forRange($booking->space, $booking->start_at, $booking->end_at);
+    }
+
+    /**
+     * An end request still waiting on this session is moot once it is
+     * closed — at the desk, by auto-close, or by a confirmation that
+     * already marked its own request before calling here.
+     */
+    private function supersedePendingEnd(Booking|WalkinSession $session, CarbonInterface $checkedOutAt): void
+    {
         $session->pendingEndRequest()->update([
             'status' => SessionEndRequestStatus::Superseded->value,
             'resolved_at' => now(),
-            'checked_out_at' => $attributes['checked_out_at'],
+            'checked_out_at' => $checkedOutAt,
         ]);
     }
 
