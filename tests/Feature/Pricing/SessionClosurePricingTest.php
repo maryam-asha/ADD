@@ -74,8 +74,8 @@ class SessionClosurePricingTest extends TestCase
         $this->assertSame(20, $row->points);
     }
 
-    /** Review Focus 5: an unpaid booking closed early keeps its offer's copied terms. */
-    public function test_an_unpaid_booking_closed_early_keeps_its_locked_offer_terms(): void
+    /** Review Focus 5: an unpaid room closed early keeps its booked price and its offer's copied terms. */
+    public function test_an_unpaid_room_closed_early_keeps_its_price_and_locked_offer_terms(): void
     {
         $offer = Coupon::factory()->automatic()->percentage(50)->create();
         $member = User::factory()->create();
@@ -90,14 +90,14 @@ class SessionClosurePricingTest extends TestCase
         app(SessionClosureService::class)->closeOut($booking->refresh(), $this->at('11:00'));
         $booking->refresh();
 
-        $this->assertSame(50, $booking->price_points);
+        $this->assertSame(100, $booking->price_points);
         $row = app(CouponLedger::class)->offerFor($booking);
-        $this->assertSame(100, $row->base_points);
-        $this->assertSame(50, $row->points);
+        $this->assertSame(200, $row->base_points);
+        $this->assertSame(100, $row->points);
     }
 
-    /** An unpaid booking repriced at check-out keeps its coupon. */
-    public function test_an_unpaid_booking_closed_early_keeps_its_coupon(): void
+    /** An unpaid room closed early keeps its booked price and its coupon. */
+    public function test_an_unpaid_room_closed_early_keeps_its_price_and_coupon(): void
     {
         Coupon::factory()->amountOff(30)->create(['code' => 'THIRTY']);
         $member = User::factory()->create();
@@ -112,12 +112,12 @@ class SessionClosurePricingTest extends TestCase
         app(SessionClosureService::class)->closeOut($booking, $this->at('11:00'));
         $booking->refresh();
 
-        $this->assertSame(70, $quote['points']);
-        $this->assertSame(70, $booking->price_points);
-        $this->assertSame(100, $booking->list_price_points);
+        $this->assertSame(170, $quote['points']);
+        $this->assertSame(170, $booking->price_points);
+        $this->assertSame(200, $booking->list_price_points);
         $redemption = app(CouponLedger::class)->couponFor($booking);
         $this->assertSame(30, $redemption->points);
-        $this->assertSame(100, $redemption->base_points);
+        $this->assertSame(200, $redemption->base_points);
     }
 
     /** A booking already paid keeps the price it was paid at. */

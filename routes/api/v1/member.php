@@ -66,6 +66,9 @@ Route::get('spaces/{space}/availability/slots', [SpaceAvailabilityController::cl
 // booking creation with slot granularity/buffer/approval rules.
 Route::post('bookings', [BookingController::class, 'store']);
 Route::post('bookings/{booking}/extend', [BookingController::class, 'extend']);
+// What a closed booking still owes, paid from the app — by the method it was
+// booked with unless the member names another (its home card's button).
+Route::post('bookings/{booking}/pay', [BookingController::class, 'pay']);
 // How far a running booking can be extended, and at what price
 // (docs/decisions/booking-outcomes-and-extension.md).
 Route::get('bookings/{booking}/extension-options', [BookingController::class, 'extensionOptions']);

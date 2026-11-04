@@ -297,6 +297,7 @@ class BookingBatchCreationService
                     'currency' => 'USD',
                     ...$row['quote']->attributes(),
                     'payment_state' => PaymentState::Unpaid,
+                    'chosen_payment_method' => $paymentMethod,
                     'note' => $note,
                     ...($row['quote']->finalPoints === 0 && $row['coverage']->coveredSeconds > 0
                         ? ['payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan, 'paid_at' => now()]

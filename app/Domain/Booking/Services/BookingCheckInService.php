@@ -4,11 +4,14 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Events\BookingCheckedIn;
+use App\Domain\Booking\Events\BookingStarted;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Services\BusinessHoursService;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Carbon\CarbonInterface;
 
 /**
@@ -30,6 +33,7 @@ class BookingCheckInService
     public function __construct(
         private readonly BusinessHoursService $businessHours,
         private readonly OpenCoworkingSessionLocator $openSessions,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
@@ -96,6 +100,13 @@ class BookingCheckInService
             'checked_in_via' => $via,
             'kiosk_id' => $kiosk?->id,
         ])->save();
+
+        // A room has no acceptance step: checked in is started, for the
+        // member's card and the desk alike. A coworking booking's start is
+        // announced by its own confirmation (CoworkingStartConfirmed).
+        if (! $booking->isCoworking()) {
+            $this->realtime->send(new BookingStarted($booking), new BookingCheckedIn($booking));
+        }
     }
 
     /**

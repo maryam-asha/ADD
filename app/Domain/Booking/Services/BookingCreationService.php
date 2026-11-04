@@ -182,6 +182,7 @@ class BookingCreationService
                 'currency' => 'USD',
                 ...$quote->attributes(),
                 'payment_state' => PaymentState::Unpaid,
+                'chosen_payment_method' => $paymentMethod,
                 'note' => $note,
                 // Wholly covered by plan hours: nothing to pay, and it holds
                 // its seat like a paid booking (never released unpaid).

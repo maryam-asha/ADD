@@ -91,7 +91,10 @@ class PaymentStatePresenter
             $points = max(0, $points - $session->pointsPaid());
         }
 
-        return $points > 0 ? ['unpaid', null, $points, null] : [null, null, null, null];
+        // A booking is paid by the method it was booked with.
+        $method = $session instanceof Booking ? $session->chosen_payment_method : null;
+
+        return $points > 0 ? ['unpaid', $method, $points, null] : [null, null, null, null];
     }
 
     /**

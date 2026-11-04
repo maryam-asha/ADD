@@ -324,6 +324,7 @@ return [
         // Member booking lifecycle: list, detail, cancellation, preview.
         'cancelled' => 'Booking cancelled.',
         'not_your_booking' => 'This booking does not belong to you.',
+        'payment_method_required' => 'Choose how to pay for this booking.',
         'start_in_the_past' => 'A booking cannot start in the past.',
         'batch_partially_unavailable' => 'Some of the selected dates are not available. Nothing was booked.',
         'batch_created' => ':count bookings created.',
