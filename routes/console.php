@@ -65,6 +65,15 @@ Schedule::command('coworking:hand-over-early-sessions')->everyMinute()->withoutO
 Schedule::command('bookings:release-unpaid-no-shows')->everyMinute()->withoutOverlapping();
 
 /*
+ * Room, office and hall bookings: the member's app hears the moment one can
+ * be checked in (its home card turns `ready`), and a checked-in one closes
+ * itself at its end — its extended end, once extended — billed at its booked
+ * price, with what it owes settled by the method it was booked with.
+ */
+Schedule::command('bookings:announce-ready')->everyMinute()->withoutOverlapping();
+Schedule::command('bookings:close-ended-rooms')->everyMinute()->withoutOverlapping();
+
+/*
  * External exchange-rate suggestion (docs/decisions/exchange-rate-external-suggestion.md)
  * — sp-today's nationwide USD/SYP quote, fetched once a day as a candidate
  * for an admin to review and accept; never written to exchange_rates
