@@ -8,6 +8,8 @@ use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
 use App\Domain\Booking\Enums\TerminationSource;
+use App\Domain\Booking\Events\BookingCheckedOut;
+use App\Domain\Booking\Events\BookingEnded;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -27,6 +29,7 @@ use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Domain\Pricing\Services\QuoteRecorder;
 use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +48,7 @@ class SessionClosureService
         private readonly BookingPlanCoverage $bookingCoverage,
         private readonly AmountCalculator $amounts,
         private readonly ClosedBookingSettlement $settlement,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
@@ -448,6 +452,9 @@ class SessionClosureService
         $this->supersedePendingEnd($booking, $attributes['checked_out_at']);
 
         $this->settlement->settle($booking);
+
+        // After the settlement, so `payment_state` is final.
+        $this->realtime->send(new BookingEnded($booking), new BookingCheckedOut($booking));
     }
 
     /** Rows made before `price_points` existed cost their booked window, as the booking fulfiller prices them. */

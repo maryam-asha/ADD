@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\BookingExtended;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -15,6 +16,7 @@ use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Services\QuoteRecorder;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -35,6 +37,7 @@ class BookingExtensionService
         private readonly WalletService $wallets,
         private readonly PaymentService $payments,
         private readonly QuoteRecorder $recorder,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
@@ -130,6 +133,8 @@ class BookingExtensionService
                 // The list price grows with it, so the breakdown still adds up.
                 'list_price_points' => ($lockedBooking->list_price_points ?? $price['undiscounted_total'] - $price['list_difference']) + $price['list_difference'],
             ])->save();
+
+            $this->realtime->send(new BookingExtended($lockedBooking));
 
             return $moved ? $lockedBooking->fresh()->seatingSpace() : null;
         });

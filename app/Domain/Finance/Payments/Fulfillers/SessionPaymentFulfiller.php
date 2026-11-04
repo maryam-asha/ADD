@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments\Fulfillers;
 
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\BookingPaid;
 use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
@@ -22,9 +23,10 @@ use App\Services\Realtime\RealtimeBroadcaster;
  * `payment_state` / `payment_source` / `payment_method` / `paid_at` /
  * `paid_by` columns reception's settle-payment has always written.
  *
- * A session paid once it has closed tells the member's app
- * (CoworkingSessionPaid), whichever way the money came — the home card
- * waiting for it goes. A booking paid when it is made has no such card.
+ * A session paid once it has closed tells the member's app, whichever way
+ * the money came — the home card waiting for it goes: CoworkingSessionPaid
+ * for a coworking session, BookingPaid for a room booking. A booking paid
+ * when it is made has no such card.
  */
 abstract class SessionPaymentFulfiller implements PaymentFulfiller
 {
@@ -51,7 +53,9 @@ abstract class SessionPaymentFulfiller implements PaymentFulfiller
         ])->save();
 
         if ($session->checked_out_at !== null) {
-            $this->realtime->send(new CoworkingSessionPaid($session));
+            $this->realtime->send($session instanceof Booking && ! $session->isCoworking()
+                ? new BookingPaid($session)
+                : new CoworkingSessionPaid($session));
         }
     }
 
