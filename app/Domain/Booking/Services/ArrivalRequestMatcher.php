@@ -3,7 +3,6 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
-use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -40,26 +39,6 @@ class ArrivalRequestMatcher
             // The kiosk scan looks only at its own coworking space; the
             // arrival flow keeps matching across the whole branch.
             ->when($space !== null, fn ($query) => $query->where('space_id', $space->id))
-            ->orderBy('start_at')
-            ->first();
-    }
-
-    /**
-     * The member's booking on anything but a coworking space — a room, an
-     * office, an event hall — at the branch, running now or starting within
-     * $withinMinutes and not yet checked in. Those stay reception's to check
-     * in, so a kiosk scan only tells reception the member is here.
-     */
-    public function nearNonCoworkingBookingFor(User $member, Branch $branch, CarbonInterface $now, int $withinMinutes): ?Booking
-    {
-        return Booking::query()
-            ->where('user_id', $member->id)
-            ->blocking()
-            ->whereNull('checked_in_at')
-            ->where('start_at', '<=', $now->copy()->addMinutes($withinMinutes))
-            ->where('end_at', '>', $now)
-            ->whereHas('space', fn ($query) => $query->where('space_type', '!=', SpaceType::CoSpace))
-            ->whereHas('space.building', fn ($query) => $query->where('branch_id', $branch->id))
             ->orderBy('start_at')
             ->first();
     }

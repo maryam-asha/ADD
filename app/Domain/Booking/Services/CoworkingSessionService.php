@@ -30,9 +30,6 @@ use Illuminate\Support\Facades\DB;
  */
 class CoworkingSessionService
 {
-    /** How far ahead a room, office or hall booking turns a scan into a word to reception. */
-    public const NON_COWORKING_ARRIVAL_MINUTES = 60;
-
     /**
      * A member with no plan in this many days is not asked to accept an
      * uncovered session: they know they pay, so the scan goes straight to
@@ -126,15 +123,11 @@ class CoworkingSessionService
                 return CoworkingStartResult::awaitingConfirmation($this->arrivals->coworkingStart($member, $kiosk, $booking));
             }
 
-            // A room, office or hall booking is reception's to check in, as
-            // at the desk: the scan only tells reception the member is here,
-            // rather than opening a coworking session they did not come for.
-            $elsewhere = $this->bookings->nearNonCoworkingBookingFor($member, $branch, now(), self::NON_COWORKING_ARRIVAL_MINUTES);
-
-            if ($elsewhere !== null) {
-                return CoworkingStartResult::arrivalRequested($this->arrivals->request($member, $elsewhere), $elsewhere);
-            }
-
+            // A room, office or hall booking does not change what the kiosk
+            // is for: the scan is always a coworking session. That booking is
+            // checked in by reception or by opening its door
+            // (AccessArrivalCheckIn), so a member can sit in the workspace
+            // until their room is due.
             $coverage = $this->coverage->evaluate($member, now());
 
             // Without a plan in LAPSED_PLAN_DAYS the scan itself is the

@@ -17,8 +17,8 @@ use Illuminate\Http\JsonResponse;
 /**
  * The app's one scan button. The value says what was scanned: the kiosk's
  * rotating code (`add-cowork:v1:…`) files a request reception confirms —
- * the coworking session or booking check-in starts at that confirmation —
- * or tells reception the member is here for a room
+ * the coworking session or the coworking booking's check-in starts at that
+ * confirmation, whatever room the member has booked later
  * (docs/decisions/coworking-self-service-sessions.md); anything else is
  * looked up as a lock's sticker and opens that door
  * (docs/decisions/qr-lock-unlock.md). Every answer that succeeds says which

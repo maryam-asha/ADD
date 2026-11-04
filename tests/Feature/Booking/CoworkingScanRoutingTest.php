@@ -3,7 +3,6 @@
 namespace Tests\Feature\Booking;
 
 use App\Domain\Booking\Enums\ArrivalRequestPurpose;
-use App\Domain\Booking\Enums\ArrivalRequestStatus;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionEndRequestStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
@@ -133,46 +132,48 @@ class CoworkingScanRoutingTest extends TestCase
         $this->assertSame(1, WalkinSession::count());
     }
 
-    public function test_a_room_booking_about_to_start_tells_reception_instead_of_opening_a_session(): void
+    /** The reported case: a room at 18:00, and the member scans to sit in the workspace meanwhile. */
+    public function test_a_room_booking_about_to_start_does_not_stop_a_coworking_session(): void
     {
         $member = $this->actingAsMember();
         $this->subscribe($member, $this->planWithHours(40));
-        $room = $this->roomInSameBranch();
-        $booking = $this->bookingOn($room, $member, '10:30', '11:30');
+        $booking = $this->bookingOn($this->roomInSameBranch(), $member, '10:30', '11:30');
 
         $this->scan()
             ->assertCreated()
-            ->assertJsonPath('data.outcome', 'arrival_requested')
-            ->assertJsonPath('data.arrival_request.purpose', 'arrival')
-            ->assertJsonPath('data.arrival_request.status', 'pending')
-            ->assertJsonPath('data.arrival_request.matched_booking_id', $booking->id)
-            ->assertJsonPath('data.booking.id', $booking->id)
-            ->assertJsonPath('data.booking.space.id', $room->id)
-            ->assertJsonPath('data.booking.start_at', $booking->start_at->toIso8601String());
+            ->assertJsonPath('data.outcome', 'awaiting_confirmation')
+            ->assertJsonPath('data.arrival_request.purpose', 'coworking_start')
+            ->assertJsonPath('data.booking', null);
 
         $request = ArrivalRequest::sole();
-        $this->assertSame(ArrivalRequestStatus::Pending, $request->status);
-        $this->assertSame(ArrivalRequestPurpose::Arrival, $request->purpose);
-        $this->assertSame(0, WalkinSession::count());
+        $this->assertSame(ArrivalRequestPurpose::CoworkingStart, $request->purpose);
+        $this->assertNull($request->matched_booking_id);
+
+        $this->confirmAtReception($member)->assertOk();
+
+        $this->assertSame($this->space->id, WalkinSession::sole()->space_id);
         $this->assertNull($booking->fresh()->checked_in_at);
     }
 
-    public function test_a_room_booking_already_running_tells_reception_too(): void
+    public function test_a_room_booking_already_running_does_not_stop_a_coworking_session(): void
     {
         $member = $this->actingAsMember();
+        $this->subscribe($member, $this->planWithHours(40));
         $booking = $this->bookingOn($this->roomInSameBranch(), $member, '09:30', '11:00');
 
-        $this->scan()->assertCreated()->assertJsonPath('data.booking.id', $booking->id);
-        $this->assertSame(0, WalkinSession::count());
+        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'awaiting_confirmation');
+
+        $this->assertSame(ArrivalRequestPurpose::CoworkingStart, ArrivalRequest::sole()->purpose);
+        $this->assertNull($booking->fresh()->checked_in_at);
     }
 
     public function test_scanning_again_returns_the_request_already_waiting(): void
     {
         $member = $this->actingAsMember();
-        $this->bookingOn($this->roomInSameBranch(), $member, '10:30', '11:30');
+        $this->subscribe($member, $this->planWithHours(40));
 
         $id = $this->scan()->assertCreated()->json('data.arrival_request.id');
-        $this->scan()->assertOk()->assertJsonPath('data.outcome', 'arrival_requested')->assertJsonPath('data.arrival_request.id', $id);
+        $this->scan()->assertOk()->assertJsonPath('data.outcome', 'awaiting_confirmation')->assertJsonPath('data.arrival_request.id', $id);
 
         $this->assertSame(1, ArrivalRequest::count());
     }

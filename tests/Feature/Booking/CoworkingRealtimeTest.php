@@ -159,23 +159,6 @@ class CoworkingRealtimeTest extends TestCase
             && $e->broadcastWith() === ['arrival_request_id' => $request->id, 'session_type' => 'walkin', 'space_id' => $this->space->id]);
     }
 
-    public function test_a_room_arrival_is_not_a_coworking_start_for_the_member(): void
-    {
-        Event::fake(self::EVENTS);
-        $member = $this->actingAsMember();
-        $room = Space::factory()->room()->create(['building_id' => $this->space->building_id]);
-        Booking::factory()->create([
-            'user_id' => $member->id,
-            'space_id' => $room->id,
-            'start_at' => now()->addMinutes(10),
-            'end_at' => now()->addMinutes(70),
-        ]);
-
-        $this->scan()->assertCreated()->assertJsonPath('data.outcome', 'arrival_requested');
-
-        Event::assertNotDispatched(CoworkingStartRequested::class);
-    }
-
     public function test_scanning_again_while_waiting_announces_nothing_new(): void
     {
         $this->memberWaiting();
@@ -187,21 +170,23 @@ class CoworkingRealtimeTest extends TestCase
         Event::assertNotDispatched(CoworkingStartRequested::class);
     }
 
-    public function test_a_room_arrival_tells_the_desk_too_and_its_confirmation_resolves_it(): void
+    /** The scan no longer files one; a room arrival filed before is still confirmed at the desk. */
+    public function test_confirming_a_room_arrival_resolves_it_at_the_desk(): void
     {
-        Event::fake(self::EVENTS);
         $member = $this->actingAsMember();
         $room = Space::factory()->room()->create(['building_id' => $this->space->building_id]);
-        Booking::factory()->create([
+        $booking = Booking::factory()->create([
             'user_id' => $member->id,
             'space_id' => $room->id,
             'start_at' => now()->addMinutes(10),
             'end_at' => now()->addMinutes(70),
         ]);
-
-        $this->scan()->assertCreated()->assertJsonPath('data.arrival_request.purpose', 'arrival');
-        $request = ArrivalRequest::sole();
-        Event::assertDispatched(ArrivalRequestCreated::class, fn ($e) => $e->broadcastWith()['purpose'] === 'arrival');
+        $request = ArrivalRequest::factory()->create([
+            'user_id' => $member->id,
+            'purpose' => ArrivalRequestPurpose::Arrival,
+            'matched_booking_id' => $booking->id,
+        ]);
+        Event::fake(self::EVENTS);
 
         $this->actingAsOperations();
         $this->postJson("/api/v1/admin/reception/arrival-requests/{$request->id}/confirm")->assertOk();

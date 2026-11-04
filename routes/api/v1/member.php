@@ -92,8 +92,8 @@ Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
 
 // The app's one scan button (ScanController): the kiosk's rotating code
-// starts a coworking session, checks a booking in or tells reception the
-// member is here (docs/decisions/coworking-self-service-sessions.md); a
+// starts a coworking session or checks a coworking booking in
+// (docs/decisions/coworking-self-service-sessions.md); a
 // lock's sticker opens that door (docs/decisions/qr-lock-unlock.md §4). The
 // throttle's third argument is a key prefix: without it the scan would share
 // one per-user bucket with every other plainly throttled member route.

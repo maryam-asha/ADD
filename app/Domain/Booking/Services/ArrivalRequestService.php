@@ -15,28 +15,16 @@ use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
  * What a kiosk scan leaves for reception to confirm (docs/decisions/kiosk-display.md,
- * docs/decisions/coworking-self-service-sessions.md): "I'm here" for a
- * booking reception checks in, or a coworking session that starts when
- * reception confirms it. At most one pending request per member, whichever
+ * docs/decisions/coworking-self-service-sessions.md): a coworking session
+ * that starts when reception confirms it. The scan no longer files an
+ * "I'm here" (`arrival`) for a room booking; ones filed before are still
+ * confirmed by reception. At most one pending request per member, whichever
  * kind; wasRecentlyCreated tells the caller whether this one is new, and
  * only a new one is announced to the desk (arrival_request.created).
  */
 class ArrivalRequestService
 {
     public function __construct(private readonly RealtimeBroadcaster $realtime) {}
-
-    public function request(User $member, ?Booking $matchedBooking): ArrivalRequest
-    {
-        return $this->pendingFor($member) ?? $this->file([
-            'user_id' => $member->id,
-            // Set here, not left to the column defaults, so the response
-            // carries them.
-            'purpose' => ArrivalRequestPurpose::Arrival,
-            'status' => ArrivalRequestStatus::Pending,
-            'requested_at' => now(),
-            'matched_booking_id' => $matchedBooking?->id,
-        ]);
-    }
 
     /**
      * $booking is the coworking booking reception's confirmation checks in;
