@@ -445,7 +445,7 @@ class BookingController extends Controller
         abort_if($booking->user_id !== $member->id, 404);
 
         if ($booking->checked_out_at === null) {
-            return response()->json(['message' => __('api.payment.booking_not_payable')], 422);
+            return response()->json(['message' => __('api.reception.not_yet_checked_out')], 422);
         }
 
         $method = $request->validated('payment_method') ?? $booking->chosen_payment_method;

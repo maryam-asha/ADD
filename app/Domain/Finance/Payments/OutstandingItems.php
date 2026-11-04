@@ -17,6 +17,7 @@ use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\PlainAmount;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 
 /**
  * Everything one member still owes, for the reception desk to settle in one
@@ -150,6 +151,35 @@ class OutstandingItems
                 'amount_points' => $p->plan !== null ? $this->quotes->forPlanPayment($p, $p->plan)->finalPoints : (int) $p->amount_points,
             ])
             ->all();
+    }
+
+    /**
+     * The member's walk-ins and bookings that have closed and still owe, by
+     * the same rules the desk lists them by, newest close first — the home
+     * screen's `unpaid`, so nothing owed drops out of sight while another
+     * session or booking runs. Upcoming bookings not paid yet are not here:
+     * they are still to happen.
+     *
+     * @return Collection<int, Booking|WalkinSession>
+     */
+    public function closedFor(int $userId): Collection
+    {
+        $bookings = $this->bookingsOwed()
+            ->where('user_id', $userId)
+            ->whereNotNull('checked_out_at')
+            ->with(['space.building.branch', 'payments'])
+            ->get()
+            ->filter(fn (Booking $booking) => (int) $booking->price_points > $booking->pointsPaid());
+
+        $sessions = $this->sessionsOwed()
+            ->where('user_id', $userId)
+            ->with(['space.building.branch', 'payments'])
+            ->get();
+
+        return $bookings->toBase()
+            ->concat($sessions)
+            ->sortByDesc(fn (Booking|WalkinSession $owed) => $owed->checked_out_at->getTimestamp())
+            ->values();
     }
 
     /**

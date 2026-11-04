@@ -24,9 +24,9 @@ use App\Services\Realtime\RealtimeBroadcaster;
  * `paid_by` columns reception's settle-payment has always written.
  *
  * A session paid once it has closed tells the member's app, whichever way
- * the money came — the home card waiting for it goes: CoworkingSessionPaid
- * for a coworking session, BookingPaid for a room booking. A booking paid
- * when it is made has no such card.
+ * the money came — it leaves home's `unpaid` list: CoworkingSessionPaid for
+ * a coworking session, BookingPaid for a room booking. A booking paid when
+ * it is made was never on that list.
  */
 abstract class SessionPaymentFulfiller implements PaymentFulfiller
 {

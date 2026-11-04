@@ -22,9 +22,9 @@ use Tests\TestCase;
 
 /**
  * GET member/home's `active_booking`: a room, office or hall booking's own
- * card, from its check-in window to what it owes once closed — never a
- * coworking booking, which is `active_session`. The district runs on
- * Asia/Damascus (+03:00).
+ * card, from its check-in window until it closes — never a coworking
+ * booking, which is `active_session` — and, once closed and still owing,
+ * its place in `unpaid`. The district runs on Asia/Damascus (+03:00).
  */
 class MemberHomeBookingCardTest extends TestCase
 {
@@ -102,8 +102,6 @@ class MemberHomeBookingCardTest extends TestCase
                 'end_at' => '2026-10-13T12:15:00+03:00',
                 'checked_in_at' => null,
                 'checked_in_via' => null,
-                'checked_out_at' => null,
-                'payment' => null,
             ])
             // The card above, so not listed again.
             ->assertJsonPath('data.today', []);
@@ -123,11 +121,10 @@ class MemberHomeBookingCardTest extends TestCase
             ->assertJsonPath('data.active_booking.id', $booking->id)
             ->assertJsonPath('data.active_booking.checked_in_at', '2026-10-13T09:40:00+03:00')
             ->assertJsonPath('data.active_booking.checked_in_via', 'door')
-            ->assertJsonPath('data.active_booking.payment', null)
             ->assertJsonPath('data.active_session', null);
     }
 
-    public function test_a_closed_room_still_owed_is_the_awaiting_payment_card_with_its_method(): void
+    public function test_a_closed_room_still_owed_is_listed_with_its_method(): void
     {
         $booking = $this->booking([
             'status' => BookingStatus::Completed,
@@ -138,11 +135,12 @@ class MemberHomeBookingCardTest extends TestCase
             'chosen_payment_method' => 'cash',
         ]);
 
-        $card = $this->home()->json('data.active_booking');
+        $response = $this->home()->assertJsonPath('data.active_booking', null);
+        $item = $response->json('data.unpaid.0');
 
-        $this->assertSame(['awaiting_payment', $booking->id], [$card['state'], $card['id']]);
-        $this->assertSame('2026-10-13T09:00:00+03:00', $card['checked_out_at']);
-        $this->assertSame(['unpaid', 'cash', 200], [$card['payment']['state'], $card['payment']['method'], $card['payment']['amount_points']]);
+        $this->assertSame(['booking', 'booking', $booking->id, $booking->reference], [$item['kind'], $item['type'], $item['id'], $item['reference']]);
+        $this->assertSame('2026-10-13T09:00:00+03:00', $item['checked_out_at']);
+        $this->assertSame(['unpaid', 'cash', 200], [$item['payment']['state'], $item['payment']['method'], $item['payment']['amount_points']]);
     }
 
     /** Paid then extended: only the extension is owed. */
@@ -160,12 +158,12 @@ class MemberHomeBookingCardTest extends TestCase
         Payment::factory()->forPayable($booking)->create(['purpose' => PaymentPurpose::Booking, 'status' => PaymentStatus::Accepted, 'settled_at' => now(), 'amount_points' => 200, 'user_id' => $this->member->id]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking.state', 'awaiting_payment')
-            ->assertJsonPath('data.active_booking.payment.amount_points', 100)
-            ->assertJsonPath('data.active_booking.payment.method', 'paymera');
+            ->assertJsonPath('data.unpaid.0.id', $booking->id)
+            ->assertJsonPath('data.unpaid.0.payment.amount_points', 100)
+            ->assertJsonPath('data.unpaid.0.payment.method', 'paymera');
     }
 
-    public function test_a_paid_closed_room_a_no_show_or_a_cancelled_booking_is_no_card(): void
+    public function test_a_paid_closed_room_a_no_show_or_a_cancelled_booking_is_neither_card_nor_owed(): void
     {
         $this->booking([
             'status' => BookingStatus::Completed,
@@ -179,7 +177,9 @@ class MemberHomeBookingCardTest extends TestCase
         $this->booking(['status' => BookingStatus::NoShow, 'start_at' => '2026-10-13 04:00:00', 'end_at' => '2026-10-13 06:00:00']);
         $this->booking(['status' => BookingStatus::Cancelled]);
 
-        $this->home()->assertJsonPath('data.active_booking', null);
+        $this->home()
+            ->assertJsonPath('data.active_booking', null)
+            ->assertJsonPath('data.unpaid', []);
     }
 
     public function test_a_coworking_booking_is_never_the_booking_card_and_a_room_never_the_session_card(): void
@@ -211,10 +211,10 @@ class MemberHomeBookingCardTest extends TestCase
             ->assertJsonPath('data.active_booking.id', $room->id);
     }
 
-    /** The checked-in room is the card even while an older one is owed. */
-    public function test_a_running_room_comes_before_one_still_owed(): void
+    /** The checked-in room is the card, and the older one it does not hide is still owed. */
+    public function test_a_running_room_does_not_hide_one_still_owed(): void
     {
-        $this->booking([
+        $owed = $this->booking([
             'status' => BookingStatus::Completed,
             'start_at' => '2026-10-12 04:00:00',
             'end_at' => '2026-10-12 06:00:00',
@@ -228,6 +228,9 @@ class MemberHomeBookingCardTest extends TestCase
 
         $this->home()
             ->assertJsonPath('data.active_booking.state', 'active')
-            ->assertJsonPath('data.active_booking.id', $running->id);
+            ->assertJsonPath('data.active_booking.id', $running->id)
+            ->assertJsonCount(1, 'data.unpaid')
+            ->assertJsonPath('data.unpaid.0.kind', 'booking')
+            ->assertJsonPath('data.unpaid.0.id', $owed->id);
     }
 }
