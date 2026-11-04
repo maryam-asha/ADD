@@ -3,7 +3,6 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
-use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
@@ -16,12 +15,11 @@ use Illuminate\Database\Eloquent\Builder;
  * - `active`: checked in (reception or the door QR) and not closed yet;
  * - `ready`: its check-in window has opened
  *   (BookingCheckInService::EARLY_CHECK_IN_MINUTES before its start) and it
- *   has not ended — the soonest one;
- * - `awaiting_payment`: closed and still owing (its price less what was paid
- *   for it, Booking::pointsPaid) — the newest one.
+ *   has not ended — the soonest one.
  *
- * Coworking bookings are never here: they are `active_session`, a coworking
- * session like a walk-in.
+ * Once closed, a booking still owing is in home's `unpaid` list
+ * (OutstandingItems::closedFor), never this card. Coworking bookings are
+ * never here: they are `active_session`, a coworking session like a walk-in.
  */
 class CurrentBookingLocator
 {
@@ -47,21 +45,7 @@ class CurrentBookingLocator
             ->oldest('start_at')
             ->first();
 
-        if ($ready !== null) {
-            return ['ready', $ready];
-        }
-
-        $owing = $this->rooms($member)
-            ->where('status', BookingStatus::Completed)
-            ->whereNotNull('checked_out_at')
-            ->where('payment_state', PaymentState::Unpaid->value)
-            ->where('price_points', '>', 0)
-            ->with('payments')
-            ->latest('checked_out_at')
-            ->get()
-            ->first(fn (Booking $booking) => $booking->price_points > $booking->pointsPaid());
-
-        return $owing === null ? null : ['awaiting_payment', $owing];
+        return $ready === null ? null : ['ready', $ready];
     }
 
     /** @return Builder<Booking> */

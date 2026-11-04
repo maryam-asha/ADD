@@ -156,7 +156,9 @@ class PayBookingTest extends TestCase
     {
         $booking = $this->closedRoom('cash', ['status' => BookingStatus::Confirmed, 'checked_out_at' => null]);
 
-        $this->pay($booking)->assertUnprocessable();
+        $this->pay($booking)
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'This booking or session must be checked out before payment can be settled.');
     }
 
     public function test_the_coworking_pay_endpoint_pays_a_booking_by_its_kept_method(): void

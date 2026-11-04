@@ -7,8 +7,8 @@ use App\Domain\Booking\Models\Booking;
 /**
  * A room booking closed — at its end, or earlier by reception — and was
  * billed; `payment_state` is final, after anything owed was taken by the
- * method it was booked with (ClosedBookingSettlement). `unpaid`: the home
- * card turns `awaiting_payment`.
+ * method it was booked with (ClosedBookingSettlement). The home card goes;
+ * `unpaid`: the booking joins home's `unpaid` list.
  */
 class BookingEnded extends MemberUpdate
 {

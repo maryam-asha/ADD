@@ -7,8 +7,8 @@ use App\Domain\Booking\Models\WalkinSession;
 
 /**
  * A closed session is paid — from the wallet, by card, or in cash at the
- * desk: the home card waiting for the payment (state awaiting_payment)
- * goes, so the app re-fetches GET member/home.
+ * desk: it leaves home's `unpaid` list, so the app re-fetches GET
+ * member/home.
  */
 class CoworkingSessionPaid extends MemberUpdate
 {
