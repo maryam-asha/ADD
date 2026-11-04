@@ -7,10 +7,39 @@ return [
             'title' => 'حجز بانتظار موافقتك',
             'body' => ':member طلب :space يوم :date الساعة :time.',
         ],
+        // Kept for the notices stored before approvals carried a payment
+        // line; new ones are approved_with_payment.
         'approved' => [
             'title' => 'تمت الموافقة على حجزك',
             'body' => 'حجزك لـ :space يوم :date الساعة :time مؤكد.',
         ],
+        'approved_with_payment' => [
+            'title' => 'تمت الموافقة على حجزك',
+            'body' => 'حجزك لـ :space يوم :date الساعة :time مؤكد.:payment',
+        ],
+        'confirmed' => [
+            'title' => 'تم تأكيد حجزك',
+            'body' => 'حجزك لـ :space يوم :date الساعة :time مؤكد.:payment',
+        ],
+        'confirmed_batch' => [
+            'title' => 'تم تأكيد حجوزاتك',
+            'body' => 'تم تأكيد :count حجوزات لـ :space (:dates).:payment',
+        ],
+        'booked_for_you' => [
+            'title' => 'حجز لك فريق ADD',
+            'body' => 'حجز لك فريق ADD :space يوم :date الساعة :time.:payment',
+        ],
+        // The sentence a confirmation ends with (BookingPaymentLine).
+        'payment_lines' => [
+            'wallet' => 'اقتُطع :points نقطة من محفظتك.',
+            'company_wallet' => 'اقتُطع :points نقطة من محفظة :company.',
+            'card' => 'دُفع :points نقطة بالبطاقة.',
+            'cash_paid' => 'دفعت :points نقطة نقداً في الاستقبال.',
+            'cash_due' => 'يُدفع المبلغ (:points نقطة) في الاستقبال.',
+            'plan' => 'الحجز مغطّى بالكامل من ساعات باقتك.',
+            'due' => 'المبلغ :points نقطة مستحق، ادفعه من التطبيق أو في الاستقبال.',
+        ],
+        'list_separator' => '، ',
         'rejected' => [
             'title' => 'لم تتم الموافقة على حجزك',
             'body' => 'رُفض حجزك لـ :space يوم :date، وأُعيد :points نقطة إلى محفظتك.',

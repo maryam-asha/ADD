@@ -79,6 +79,7 @@ class BookingReceptionController extends Controller
                     $request->validated('wallet_owner_id'),
                     $request->validated('note'),
                     $method,
+                    byReception: true,
                 );
 
                 if ($collected && (int) $booking->price_points > 0) {

@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments;
 
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\ConfirmedBookingNotice;
 use App\Domain\Booking\Services\PendingBookingNotice;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Support\Enums\EventRegistrationStatus;
@@ -18,7 +19,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PrepaymentHold
 {
-    public function __construct(private readonly PendingBookingNotice $pendingNotice) {}
+    public function __construct(
+        private readonly PendingBookingNotice $pendingNotice,
+        private readonly ConfirmedBookingNotice $confirmedNotice,
+    ) {}
 
     /** When a hold made now ends: the window, never past the start. */
     public function dueAt(CarbonInterface $start): CarbonInterface
@@ -54,6 +58,8 @@ class PrepaymentHold
 
                 if ($status === BookingStatus::Pending) {
                     $this->pendingNotice->send($locked);
+                } else {
+                    $this->confirmedNotice->send($locked);
                 }
             } elseif ($locked instanceof EventAttendee && $locked->status === EventRegistrationStatus::AwaitingPayment) {
                 $locked->forceFill(['status' => EventRegistrationStatus::Approved, 'payment_due_at' => null])->save();

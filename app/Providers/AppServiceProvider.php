@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Domain\Booking\Services\ConfirmedBookingNotice;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Policies\CompanyPolicy;
 use App\Domain\Providers\Policies\ProviderPolicy;
@@ -40,6 +41,10 @@ class AppServiceProvider extends ServiceProvider
         // Same reason: it memoises currency rows to format a price, and a
         // listing formats one per card.
         $this->app->singleton(EventPricePresenter::class);
+        // Remembers which bookings it announced, so the card payment that
+        // confirmed one is not announced twice; scoped, so that memory lasts
+        // one request or job.
+        $this->app->scoped(ConfirmedBookingNotice::class);
     }
 
     /**

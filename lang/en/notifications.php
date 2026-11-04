@@ -7,10 +7,39 @@ return [
             'title' => 'Booking awaiting your approval',
             'body' => ':member requested :space on :date at :time.',
         ],
+        // Kept for the notices stored before approvals carried a payment
+        // line; new ones are approved_with_payment.
         'approved' => [
             'title' => 'Booking Approved',
             'body' => 'Your booking for :space on :date at :time is confirmed.',
         ],
+        'approved_with_payment' => [
+            'title' => 'Booking Approved',
+            'body' => 'Your booking for :space on :date at :time is confirmed.:payment',
+        ],
+        'confirmed' => [
+            'title' => 'Booking confirmed',
+            'body' => 'Your booking for :space on :date at :time is confirmed.:payment',
+        ],
+        'confirmed_batch' => [
+            'title' => 'Bookings confirmed',
+            'body' => ':count bookings for :space are confirmed (:dates).:payment',
+        ],
+        'booked_for_you' => [
+            'title' => 'The ADD team booked for you',
+            'body' => 'The ADD team booked :space for you on :date at :time.:payment',
+        ],
+        // The sentence a confirmation ends with (BookingPaymentLine).
+        'payment_lines' => [
+            'wallet' => ':points points were taken from your wallet.',
+            'company_wallet' => ':points points were taken from the :company wallet.',
+            'card' => ':points points were paid by card.',
+            'cash_paid' => 'You paid :points points in cash at reception.',
+            'cash_due' => 'The amount (:points points) is paid at reception.',
+            'plan' => 'The booking is fully covered by your plan hours.',
+            'due' => ':points points are due; pay them in the app or at reception.',
+        ],
+        'list_separator' => ', ',
         'rejected' => [
             'title' => 'Your booking was not approved',
             'body' => 'Your booking for :space on :date was declined, and :points points were returned to your wallet.',

@@ -49,6 +49,7 @@ class BookingCreationService
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
         private readonly PendingBookingNotice $pendingNotice,
+        private readonly ConfirmedBookingNotice $confirmedNotice,
         private readonly PaymentMethodRegistry $methods,
         private readonly PrepaymentHold $holds,
         private readonly BookingCancellationService $cancellations,
@@ -65,6 +66,7 @@ class BookingCreationService
         ?string $note = null,
         ?string $paymentMethod = null,
         ?string $couponCode = null,
+        bool $byReception = false,
     ): Booking {
         // Normalize to UTC: Eloquent's datetime cast stores the Carbon
         // value's current wall-clock as-is and reinterprets it as UTC on
@@ -86,7 +88,7 @@ class BookingCreationService
         // An unknown code is refused before anything is locked.
         $coupon = $couponCode !== null ? $this->coupons->resolve($couponCode) : null;
 
-        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod, $coupon) {
+        return DB::transaction(function () use ($space, $member, $startAt, $endAt, $walletOwnerType, $walletOwnerId, $rules, $note, $paymentMethod, $coupon, $byReception) {
             // The coupon's and the limited offers' rows first — before the branch and the space — so
             // its limits are counted from a fresh snapshot (CouponLedger).
             $coupon = $this->couponLedger->lockForPricing($coupon);
@@ -205,6 +207,11 @@ class BookingCreationService
 
             if ($status === BookingStatus::Pending) {
                 $this->pendingNotice->send($booking);
+            }
+
+            // A held booking is told when its card goes through (PrepaymentHold).
+            if ($status === BookingStatus::Confirmed) {
+                $this->confirmedNotice->send($booking, $byReception);
             }
 
             return $booking;

@@ -61,7 +61,7 @@ class FakeSendersAreRealTest extends TestCase
 
         app(BookingApprovalService::class)->approve($booking, $this->operator);
 
-        $notice = $this->assertNoticed($booking->user_id, 'booking.approved');
+        $notice = $this->assertNoticed($booking->user_id, 'booking.approved_with_payment');
         $this->assertSame(['ar' => 'غرفة الاجتماعات', 'en' => 'Meeting room'], $notice->data['params']['space']);
         $this->assertSame('2026-08-18', $notice->data['params']['date']);
         $this->assertSame('10:00', $notice->data['params']['time']);

@@ -61,7 +61,7 @@ class BookingApprovalServiceTest extends TestCase
         $this->assertNotNull($booking->approved_at);
         $this->assertSame(
             1,
-            $this->notices($booking->user_id, 'booking.approved')->count()
+            $this->notices($booking->user_id, 'booking.approved_with_payment')->count()
         );
     }
 

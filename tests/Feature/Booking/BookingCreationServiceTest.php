@@ -588,10 +588,13 @@ class BookingCreationServiceTest extends TestCase
         $space = $this->openSpace(['requires_approval' => false]);
         [$start, $end] = $this->slot(10);
 
-        $booking = $this->creations->create($space, User::factory()->create(), $start, $end);
+        $member = User::factory()->create();
+        $booking = $this->creations->create($space, $member, $start, $end);
 
         $this->assertSame(BookingStatus::Confirmed, $booking->status);
-        $this->assertDatabaseCount('notifications', 0);
+        // Nobody is asked to approve it; only its member is told it is confirmed.
+        $this->assertDatabaseCount('notifications', 1);
+        $this->assertDatabaseHas('notifications', ['notifiable_id' => $member->id]);
     }
 
     // ------------------------------------------------------------------

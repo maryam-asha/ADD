@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
+use App\Http\Middleware\SetLocaleFromHeader;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\NotificationText;
 use Carbon\CarbonInterface;
@@ -18,11 +19,61 @@ use Carbon\CarbonInterface;
  */
 class BookingNotifier
 {
-    public function __construct(private readonly NotificationService $notifications) {}
+    public function __construct(
+        private readonly NotificationService $notifications,
+        private readonly BookingPaymentLine $paymentLine,
+    ) {}
 
+    /**
+     * Approved, with how it was or will be paid. `booking.approved` (no
+     * payment line) is kept only for the notices stored before.
+     */
     public function approved(Booking $booking): void
     {
-        $this->tellMember($booking, 'booking.approved');
+        $this->tellMember($booking, 'booking.approved_with_payment', ['payment' => $this->paymentLine->for([$booking])]);
+    }
+
+    /**
+     * Confirmed the moment it was made (or the moment its card went
+     * through), with how it was or will be paid. One the desk made for the
+     * member says so. Called after the booking's transaction commits
+     * (ConfirmedBookingNotice), so the payment line reads what was saved.
+     */
+    public function confirmed(Booking $booking, bool $byReception = false): void
+    {
+        $this->tellMember(
+            $booking,
+            $byReception ? 'booking.booked_for_you' : 'booking.confirmed',
+            ['payment' => $this->paymentLine->for([$booking])],
+        );
+    }
+
+    /**
+     * Several dates booked in one go: one notice for all of them, with what
+     * they cost together, rather than one per date.
+     *
+     * @param  list<Booking>  $bookings  confirmed, all the same member's
+     */
+    public function confirmedBatch(array $bookings): void
+    {
+        if (count($bookings) === 1) {
+            $this->confirmed($bookings[0]);
+
+            return;
+        }
+
+        $first = $bookings[0];
+
+        if ($first->user === null) {
+            return;
+        }
+
+        $this->notifications->sendToUser($first->user, 'booking.confirmed_batch', [
+            'count' => count($bookings),
+            'space' => $this->joined(collect($bookings)->map(fn (Booking $booking) => $booking->space?->name ?? '')->unique(fn ($name) => json_encode($name))->values()->all()),
+            'dates' => $this->joined(collect($bookings)->map(fn (Booking $booking) => NotificationText::localDate($booking->start_at))->unique()->values()->all()),
+            'payment' => $this->paymentLine->for($bookings),
+        ], $this->target($first));
     }
 
     public function rejected(Booking $booking, int $refundedPoints): void
@@ -122,6 +173,27 @@ class BookingNotifier
             'date' => NotificationText::localDate($booking->start_at),
             'time' => NotificationText::localTime($booking->start_at),
         ];
+    }
+
+    /**
+     * A list in each language, from values that may themselves be
+     * translatable (a space's name).
+     *
+     * @param  list<string|array<string, mixed>>  $values
+     * @return array<string, string>
+     */
+    private function joined(array $values): array
+    {
+        $lists = [];
+
+        foreach (SetLocaleFromHeader::SUPPORTED_LOCALES as $locale) {
+            $lists[$locale] = implode(
+                __('notifications.booking.list_separator', [], $locale),
+                array_map(fn ($value) => is_array($value) ? NotificationText::pick($value, $locale) : (string) $value, $values),
+            );
+        }
+
+        return $lists;
     }
 
     /** @return array<string, string> what the app opens */

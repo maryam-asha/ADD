@@ -71,6 +71,7 @@ class BookingBatchCreationService
         private readonly CouponEligibility $coupons,
         private readonly CouponLedger $couponLedger,
         private readonly PendingBookingNotice $pendingNotice,
+        private readonly ConfirmedBookingNotice $confirmedNotice,
         private readonly BookingPlanCoverage $coverage,
     ) {}
 
@@ -320,6 +321,12 @@ class BookingBatchCreationService
 
                 $created[] = $booking;
             }
+
+            // One notice for every date confirmed now, not one per date.
+            $this->confirmedNotice->sendBatch(array_values(array_filter(
+                $created,
+                fn (Booking $booking) => $booking->status === BookingStatus::Confirmed,
+            )));
 
             return $created;
         });

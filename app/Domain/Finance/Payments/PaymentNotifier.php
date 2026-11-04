@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Payments;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Booking\Services\ConfirmedBookingNotice;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Retail\Models\ItemSale;
@@ -22,10 +23,19 @@ use Illuminate\Support\Facades\DB;
  */
 class PaymentNotifier
 {
-    public function __construct(private readonly NotificationService $notifications) {}
+    public function __construct(
+        private readonly NotificationService $notifications,
+        private readonly ConfirmedBookingNotice $confirmations,
+    ) {}
 
     public function received(Payment $payment): void
     {
+        // The booking this payment confirmed says it was paid, by what and
+        // how much (ConfirmedBookingNotice): one notice, not two.
+        if ($this->confirmations->supersedes($payment)) {
+            return;
+        }
+
         $this->send($payment, 'payment.received', ['points' => (int) ($payment->points_to_credit ?: $payment->amount_points)]);
     }
 
