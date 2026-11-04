@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\ArrivalRequestService;
 use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\Services\CoworkingSessionService;
+use App\Domain\Booking\Services\CurrentBookingLocator;
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Experience\Models\Event;
@@ -38,6 +39,7 @@ class MemberHomeService
 {
     public function __construct(
         private readonly CoworkingSessionService $sessions,
+        private readonly CurrentBookingLocator $bookings,
         private readonly ArrivalRequestService $arrivals,
         private readonly ServiceCatalogService $catalog,
         private readonly BookingPresentationService $presentation,
@@ -67,6 +69,7 @@ class MemberHomeService
                 'greeting' => $this->greeting(null, $localNow, $locale),
                 'unread_notifications' => 0,
                 'active_session' => null,
+                'active_booking' => null,
                 'banners' => $this->banners($locale),
                 'today' => [],
                 'explore' => $this->explore(null, $locale),
@@ -74,6 +77,14 @@ class MemberHomeService
         }
 
         $session = $this->sessions->openSessionFor($member);
+        $current = $this->bookings->for($member);
+
+        // The running session's booking and the booking on its own card are
+        // the cards above, so `today` does not list them twice.
+        $shown = array_values(array_filter([
+            $session instanceof Booking ? $session->id : null,
+            $current === null ? null : $current[1]->id,
+        ]));
 
         return [
             'greeting' => $this->greeting($member, $localNow, $locale),
@@ -81,8 +92,9 @@ class MemberHomeService
             'active_session' => $session === null
                 ? $this->awaitingSession($member, $locale) ?? $this->owingSession($member, $locale)
                 : $this->session($session, $locale),
+            'active_booking' => $current === null ? null : $this->booking($current[0], $current[1], $member, $locale),
             'banners' => $this->banners($locale),
-            'today' => $this->today($member, $session, $now, $dayStart, $dayEnd, $locale),
+            'today' => $this->today($member, $shown, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
         ];
     }
@@ -198,6 +210,36 @@ class MemberHomeService
     }
 
     /**
+     * A room, office or hall booking's own card (CurrentBookingLocator), from
+     * its check-in window (`ready`) through the booking (`active`, checked
+     * in by reception or the door QR) to what it still owes once closed
+     * (`awaiting_payment`). It closes itself at `end_at` or at the desk —
+     * the member does not end it — and `payment`, only once it owes, is the
+     * block every booking shows, `method` the one it was booked with:
+     * paying is POST member/bookings/{booking}/pay.
+     *
+     * @return array<string, mixed>
+     */
+    private function booking(string $state, Booking $booking, User $member, string $locale): array
+    {
+        $booking->loadMissing('space.building.branch');
+
+        return [
+            'state' => $state,
+            'id' => $booking->id,
+            'reference' => $booking->reference,
+            'space' => $this->space($booking->space, $locale),
+            'branch' => $this->branch($booking->space->building?->branch, $locale),
+            'start_at' => $this->time->toLocal($booking->start_at)?->toIso8601String(),
+            'end_at' => $this->time->toLocal($booking->end_at)?->toIso8601String(),
+            'checked_in_at' => $this->time->toLocal($booking->checked_in_at)?->toIso8601String(),
+            'checked_in_via' => $booking->checked_in_via?->value,
+            'checked_out_at' => $this->time->toLocal($booking->checked_out_at)?->toIso8601String(),
+            'payment' => $state === 'awaiting_payment' ? $this->payments->for($booking, $member) : null,
+        ];
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function banners(string $locale): array
@@ -223,19 +265,20 @@ class MemberHomeService
 
     /**
      * The member's bookings and events still ahead of them today, soonest
-     * first. A booking that is the running session is the card above, so
-     * it is not listed twice.
+     * first. The bookings in $shown are the cards above, so they are not
+     * listed twice.
      *
+     * @param  list<int>  $shown
      * @return list<array<string, mixed>>
      */
-    private function today(User $member, Booking|WalkinSession|null $session, CarbonInterface $now, CarbonInterface $dayStart, CarbonInterface $dayEnd, string $locale): array
+    private function today(User $member, array $shown, CarbonInterface $now, CarbonInterface $dayStart, CarbonInterface $dayEnd, string $locale): array
     {
         $bookings = Booking::query()
             ->where('user_id', $member->id)
             ->whereIn('status', BookingStatus::open())
             ->where('start_at', '<', $dayEnd)
             ->where('end_at', '>', $now)
-            ->when($session instanceof Booking, fn ($query) => $query->whereKeyNot($session->id))
+            ->whereKeyNot($shown)
             ->with('space.building.branch')
             ->get()
             ->map(fn (Booking $booking) => [
