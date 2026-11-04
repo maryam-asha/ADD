@@ -594,6 +594,12 @@ return [
             'uses_count' => 'استُخدم :count مرة',
             'left_of' => 'متبقٍ :remaining من :total',
             'everywhere' => 'كل المساحات',
+            // مزايا الباقة (benefits): ما تمنحه الخطة قبل أي استهلاك.
+            'hours_included' => ':count ساعة',
+            'unlimited_hours' => 'ساعات غير محدودة',
+            'uses_included' => ':count استخدام',
+            'unlimited_uses' => 'استخدام غير محدود',
+            'amount' => ':count :unit',
         ],
         'balances' => [
             'cafe' => 'رصيد الكافيه',
@@ -602,15 +608,6 @@ return [
         ],
         'units' => [
             'hours' => 'ساعة',
-        ],
-        'tags' => [
-            'cafe' => 'كافيه',
-            'printing' => 'طباعة',
-            'meeting' => 'اجتماعات',
-            'discounts' => 'خصومات',
-        ],
-        'discounts' => [
-            'default' => 'وفّر :percentage% على حجوزاتك.',
         ],
         'subtitles' => [
             'starter' => 'مثالية للأفراد والفرق الصغيرة.',

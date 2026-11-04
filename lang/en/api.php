@@ -607,6 +607,12 @@ return [
             'uses_count' => 'Used :count times',
             'left_of' => ':remaining of :total left',
             'everywhere' => 'all spaces',
+            // A package's `benefits`: what the plan gives, nothing used yet.
+            'hours_included' => ':count hours',
+            'unlimited_hours' => 'Unlimited hours',
+            'uses_included' => ':count uses',
+            'unlimited_uses' => 'Unlimited uses',
+            'amount' => ':count :unit',
         ],
         'balances' => [
             'cafe' => 'Café Balance',
@@ -615,15 +621,6 @@ return [
         ],
         'units' => [
             'hours' => 'hours',
-        ],
-        'tags' => [
-            'cafe' => 'Café',
-            'printing' => 'Printing',
-            'meeting' => 'Meeting',
-            'discounts' => 'Discounts',
-        ],
-        'discounts' => [
-            'default' => 'Save :percentage% on your bookings.',
         ],
         'subtitles' => [
             'starter' => 'Perfect for individuals and small teams.',

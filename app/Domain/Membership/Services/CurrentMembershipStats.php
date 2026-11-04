@@ -26,6 +26,9 @@ use App\Support\Time\LocalTime;
  * when there is a total to draw against and `value` when there is none
  * (unlimited). Hours and discount uses are the person's own, this cycle —
  * on a company plan too.
+ *
+ * forPlan() draws a plan not yet bought — a package's `benefits` — with the
+ * same cards and nothing used.
  */
 class CurrentMembershipStats
 {
@@ -60,6 +63,56 @@ class CurrentMembershipStats
         ]));
     }
 
+    /**
+     * What a plan gives, as the cards for() draws once it is bought, in the
+     * same order: the shared-workspace hours, free hours on a space,
+     * discounts, resources. No period or balances — a package says those in
+     * `duration_days` and `balances_grant`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function forPlan(Plan $plan): array
+    {
+        $plan->loadMissing(['spaceHours.space', 'discounts.space', 'resourceGrants.resourceType']);
+
+        return array_values(array_filter([
+            $plan->includesCoworking()
+                ? $this->offeredHours('workspace_hours', __('api.package.stats.workspace_hours'), $this->allowances->allowanceForPlan($plan, SpaceType::CoSpace)?->hours)
+                : null,
+            ...$plan->spaceHours->map(fn (PlanSpaceHour $row) => $this->offeredHours("space_hours:{$row->id}", $this->spaceHoursTitle($row), (float) $row->hours))->all(),
+            ...$plan->discounts->where('is_active', true)->map(fn (PlanDiscount $d) => $this->offeredDiscount($d))->all(),
+            ...$plan->resourceGrants->map(fn (PlanResourceGrant $g) => $this->offeredResource($g))->all(),
+        ]));
+    }
+
+    /** @return array<string, mixed> */
+    private function offeredHours(string $key, string $title, ?float $hours): array
+    {
+        return $this->card($key, 'hours', $title, null, 'clock', 'hours', $hours, 0,
+            fn (int|float|null $total) => $total === null
+                ? __('api.package.stats.unlimited_hours')
+                : __('api.package.stats.hours_included', ['count' => $total]));
+    }
+
+    /** @return array<string, mixed> */
+    private function offeredDiscount(PlanDiscount $discount): array
+    {
+        return $this->card("discount:{$discount->id}", 'discount', $this->discountTitle($discount), null, 'percent', 'uses', $discount->usage_limit, 0,
+            fn (int|float|null $total) => $total === null
+                ? __('api.package.stats.unlimited_uses')
+                : __('api.package.stats.uses_included', ['count' => $total]),
+        ) + ['percent_off' => (int) $discount->percentage];
+    }
+
+    /** @return array<string, mixed> */
+    private function offeredResource(PlanResourceGrant $grant): array
+    {
+        $unit = $grant->resourceType?->translate('unit_label') ?? '';
+
+        return $this->card("resource:{$grant->id}", 'resource', $this->resourceTitle($grant), null, $grant->resourceType?->icon ?? 'wallet', $unit, (float) $grant->quantity, 0,
+            fn (int|float|null $total) => trim(__('api.package.stats.amount', ['count' => $total, 'unit' => $unit])));
+    }
+
     /** @return array<string, mixed> */
     private function period(Membership $membership): array
     {
@@ -86,10 +139,13 @@ class CurrentMembershipStats
     /** @return array<string, mixed> */
     private function spaceHours(Membership $membership, User $user, PlanSpaceHour $row): array
     {
-        $title = $row->translate('description')
-            ?? __('api.package.stats.free_hours_on', ['target' => $this->target($row->space, $row->space_type)]);
+        return $this->hours("space_hours:{$row->id}", $this->spaceHoursTitle($row), $membership, $user, new HourAllowance($row, (float) $row->hours, false));
+    }
 
-        return $this->hours("space_hours:{$row->id}", $title, $membership, $user, new HourAllowance($row, (float) $row->hours, false));
+    private function spaceHoursTitle(PlanSpaceHour $row): string
+    {
+        return $row->translate('description')
+            ?? __('api.package.stats.free_hours_on', ['target' => $this->target($row->space, $row->space_type)]);
     }
 
     /** @return array<string, mixed> */
@@ -107,17 +163,21 @@ class CurrentMembershipStats
     private function discount(Membership $membership, User $user, PlanDiscount $discount): array
     {
         $used = $this->discounts->usesFor($discount, $membership, $user, now());
-        $title = $discount->translate('description')
-            ?? __('api.package.stats.discount_on', [
-                'percent' => (int) $discount->percentage,
-                'target' => $this->target($discount->space, $discount->space_type),
-            ]);
 
-        return $this->card("discount:{$discount->id}", 'discount', $title, null, 'percent', 'uses', $discount->usage_limit, $used,
+        return $this->card("discount:{$discount->id}", 'discount', $this->discountTitle($discount), null, 'percent', 'uses', $discount->usage_limit, $used,
             fn (int|float|null $remaining) => $remaining === null
                 ? __('api.package.stats.uses_count', ['count' => $used])
                 : __('api.package.stats.uses_left', ['count' => $remaining]),
         ) + ['percent_off' => (int) $discount->percentage];
+    }
+
+    private function discountTitle(PlanDiscount $discount): string
+    {
+        return $discount->translate('description')
+            ?? __('api.package.stats.discount_on', [
+                'percent' => (int) $discount->percentage,
+                'target' => $this->target($discount->space, $discount->space_type),
+            ]);
     }
 
     /**
@@ -187,7 +247,7 @@ class CurrentMembershipStats
         return $this->card(
             "resource:{$grant->id}",
             'resource',
-            $grant->translate('description') ?? $type?->translate('name') ?? '',
+            $this->resourceTitle($grant),
             null,
             $type?->icon ?? 'wallet',
             $type?->translate('unit_label') ?? '',
@@ -195,6 +255,11 @@ class CurrentMembershipStats
             $used,
             fn (int|float|null $left) => __('api.package.stats.left_of', ['remaining' => $left, 'total' => $total]),
         );
+    }
+
+    private function resourceTitle(PlanResourceGrant $grant): string
+    {
+        return $grant->translate('description') ?? $grant->resourceType?->translate('name') ?? '';
     }
 
     /**

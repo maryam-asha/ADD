@@ -3,7 +3,6 @@
 namespace App\Domain\Membership\Services;
 
 use App\Domain\Finance\Services\PointConversionService;
-use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\CoworkingSeat;
@@ -12,9 +11,7 @@ use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanBalance;
-use App\Domain\Membership\Models\PlanDiscount;
 use App\Domain\Membership\Models\PlanFeature;
-use App\Domain\Membership\Models\PlanResourceGrant;
 use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Pricing\Services\PlanSavingCalculator;
 use App\Support\Presenters\PriceLabelPresenter;
@@ -128,48 +125,12 @@ class PackageBrowseService
     }
 
     /**
-     * Which of the four quick-glance badges (Café / Printing / Meeting /
-     * Discounts) this plan actually grants — one clear mechanism per badge,
-     * so a plan with no meeting-room balance never claims "Meeting: Included".
-     * Deliberately independent of `plan_features` free text: that list can
-     * say anything, while this reflects what's actually configured and
-     * enforced (`plan_balances` categories, active `plan_discounts`).
-     *
-     * @return array<string, bool>
-     */
-    private function resolvePlanCapabilities(Plan $plan): array
-    {
-        return [
-            'cafe' => $plan->balances->contains(fn (PlanBalance $b) => $b->category === WalletTransactionCategory::Cafe),
-            'printing' => $plan->balances->contains(fn (PlanBalance $b) => $b->category === WalletTransactionCategory::PrintingInternet),
-            'meeting' => $plan->balances->contains(fn (PlanBalance $b) => $b->category === WalletTransactionCategory::SpaceSpecific),
-            'discounts' => $plan->discounts->where('is_active', true)->isNotEmpty(),
-        ];
-    }
-
-    /**
-     * @param  array<string, bool>  $capabilities
-     * @return array<int, array<string, mixed>>
-     */
-    private function defaultTags(array $capabilities): array
-    {
-        $all = [
-            'cafe' => ['key' => 'cafe', 'label' => __('api.package.tags.cafe'), 'icon' => 'coffee'],
-            'printing' => ['key' => 'printing', 'label' => __('api.package.tags.printing'), 'icon' => 'printer'],
-            'meeting' => ['key' => 'meeting', 'label' => __('api.package.tags.meeting'), 'icon' => 'users'],
-            'discounts' => ['key' => 'discounts', 'label' => __('api.package.tags.discounts'), 'icon' => 'percent'],
-        ];
-
-        return collect($all)->only(array_keys(array_filter($capabilities)))->values()->all();
-    }
-
-    /**
      * @return array<int, array<string, mixed>>
      */
     private function formatAvailablePackages(?Membership $activeMembership, ?User $user, ?string $moduleFilter = null): array
     {
         $query = Plan::query()
-            ->with(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType', 'referencePlan', 'referenceSpace'])
+            ->with(['planModule', 'balances', 'features', 'discounts.space', 'resourceGrants.resourceType', 'referencePlan', 'referenceSpace', 'spaceHours.space'])
             ->publiclyListable()
             ->where('is_subscription', true);
 
@@ -190,8 +151,8 @@ class PackageBrowseService
         // The catalog is a lightweight browsing list, not a details screen:
         // `features` (a free-text bullet list, up to 9 items on the seeded
         // plans) is capped at 3 with a `more_features_count` remainder, and
-        // `tags`/`balances_grant`/`discounts`/`resources_grant` are dropped
-        // entirely — the card UI shows none of them, only "View details".
+        // `balances_grant`/`benefits` are dropped entirely — the card UI
+        // shows neither, only "View details".
         // `getPackageDetails()` is the one place a client reads the full set.
         return $plans->map(function (Plan $plan) use ($activeMembership, $user) {
             $isCurrent = $activeMembership !== null && $activeMembership->plan_id === $plan->id;
@@ -201,7 +162,7 @@ class PackageBrowseService
             $details['features'] = array_slice($allFeatures, 0, 3);
             $details['more_features_count'] = max(0, count($allFeatures) - 3);
 
-            unset($details['tags'], $details['balances_grant'], $details['discounts'], $details['resources_grant']);
+            unset($details['balances_grant'], $details['benefits']);
 
             return $details;
         })->values()->all();
@@ -227,7 +188,7 @@ class PackageBrowseService
             return null;
         }
 
-        $plan->loadMissing(['planModule', 'balances', 'features', 'discounts', 'resourceGrants.resourceType']);
+        $plan->loadMissing(['planModule', 'balances', 'features', 'discounts.space', 'resourceGrants.resourceType', 'spaceHours.space']);
 
         $activeMembership = $user !== null ? $this->membershipResolver->activeFor($user) : null;
         $isCurrent = $activeMembership !== null && $activeMembership->plan_id === $plan->id;
@@ -286,7 +247,6 @@ class PackageBrowseService
             ])->values()->all()
             : [];
 
-        $tags = $this->defaultTags($this->resolvePlanCapabilities($plan));
         $blockedReason = $this->subscribeBlockedReason($user);
 
         return [
@@ -302,6 +262,7 @@ class PackageBrowseService
                 'slug' => $plan->planModule->slug,
                 'icon' => $plan->planModule->icon,
             ] : null,
+            'seat' => ($plan->coworking_seat ?? CoworkingSeat::None)->value,
             'subtitle' => $subtitle,
             'pricing' => $pricing,
             // The best offer live now for this member: what a purchase
@@ -311,21 +272,11 @@ class PackageBrowseService
             // own price, not a discount; shown beside any offer.
             'saving' => $this->prices->saving($this->savings->for($plan), $user),
             'duration_days' => $plan->duration_days,
-            'tags' => $tags,
             'features' => $features,
             'balances_grant' => $balancesGrant,
-            'discounts' => $this->formatDiscounts($plan),
-            'resources_grant' => $plan->resourceGrants->isNotEmpty()
-                ? $plan->resourceGrants->map(fn (PlanResourceGrant $g) => [
-                    'id' => $g->id,
-                    'resource_type_id' => $g->resource_type_id,
-                    'slug' => $g->resourceType?->slug,
-                    'name' => $g->resourceType?->translate('name'),
-                    'unit_label' => $g->resourceType?->translate('unit_label'),
-                    'icon' => $g->resourceType?->icon,
-                    'granted' => (float) $g->quantity,
-                ])->values()->all()
-                : [],
+            // What else it gives — workspace and free hours, discounts,
+            // resources — as the cards memberships/current draws, nothing used.
+            'benefits' => $this->stats->forPlan($plan),
             'is_current' => $isCurrent,
         ];
     }
@@ -342,29 +293,5 @@ class PackageBrowseService
         }
 
         return $this->blockedReasons[$user->id];
-    }
-
-    /**
-     * Raw `space_id`/`space_type` rather than a pre-translated "applies to
-     * Room #3" sentence — the client already resolves `balances_grant`'s raw
-     * `category` into a label itself, and has its own SpaceType label table.
-     * `title` prefers the admin's own description, same fallback pattern as
-     * `balancesGrant` below. `is_active` only — no per-membership usage-
-     * exhaustion filtering, matching how `balances`/`balances_grant` already
-     * reflect general plan configuration, not live per-member consumption.
-     *
-     * @return array<int, array<string, mixed>>
-     */
-    private function formatDiscounts(Plan $plan): array
-    {
-        return $plan->discounts->where('is_active', true)->map(fn (PlanDiscount $d) => [
-            'id' => $d->id,
-            'percentage' => (int) $d->percentage,
-            'title' => $d->translate('description') ?? __('api.package.discounts.default', ['percentage' => $d->percentage]),
-            'space_id' => $d->space_id,
-            'space_type' => $d->space_type?->value,
-            'usage_limit' => $d->usage_limit,
-            'icon' => 'percent',
-        ])->values()->all();
     }
 }

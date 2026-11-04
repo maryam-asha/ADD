@@ -11,6 +11,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\AllowanceCycle;
 use App\Domain\Membership\Enums\CoworkingSeat;
 use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Models\Plan;
 use App\Domain\Membership\Models\PlanHourUsage;
 use App\Domain\Membership\Models\PlanSpaceHour;
 use App\Domain\Membership\ValueObjects\HourAllowance;
@@ -62,12 +63,12 @@ class PlanAllowanceService
      */
     public function allowanceFor(Membership $membership, SpaceType $type, ?int $spaceId = null): ?HourAllowance
     {
-        $plan = $membership->plan;
+        return $membership->plan === null ? null : $this->allowanceForPlan($membership->plan, $type, $spaceId);
+    }
 
-        if ($plan === null) {
-            return null;
-        }
-
+    /** The same, read off a plan alone — a package not yet bought. */
+    public function allowanceForPlan(Plan $plan, SpaceType $type, ?int $spaceId = null): ?HourAllowance
+    {
         if ($type === SpaceType::CoSpace && $plan->includesCoworking()) {
             $hours = $plan->coworking_seat === CoworkingSeat::Dedicated || $plan->coworking_hours === null
                 ? null

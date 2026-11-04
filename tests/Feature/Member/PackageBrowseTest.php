@@ -3,6 +3,7 @@
 namespace Tests\Feature\Member;
 
 use App\Domain\Finance\Models\ExchangeRate;
+use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Enums\OwnerType;
@@ -114,14 +115,13 @@ class PackageBrowseTest extends TestCase
             ],
         ]);
 
-        // Lightweight browsing list — tags/balances_grant/discounts/
-        // resources_grant are all "View details" data, not shown on the
-        // card; getPackageDetails() (packages/{plan}) is the one place a
-        // client reads them.
+        // Lightweight browsing list — balances_grant/benefits are "View
+        // details" data, not shown on the card; getPackageDetails()
+        // (packages/{plan}) is the one place a client reads them. No tags
+        // anywhere.
         $response->assertJsonMissingPath('data.0.tags');
         $response->assertJsonMissingPath('data.0.balances_grant');
-        $response->assertJsonMissingPath('data.0.discounts');
-        $response->assertJsonMissingPath('data.0.resources_grant');
+        $response->assertJsonMissingPath('data.0.benefits');
         $response->assertJsonMissingPath('data.0.action_button');
         $response->assertJsonMissingPath('data.0.view_details');
 
@@ -196,12 +196,12 @@ class PackageBrowseTest extends TestCase
         $response->assertJsonPath('data.2.is_current', false);
     }
 
-    public function test_a_plan_with_no_discounts_returns_an_empty_array_not_a_missing_key(): void
+    public function test_a_plan_that_gives_nothing_else_has_empty_benefits_not_a_missing_key(): void
     {
         $this->actingAsMember();
 
         $plan = Plan::create([
-            'name' => ['en' => 'No Discount Plan', 'ar' => 'خطة بدون خصم'],
+            'name' => ['en' => 'No Benefits Plan', 'ar' => 'خطة بدون مزايا'],
             'is_subscription' => true,
             'price_points' => 100,
             'duration_days' => 30,
@@ -209,35 +209,13 @@ class PackageBrowseTest extends TestCase
             'order' => 99,
         ]);
 
-        // `discounts` is a "View details" field, not on the catalog card.
+        // `benefits` is a "View details" field, not on the catalog card.
         $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('data.discounts', []);
-    }
-
-    /**
-     * Mirrors the discounts empty-array assertion above, for the
-     * resources_grant key (docs/decisions/resource-quota-design.md).
-     */
-    public function test_a_plan_with_no_resource_grants_returns_an_empty_array_not_a_missing_key(): void
-    {
-        $this->actingAsMember();
-
-        $plan = Plan::create([
-            'name' => ['en' => 'No Resource Grant Plan', 'ar' => 'خطة بدون موارد'],
-            'is_subscription' => true,
-            'price_points' => 100,
-            'duration_days' => 30,
-            'is_active' => true,
-            'order' => 99,
-        ]);
-
-        // `resources_grant` is a "View details" field, not on the catalog card.
-        $response = $this->getJson("/api/v1/member/packages/{$plan->id}");
-
-        $response->assertOk();
-        $response->assertJsonPath('data.resources_grant', []);
+        $response->assertJsonPath('data.benefits', []);
+        $response->assertJsonMissingPath('data.discounts');
+        $response->assertJsonMissingPath('data.resources_grant');
     }
 
     public function test_purchasing_membership_auto_grants_plan_balances(): void
@@ -314,13 +292,11 @@ class PackageBrowseTest extends TestCase
     }
 
     /**
-     * `tags`/`balances_grant`/`discounts` — dropped from the catalog list —
-     * are exactly what "View details" exists to show. Badges reflect real
-     * plan configuration (a matching `plan_balances` category, or an active
-     * discount), not a fixed list: "The Dedicated +" (Cafe/Printing/Meeting
-     * balances + a real discount) shows all four.
+     * `balances_grant`/`benefits` — dropped from the catalog list — are
+     * exactly what "View details" exists to show; there are no `tags`.
+     * "The Dedicated +" has balances and a real discount.
      */
-    public function test_package_details_includes_tags_balances_grant_and_discounts(): void
+    public function test_package_details_includes_balances_grant_and_benefits_and_no_tags(): void
     {
         $this->actingAsMember();
 
@@ -329,20 +305,60 @@ class PackageBrowseTest extends TestCase
         $response->assertOk();
         $response->assertJsonStructure([
             'data' => [
-                'tags' => ['*' => ['key', 'label', 'icon']],
                 'balances_grant' => ['*' => ['category', 'title', 'amount', 'formatted', 'icon']],
-                'discounts' => ['*' => ['id', 'percentage', 'title', 'space_id', 'space_type', 'usage_limit', 'icon']],
-                'resources_grant',
+                'benefits' => ['*' => ['key', 'type', 'display', 'title', 'subtitle', 'icon', 'unit', 'total', 'used', 'remaining', 'percent', 'label']],
             ],
         ]);
+        $response->assertJsonMissingPath('data.tags');
+        $this->assertContains('discount', collect($response->json('data.benefits'))->pluck('type')->all());
+    }
 
-        $tagKeys = collect($response->json('data.tags'))->pluck('key')->all();
-        $this->assertSame(['cafe', 'printing', 'meeting', 'discounts'], $tagKeys);
+    /**
+     * Hours, discounts and resources come as one list of the cards
+     * memberships/current draws, nothing used yet; balances stay apart in
+     * `balances_grant`.
+     */
+    public function test_package_details_returns_its_benefits_as_current_plan_cards(): void
+    {
+        $this->actingAsMember();
+        $plan = Plan::factory()->coworking(25)->create(['is_active' => true, 'is_subscription' => true, 'is_public' => true]);
+        $hours = $plan->spaceHours()->create(['hours' => 6, 'space_type' => SpaceType::Room]);
+        $limited = $plan->discounts()->create(['percentage' => 20, 'space_type' => SpaceType::Room, 'usage_limit' => 5, 'is_active' => true]);
+        $open = $plan->discounts()->create(['percentage' => 10, 'is_active' => true]);
+        $plan->discounts()->create(['percentage' => 30, 'is_active' => false]);
 
-        // "The Smart Starter" (id 1) has no meeting-room balance.
-        $starterResponse = $this->getJson('/api/v1/member/packages/1');
-        $starterTagKeys = collect($starterResponse->json('data.tags'))->pluck('key')->all();
-        $this->assertNotContains('meeting', $starterTagKeys);
+        $response = $this->withHeader('lang', 'en')->getJson("/api/v1/member/packages/{$plan->id}")->assertOk();
+
+        $response->assertJsonPath('data.seat', 'flexible');
+        $response->assertJsonMissingPath('data.hours');
+        $response->assertJsonMissingPath('data.discounts');
+
+        $cards = collect($response->json('data.benefits'))->keyBy('key');
+        $this->assertSame(['workspace_hours', "space_hours:{$hours->id}", "discount:{$limited->id}", "discount:{$open->id}"], $cards->keys()->all());
+
+        $this->assertSame(['type' => 'hours', 'display' => 'ring', 'unit' => 'hours', 'total' => 25, 'used' => 0, 'remaining' => 25, 'percent' => 0, 'label' => '25 hours'],
+            collect($cards['workspace_hours'])->only(['type', 'display', 'unit', 'total', 'used', 'remaining', 'percent', 'label'])->all());
+        $this->assertSame(6, $cards["space_hours:{$hours->id}"]['total']);
+        $this->assertSame(['display' => 'ring', 'total' => 5, 'label' => '5 uses', 'percent_off' => 20],
+            collect($cards["discount:{$limited->id}"])->only(['display', 'total', 'label', 'percent_off'])->all());
+        $this->assertSame(['display' => 'value', 'total' => null, 'label' => 'Unlimited uses', 'percent_off' => 10],
+            collect($cards["discount:{$open->id}"])->only(['display', 'total', 'label', 'percent_off'])->all());
+
+        // Dropped from the index catalog list
+        $catalog = $this->getJson('/api/v1/member/packages')->assertOk();
+        $this->assertArrayNotHasKey('benefits', $catalog->json('data.0'));
+        $this->assertArrayHasKey('seat', $catalog->json('data.0'));
+    }
+
+    public function test_unlimited_workspace_hours_are_a_value_card(): void
+    {
+        $this->actingAsMember();
+        $plan = Plan::factory()->coworking()->create(['is_active' => true, 'is_subscription' => true, 'is_public' => true]);
+
+        $card = $this->withHeader('lang', 'en')->getJson("/api/v1/member/packages/{$plan->id}")->assertOk()->json('data.benefits.0');
+
+        $this->assertSame(['key' => 'workspace_hours', 'display' => 'value', 'total' => null, 'remaining' => null, 'label' => 'Unlimited hours'],
+            collect($card)->only(['key', 'display', 'total', 'remaining', 'label'])->all());
     }
 
     public function test_package_details_marks_the_members_own_active_plan(): void
