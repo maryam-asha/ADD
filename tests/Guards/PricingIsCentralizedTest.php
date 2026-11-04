@@ -24,7 +24,7 @@ class PricingIsCentralizedTest extends TestCase
     use ScansSourceFiles;
 
     /**
-     * Pricing time outside the Pricing domain. The three fallbacks price a
+     * Pricing time outside the Pricing domain. The fallbacks price a
      * record from before its price was stored — they read what such a
      * record cost, and an offer or coupon could not have been on it.
      *
@@ -38,6 +38,8 @@ class PricingIsCentralizedTest extends TestCase
         'app/Domain/Finance/Payments/Fulfillers/BookingFulfiller.php',
         // Reports a session closed before price_points existed.
         'app/Domain/Booking/Services/SessionReportBuilder.php',
+        // Closes a room booked before price_points existed at its booked window.
+        'app/Domain/Booking/Services/SessionClosureService.php',
     ];
 
     /** @var list<string> */
