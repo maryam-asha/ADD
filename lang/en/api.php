@@ -561,6 +561,9 @@ return [
         'sale_discount_amount' => 'Save :amount',
         'saving_percent' => 'Save :percent%',
         'saving_amount' => 'Save :amount',
+        // The same badges as Markdown (saving_label_md).
+        'saving_percent_md' => 'Save **:percent%**',
+        'saving_amount_md' => 'Save **:amount**',
         // The saving spelled out (saving_description): what you get, for
         // what, against what, and what one unit comes to.
         'saving_description' => "Get :quantity for :price (regular price :regular) — save :saving (:points). That's :per_unit:per.",

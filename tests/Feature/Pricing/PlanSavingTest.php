@@ -139,6 +139,22 @@ class PlanSavingTest extends TestCase
         $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $prices->saving($saving, null, 'en')['saving_label']);
     }
 
+    /** The badge as Markdown too, its figure in bold — a percent, or the amount under one percent. */
+    public function test_the_saving_label_comes_as_markdown_too(): void
+    {
+        $prices = app(PriceLabelPresenter::class);
+        $saving = $this->calculator()->for($this->yearly($this->monthly()));
+
+        $this->assertSame('Save **40%**', $prices->saving($saving, null, 'en')['saving_label_md']);
+        $this->assertSame('وفّر **40%**', $prices->saving($saving, null, 'ar')['saving_label_md']);
+
+        $reference = Plan::factory()->create(['price_points' => 1000]);
+        $slight = $this->calculator()->for(Plan::factory()->create(['price_points' => 995, 'reference_plan_id' => $reference->id, 'reference_units' => 1]));
+
+        $this->assertSame('Save **0.50 $**', $prices->saving($slight, null, 'en')['saving_label_md']);
+        $this->assertSame('Save 0.50 $', $prices->saving($slight, null, 'en')['saving_label']);
+    }
+
     public function test_an_hours_bundle_is_described_in_hours(): void
     {
         $space = Space::factory()->room()->create(['hourly_rate_points' => 15]);
@@ -281,6 +297,7 @@ class PlanSavingTest extends TestCase
         $this->assertSame(600, $data['saving']['saving_points']);
         $this->assertSame(40, $data['saving']['saving_percent']);
         $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $data['saving']['saving_label']);
+        $this->assertSame('Save **40%**', $data['saving']['saving_label_md']);
         // Numbers beside the currency symbol and the reference plan's month; no labels.
         $this->assertSame(1500, $data['saving']['reference_points']);
         $this->assertSame(75, $data['saving']['per_unit_points']);

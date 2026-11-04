@@ -550,6 +550,9 @@ return [
         'sale_discount_amount' => 'وفّر :amount',
         'saving_percent' => 'وفّر :percent%',
         'saving_amount' => 'وفّر :amount',
+        // الشارتان نفسهما بصيغة Markdown (saving_label_md).
+        'saving_percent_md' => 'وفّر **:percent%**',
+        'saving_amount_md' => 'وفّر **:amount**',
         // التوفير بجملة كاملة (saving_description).
         'saving_description' => 'احصل على :quantity بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit :per.',
         'saving_description_plain' => 'احصل عليها بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit لكل :unit.',
