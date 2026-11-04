@@ -561,14 +561,12 @@ return [
         'sale_discount_amount' => 'Save :amount',
         'saving_percent' => 'Save :percent%',
         'saving_amount' => 'Save :amount',
-        // The same badges as Markdown (saving_label_md).
-        'saving_percent_md' => 'Save **:percent%**',
-        'saving_amount_md' => 'Save **:amount**',
-        // The saving spelled out (saving_description): what you get, for
-        // what, against what, and what one unit comes to.
-        'saving_description' => "Get :quantity for :price (regular price :regular) — save :saving (:points). That's :per_unit:per.",
-        'saving_description_plain' => "Get it for :price (regular price :regular) — save :saving (:points). That's :per_unit per :unit.",
-        'saving_description_day' => 'Get a full day for :price (regular price :regular for :quantity) — save :saving (:points).',
+        // The saving spelled out (saving_description), in Markdown: what you
+        // get, for what, against what, and what one unit comes to — what you
+        // get, its price and the saving in bold.
+        'saving_description' => "Get **:quantity** for **:price** (regular price :regular) — save **:saving** (:points). That's :per_unit:per.",
+        'saving_description_plain' => "Get it for **:price** (regular price :regular) — save **:saving** (:points). That's :per_unit per :unit.",
+        'saving_description_day' => 'Get **a full day** for **:price** (regular price :regular for :quantity) — save **:saving** (:points).',
         'saving_quantity' => [
             'hour' => '{1} 1 hour|[2,*] :count hours',
             'day' => '{1} 1 day|[2,*] :count days',

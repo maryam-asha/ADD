@@ -213,10 +213,9 @@ class PriceLabelPresenter
      * apart (`unit`, `unit_label`): an hour against a space, the reference
      * plan's period otherwise — named by the reference plan, with `unit`
      * null, when that period is not a day, a week or a month.
-     * `saving_label_md` is `saving_label` as Markdown, for an app that
-     * renders it. Null when the plan has no saving.
+     * Null when the plan has no saving.
      *
-     * @return array{compared_to: string, reference_points: int, reference_price: int|float, saving_points: int, saving_percent: int, saving_label: string, saving_label_md: string, per_unit_points: int, per_unit_price: int|float, currency: string, unit: ?string, unit_label: ?string, saving_description: string}|null
+     * @return array{compared_to: string, reference_points: int, reference_price: int|float, saving_points: int, saving_percent: int, saving_label: string, per_unit_points: int, per_unit_price: int|float, currency: string, unit: ?string, unit_label: ?string, saving_description: string}|null
      */
     public function saving(?PlanSaving $saving, ?User $user, ?string $locale = null): ?array
     {
@@ -229,10 +228,6 @@ class PriceLabelPresenter
         $perUnit = (int) (bccomp($saving->perUnitPoints, $whole, 2) > 0 ? bcadd($whole, '1') : $whole);
         $savingAmount = $this->total($saving->savingPoints, $user, $locale)['price'];
         $unit = $this->savingUnit($saving);
-        // Under one percent, "0%" would say nothing: the amount instead.
-        [$label, $labelReplace] = $saving->savingPercent >= 1
-            ? ['api.package.saving_percent', ['percent' => $saving->savingPercent]]
-            : ['api.package.saving_amount', ['amount' => $savingAmount]];
 
         return [
             'compared_to' => $saving->comparedTo,
@@ -240,9 +235,10 @@ class PriceLabelPresenter
             'reference_price' => $this->priceOf($saving->referencePoints, $user),
             'saving_points' => $saving->savingPoints,
             'saving_percent' => $saving->savingPercent,
-            'saving_label' => __($label, $labelReplace, $locale),
-            // The same badge as Markdown, its figure in bold.
-            'saving_label_md' => __("{$label}_md", $labelReplace, $locale),
+            // Under one percent, "0%" would say nothing: the amount instead.
+            'saving_label' => $saving->savingPercent >= 1
+                ? __('api.package.saving_percent', ['percent' => $saving->savingPercent], $locale)
+                : __('api.package.saving_amount', ['amount' => $savingAmount], $locale),
             'per_unit_points' => $perUnit,
             'per_unit_price' => $this->priceOf($perUnit, $user),
             'currency' => $this->currencySymbol($this->amountFor($saving->referencePoints, $user)[1], $locale),
@@ -259,10 +255,11 @@ class PriceLabelPresenter
     }
 
     /**
-     * The saving as one sentence, where `saving_label` is the badge: "Get 12
-     * months for 900 $ (regular price 1,500 $) — save 40% (6,000 pts).
-     * That's 750 pts/mo." The quantity is counted in the reference's unit —
-     * an hour for a space, the reference plan's period otherwise; a period
+     * The saving as one sentence in Markdown, where `saving_label` is the
+     * plain badge: "Get **12 months** for **900 $** (regular price 1,500 $)
+     * — save **40%** (6,000 pts). That's 750 pts/mo." What you get, its
+     * price and the saving are in bold. The quantity is counted in the
+     * reference's unit — an hour for a space, the reference plan's period otherwise; a period
      * that is not a day, a week or a month is named by the reference plan
      * instead. What one unit comes to is in points (user ruling, 2026-10-08):
      * a money rate shows fractions ("1.20 $") a whole number of points never

@@ -550,13 +550,10 @@ return [
         'sale_discount_amount' => 'وفّر :amount',
         'saving_percent' => 'وفّر :percent%',
         'saving_amount' => 'وفّر :amount',
-        // الشارتان نفسهما بصيغة Markdown (saving_label_md).
-        'saving_percent_md' => 'وفّر **:percent%**',
-        'saving_amount_md' => 'وفّر **:amount**',
-        // التوفير بجملة كاملة (saving_description).
-        'saving_description' => 'احصل على :quantity بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit :per.',
-        'saving_description_plain' => 'احصل عليها بـ :price بدلاً من :regular — وفّر :saving (:points). أي :per_unit لكل :unit.',
-        'saving_description_day' => 'احصل على يوم كامل بـ :price بدلاً من :regular لـ :quantity — وفّر :saving (:points).',
+        // التوفير بجملة كاملة (saving_description) بصيغة Markdown: ما تحصل عليه وسعره والتوفير بخط عريض.
+        'saving_description' => 'احصل على **:quantity** بـ **:price** بدلاً من :regular — وفّر **:saving** (:points). أي :per_unit :per.',
+        'saving_description_plain' => 'احصل عليها بـ **:price** بدلاً من :regular — وفّر **:saving** (:points). أي :per_unit لكل :unit.',
+        'saving_description_day' => 'احصل على **يوم كامل** بـ **:price** بدلاً من :regular لـ :quantity — وفّر **:saving** (:points).',
         'saving_quantity' => [
             'hour' => '{1} ساعة واحدة|{2} ساعتين|[3,10] :count ساعات|[11,*] :count ساعة',
             'day' => '{1} يوم واحد|{2} يومين|[3,10] :count أيام|[11,*] :count يوماً',

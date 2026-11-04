@@ -122,37 +122,21 @@ class PlanSavingTest extends TestCase
         $this->assertSame('1.60', $saving->perUnitPoints);
     }
 
-    /** The saving as a sentence beside the badge, counted in the reference's unit. */
+    /** The saving as a Markdown sentence beside the badge, counted in the reference's unit. */
     public function test_the_saving_is_described_in_full(): void
     {
         $saving = $this->calculator()->for($this->yearly($this->monthly()));
         $prices = app(PriceLabelPresenter::class);
 
         $this->assertSame(
-            "Get 12 months for 90 $ (regular price 150 $) — save 40% (600 pts). That's 75 pts/mo.",
+            "Get **12 months** for **90 $** (regular price 150 $) — save **40%** (600 pts). That's 75 pts/mo.",
             $prices->saving($saving, null, 'en')['saving_description'],
         );
         $this->assertSame(
-            'احصل على 12 شهراً بـ 90 $ بدلاً من 150 $ — وفّر 40% (600 نقطة). أي 75 نقطة شهرياً.',
+            'احصل على **12 شهراً** بـ **90 $** بدلاً من 150 $ — وفّر **40%** (600 نقطة). أي 75 نقطة شهرياً.',
             $prices->saving($saving, null, 'ar')['saving_description'],
         );
         $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $prices->saving($saving, null, 'en')['saving_label']);
-    }
-
-    /** The badge as Markdown too, its figure in bold — a percent, or the amount under one percent. */
-    public function test_the_saving_label_comes_as_markdown_too(): void
-    {
-        $prices = app(PriceLabelPresenter::class);
-        $saving = $this->calculator()->for($this->yearly($this->monthly()));
-
-        $this->assertSame('Save **40%**', $prices->saving($saving, null, 'en')['saving_label_md']);
-        $this->assertSame('وفّر **40%**', $prices->saving($saving, null, 'ar')['saving_label_md']);
-
-        $reference = Plan::factory()->create(['price_points' => 1000]);
-        $slight = $this->calculator()->for(Plan::factory()->create(['price_points' => 995, 'reference_plan_id' => $reference->id, 'reference_units' => 1]));
-
-        $this->assertSame('Save **0.50 $**', $prices->saving($slight, null, 'en')['saving_label_md']);
-        $this->assertSame('Save 0.50 $', $prices->saving($slight, null, 'en')['saving_label']);
     }
 
     public function test_an_hours_bundle_is_described_in_hours(): void
@@ -161,11 +145,11 @@ class PlanSavingTest extends TestCase
         $bundle = Plan::factory()->create(['price_points' => 300, 'reference_space_id' => $space->id, 'reference_units' => 25]);
 
         $this->assertSame(
-            "Get 25 hours for 30 $ (regular price 37.50 $) — save 20% (75 pts). That's 12 pts/hour.",
+            "Get **25 hours** for **30 $** (regular price 37.50 $) — save **20%** (75 pts). That's 12 pts/hour.",
             app(PriceLabelPresenter::class)->saving($this->calculator()->for($bundle), null, 'en')['saving_description'],
         );
         $this->assertSame(
-            'احصل على 25 ساعة بـ 30 $ بدلاً من 37.50 $ — وفّر 20% (75 نقطة). أي 12 نقطة للساعة.',
+            'احصل على **25 ساعة** بـ **30 $** بدلاً من 37.50 $ — وفّر **20%** (75 نقطة). أي 12 نقطة للساعة.',
             app(PriceLabelPresenter::class)->saving($this->calculator()->for($bundle), null, 'ar')['saving_description'],
         );
     }
@@ -178,11 +162,11 @@ class PlanSavingTest extends TestCase
         $saving = $this->calculator()->for($daily);
 
         $this->assertSame(
-            'Get a full day for 6 $ (regular price 12 $ for 8 hours) — save 50% (60 pts).',
+            'Get **a full day** for **6 $** (regular price 12 $ for 8 hours) — save **50%** (60 pts).',
             app(PriceLabelPresenter::class)->saving($saving, null, 'en')['saving_description'],
         );
         $this->assertSame(
-            'احصل على يوم كامل بـ 6 $ بدلاً من 12 $ لـ 8 ساعات — وفّر 50% (60 نقطة).',
+            'احصل على **يوم كامل** بـ **6 $** بدلاً من 12 $ لـ 8 ساعات — وفّر **50%** (60 نقطة).',
             app(PriceLabelPresenter::class)->saving($saving, null, 'ar')['saving_description'],
         );
     }
@@ -193,7 +177,7 @@ class PlanSavingTest extends TestCase
         $plan = Plan::factory()->create(['price_points' => 1000, 'reference_plan_id' => $quarter->id, 'reference_units' => 4]);
 
         $this->assertSame(
-            "Get it for 100 $ (regular price 120 $) — save 16% (200 pts). That's 250 pts per Quarter.",
+            "Get it for **100 $** (regular price 120 $) — save **16%** (200 pts). That's 250 pts per Quarter.",
             app(PriceLabelPresenter::class)->saving($this->calculator()->for($plan), null, 'en')['saving_description'],
         );
     }
@@ -297,7 +281,6 @@ class PlanSavingTest extends TestCase
         $this->assertSame(600, $data['saving']['saving_points']);
         $this->assertSame(40, $data['saving']['saving_percent']);
         $this->assertSame(__('api.package.saving_percent', ['percent' => 40], 'en'), $data['saving']['saving_label']);
-        $this->assertSame('Save **40%**', $data['saving']['saving_label_md']);
         // Numbers beside the currency symbol and the reference plan's month; no labels.
         $this->assertSame(1500, $data['saving']['reference_points']);
         $this->assertSame(75, $data['saving']['per_unit_points']);
