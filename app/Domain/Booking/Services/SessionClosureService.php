@@ -44,6 +44,7 @@ class SessionClosureService
         private readonly CoworkingBookingPolicy $policy,
         private readonly BookingPlanCoverage $bookingCoverage,
         private readonly AmountCalculator $amounts,
+        private readonly ClosedBookingSettlement $settlement,
     ) {}
 
     /**
@@ -411,6 +412,10 @@ class SessionClosureService
         }
 
         $this->supersedePendingEnd($session, $attributes['checked_out_at']);
+
+        if ($session instanceof Booking) {
+            $this->settlement->settle($session);
+        }
     }
 
     /**
@@ -441,6 +446,8 @@ class SessionClosureService
         $booking->forceFill($attributes)->save();
 
         $this->supersedePendingEnd($booking, $attributes['checked_out_at']);
+
+        $this->settlement->settle($booking);
     }
 
     /** Rows made before `price_points` existed cost their booked window, as the booking fulfiller prices them. */
