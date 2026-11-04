@@ -58,7 +58,7 @@ class MembershipCurrentControllerTest extends TestCase
 
         $response = $this->getJson('/api/v1/member/memberships/current')->assertOk();
 
-        $this->assertSame(['membership_id', 'via', 'company', 'plan', 'period', 'stats', 'applied_discounts'], array_keys($response->json('data')));
+        $this->assertSame(['membership_id', 'via', 'company', 'plan', 'period', 'stats'], array_keys($response->json('data')));
         $this->assertSame(['id', 'name', 'module', 'seat', 'desks'], array_keys($response->json('data.plan')));
         $this->assertSame(['start', 'end', 'cycle_start', 'cycle_end'], array_keys($response->json('data.period')));
         $response->assertJsonPath('data.membership_id', $membership->id)
@@ -67,7 +67,8 @@ class MembershipCurrentControllerTest extends TestCase
             ->assertJsonPath('data.plan.seat', 'flexible')
             ->assertJsonPath('data.plan.desks', null)
             ->assertJsonPath('data.stats.0.key', 'period')
-            ->assertJsonPath('data.stats.1.key', 'workspace_hours');
+            ->assertJsonPath('data.stats.1.key', 'workspace_hours')
+            ->assertJsonMissingPath('data.applied_discounts');
     }
 
     public function test_a_company_plan_says_whose_it_is_and_counts_the_employees_own_hours(): void

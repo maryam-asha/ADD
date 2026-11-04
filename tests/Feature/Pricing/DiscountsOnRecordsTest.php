@@ -113,11 +113,10 @@ class DiscountsOnRecordsTest extends TestCase
         $this->assertSame($this->offer->id, $rows[$membership->id]['discounts'][0]['offer_id']);
         $this->assertSame([], $rows[$granted->id]['discounts']);
 
-        // Beside `discounts`, the plan's own discounts on bookings.
         $this->getJson('/api/v1/member/memberships/current')
             ->assertOk()
             ->assertJsonPath('data.membership_id', $membership->id)
-            ->assertJsonPath('data.applied_discounts.0.offer_id', $this->offer->id);
+            ->assertJsonMissingPath('data.applied_discounts');
     }
 
     public function test_my_events_and_the_event_name_what_was_taken_off_the_registration(): void

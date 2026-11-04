@@ -66,6 +66,32 @@ class CurrentMembershipStatsTest extends TestCase
         $this->assertSame('متبقٍ 18 يوماً', $period['label']);
     }
 
+    public function test_the_period_card_counts_calendar_days_regardless_of_time(): void
+    {
+        $start = Carbon::parse('2026-11-01 20:00:00', 'Asia/Damascus')->utc();
+        $membership = Membership::factory()->create([
+            'plan_id' => Plan::factory()->create()->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $this->member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => $start,
+            'current_period_end' => $start->copy()->addDays(30),
+        ]);
+
+        // Viewed on the 5th of the month at 08:00 AM
+        Carbon::setTestNow(Carbon::parse('2026-11-05 08:00:00', 'Asia/Damascus')->utc());
+        $cardMorning = $this->card($membership, 'period');
+        $this->assertSame(30, $cardMorning['total']);
+        $this->assertSame(4, $cardMorning['used']);
+        $this->assertSame(26, $cardMorning['remaining']);
+
+        // Viewed on the 5th of the month at 23:00 PM
+        Carbon::setTestNow(Carbon::parse('2026-11-05 23:00:00', 'Asia/Damascus')->utc());
+        $cardEvening = $this->card($membership, 'period');
+        $this->assertSame(4, $cardEvening['used']);
+        $this->assertSame(26, $cardEvening['remaining']);
+    }
+
     public function test_unlimited_hours_are_a_value(): void
     {
         $membership = $this->subscribe(Plan::factory()->create());

@@ -69,19 +69,11 @@ class MembershipController extends Controller
      * cash is not a membership, and `data` keeps its shape for old apps.
      * Plans no longer take cash; this shows a hold opened before that until
      * reception settles it or it lapses (payments:expire-pending).
-     *
-     * `applied_discounts` is what was taken off when it was bought — offer,
-     * coupon, the plan's saving — beside `discounts`, which are the plan's
-     * own discounts on bookings.
      */
-    public function current(Request $request, PackageBrowseService $service, AppliedDiscountPresenter $discounts): JsonResponse
+    public function current(Request $request, PackageBrowseService $service): JsonResponse
     {
         $pending = $this->pendingCashPurchase($request->user());
         $data = $service->getCurrentSubscription($request->user());
-
-        if ($data !== null) {
-            $data['applied_discounts'] = $this->purchaseDiscounts([$data['membership_id']], $discounts)[$data['membership_id']];
-        }
 
         return response()->json([
             'data' => $data,

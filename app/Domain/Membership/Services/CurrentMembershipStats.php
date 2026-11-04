@@ -17,6 +17,7 @@ use App\Domain\Membership\Models\PlanSpaceHour;
 use App\Domain\Membership\Models\Wallet;
 use App\Domain\Membership\Models\WalletTransaction;
 use App\Domain\Membership\ValueObjects\HourAllowance;
+use App\Support\Time\LocalTime;
 
 /**
  * A member's plan as one list of cards, in the order the app shows them:
@@ -33,6 +34,7 @@ class CurrentMembershipStats
         private readonly PlanDiscountService $discounts,
         private readonly ResourceQuotaService $resourceQuota,
         private readonly PointConversionService $points,
+        private readonly LocalTime $time,
     ) {}
 
     /**
@@ -61,9 +63,13 @@ class CurrentMembershipStats
     /** @return array<string, mixed> */
     private function period(Membership $membership): array
     {
-        $start = $membership->current_period_start;
-        $total = (int) ceil($start->diffInSeconds($membership->current_period_end) / 86400);
-        $used = min($total, (int) floor(max(0, $start->diffInSeconds(now())) / 86400));
+        $start = $this->time->toLocal($membership->current_period_start)->startOfDay();
+        $today = $this->time->toLocal(now())->startOfDay();
+
+        $total = max(1, (int) ceil($membership->current_period_start->diffInSeconds($membership->current_period_end) / 86400));
+        $used = $today->lessThan($start)
+            ? 0
+            : min($total, (int) $start->diffInDays($today));
 
         return $this->card('period', 'period', __('api.package.stats.period'), null, 'calendar', 'days', $total, $used,
             fn (int|float|null $remaining) => __('api.package.stats.days_left', ['count' => $remaining]));
