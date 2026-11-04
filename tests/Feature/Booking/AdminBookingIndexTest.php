@@ -106,6 +106,23 @@ class AdminBookingIndexTest extends TestCase
             ->assertJsonPath('meta.total', 2);
     }
 
+    /** Newest made first, whatever day it is for: the booking just taken is at the top. */
+    public function test_the_newest_booking_comes_first(): void
+    {
+        $this->actingAsOperations();
+        $space = $this->space();
+        $older = $this->book($space, 18, ['created_at' => now()->subDay()]);
+        $newer = $this->book($space, 9, ['created_at' => now()]);
+        $sameSecond = $this->book($space, 11, ['created_at' => now()]);
+
+        $this->withHeader('lang', 'en')
+            ->getJson('/api/v1/admin/bookings')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $sameSecond->id)
+            ->assertJsonPath('data.1.id', $newer->id)
+            ->assertJsonPath('data.2.id', $older->id);
+    }
+
     public function test_bookings_can_be_filtered_by_status(): void
     {
         $this->actingAsOperations();

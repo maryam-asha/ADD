@@ -45,7 +45,10 @@ class BookingController extends Controller
                 'user',
                 fn ($user) => $user->where('name', 'LIKE', "%{$term}%")->orWhere('phone', 'LIKE', "%{$term}%")
             ))
-            ->orderByDesc('start_at')
+            // Newest made first, so a booking just taken is at the top; id
+            // breaks ties between bookings made in the same second (a batch).
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->paginate((int) ($filters['per_page'] ?? 25));
 
         return response()->json([
