@@ -177,8 +177,9 @@ class CoworkingSessionController extends Controller
      * answers `next: pay_at_reception` and tells the desk to collect it
      * (CoworkingPaymentAtReception), which settles it through
      * settle-payment. There is no create request to send again for a
-     * session, so it has its own endpoint. Not the member's: 404, as for the
-     * report.
+     * session, so it has its own endpoint. A booking left without a method
+     * is paid by the one it was booked with. Not the member's: 404, as for
+     * the report.
      */
     public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout, RealtimeBroadcaster $realtime): JsonResponse
     {
@@ -186,12 +187,18 @@ class CoworkingSessionController extends Controller
 
         abort_if($session === null || $session->user_id !== $request->user()->id, 404);
 
+        $method = $request->validated('payment_method') ?? ($session instanceof Booking ? $session->chosen_payment_method : null);
+
+        if ($method === null) {
+            return response()->json(['message' => __('api.booking.payment_method_required')], 422);
+        }
+
         try {
             $outcome = $checkout->pay(
                 $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
                 $session,
                 $request->user(),
-                $request->validated('payment_method'),
+                $method,
                 [
                     'wallet_owner_type' => $request->validated('wallet_owner_type'),
                     'wallet_owner_id' => $request->validated('wallet_owner_id'),

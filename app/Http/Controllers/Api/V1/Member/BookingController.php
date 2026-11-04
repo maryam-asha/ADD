@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Exceptions\BatchUnavailableException;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
@@ -19,6 +20,7 @@ use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
+use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Pricing\Services\CouponEligibility;
@@ -28,12 +30,14 @@ use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\Booking\ExtendBookingRequest;
 use App\Http\Requests\Member\Booking\ListBookingsRequest;
+use App\Http\Requests\Member\Booking\PayBookingRequest;
 use App\Http\Requests\Member\Booking\PreviewBookingRequest;
 use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
+use App\Services\Realtime\RealtimeBroadcaster;
 use App\Support\Presenters\CouponOutcomePresenter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -422,6 +426,50 @@ class BookingController extends Controller
         return response()->json(['message' => $movedTo === null
             ? __('api.booking.extended')
             : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($movedTo, app()->getLocale())['formatted']])]);
+    }
+
+    /**
+     * What a closed booking still owes — an extension, an overstay, or all
+     * of it when it was booked to be paid at the desk — paid from the app,
+     * its home card's button: by the method it was booked with
+     * (`chosen_payment_method`) unless the member names another. `wallet`
+     * spends the points now, a gateway answers with its `redirect_url`, and
+     * `cash` answers `next: pay_at_reception` and tells the desk to collect
+     * it. A booking still to close is paid through POST bookings instead.
+     * Not the member's: 404, as for a coworking session's payment.
+     */
+    public function pay(PayBookingRequest $request, Booking $booking, PayableCheckout $checkout, RealtimeBroadcaster $realtime): JsonResponse
+    {
+        $member = $request->user();
+
+        abort_if($booking->user_id !== $member->id, 404);
+
+        if ($booking->checked_out_at === null) {
+            return response()->json(['message' => __('api.payment.booking_not_payable')], 422);
+        }
+
+        $method = $request->validated('payment_method') ?? $booking->chosen_payment_method;
+
+        if ($method === null) {
+            return response()->json(['message' => __('api.booking.payment_method_required')], 422);
+        }
+
+        try {
+            $outcome = $checkout->pay(PaymentPurpose::Booking, $booking, $member, $method, [
+                'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ], $request->validated('coupon_code'));
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
+        }
+
+        if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
+            $realtime->send(new CoworkingPaymentAtReception($booking));
+        }
+
+        return response()->json([
+            'data' => $this->checkoutFields($outcome) + ($outcome->coupon !== null ? ['coupon' => $outcome->coupon] : []),
+        ], 201);
     }
 
     /**
