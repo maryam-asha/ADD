@@ -10,7 +10,6 @@ use App\Domain\Identity\Models\DeviceToken;
 use App\Domain\Identity\Models\NotificationLog;
 use App\Domain\Identity\Models\User;
 use App\Notifications\GeneralNotification;
-use App\Services\Realtime\RealtimeBroadcaster;
 use Closure;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
@@ -24,13 +23,12 @@ use Spatie\Permission\Exceptions\PermissionDoesNotExist;
  * The one way a notification is sent. Delivery happens in the request — the
  * host runs no queue worker — and only once the surrounding transaction
  * commits, so a change that rolls back tells nobody; outside a transaction
- * it is immediate. A failed push or nudge is logged, never thrown.
+ * it is immediate. A failed push is logged, never thrown.
  */
 class NotificationService
 {
     public function __construct(
         private readonly PushProvider $pushProvider,
-        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
@@ -183,9 +181,9 @@ class NotificationService
     }
 
     /**
-     * The inbox row, the push — a member's to the app, a staff or provider
-     * notice to the account's dashboard browsers — and the nudge to the
-     * reader's open screens, once the caller's transaction has committed.
+     * The inbox row and the push — a member's to the app, a staff or
+     * provider notice to the account's dashboard browsers — once the
+     * caller's transaction has committed.
      *
      * @param  Closure(string): array{title: string, body: string}  $textFor  the push text in one locale
      */
@@ -205,8 +203,6 @@ class NotificationService
                     'audience' => $notification->audience->value,
                 ]);
             }
-
-            $this->realtime->send(new NotificationCreated($user->id, $notification->audience));
         });
     }
 

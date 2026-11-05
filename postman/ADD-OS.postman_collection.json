@@ -8125,7 +8125,7 @@
                 },
                 {
                     "name": "9. Notifications",
-                    "description": "In-app notifications and the push device token. The member's inbox holds member notices only \u2014 staff and provider notices live in the dashboard's own inboxes, so a person who is both never sees a work notice on their phone.\n\n**An inbox item** \u2014 `id` (uuid), `template_key` (what happened, e.g. `booking.approved`), `title` and `body` rendered in the request's `lang` header (so a language switch is a re-fetch), `data` (what it is about, below; `null` for a notice about nothing, such as an admin broadcast), `read_at` (null while unread) and `created_at`. Twenty per page, newest first; `meta` holds `current_page`, `last_page`, `per_page`.\n\n**What a notice is about** \u2014 every notice about a record names it the same way, in the inbox and in the push: `data.target_type` and `data.target_id` (a string). A digest about a list names only `target_type` (or a `target_id` that is not an id, like `overdue`).\n\n| target_type | target_id is | notices |\n|---|---|---|\n| `booking` | the booking | approved, rejected, cancelled, lapsed, payment expired, no-show, released, affected by maintenance, starting/ending reminders, door code ready/revoked; a coworking session run on a booking (started, ended, closed by the system, unpaid reminder); a payment for a booking or its extension |\n| `walkin_session` | the walk-in session | the same coworking notices for a walk-in (its pay screen is `coworking-sessions/walkin/{id}`) |\n| `arrival_request` | the arrival request | a coworking start refused at the desk, or expired unanswered |\n| `event` | the event (not the registration) | registration approved/rejected/expired, payment due, reminders; a payment for a registration |\n| `membership` | the subscription | assigned, started, renewed, desk assigned, ending soon, ended |\n| `company` | the company | joined or removed, door access granted/revoked, admin role given/taken |\n| `wallet` | the allocation's wallet transaction | points allocated from the company wallet |\n| `office_lease` | the lease | contracted, office opened, ending soon, ended |\n| `invoice` | the invoice | issued, payment recorded, overdue (company admins) |\n| `service_request` | the request | its status changed |\n| `item_sale` | the sale | a payment for a reception sale |\n| `payment` | the payment | a payment with nothing else to open: a wallet top-up, a plan bought |\n| `hr_*` | an HR record | HR notices to an employee who has no dashboard access (e.g. `hr_payslip`, `hr_approval_request`) |\n\n**Push** (FCM) \u2014 a notification with the title and body in the device's language (the `lang` header sent with Register / Update Device Token), and `data`: `template_key` plus `target_type`/`target_id` as above. FCM data values are strings.\n\n**Live** \u2014 while the app is open, `notification.created` arrives on the member's own channel `private-member.{id}` (11. Coworking Sessions \u2192 Real-time: Authorize Member Channel), payload `{\"audience\": \"member\"}`: re-read Get Unread Count, and the list if it is on screen. Only the nudge travels.",
+                    "description": "In-app notifications and the push device token. The member's inbox holds member notices only \u2014 staff and provider notices live in the dashboard's own inboxes, so a person who is both never sees a work notice on their phone.\n\n**An inbox item** \u2014 `id` (uuid), `template_key` (what happened, e.g. `booking.approved`), `title` and `body` rendered in the request's `lang` header (so a language switch is a re-fetch), `data` (what it is about, below; `null` for a notice about nothing, such as an admin broadcast), `read_at` (null while unread) and `created_at`. Twenty per page, newest first; `meta` holds `current_page`, `last_page`, `per_page`.\n\n**What a notice is about** \u2014 every notice about a record names it the same way, in the inbox and in the push: `data.target_type` and `data.target_id` (a string). A digest about a list names only `target_type` (or a `target_id` that is not an id, like `overdue`).\n\n| target_type | target_id is | notices |\n|---|---|---|\n| `booking` | the booking | approved, rejected, cancelled, lapsed, payment expired, no-show, released, affected by maintenance, starting/ending reminders, door code ready/revoked; a coworking session run on a booking (started, ended, closed by the system, unpaid reminder); a payment for a booking or its extension |\n| `walkin_session` | the walk-in session | the same coworking notices for a walk-in (its pay screen is `coworking-sessions/walkin/{id}`) |\n| `arrival_request` | the arrival request | a coworking start refused at the desk, or expired unanswered |\n| `event` | the event (not the registration) | registration approved/rejected/expired, payment due, reminders; a payment for a registration |\n| `membership` | the subscription | assigned, started, renewed, desk assigned, ending soon, ended |\n| `company` | the company | joined or removed, door access granted/revoked, admin role given/taken |\n| `wallet` | the allocation's wallet transaction | points allocated from the company wallet |\n| `office_lease` | the lease | contracted, office opened, ending soon, ended |\n| `invoice` | the invoice | issued, payment recorded, overdue (company admins) |\n| `service_request` | the request | its status changed |\n| `item_sale` | the sale | a payment for a reception sale |\n| `payment` | the payment | a payment with nothing else to open: a wallet top-up, a plan bought |\n| `hr_*` | an HR record | HR notices to an employee who has no dashboard access (e.g. `hr_payslip`, `hr_approval_request`) |\n\n**Push** (FCM) \u2014 a notification with the title and body in the device's language (the `lang` header sent with Register / Update Device Token), and `data`: `template_key` plus `target_type`/`target_id` as above. FCM data values are strings.",
                     "item": [
                         {
                             "name": "List Notifications",
@@ -9774,7 +9774,7 @@
                                         "auth"
                                     ]
                                 },
-                                "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect.\n\nThe same channel carries `notification.created` (payload `{\"audience\": \"member\"}`) whenever a notice lands in the member's inbox: re-read 9. Notifications \u2192 Get Unread Count."
+                                "description": "Signs the app's subscription to its own private channel \u2014 the Pusher client calls this itself when it subscribes; this request is here to show the exchange. Bearer = the member's access token. `channel_name` is `private-member.{user_id}` with your own id ({{member_id}}, saved by Login). Answers `{\"auth\": \"<key>:<signature>\"}`, which the client library passes to Pusher.\n\nNot under /v1: the path is Laravel's standard one, so a later move from Pusher to Reverb changes nothing here. Locally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another member's id, or `private-reception`.\n- **Error: Token Expired** \u2014 401 `{\"message\":\"Unauthenticated.\"}` \u2014 refresh the token (auth/refresh), then reconnect."
                             },
                             "response": [
                                 {
@@ -26332,169 +26332,9 @@
                                     "body": "{\n    \"message\": \"Device token removed.\"\n}"
                                 }
                             ]
-                        },
-                        {
-                            "name": "Real-time: Authorize Dashboard Channel",
-                            "request": {
-                                "method": "POST",
-                                "header": [
-                                    {
-                                        "key": "lang",
-                                        "value": "{{lang}}",
-                                        "type": "text"
-                                    },
-                                    {
-                                        "key": "currency",
-                                        "value": "{{currency}}",
-                                        "type": "text"
-                                    }
-                                ],
-                                "body": {
-                                    "mode": "urlencoded",
-                                    "urlencoded": [
-                                        {
-                                            "key": "socket_id",
-                                            "value": "123456.7890123",
-                                            "type": "text",
-                                            "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                        },
-                                        {
-                                            "key": "channel_name",
-                                            "value": "private-dashboard.{{user_id}}",
-                                            "type": "text"
-                                        }
-                                    ]
-                                },
-                                "url": {
-                                    "raw": "{{base_url}}/api/broadcasting/auth",
-                                    "host": [
-                                        "{{base_url}}"
-                                    ],
-                                    "path": [
-                                        "api",
-                                        "broadcasting",
-                                        "auth"
-                                    ]
-                                },
-                                "description": "Signs the dashboard's subscription to the account's own channel `private-dashboard.{user_id}` \u2014 Laravel Echo calls this itself, with the session cookie and X-XSRF-TOKEN like every dashboard call; this request is here to show the exchange. Staff and provider accounts alike, signed in to the dashboard (a member-app token is refused). Answers `{\"auth\": \"<key>:<signature>\"}`.\n\nWhat travels on it: `notification.created`, payload `{\"audience\": \"staff\"}` (or `provider`), whenever a notice lands in this account's dashboard inbox \u2014 re-read the unread count and the list. Only the nudge; the text is read from the inbox.\n\nLocally, with BROADCAST_CONNECTION=log, it answers 200 with an empty body and checks nothing \u2014 only the pusher (or reverb) driver signs.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Your Channel** \u2014 403 `{\"message\":\"This action is unauthorized.\"}` \u2014 another account's id, or a member-app token."
-                            },
-                            "response": [
-                                {
-                                    "name": "200 OK",
-                                    "originalRequest": {
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "urlencoded",
-                                            "urlencoded": [
-                                                {
-                                                    "key": "socket_id",
-                                                    "value": "123456.7890123",
-                                                    "type": "text",
-                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                                },
-                                                {
-                                                    "key": "channel_name",
-                                                    "value": "private-dashboard.{{user_id}}",
-                                                    "type": "text"
-                                                }
-                                            ]
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/broadcasting/auth",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "broadcasting",
-                                                "auth"
-                                            ]
-                                        }
-                                    },
-                                    "status": "OK",
-                                    "code": 200,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"auth\": \"a1b2c3d4e5f6:7f3c9e0d2b8a4f61c5e7d9b3a1f0e2c4d6b8a0f1e3c5d7b9a2f4e6c8d0b1a3f5e7\"\n}"
-                                },
-                                {
-                                    "name": "Error: Not Your Channel",
-                                    "originalRequest": {
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "currency",
-                                                "value": "{{currency}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "urlencoded",
-                                            "urlencoded": [
-                                                {
-                                                    "key": "socket_id",
-                                                    "value": "123456.7890123",
-                                                    "type": "text",
-                                                    "description": "From the socket connection (the client library fills it in). Two numbers joined by a dot."
-                                                },
-                                                {
-                                                    "key": "channel_name",
-                                                    "value": "private-dashboard.{{user_id}}",
-                                                    "type": "text"
-                                                }
-                                            ]
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/broadcasting/auth",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "broadcasting",
-                                                "auth"
-                                            ]
-                                        }
-                                    },
-                                    "status": "Forbidden",
-                                    "code": 403,
-                                    "_postman_previewlanguage": "json",
-                                    "header": [
-                                        {
-                                            "key": "Content-Type",
-                                            "value": "application/json"
-                                        }
-                                    ],
-                                    "cookie": [],
-                                    "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
-                                }
-                            ]
                         }
                     ],
-                    "description": "The staff account's own inbox, its browser's push token and its live channel \u2014 plus the admin broadcast to members.\n\nStaff notices reach an account by the permissions it holds (never by role name). The inbox routes, like `me`, sit behind `staff` only: any account holding at least one permission; one with none answers 403.\n\nLive: `notification.created` on `private-dashboard.{user_id}` (Real-time: Authorize Dashboard Channel) \u2014 re-read the unread count and the list."
+                    "description": "The staff account's own inbox and its browser's push token \u2014 plus the admin broadcast to members.\n\nStaff notices reach an account by the permissions it holds (never by role name). The inbox routes, like `me`, sit behind `staff` only: any account holding at least one permission; one with none answers 403."
                 },
                 {
                     "name": "Events",

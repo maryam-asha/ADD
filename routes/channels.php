@@ -15,10 +15,6 @@ use Illuminate\Support\Facades\Broadcast;
 // expired, their session ended.
 Broadcast::channel('member.{id}', fn (User $user, string $id) => (int) $user->id === (int) $id);
 
-// One dashboard account's own updates: a new staff or provider notification
-// in its inbox. Signed in to the dashboard only, like `reception` below.
-Broadcast::channel('dashboard.{id}', fn (User $user, string $id) => (int) $user->id === (int) $id && $user->tokenCan('dashboard'));
-
 // The reception desk — one today, a single branch. Whoever may see the desk
 // (`reception.view`, the permission its screens read with — any role, by
 // permission, never by role name: docs/decisions/rbac-permission-pilot.md,
