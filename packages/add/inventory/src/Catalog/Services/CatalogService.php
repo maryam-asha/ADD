@@ -10,7 +10,9 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Catalog\Models\Location;
 use Add\Inventory\Integrations\OwnLocationResolver;
 use Add\Inventory\Stock\Models\StockMovement;
+use Add\Inventory\Support\Decimal;
 use Add\Inventory\Support\InventoryException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -96,14 +98,45 @@ class CatalogService
     public function createItem(array $data): Item
     {
         return DB::transaction(function () use ($data) {
-            $item = Item::query()->create($data);
+            $item = Item::query()->create(Arr::except($data, 'units'));
 
             if ($item->sku === null) {
                 $item->update(['sku' => config('inventory.items.sku_prefix').str_pad((string) $item->id, (int) config('inventory.items.sku_pad'), '0', STR_PAD_LEFT)]);
             }
 
+            if (array_key_exists('units', $data)) {
+                $this->syncUnits($item, $data['units']);
+            }
+
             return $item;
         });
+    }
+
+    /**
+     * Replaces the item's packs with `$units`. A pack the ledger already
+     * recorded quantities in stays, with its factor: changing it would
+     * change what those movements meant.
+     *
+     * @param  list<array{unit_id: int|string, factor: int|float|string}>  $units
+     */
+    public function syncUnits(Item $item, array $units): void
+    {
+        $wanted = collect($units)->mapWithKeys(fn (array $unit) => [(int) $unit['unit_id'] => Decimal::trim($unit['factor'])]);
+        $used = StockMovement::query()->where('item_id', $item->id)->whereNotNull('entered_unit_id')->distinct()->pluck('entered_unit_id');
+
+        foreach ($item->otherUnits()->whereIn('unit_id', $used)->get() as $pack) {
+            if (! $wanted->has($pack->unit_id) || Decimal::cmp($wanted[$pack->unit_id], $pack->factor) !== 0) {
+                InventoryException::fail('inventory::catalog.unit_in_use_by_movements');
+            }
+        }
+
+        $item->otherUnits()->whereNotIn('unit_id', $wanted->keys())->delete();
+
+        foreach ($wanted as $unitId => $factor) {
+            $item->otherUnits()->updateOrCreate(['unit_id' => $unitId], ['factor' => $factor]);
+        }
+
+        $item->unsetRelation('otherUnits');
     }
 
     /**
@@ -123,9 +156,15 @@ class CatalogService
             InventoryException::fail('inventory::catalog.unit_locked');
         }
 
-        $item->update($data);
+        return DB::transaction(function () use ($item, $data) {
+            $item->update(Arr::except($data, 'units'));
 
-        return $item;
+            if (array_key_exists('units', $data)) {
+                $this->syncUnits($item, $data['units']);
+            }
+
+            return $item;
+        });
     }
 
     public function deleteItem(Item $item): void

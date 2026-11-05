@@ -36,6 +36,8 @@ Route::middleware('can:'.Abilities::CATALOG_VIEW)->group(function () use ($catal
     foreach ($catalog as $uri => [$controller, $parameter]) {
         Route::apiResource($uri, $controller)->only(['index', 'show'])->parameters([$uri => $parameter]);
     }
+
+    Route::get('items/barcode/{barcode}', [ItemController::class, 'byBarcode'])->name('items.barcode');
 });
 
 Route::middleware('can:'.Abilities::CATALOG_MANAGE)->group(function () use ($catalog) {
@@ -43,6 +45,7 @@ Route::middleware('can:'.Abilities::CATALOG_MANAGE)->group(function () use ($cat
         Route::apiResource($uri, $controller)->only(['store', 'update', 'destroy'])->parameters([$uri => $parameter]);
     }
 
+    Route::post('items/barcodes', [ItemController::class, 'generateBarcode'])->name('items.barcodes');
     Route::post('categories/{category}/fields', [AttributeDefinitionController::class, 'store'])->name('fields.store');
     Route::match(['put', 'patch'], 'fields/{attributeDefinition}', [AttributeDefinitionController::class, 'update'])->name('fields.update');
     Route::delete('fields/{attributeDefinition}', [AttributeDefinitionController::class, 'destroy'])->name('fields.destroy');
