@@ -8,6 +8,7 @@ use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Floor;
@@ -99,20 +100,22 @@ class InventoryIntegrationTest extends TestCase
         $this->getJson('/api/v1/inventory/locations')->assertNotFound();
     }
 
-    public function test_stock_in_a_branch_counts_every_space_inside_it(): void
+    public function test_stock_in_a_branch_counts_every_warehouse_of_it(): void
     {
         $this->storeKeeper();
-        $space = $this->space();
-        $branchId = $space->building->branch_id;
+        $branchId = $this->space()->building->branch_id;
         $paper = Item::factory()->create(['category_id' => Category::factory()->stock()->create()->id]);
+        $main = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $branchId, 'is_primary' => true]);
+        $cafe = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $branchId]);
+        $elsewhere = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => Branch::factory()->create()->id]);
         $stock = app(StockService::class);
-        $stock->receive($paper, new Place('space', $space->id), 20, 3);
-        $stock->receive($paper, new Place('branch', $branchId), 5, 3);
-        $stock->receive($paper, new Place('space', Space::factory()->create()->id), 7, 3);
+        $stock->receive($paper, $main->asPlace(), 20, 3);
+        $stock->receive($paper, $cafe->asPlace(), 5, 3);
+        $stock->receive($paper, $elsewhere->asPlace(), 7, 3);
 
-        $this->getJson("/api/v1/inventory/stock/balances?location[type]=branch&location[id]={$branchId}")
+        $this->getJson("/api/v1/inventory/stock/balances?place[type]=branch&place[id]={$branchId}")
             ->assertOk()->assertJsonCount(2, 'data');
-        $this->getJson("/api/v1/inventory/reports/stock-valuation?location[type]=branch&location[id]={$branchId}")
+        $this->getJson("/api/v1/inventory/reports/stock-valuation?place[type]=branch&place[id]={$branchId}")
             ->assertOk()->assertJsonPath('data.total', '75');
     }
 
