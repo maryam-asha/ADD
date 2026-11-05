@@ -24,7 +24,7 @@ class MemberDeviceTokenControllerTest extends TestCase
         $member->assignRole('member');
         Sanctum::actingAs($member, ['member-app']);
 
-        $response = $this->putJson('/api/v1/member/device-token', [
+        $response = $this->withHeader('lang', 'en')->putJson('/api/v1/member/device-token', [
             'fcm_token' => 'test-fcm-token-abc123',
             'platform' => 'ios',
         ]);
@@ -70,7 +70,7 @@ class MemberDeviceTokenControllerTest extends TestCase
             ['token' => 'token-2', 'platform' => 'android'],
         ]);
 
-        $response = $this->deleteJson('/api/v1/member/device-token', [
+        $response = $this->withHeader('lang', 'en')->deleteJson('/api/v1/member/device-token', [
             'token' => 'token-1',
         ]);
 
@@ -89,7 +89,7 @@ class MemberDeviceTokenControllerTest extends TestCase
 
         $member->deviceTokens()->create(['token' => 'existing-token']);
 
-        $response = $this->deleteJson('/api/v1/member/device-token');
+        $response = $this->withHeader('lang', 'en')->deleteJson('/api/v1/member/device-token');
 
         $response->assertOk();
         $response->assertJson(['message' => 'Device token removed.']);

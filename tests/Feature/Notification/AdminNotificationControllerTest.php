@@ -35,7 +35,7 @@ class AdminNotificationControllerTest extends TestCase
             'title' => ['en' => 'Hello', 'ar' => 'مرحباً'],
             'body' => ['en' => 'Welcome to ADD', 'ar' => 'أهلاً بك في ADD'],
             'target' => 'all',
-        ]);
+        ], ['lang' => 'en']);
 
         $response->assertOk();
         $response->assertJson(['message' => 'Notification broadcast sent.']);

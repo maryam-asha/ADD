@@ -16,6 +16,15 @@ trait ServesNotificationInbox
 {
     abstract protected function inboxAudience(): NotificationAudience;
 
+    /**
+     * Whether listing a page marks that page's notices read. Only the notices
+     * the page returned, never later pages: those have not been seen yet.
+     */
+    protected function listingMarksPageRead(): bool
+    {
+        return false;
+    }
+
     public function index(Request $request): JsonResponse
     {
         $paginator = $request->user()
@@ -23,8 +32,22 @@ trait ServesNotificationInbox
             ->forAudience($this->inboxAudience())
             ->paginate(20);
 
+        // Resolved before marking, so the page still shows which notices were new.
+        $data = NotificationResource::collection($paginator->items())->resolve();
+
+        if ($this->listingMarksPageRead()) {
+            $unseen = $paginator->getCollection()->whereNull('read_at')->modelKeys();
+
+            if ($unseen !== []) {
+                $request->user()
+                    ->unreadNotifications()
+                    ->whereKey($unseen)
+                    ->update(['read_at' => now()]);
+            }
+        }
+
         return response()->json([
-            'data' => NotificationResource::collection($paginator->items())->resolve(),
+            'data' => $data,
             'meta' => [
                 'current_page' => $paginator->currentPage(),
                 'last_page' => $paginator->lastPage(),

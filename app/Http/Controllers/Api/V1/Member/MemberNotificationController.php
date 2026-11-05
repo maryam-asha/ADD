@@ -14,4 +14,9 @@ class MemberNotificationController extends Controller
     {
         return NotificationAudience::Member;
     }
+
+    protected function listingMarksPageRead(): bool
+    {
+        return true;
+    }
 }
