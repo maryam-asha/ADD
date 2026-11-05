@@ -157,11 +157,27 @@ class ReceptionWarehouseTest extends TestCase
 
         $this->getJson('/api/v1/admin/reception/warehouses')
             ->assertOk()
-            ->assertJsonCount(2, 'data')
-            ->assertJsonPath('data.0.id', $this->main->id)
-            ->assertJsonPath('data.0.is_primary', true)
-            ->assertJsonPath('data.1.id', $store->id)
-            ->assertJsonPath('data.1.allows_sales', false);
+            ->assertJsonPath('data.branch_id', $this->branch->id)
+            ->assertJsonCount(2, 'data.warehouses')
+            ->assertJsonPath('data.warehouses.0.id', $this->main->id)
+            ->assertJsonPath('data.warehouses.0.is_primary', true)
+            ->assertJsonPath('data.warehouses.1.id', $store->id)
+            ->assertJsonPath('data.warehouses.1.allows_sales', false);
+    }
+
+    public function test_options_with_no_register_say_they_belong_to_no_branch(): void
+    {
+        $other = User::factory()->create();
+        $other->assignRole('operations');
+        Sanctum::actingAs($other, ['*']);
+        $this->warehouseIn(Branch::factory()->create(), ['is_primary' => true]);
+
+        // Every active warehouse, two of them primary: the desk must choose,
+        // so nothing tells it which one is "its" primary.
+        $this->getJson('/api/v1/admin/reception/warehouses')
+            ->assertOk()
+            ->assertJsonPath('data.branch_id', null)
+            ->assertJsonCount(2, 'data.warehouses');
     }
 
     public function test_sale_items_carry_the_item_barcode(): void

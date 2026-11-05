@@ -10,6 +10,7 @@ use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
 /**
@@ -34,6 +35,19 @@ class WarehouseHostTest extends TestCase
     public function test_admin_holds_the_warehouse_permissions(): void
     {
         $this->getJson('/api/v1/inventory/warehouses')->assertOk();
+    }
+
+    public function test_roles_that_handle_stock_can_see_warehouses_after_deploy(): void
+    {
+        $keeper = Role::create(['name' => 'store_keeper_test', 'guard_name' => 'web']);
+        $keeper->givePermissionTo('inventory.stock.receive');
+        $viewer = Role::create(['name' => 'asset_viewer_test', 'guard_name' => 'web']);
+        $viewer->givePermissionTo('inventory.assets.view');
+
+        (require base_path('database/migrations/2026_11_05_200100_grant_warehouse_view_to_stock_roles.php'))->up();
+
+        $this->assertTrue($keeper->refresh()->hasPermissionTo('inventory.warehouses.view'));
+        $this->assertFalse($viewer->refresh()->hasPermissionTo('inventory.warehouses.view'));
     }
 
     public function test_a_warehouse_sits_in_a_branch_or_in_nothing(): void

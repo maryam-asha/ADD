@@ -173,7 +173,12 @@ class CatalogService
             InventoryException::fail('inventory::catalog.item_has_history');
         }
 
-        $item->delete();
+        // An item with no history may still be on a warehouse's list of
+        // allowed items; it leaves the lists with itself.
+        DB::transaction(function () use ($item) {
+            DB::table('inv_warehouse_items')->where('item_id', $item->id)->delete();
+            $item->delete();
+        });
     }
 
     public function deleteLocation(Location $location): void

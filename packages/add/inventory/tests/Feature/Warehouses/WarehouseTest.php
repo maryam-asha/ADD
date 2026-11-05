@@ -166,6 +166,20 @@ class WarehouseTest extends TestCase
         $this->getJson('/api/inventory/warehouses')->assertOk()->assertJsonPath('data.0.items_with_balance', 1);
     }
 
+    public function test_deleting_an_item_with_no_history_takes_it_off_warehouse_lists(): void
+    {
+        $this->actingAsWith([...self::ALL, Abilities::CATALOG_MANAGE]);
+        $item = $this->stockItem();
+        $cafe = $this->warehouse(['item_scope' => 'selected']);
+        $cafe->items()->attach($item);
+
+        $this->deleteJson("/api/inventory/items/{$item->id}")->assertNoContent();
+
+        // On MySQL the pivot's restrict key refused the delete (a 500); the
+        // list row has to go with the item.
+        $this->assertDatabaseMissing('inv_warehouse_items', ['item_id' => $item->id]);
+    }
+
     public function test_viewing_needs_the_view_ability_and_writing_the_manage_one(): void
     {
         $this->actingAsWith([Abilities::WAREHOUSES_VIEW]);

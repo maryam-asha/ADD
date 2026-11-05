@@ -67,7 +67,10 @@ class ReceptionWarehouse
             ->get();
     }
 
-    private function branchOf(User $operator): ?int
+    /**
+     * The branch of the register the operator has open, if any.
+     */
+    public function branchOf(User $operator): ?int
     {
         $branchId = $this->registers->currentSession($operator)?->branch_id;
 

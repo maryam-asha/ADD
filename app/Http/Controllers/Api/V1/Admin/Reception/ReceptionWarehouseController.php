@@ -17,14 +17,18 @@ class ReceptionWarehouseController extends Controller
 {
     public function index(Request $request, ReceptionWarehouse $warehouses): JsonResponse
     {
-        return response()->json([
-            'data' => $warehouses->options($request->user())->map(fn (Warehouse $warehouse) => [
+        return response()->json(['data' => [
+            // The open register's branch the list is limited to; null when no
+            // register is open and the list holds every active warehouse, so
+            // the desk must choose rather than take the first primary.
+            'branch_id' => $warehouses->branchOf($request->user()),
+            'warehouses' => $warehouses->options($request->user())->map(fn (Warehouse $warehouse) => [
                 'id' => $warehouse->id,
                 'name' => $warehouse->name,
                 'code' => $warehouse->code,
                 'allows_sales' => $warehouse->allows_sales,
                 'is_primary' => $warehouse->is_primary,
             ])->values(),
-        ]);
+        ]]);
     }
 }
