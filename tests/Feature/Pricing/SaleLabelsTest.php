@@ -5,6 +5,9 @@ namespace Tests\Feature\Pricing;
 use App\Domain\Experience\Models\Event;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\MembershipStatus;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Models\Plan;
 use App\Domain\Pricing\Models\Coupon;
 use Carbon\Carbon;
@@ -237,5 +240,64 @@ class SaleLabelsTest extends TestCase
         $event->attendees()->create(['user_id' => $this->member->id, 'name' => 'Member', 'email' => $this->member->email, 'status' => 'confirmed', 'price_points' => 75]);
 
         $this->assertNull($this->fetch("/api/v1/member/events/{$event->id}")->json('data.sale'));
+    }
+
+    private function subscribe(Plan $plan): void
+    {
+        Membership::factory()->create([
+            'plan_id' => $plan->id,
+            'owner_type' => OwnerType::User,
+            'owner_id' => $this->member->id,
+            'status' => MembershipStatus::Active,
+            'current_period_start' => now()->subDay(),
+            'current_period_end' => now()->addDays(29),
+        ]);
+    }
+
+    /** A plan's discount on a space shows as its sale, as a booking made now is priced. */
+    public function test_a_plan_discount_on_a_space_shows_as_its_sale(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        $plan = Plan::factory()->create();
+        $plan->discounts()->create(['percentage' => 30, 'space_id' => $space->id]);
+        $this->subscribe($plan);
+
+        $sale = $this->fetch("/api/v1/member/spaces/{$space->id}")->json('data.details.sale');
+
+        $this->assertSame(70, $sale['points']);
+        $this->assertSame(100, $sale['original_points']);
+        $this->assertSame(30, $sale['discount_percent']);
+        $this->assertNull($sale['ends_at']);
+
+        $card = collect($this->fetch('/api/v1/member/spaces')->json('data.spaces'))->firstWhere('id', $space->id);
+        $this->assertSame(70, $card['sale']['points']);
+    }
+
+    /** Never both: the lower price of the offer and the plan discount. */
+    public function test_the_lower_of_an_offer_and_a_plan_discount_is_shown(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        $plan = Plan::factory()->create();
+        $plan->discounts()->create(['percentage' => 30, 'space_type' => $space->space_type]);
+        $this->subscribe($plan);
+
+        $this->offerOnSpace($space, 80, now()->subDay(), now()->addDays(6));
+        $this->assertSame(70, $this->fetch("/api/v1/member/spaces/{$space->id}")->json('data.details.sale.points'));
+
+        $this->offerOnSpace($space, 60, now()->subDay(), now()->addDays(6));
+        $sale = $this->fetch("/api/v1/member/spaces/{$space->id}")->json('data.details.sale');
+        $this->assertSame(60, $sale['points']);
+        $this->assertNotNull($sale['ends_at']);
+    }
+
+    /** A discount whose uses are spent this cycle is not announced. */
+    public function test_a_spent_plan_discount_shows_none(): void
+    {
+        $space = Space::factory()->room()->create(['hourly_rate_points' => 100]);
+        $plan = Plan::factory()->create();
+        $plan->discounts()->create(['percentage' => 30, 'space_id' => $space->id, 'usage_limit' => 0]);
+        $this->subscribe($plan);
+
+        $this->assertNull($this->fetch("/api/v1/member/spaces/{$space->id}")->json('data.details.sale'));
     }
 }

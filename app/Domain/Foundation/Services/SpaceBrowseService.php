@@ -10,6 +10,9 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Inventory\SpaceEquipment;
+use App\Domain\Membership\Models\Membership;
+use App\Domain\Membership\Services\MembershipResolver;
+use App\Domain\Membership\Services\PlanDiscountService;
 use App\Domain\Pricing\Services\OfferResolver;
 use App\Domain\Settings\Services\SettingService;
 use App\Support\Presenters\BranchHoursPresenter;
@@ -27,7 +30,12 @@ class SpaceBrowseService
         private readonly PriceLabelPresenter $prices,
         private readonly OfferResolver $offers,
         private readonly SpaceEquipment $equipment,
+        private readonly MembershipResolver $memberships,
+        private readonly PlanDiscountService $planDiscounts,
     ) {}
+
+    /** @var array<int, Membership|null> member id => their live membership, read once per listing */
+    private array $membershipOf = [];
 
     /**
      * Note: there is no `date` filter here. One was documented for a long
@@ -282,10 +290,39 @@ class SpaceBrowseService
             'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
             // The best offer live now for this member: the rate struck
             // through, the offer rate, when it ends.
-            'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, 'hour', 'api.space'),
+            'sale' => $this->sale($space, $user),
             'amenities' => $amenities,
             'main_image' => $space->main_image,
         ];
+    }
+
+    /**
+     * The `sale` block of a space's hourly rate: the reduction a booking
+     * made now would get (PriceQuoteService::forBooking) — the best
+     * automatic offer or the member's plan discount on this space, the
+     * lower price of the two, a tie to the offer. A plan discount whose
+     * uses are spent is not shown; it ends with the plan, so no end date.
+     */
+    private function sale(Space $space, ?User $user): ?array
+    {
+        $rate = (int) ($space->hourly_rate_points ?? 0);
+        $offer = $this->offers->hourlyNow($space, $user);
+        $membership = null;
+
+        if ($user !== null && $rate > 0) {
+            if (! array_key_exists($user->id, $this->membershipOf)) {
+                $this->membershipOf[$user->id] = $this->memberships->activeFor($user);
+            }
+
+            $membership = $this->membershipOf[$user->id];
+        }
+
+        $discount = $membership !== null ? $this->planDiscounts->resolveFor($membership, $space, [], $user) : null;
+        $planRate = $discount !== null ? $this->planDiscounts->apply($rate, $discount) : $rate;
+
+        return $planRate < $rate && ($offer === null || $planRate < $offer->points)
+            ? $this->prices->saleAt($planRate, null, $rate, $user, 'hour', 'api.space')
+            : $this->prices->sale($offer, $rate, $user, 'hour', 'api.space');
     }
 
     /**
@@ -401,7 +438,7 @@ class SpaceBrowseService
                 'status' => $space->status->value,
                 'status_label' => __('api.space.statuses.'.$space->status->value),
                 'pricing' => $this->prices->hourly((int) ($space->hourly_rate_points ?? 0), $user),
-                'sale' => $this->prices->sale($this->offers->hourlyNow($space, $user), (int) ($space->hourly_rate_points ?? 0), $user, 'hour', 'api.space'),
+                'sale' => $this->sale($space, $user),
                 'capacity' => [
                     'count' => $space->capacity ?? 1,
                     'formatted' => ($space->capacity ?? 1) === 1

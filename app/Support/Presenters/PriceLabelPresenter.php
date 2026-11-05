@@ -10,6 +10,7 @@ use App\Domain\Pricing\ValueObjects\OfferPrice;
 use App\Domain\Pricing\ValueObjects\PlanSaving;
 use App\Support\PlainAmount;
 use App\Support\Time\LocalTime;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 
 /**
@@ -174,20 +175,32 @@ class PriceLabelPresenter
      */
     public function sale(?OfferPrice $offer, int $originalPoints, ?User $user, ?string $unit, string $group, ?string $locale = null): ?array
     {
-        if ($offer === null || $offer->points >= $originalPoints) {
+        return $offer === null ? null : $this->saleAt($offer->points, $offer->endsAt, $originalPoints, $user, $unit, $group, $locale);
+    }
+
+    /**
+     * The same `sale` block for a price that is not an automatic offer's —
+     * a space's hourly rate under the member's plan discount
+     * (SpaceBrowseService). `$endsAt` null: nothing to say about ending.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function saleAt(int $points, ?CarbonImmutable $endsAt, int $originalPoints, ?User $user, ?string $unit, string $group, ?string $locale = null): ?array
+    {
+        if ($points >= $originalPoints) {
             return null;
         }
 
         $locale ??= app()->getLocale();
-        $endsAt = $offer->endsAt !== null ? app(LocalTime::class)->toLocal($offer->endsAt) : null;
+        $endsAt = $endsAt !== null ? app(LocalTime::class)->toLocal($endsAt) : null;
 
-        $discount = $originalPoints - $offer->points;
+        $discount = $originalPoints - $points;
         // Rounded down: the discount announced is never more than the real one.
         $percent = intdiv($discount * 100, $originalPoints);
 
         return [
-            'points' => $offer->points,
-            'price' => $this->priceOf($offer->points, $user),
+            'points' => $points,
+            'price' => $this->priceOf($points, $user),
             'original_points' => $originalPoints,
             'original_price' => $this->priceOf($originalPoints, $user),
             'discount_points' => $discount,
