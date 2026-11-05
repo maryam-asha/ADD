@@ -5,6 +5,8 @@ namespace Add\Inventory\Tests\Feature\Warehouses;
 use Add\Inventory\Authorization\Abilities;
 use Add\Inventory\Catalog\Models\Location;
 use Add\Inventory\Integrations\OwnLocationResolver;
+use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Tests\Concerns\BuildsInventory;
 use Add\Inventory\Tests\TestCase;
 use Add\Inventory\Warehouses\Models\Warehouse;
@@ -114,6 +116,54 @@ class WarehouseTest extends TestCase
         $this->getJson('/api/inventory/warehouses?search=Kitch')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $kitchen->id);
         $this->getJson('/api/inventory/warehouses?active=0')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.name.en', 'External');
         $this->getJson("/api/inventory/warehouses?manager_id={$manager->id}")->assertOk()->assertJsonCount(1, 'data');
+    }
+
+    public function test_cannot_deactivate_or_delete_while_holding_stock(): void
+    {
+        $this->actingAsWith(self::ALL);
+        $warehouse = $this->warehouse();
+        app(StockService::class)->receive($this->stockItem(), $this->in($warehouse), 5);
+
+        $this->patchJson("/api/inventory/warehouses/{$warehouse->id}", ['is_active' => false])
+            ->assertUnprocessable()->assertJsonPath('message', __('inventory::warehouses.holds_stock'));
+        $this->deleteJson("/api/inventory/warehouses/{$warehouse->id}")->assertUnprocessable();
+        $this->assertTrue($warehouse->refresh()->is_active);
+    }
+
+    public function test_cannot_delete_with_history(): void
+    {
+        $this->actingAsWith(self::ALL);
+        $warehouse = $this->warehouse();
+        $item = $this->stockItem();
+        app(StockService::class)->receive($item, $this->in($warehouse), 5);
+        app(StockService::class)->issue($item, $this->in($warehouse), 5, IssueReason::InternalUse);
+
+        $this->deleteJson("/api/inventory/warehouses/{$warehouse->id}")
+            ->assertUnprocessable()->assertJsonPath('message', __('inventory::warehouses.has_history'));
+        $this->patchJson("/api/inventory/warehouses/{$warehouse->id}", ['is_active' => false])->assertOk();
+    }
+
+    public function test_narrowing_scope_refused_while_a_removed_item_holds_stock(): void
+    {
+        $this->actingAsWith(self::ALL);
+        $warehouse = $this->warehouse();
+        $held = $this->stockItem();
+        $other = $this->stockItem();
+        app(StockService::class)->receive($held, $this->in($warehouse), 2);
+
+        $this->patchJson("/api/inventory/warehouses/{$warehouse->id}", ['item_scope' => 'selected', 'item_ids' => [$other->id]])
+            ->assertUnprocessable()->assertJsonPath('message', __('inventory::warehouses.scope_strands_stock'));
+        $this->patchJson("/api/inventory/warehouses/{$warehouse->id}", ['item_scope' => 'selected', 'item_ids' => [$held->id, $other->id]])
+            ->assertOk();
+    }
+
+    public function test_index_counts_items_with_balance(): void
+    {
+        $this->actingAsWith(self::ALL);
+        $warehouse = $this->warehouse();
+        app(StockService::class)->receive($this->stockItem(), $this->in($warehouse), 2);
+
+        $this->getJson('/api/inventory/warehouses')->assertOk()->assertJsonPath('data.0.items_with_balance', 1);
     }
 
     public function test_viewing_needs_the_view_ability_and_writing_the_manage_one(): void

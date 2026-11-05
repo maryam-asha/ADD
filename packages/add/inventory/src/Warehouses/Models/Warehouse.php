@@ -4,6 +4,7 @@ namespace Add\Inventory\Warehouses\Models;
 
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Database\Factories\WarehouseFactory;
+use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Support\Concerns\HasTranslations;
 use Add\Inventory\Support\Place;
@@ -98,6 +99,42 @@ class Warehouse extends Model
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('is_active', true);
+    }
+
+    /**
+     * Warehouses sitting in this place or any place inside it.
+     */
+    public function scopeWithin(Builder $query, Place $place): Builder
+    {
+        return $query->where(function (Builder $query) use ($place) {
+            foreach (collect(Inventory::locations()->within($place))->groupBy('type') as $type => $group) {
+                $query->orWhere(fn (Builder $q) => $q->where('place_type', $type)->whereIn('place_id', $group->pluck('id')));
+            }
+
+            $query->orWhereRaw('1 = 0');
+        });
+    }
+
+    /**
+     * The warehouses a list request narrows to — `warehouse_id`, or
+     * `place[type]` + `place[id]` — or null when it names neither.
+     *
+     * @param  array<string, mixed>  $input
+     * @return list<int>|null
+     */
+    public static function idsFromFilter(array $input): ?array
+    {
+        if (is_numeric($input['warehouse_id'] ?? null)) {
+            return [(int) $input['warehouse_id']];
+        }
+
+        $place = $input['place'] ?? null;
+
+        if (is_array($place) && is_string($place['type'] ?? null) && is_numeric($place['id'] ?? null)) {
+            return self::query()->within(Place::from($place))->pluck('id')->all();
+        }
+
+        return null;
     }
 
     protected static function newFactory(): WarehouseFactory

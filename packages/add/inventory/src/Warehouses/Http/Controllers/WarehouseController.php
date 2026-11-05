@@ -2,7 +2,6 @@
 
 namespace Add\Inventory\Warehouses\Http\Controllers;
 
-use Add\Inventory\Inventory;
 use Add\Inventory\Support\Place;
 use Add\Inventory\Warehouses\Http\Requests\WarehouseRequest;
 use Add\Inventory\Warehouses\Http\Resources\WarehouseResource;
@@ -37,13 +36,7 @@ class WarehouseController extends Controller
             ->when($request->filled('manager_id'), fn (Builder $query) => $query->where('manager_id', $request->integer('manager_id')))
             ->when(
                 is_array($place) && is_string($place['type'] ?? null) && is_numeric($place['id'] ?? null),
-                fn (Builder $query) => $query->where(function (Builder $query) use ($place) {
-                    foreach (collect(Inventory::locations()->within(Place::from($place)))->groupBy('type') as $type => $group) {
-                        $query->orWhere(fn (Builder $q) => $q->where('place_type', $type)->whereIn('place_id', $group->pluck('id')));
-                    }
-
-                    $query->orWhereRaw('1 = 0');
-                }),
+                fn (Builder $query) => $query->within(Place::from($place)),
             )
             ->orderByDesc('is_primary')
             ->orderBy('id')

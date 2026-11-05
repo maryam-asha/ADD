@@ -4,7 +4,6 @@ namespace Add\Inventory\Tests\Feature\Reports;
 
 use Add\Inventory\Assets\Services\AssetService;
 use Add\Inventory\Authorization\Abilities;
-use Add\Inventory\Catalog\Models\Location;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Tests\Concerns\BuildsInventory;
 use Add\Inventory\Tests\TestCase;
@@ -13,23 +12,26 @@ class ReportsTest extends TestCase
 {
     use BuildsInventory;
 
-    public function test_stock_valuation_per_location_at_average_cost(): void
+    public function test_stock_valuation_per_warehouse_at_average_cost(): void
     {
         $this->actingAsWith([Abilities::REPORTS_VIEW]);
-        $store = Location::factory()->create();
-        $desk = Location::factory()->create();
+        $store = $this->warehouse();
+        $desk = $this->warehouse();
         $stock = app(StockService::class);
-        $stock->receive($this->stockItem(), $this->place($store), 10, 1.25);
-        $stock->receive($this->stockItem(), $this->place($store), 2, 10);
-        $stock->receive($this->stockItem(), $this->place($desk), 3, 1);
+        $stock->receive($this->stockItem(), $this->in($store), 10, 1.25);
+        $stock->receive($this->stockItem(), $this->in($store), 2, 10);
+        $stock->receive($this->stockItem(), $this->in($desk), 3, 1);
 
         $this->getJson('/api/inventory/reports/stock-valuation')
             ->assertOk()
             ->assertJsonPath('data.currency', 'USD')
             ->assertJsonPath('data.total', '35.5')
-            ->assertJsonPath('data.locations.0.location.id', $store->id)
-            ->assertJsonPath('data.locations.0.items', 2)
-            ->assertJsonPath('data.locations.0.value', '32.5');
+            ->assertJsonPath('data.warehouses.0.warehouse.id', $store->id)
+            ->assertJsonPath('data.warehouses.0.items', 2)
+            ->assertJsonPath('data.warehouses.0.value', '32.5');
+
+        $this->getJson("/api/inventory/reports/stock-valuation?warehouse_id={$desk->id}")
+            ->assertOk()->assertJsonPath('data.total', '3')->assertJsonCount(1, 'data.warehouses');
     }
 
     public function test_asset_register_totals_each_currency_apart(): void
