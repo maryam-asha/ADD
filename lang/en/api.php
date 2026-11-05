@@ -235,7 +235,10 @@ return [
     ],
 
     'reception' => [
-        'stock_location_required' => 'Choose where the stock is taken from, or open a cash register at your branch.',
+        'no_primary_warehouse' => 'No primary warehouse to take the stock from: open a cash register at a branch with one, or choose a warehouse.',
+        'warehouse_unavailable' => 'This warehouse does not exist or is not active.',
+        'warehouse_not_for_sale' => 'Sales from this warehouse are not allowed.',
+        'warehouse_other_branch' => 'This warehouse is not in the branch of your open cash register.',
         'checked_in' => 'Checked in.',
         'checked_out' => 'Checked out.',
         'cancelled' => 'Booking cancelled.',

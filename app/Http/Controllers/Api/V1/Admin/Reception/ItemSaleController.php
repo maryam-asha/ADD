@@ -6,7 +6,7 @@ use App\Concerns\LogsSensitiveActions;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Finance\Exceptions\PaymentPricingException;
 use App\Domain\Identity\Models\User;
-use App\Domain\Inventory\ReceptionStockLocation;
+use App\Domain\Inventory\ReceptionWarehouse;
 use App\Domain\Retail\Services\ItemSaleService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\StoreItemSaleRequest;
@@ -25,10 +25,11 @@ class ItemSaleController extends Controller
 {
     use LogsSensitiveActions;
 
-    public function store(StoreItemSaleRequest $request, ItemSaleService $sales, ReceptionStockLocation $locations): JsonResponse
+    public function store(StoreItemSaleRequest $request, ItemSaleService $sales, ReceptionWarehouse $warehouses): JsonResponse
     {
         try {
-            $from = $locations->resolve($request->validated('stock_location'), $request->user());
+            $warehouseId = $request->validated('warehouse_id');
+            $from = $warehouses->resolve($warehouseId === null ? null : (int) $warehouseId, $request->user(), forSale: true)->asPlace();
             ['sale' => $sale, 'payment' => $payment] = $sales->sell(
                 User::query()->findOrFail($request->validated('user_id')),
                 $request->validated('lines'),
