@@ -94,6 +94,27 @@ class ReminderTest extends RenewalsTestCase
         $this->assertNotNoticed($old->user_id, 'coworking.unpaid_reminder');
     }
 
+    public function test_a_session_whose_plan_cover_ends_soon_is_reminded_once(): void
+    {
+        $covered = fn (?string $until, string $status = 'covered') => ['status' => $status, 'reason' => null, 'plan' => null, 'hours_total' => 10.0, 'hours_remaining' => 1.0, 'window' => null, 'covered_until' => $until];
+
+        $endingSoon = WalkinSession::factory()->create(['checked_in_at' => now()->subMinutes(50), 'coverage_snapshot' => $covered(now()->addMinutes(10)->toIso8601String())]);
+        $endingLater = WalkinSession::factory()->create(['checked_in_at' => now()->subMinutes(30), 'coverage_snapshot' => $covered(now()->addMinutes(40)->toIso8601String())]);
+        $alreadyEnded = WalkinSession::factory()->create(['checked_in_at' => now()->subHours(2), 'coverage_snapshot' => $covered(now()->subMinutes(5)->toIso8601String())]);
+        $checkedOut = WalkinSession::factory()->create(['checked_in_at' => now()->subMinutes(50), 'checked_out_at' => now()->subMinute(), 'coverage_snapshot' => $covered(now()->addMinutes(10)->toIso8601String())]);
+        $notCovered = WalkinSession::factory()->create(['checked_in_at' => now()->subMinutes(50), 'coverage_snapshot' => $covered(null, 'not_covered')]);
+
+        $this->runTwice();
+
+        $notice = $this->assertNoticed($endingSoon->user_id, 'coworking.plan_cover_ending');
+        $this->assertSame('10', (string) $notice->data['params']['minutes']);
+        $this->assertCount(1, $this->notices($endingSoon->user_id, 'coworking.plan_cover_ending'));
+        $this->assertNotNoticed($endingLater->user_id, 'coworking.plan_cover_ending');
+        $this->assertNotNoticed($alreadyEnded->user_id, 'coworking.plan_cover_ending');
+        $this->assertNotNoticed($checkedOut->user_id, 'coworking.plan_cover_ending');
+        $this->assertNotNoticed($notCovered->user_id, 'coworking.plan_cover_ending');
+    }
+
     public function test_a_plan_is_reminded_a_week_and_a_day_before_it_ends(): void
     {
         $plan = Membership::factory()->create(['current_period_start' => now()->subDays(24), 'current_period_end' => now()->addDays(6), 'auto_renew' => false]);

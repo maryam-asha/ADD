@@ -14,12 +14,14 @@ use App\Domain\Invoicing\Services\InvoiceNotifier;
 use App\Domain\Leasing\Enums\OfficeLeaseStatus;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Leasing\Services\LeaseNotifier;
+use App\Domain\Membership\Enums\CoverageStatus;
 use App\Domain\Membership\Enums\MembershipStatus;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\MembershipNotifier;
 use App\Domain\Settings\Services\SettingService;
 use App\Services\Experience\EventNotifier;
 use App\Support\Enums\EventRegistrationStatus;
+use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
@@ -62,6 +64,7 @@ class ReminderRunner
             'invoices_overdue' => $this->invoicesOverdue(),
             'overdue_digest' => $this->overdueDigest(),
             'sessions_unpaid' => $this->sessionsUnpaid(),
+            'plan_cover_ending' => $this->planCoverEndingSoon(),
         ];
     }
 
@@ -213,6 +216,57 @@ class ReminderRunner
 
         return $this->each($unpaid(WalkinSession::query()), $remind)
             + $this->each($unpaid(Booking::query()->where('status', BookingStatus::Completed)), $remind);
+    }
+
+    /**
+     * Walk-ins in progress whose plan stops covering them within a quarter
+     * hour: covered_until from the snapshot taken at start — the hours left
+     * then, the cycle, the period or the daily window, whichever ends first.
+     * Time after it is billed at the space's price.
+     */
+    private function planCoverEndingSoon(): int
+    {
+        $now = now();
+        $horizon = $now->copy()->addMinutes(15);
+
+        $ids = WalkinSession::query()
+            ->open()
+            ->whereNotNull('coverage_snapshot')
+            ->get(['id', 'coverage_snapshot'])
+            ->filter(function (WalkinSession $session) use ($now, $horizon) {
+                $until = $this->coveredUntil($session);
+
+                return $until !== null && $until->greaterThan($now) && $until->lessThanOrEqualTo($horizon);
+            })
+            ->modelKeys();
+
+        return $this->each(
+            WalkinSession::query()->whereKey($ids)->with(['space', 'user']),
+            function (WalkinSession $session) {
+                $until = $this->coveredUntil($session);
+
+                if ($session->user === null || $until === null) {
+                    return;
+                }
+
+                $this->notifications->sendToUserOnce($session->user, "coworking.plan_cover_ending:{$session->id}", 'coworking.plan_cover_ending', [
+                    'minutes' => max(1, (int) ceil(now()->diffInSeconds($until, false) / 60)),
+                    'time' => NotificationText::localTime($until),
+                    'space' => $session->space?->name ?? '',
+                ], $session->notificationTarget());
+            },
+        );
+    }
+
+    private function coveredUntil(WalkinSession $session): ?CarbonImmutable
+    {
+        $snapshot = $session->coverage_snapshot;
+
+        if (($snapshot['status'] ?? null) !== CoverageStatus::Covered->value || empty($snapshot['covered_until'])) {
+            return null;
+        }
+
+        return CarbonImmutable::parse($snapshot['covered_until']);
     }
 
     /** Live plans no renewal follows. */

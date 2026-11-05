@@ -287,6 +287,10 @@ return [
             'title' => 'Your session was closed automatically',
             'body' => 'Your session at :space was closed at :time because no check-out was recorded.',
         ],
+        'plan_cover_ending' => [
+            'title' => "Your plan's cover ends in :minutes minutes",
+            'body' => "Your plan stops covering your session at :space at :time. Time after that is charged at the space's price.",
+        ],
         'unpaid_reminder' => [
             'title' => 'Unpaid session',
             'body' => 'You still owe :points points for your session on :date. Tap to pay.',
