@@ -2,18 +2,25 @@
 
 namespace Tests\Feature\Booking;
 
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Enums\SessionStartSource;
+use App\Domain\Booking\Events\BookingCancelled;
 use App\Domain\Booking\Events\BookingCheckedIn;
 use App\Domain\Booking\Events\BookingCheckedOut;
+use App\Domain\Booking\Events\BookingCreated;
 use App\Domain\Booking\Events\BookingEnded;
 use App\Domain\Booking\Events\BookingExtended;
 use App\Domain\Booking\Events\BookingPaid;
+use App\Domain\Booking\Events\BookingPendingApproval;
 use App\Domain\Booking\Events\BookingStarted;
 use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\BookingApprovalService;
+use App\Domain\Booking\Services\BookingCancellationService;
 use App\Domain\Booking\Services\BookingCheckInService;
+use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Finance\Enums\PaymentMethod;
@@ -60,6 +67,9 @@ class BookingRealtimeTest extends TestCase
         BookingCheckedOut::class,
         BookingPaid::class,
         CoworkingSessionPaid::class,
+        BookingCreated::class,
+        BookingPendingApproval::class,
+        BookingCancelled::class,
     ];
 
     protected function setUp(): void
@@ -265,5 +275,141 @@ class BookingRealtimeTest extends TestCase
 
         $this->assertNotNull($booking->fresh()->checked_in_at);
         Log::shouldHaveReceived('warning')->with('[Realtime] broadcast failed', \Mockery::on(fn ($context) => $context['error'] === 'Pusher is down'))->twice();
+    }
+
+    public function test_confirmed_booking_creation_announces_booking_created_on_reception(): void
+    {
+        $member = $this->member(500);
+        $space = Space::factory()->create([
+            'space_type' => SpaceType::Room,
+            'hourly_rate_points' => 100,
+            'slot_granularity_minutes' => 60,
+            'requires_approval' => false,
+        ]);
+        BusinessHour::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'day_of_week' => DayOfWeek::Monday,
+            'open_time' => '08:00',
+            'close_time' => '20:00',
+        ]);
+        Event::fake(self::EVENTS);
+
+        $booking = app(BookingCreationService::class)->create(
+            $space,
+            $member,
+            $this->at('14:00'),
+            $this->at('16:00'),
+            paymentMethod: 'cash',
+        );
+
+        Event::assertDispatchedTimes(BookingCreated::class, 1);
+        Event::assertDispatched(BookingCreated::class, fn (BookingCreated $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'booking.created'
+            && $e->broadcastWith() === [
+                'booking_id' => $booking->id,
+                'member_id' => $member->id,
+                'space_id' => $space->id,
+                'status' => 'confirmed',
+            ]);
+    }
+
+    public function test_pending_booking_creation_announces_booking_pending_approval_on_reception(): void
+    {
+        $member = $this->member(500);
+        $space = Space::factory()->create([
+            'space_type' => SpaceType::Room,
+            'hourly_rate_points' => 100,
+            'slot_granularity_minutes' => 60,
+            'requires_approval' => true,
+        ]);
+        BusinessHour::factory()->create([
+            'branch_id' => $space->building->branch_id,
+            'day_of_week' => DayOfWeek::Monday,
+            'open_time' => '08:00',
+            'close_time' => '20:00',
+        ]);
+        Event::fake(self::EVENTS);
+
+        $booking = app(BookingCreationService::class)->create(
+            $space,
+            $member,
+            $this->at('14:00'),
+            $this->at('16:00'),
+            paymentMethod: 'cash',
+        );
+
+        $this->assertSame(BookingStatus::Pending, $booking->status);
+        Event::assertDispatchedTimes(BookingPendingApproval::class, 1);
+        Event::assertDispatched(BookingPendingApproval::class, fn (BookingPendingApproval $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'booking.pending_approval'
+            && $e->broadcastWith() === [
+                'booking_id' => $booking->id,
+                'member_id' => $member->id,
+                'space_id' => $space->id,
+                'status' => 'pending',
+            ]);
+    }
+
+    public function test_approving_a_pending_booking_announces_booking_created_on_reception(): void
+    {
+        $member = $this->member();
+        $booking = $this->booking($member, attributes: ['status' => BookingStatus::Pending]);
+        $operator = User::factory()->create();
+        Event::fake(self::EVENTS);
+
+        app(BookingApprovalService::class)->approve($booking, $operator);
+
+        Event::assertDispatchedTimes(BookingCreated::class, 1);
+        Event::assertDispatched(BookingCreated::class, fn (BookingCreated $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'booking.created'
+            && $e->broadcastWith() === [
+                'booking_id' => $booking->id,
+                'member_id' => $member->id,
+                'space_id' => $booking->space_id,
+                'status' => 'confirmed',
+            ]);
+    }
+
+    public function test_rejecting_a_pending_booking_announces_booking_cancelled_on_reception(): void
+    {
+        $member = $this->member();
+        $booking = $this->booking($member, attributes: ['status' => BookingStatus::Pending]);
+        $operator = User::factory()->create();
+        Event::fake(self::EVENTS);
+
+        app(BookingApprovalService::class)->reject($booking, $operator, 'Room unavailable');
+
+        Event::assertDispatchedTimes(BookingCancelled::class, 1);
+        Event::assertDispatched(BookingCancelled::class, fn (BookingCancelled $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'booking.cancelled'
+            && $e->broadcastWith() === [
+                'booking_id' => $booking->id,
+                'member_id' => $member->id,
+                'space_id' => $booking->space_id,
+                'status' => 'cancelled',
+            ]);
+    }
+
+    public function test_cancelling_a_booking_announces_booking_cancelled_on_reception(): void
+    {
+        $member = $this->member();
+        $booking = $this->booking($member, attributes: [
+            'status' => BookingStatus::Confirmed,
+            'start_at' => $this->at('14:00'),
+            'end_at' => $this->at('16:00'),
+        ]);
+        Event::fake(self::EVENTS);
+
+        app(BookingCancellationService::class)->cancel($booking);
+
+        Event::assertDispatchedTimes(BookingCancelled::class, 1);
+        Event::assertDispatched(BookingCancelled::class, fn (BookingCancelled $e) => $this->onChannel($e, 'private-reception')
+            && $e->broadcastAs() === 'booking.cancelled'
+            && $e->broadcastWith() === [
+                'booking_id' => $booking->id,
+                'member_id' => $member->id,
+                'space_id' => $booking->space_id,
+                'status' => 'cancelled',
+            ]);
     }
 }

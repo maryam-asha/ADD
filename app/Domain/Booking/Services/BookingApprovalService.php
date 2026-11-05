@@ -3,9 +3,12 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
+use App\Domain\Booking\Events\BookingCancelled;
+use App\Domain\Booking\Events\BookingCreated;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Identity\Models\User;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -19,6 +22,7 @@ class BookingApprovalService
         private readonly BookingPlanBenefits $planBenefits,
         private readonly BookingRefunder $refunder,
         private readonly BookingNotifier $notifier,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     public function approve(Booking $booking, User $operator): void
@@ -33,6 +37,7 @@ class BookingApprovalService
             ])->save();
 
             $this->notifier->approved($locked);
+            $this->realtime->send(new BookingCreated($locked));
         });
     }
 
@@ -60,6 +65,7 @@ class BookingApprovalService
             $this->planBenefits->voidFor($locked);
 
             $this->notifier->rejected($locked, $refunded);
+            $this->realtime->send(new BookingCancelled($locked));
         });
     }
 
@@ -93,6 +99,7 @@ class BookingApprovalService
             $this->refunder->refund($locked, 'Booking lapsed unreviewed refund');
             $this->planBenefits->voidFor($locked);
             $this->notifier->lapsed($locked, $refunded);
+            $this->realtime->send(new BookingCancelled($locked));
 
             return true;
         });
