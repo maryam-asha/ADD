@@ -163,6 +163,8 @@ return [
         ],
     ],
 
-    'attributes' => [],
+    'attributes' => [
+        'privacy_policy_accepted' => 'privacy policy acceptance',
+    ],
 
 ];

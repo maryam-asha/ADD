@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Auth;
 
+use App\Domain\Ecosystem\Models\PrivacyPolicy;
 use App\Domain\Finance\Models\Currency;
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Models\PendingRegistration;
@@ -198,6 +199,13 @@ class MemberAuthController extends Controller
             // A provider's client company may already be waiting for this
             // phone (docs/decisions/service-providers.md).
             app(CompanyInvitationAcceptor::class)->acceptFor($user);
+
+            if ($policy = PrivacyPolicy::first()) {
+                $user->privacyPolicyConsents()->create([
+                    'privacy_policy_id' => $policy->id,
+                    'agreed_at' => now(),
+                ]);
+            }
 
             // The sign-up is no longer pending. Dropped in the same transaction
             // that creates the account, so the two states can never both exist.

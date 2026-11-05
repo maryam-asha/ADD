@@ -178,6 +178,7 @@ class MemberOperationsIsolationTest extends IdentityTestCase
             'name' => 'Maryam Asha',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
+            'privacy_policy_accepted' => true,
         ];
 
         $code = $this->startRegistration($profile);

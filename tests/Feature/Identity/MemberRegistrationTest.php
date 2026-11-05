@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Identity;
 
+use App\Domain\Ecosystem\Models\PrivacyPolicy;
 use App\Domain\Identity\Enums\OtpPurpose;
 use App\Domain\Identity\Models\OtpVerification;
 use App\Domain\Identity\Models\PendingRegistration;
@@ -49,6 +50,7 @@ class MemberRegistrationTest extends IdentityTestCase
             'email' => 'maryam@example.com',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
+            'privacy_policy_accepted' => true,
         ], $overrides);
     }
 
@@ -264,6 +266,37 @@ class MemberRegistrationTest extends IdentityTestCase
         $this->start(['name' => null])->assertStatus(422)->assertJsonValidationErrors('name');
 
         $this->assertDatabaseCount('pending_registrations', 0);
+    }
+
+    public function test_unaccepted_privacy_policy_is_refused_before_any_code_is_sent(): void
+    {
+        $payloadWithoutConsent = $this->payload();
+        unset($payloadWithoutConsent['privacy_policy_accepted']);
+
+        $this->postJson('/api/v1/auth/register', $payloadWithoutConsent)
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('privacy_policy_accepted');
+
+        $this->start(['privacy_policy_accepted' => false])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('privacy_policy_accepted');
+
+        $this->assertDatabaseCount('otp_verifications', 0);
+        $this->assertDatabaseCount('pending_registrations', 0);
+    }
+
+    public function test_registration_creates_privacy_policy_consent_record_when_policy_exists(): void
+    {
+        $policy = PrivacyPolicy::create(['content' => ['en' => 'Terms', 'ar' => 'الشروط']]);
+
+        $this->register()->assertOk();
+
+        $user = User::where('phone', self::PHONE)->sole();
+
+        $this->assertDatabaseHas('user_privacy_policy_consents', [
+            'user_id' => $user->id,
+            'privacy_policy_id' => $policy->id,
+        ]);
     }
 
     public function test_the_email_is_optional(): void

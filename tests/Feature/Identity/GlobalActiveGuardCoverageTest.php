@@ -33,6 +33,7 @@ class GlobalActiveGuardCoverageTest extends IdentityTestCase
             'name' => 'Prospective Member',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
+            'privacy_policy_accepted' => true,
         ]);
 
         $response->assertOk();

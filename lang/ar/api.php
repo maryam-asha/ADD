@@ -32,6 +32,7 @@ return [
         'code_purpose_mismatch' => 'هذا الرمز مخصّص لإجراء آخر.',
         'current_password_incorrect' => 'كلمة المرور الحالية غير صحيحة.',
         'password_changed' => 'تم تحديث كلمة المرور.',
+        'privacy_policy_must_be_accepted' => 'يجب الموافقة على سياسة الخصوصية للمتابعة.',
     ],
 
     'wallet' => [

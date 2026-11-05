@@ -51,6 +51,7 @@ class RegisterRequest extends FormRequest
              * cheap; the reset flow already exists to carry members across it.
              */
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'privacy_policy_accepted' => ['required', 'accepted'],
         ];
     }
 
@@ -61,6 +62,8 @@ class RegisterRequest extends FormRequest
     {
         return [
             'phone.unique' => __('api.auth.phone_already_registered'),
+            'privacy_policy_accepted.accepted' => __('api.auth.privacy_policy_must_be_accepted'),
+            'privacy_policy_accepted.required' => __('api.auth.privacy_policy_must_be_accepted'),
         ];
     }
 }

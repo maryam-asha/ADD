@@ -165,6 +165,7 @@ return [
 
     'attributes' => [
         'payment_method' => 'طريقة الدفع',
+        'privacy_policy_accepted' => 'الموافقة على سياسة الخصوصية',
     ],
 
 ];

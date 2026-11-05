@@ -29,6 +29,8 @@ trait InteractsWithOtp
      */
     protected function startRegistration(array $payload): string
     {
+        $payload = array_merge(['privacy_policy_accepted' => true], $payload);
+
         $this->postJson('/api/v1/auth/register', $payload)->assertOk();
 
         return $this->otpProvider->lastCodeFor($payload['phone']);

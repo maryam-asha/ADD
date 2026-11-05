@@ -32,6 +32,7 @@ return [
         'code_purpose_mismatch' => 'That code was issued for a different action.',
         'current_password_incorrect' => 'Current password is incorrect.',
         'password_changed' => 'Password updated.',
+        'privacy_policy_must_be_accepted' => 'You must accept the privacy policy to continue.',
     ],
 
     'wallet' => [

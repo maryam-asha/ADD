@@ -54,6 +54,7 @@ class OtpDeliveryFailureTest extends TestCase
             'email' => 'maryam@example.com',
             'password' => 'correct-horse',
             'password_confirmation' => 'correct-horse',
+            'privacy_policy_accepted' => true,
         ]);
     }
 

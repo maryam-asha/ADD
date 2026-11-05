@@ -59,6 +59,7 @@ class AuthResponseRatesTest extends IdentityTestCase
             'name' => 'Maryam Asha',
             'password' => self::PASSWORD,
             'password_confirmation' => self::PASSWORD,
+            'privacy_policy_accepted' => true,
         ]);
 
         $this->postJson('/api/v1/auth/register/verify', [
