@@ -102,6 +102,8 @@ class MemberHomeBookingCardTest extends TestCase
                 'end_at' => '2026-10-13T12:15:00+03:00',
                 'checked_in_at' => null,
                 'checked_in_via' => null,
+                // Door buttons only once checked in.
+                'door' => ['available' => false],
             ])
             // The card above, so not listed again.
             ->assertJsonPath('data.today', []);

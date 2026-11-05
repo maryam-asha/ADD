@@ -209,6 +209,12 @@ return [
         'no_active_grant' => 'You do not have active access to this lock right now.',
         'gateway_offline' => "This lock's gateway is currently offline — use the keypad code instead.",
         'unlock_failed' => 'The lock could not be unlocked. Please try again or use the keypad code.',
+        'locked' => 'Locked.',
+        'door_requires_check_in' => 'The door controls open once your booking is checked in.',
+        'door_unavailable' => "This room's door cannot be controlled from the app.",
+        'lock_gateway_offline' => "This lock's gateway is currently offline, so the door cannot be locked from the app right now.",
+        'remote_lock_unsupported' => 'This lock does not support locking from the app.',
+        'lock_failed' => 'The door could not be locked. Please try again.',
     ],
 
     // The app's one scan button (member/scan).

@@ -63,6 +63,17 @@ class TTLockClient
         ]));
     }
 
+    /**
+     * Locks through the paired gateway. Not every TTLock model supports it:
+     * those answer -4043, as for a remote unlock left switched off.
+     */
+    public function remoteLock(Device $lock): void
+    {
+        $this->assertSuccess($this->callV3('/v3/lock/lock', [
+            'lockId' => $lock->external_ref,
+        ]));
+    }
+
     private function assertSuccess(array $response): void
     {
         if (! array_key_exists('errcode', $response)) {

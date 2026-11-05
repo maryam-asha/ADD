@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\V1\Member\AccountController;
 use App\Http\Controllers\Api\V1\Member\BookingController;
+use App\Http\Controllers\Api\V1\Member\BookingDoorController;
 use App\Http\Controllers\Api\V1\Member\CompanyMemberController;
 use App\Http\Controllers\Api\V1\Member\CompanyOfficeLeaseController;
 use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
@@ -90,6 +91,10 @@ Route::post('bookings/preview', [BookingController::class, 'preview']);
 Route::post('bookings/batch', [BookingController::class, 'storeBatch']);
 Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+// The live room card's door buttons: open or lock the booked room's door
+// without its sticker, once the booking is checked in and until it closes.
+Route::post('bookings/{booking}/door/unlock', [BookingDoorController::class, 'unlock'])->middleware('throttle:10,1,member-door');
+Route::post('bookings/{booking}/door/lock', [BookingDoorController::class, 'lock'])->middleware('throttle:10,1,member-door');
 
 // The app's one scan button (ScanController): the kiosk's rotating code
 // starts a coworking session or checks a coworking booking in

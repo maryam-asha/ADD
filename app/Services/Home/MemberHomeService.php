@@ -2,6 +2,7 @@
 
 namespace App\Services\Home;
 
+use App\Domain\Access\Services\BookingDoorService;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -48,6 +49,7 @@ class MemberHomeService
         private readonly OutstandingItems $outstanding,
         private readonly PaymentStatePresenter $payments,
         private readonly LocalTime $time,
+        private readonly BookingDoorService $doors,
     ) {}
 
     /**
@@ -194,6 +196,9 @@ class MemberHomeService
             'end_at' => $this->time->toLocal($booking->end_at)?->toIso8601String(),
             'checked_in_at' => $this->time->toLocal($booking->checked_in_at)?->toIso8601String(),
             'checked_in_via' => $booking->checked_in_via?->value,
+            // Whether to show the door buttons (POST member/bookings/{id}/door/unlock|lock):
+            // only once checked in, and only for a room whose door code is live.
+            'door' => ['available' => $state === 'active' && $this->doors->available($booking)],
         ];
     }
 
