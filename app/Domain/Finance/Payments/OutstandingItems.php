@@ -12,11 +12,14 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
+use App\Domain\Identity\Models\User;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
 use App\Support\PlainAmount;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 
 /**
@@ -42,17 +45,7 @@ class OutstandingItems
      */
     public function for(int $userId, string $currency): array
     {
-        $items = [
-            ...$this->bookings($userId),
-            ...$this->sessions($userId),
-            ...$this->registrations($userId),
-            ...$this->heldPlans($userId),
-        ];
-
-        foreach ($items as &$item) {
-            $item['amount'] = ['value' => PlainAmount::of($this->converter->pointsToAmount($item['amount_points'], $currency)), 'currency' => $currency];
-        }
-        unset($item);
+        $items = $this->priced($this->owed(fn (Builder $query) => $query->where('user_id', $userId)), $currency);
 
         $total = (int) array_sum(array_column($items, 'amount_points'));
 
@@ -64,21 +57,85 @@ class OutstandingItems
     }
 
     /**
+     * Everything owed by every member — the reception desk's "pending
+     * payments" list, the rows countAll() counts — each naming its member,
+     * optionally narrowed to members whose name or phone holds `$search`.
+     * What was used already comes first, oldest first, then what is still to
+     * happen, then held plans; only the page returned is priced.
+     *
+     * @return LengthAwarePaginator<int, array<string, mixed>>
+     */
+    public function forEveryone(string $currency, ?string $search, int $page, int $perPage): LengthAwarePaginator
+    {
+        $search = trim((string) $search);
+
+        $items = collect($this->owed(fn (Builder $query) => $search === '' ? $query : $query->whereHas('user', function (Builder $user) use ($search) {
+            $user->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%");
+        })))
+            ->sortBy(fn (array $item) => $item['starts_at'] === null ? PHP_INT_MAX : strtotime($item['starts_at']))
+            ->values();
+
+        return new LengthAwarePaginator(
+            $this->priced($items->forPage($page, $perPage)->values()->all(), $currency),
+            $items->count(),
+            $perPage,
+            $page,
+        );
+    }
+
+    /**
+     * Every kind of owed row, each narrowed by `$scope` the same way.
+     *
+     * @param  Closure(Builder): mixed  $scope
+     * @return list<array<string, mixed>>
+     */
+    private function owed(Closure $scope): array
+    {
+        return [
+            ...$this->bookings($scope),
+            ...$this->sessions($scope),
+            ...$this->registrations($scope),
+            ...$this->heldPlans($scope),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $items
+     * @return list<array<string, mixed>>
+     */
+    private function priced(array $items, string $currency): array
+    {
+        foreach ($items as &$item) {
+            $item['amount'] = ['value' => PlainAmount::of($this->converter->pointsToAmount($item['amount_points'], $currency)), 'currency' => $currency];
+        }
+        unset($item);
+
+        return $items;
+    }
+
+    /** @return array{id: int, name: string|null, phone: string|null}|null */
+    private function member(?User $user): ?array
+    {
+        return $user === null ? null : ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone];
+    }
+
+    /**
      * What each booking still owes: its price less what was already paid
      * for it — a paid booking that was then extended owes the extension.
      *
      * @return list<array<string, mixed>>
      */
-    private function bookings(int $userId): array
+    private function bookings(Closure $scope): array
     {
         return $this->bookingsOwed()
-            ->with(['space', 'payments'])
-            ->where('user_id', $userId)
+            ->with(['space', 'payments', 'user:id,name,phone'])
+            ->where($scope)
             ->orderBy('start_at')
             ->get()
             ->map(fn (Booking $b) => [
                 'purpose' => PaymentPurpose::Booking->value,
                 'payable_id' => $b->id,
+                'member' => $this->member($b->user),
                 'title' => $b->space?->translate('name'),
                 'starts_at' => $b->start_at?->toIso8601String(),
                 'amount_points' => max(0, (int) $b->price_points - $b->pointsPaid()),
@@ -91,16 +148,17 @@ class OutstandingItems
     /**
      * @return list<array<string, mixed>>
      */
-    private function sessions(int $userId): array
+    private function sessions(Closure $scope): array
     {
         return $this->sessionsOwed()
-            ->with('space')
-            ->where('user_id', $userId)
+            ->with(['space', 'user:id,name,phone'])
+            ->where($scope)
             ->orderBy('checked_in_at')
             ->get()
             ->map(fn (WalkinSession $s) => [
                 'purpose' => PaymentPurpose::CoworkingSession->value,
                 'payable_id' => $s->id,
+                'member' => $this->member($s->user),
                 'title' => $s->space?->translate('name'),
                 'starts_at' => $s->checked_in_at?->toIso8601String(),
                 'amount_points' => (int) $s->price_points,
@@ -111,16 +169,17 @@ class OutstandingItems
     /**
      * @return list<array<string, mixed>>
      */
-    private function registrations(int $userId): array
+    private function registrations(Closure $scope): array
     {
         return $this->registrationsOwed()
-            ->with('event')
-            ->where('user_id', $userId)
+            ->with(['event', 'user:id,name,phone'])
+            ->where($scope)
             ->orderBy('id')
             ->get()
             ->map(fn (EventAttendee $a) => [
                 'purpose' => PaymentPurpose::EventRegistration->value,
                 'payable_id' => $a->id,
+                'member' => $this->member($a->user),
                 'title' => $a->event?->translate('title'),
                 'starts_at' => $a->event?->start_at?->toIso8601String(),
                 'amount_points' => (int) $a->price_points,
@@ -134,16 +193,17 @@ class OutstandingItems
      *
      * @return list<array<string, mixed>>
      */
-    private function heldPlans(int $userId): array
+    private function heldPlans(Closure $scope): array
     {
         return $this->plansHeld()
-            ->with('plan')
-            ->where('user_id', $userId)
+            ->with(['plan', 'user:id,name,phone'])
+            ->where($scope)
             ->orderBy('id')
             ->get()
             ->map(fn (Payment $p) => [
                 'purpose' => PaymentPurpose::PlanPurchase->value,
                 'payment_id' => $p->id,
+                'member' => $this->member($p->user),
                 'title' => $p->plan?->translate('name'),
                 'starts_at' => null,
                 // What the desk will charge: the plan as it is now, at the

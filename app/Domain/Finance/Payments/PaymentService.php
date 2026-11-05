@@ -389,7 +389,7 @@ class PaymentService
 
             $settled = $this->collect($payment, $fulfiller, $collectedVia, $amount, $currency, $operator);
 
-            $this->notifier->received($payment);
+            $this->notifier->receivedAtReception($settled);
 
             return $settled;
         });

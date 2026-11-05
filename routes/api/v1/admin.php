@@ -434,6 +434,8 @@ Route::post('reception/walk-ins/{walkinSession}/settle-payment', [WalkInSessionC
 Route::post('reception/payments/settle', [ReceptionPaymentController::class, 'settle'])->middleware('permission:reception.settle_payment');
 Route::post('reception/item-sales', [ReceptionItemSaleController::class, 'store'])->middleware('permission:item-sales.create');
 Route::get('reception/outstanding', [ReceptionPaymentController::class, 'outstanding'])->middleware('permission:reception.view');
+// Everything owed across every member — what the desk's pending-payments count counts.
+Route::get('reception/pending-payments', [ReceptionPaymentController::class, 'pending'])->middleware('permission:reception.view');
 
 // The desk's day at a glance: counts and what needs it next
 // (the reception desk screen).

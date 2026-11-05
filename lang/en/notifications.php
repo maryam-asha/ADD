@@ -366,6 +366,15 @@ return [
             'title' => 'Payment Received',
             'body' => 'Your payment for :purpose was received (:points points).',
         ],
+        // Money handed over at the reception desk (PaymentNotifier::receivedAtReception).
+        'received_at_reception' => [
+            'title' => 'Payment recorded at reception',
+            'body' => 'Reception received :amount for :purpose (:points points). Your payment is complete.',
+        ],
+        'received_at_reception_with_change' => [
+            'title' => 'Payment recorded at reception',
+            'body' => 'Reception received :amount for :purpose (:points points). Your payment is complete, and the remaining :change points were added to your wallet.',
+        ],
         'expired' => [
             'title' => 'Reserved Package Released',
             'body' => 'The package you chose to pay for at reception was not paid in time and has been released.',

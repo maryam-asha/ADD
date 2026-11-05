@@ -112,7 +112,9 @@ class PaymentNotificationsTest extends TestCase
             'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash',
         ])->assertCreated();
 
-        $this->assertTold($member, 'payment.received');
+        // The desk's own notice: what was taken, in money (ReceptionPendingPaymentsTest).
+        $this->assertTold($member, 'payment.received_at_reception');
+        $this->assertNotTold($member, 'payment.received');
         $notification = Notification::sent($member, GeneralNotification::class)->first();
         $data = $notification->toArray($member);
         // It opens what was paid for: the booking.

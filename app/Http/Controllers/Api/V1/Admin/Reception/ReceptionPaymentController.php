@@ -107,6 +107,41 @@ class ReceptionPaymentController extends Controller
         return response()->json(['data' => $result]);
     }
 
+    /**
+     * Everything owed across every member, for the desk to collect: the rows
+     * the summary's `pending_payments` counts, each naming its member — what
+     * a member chose to pay at the desk included. 25 per page.
+     */
+    public function pending(Request $request, OutstandingItems $items, CurrencyConversionService $currencies): JsonResponse
+    {
+        $validated = $request->validate([
+            'search' => ['nullable', 'string', 'max:100'],
+            'currency' => ['nullable', 'string', 'exists:currencies,code'],
+            'page' => ['nullable', 'integer', 'min:1'],
+        ]);
+
+        try {
+            $page = $items->forEveryone(
+                $validated['currency'] ?? $currencies->baseCurrencyCode(),
+                $validated['search'] ?? null,
+                (int) ($validated['page'] ?? 1),
+                25,
+            );
+        } catch (PaymentPricingException) {
+            return response()->json(['message' => __('api.payment.currency_unavailable')], 422);
+        }
+
+        return response()->json([
+            'data' => $page->items(),
+            'meta' => [
+                'current_page' => $page->currentPage(),
+                'last_page' => $page->lastPage(),
+                'per_page' => $page->perPage(),
+                'total' => $page->total(),
+            ],
+        ]);
+    }
+
     private function target(PaymentPurpose $purpose, SettleAtReceptionRequest $request): Model|Payment
     {
         $id = (int) ($purpose === PaymentPurpose::PlanPurchase ? $request->validated('payment_id') : $request->validated('payable_id'));

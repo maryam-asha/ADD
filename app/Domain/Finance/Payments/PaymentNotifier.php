@@ -10,6 +10,7 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Retail\Models\ItemSale;
 use App\Services\Notification\NotificationService;
 use App\Services\Notification\NotificationText;
+use App\Support\PlainAmount;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -37,6 +38,30 @@ class PaymentNotifier
         }
 
         $this->send($payment, 'payment.received', ['points' => (int) ($payment->points_to_credit ?: $payment->amount_points)]);
+    }
+
+    /**
+     * Money handed over at the desk for something owed: the member is told
+     * what was taken, in the money they paid, what it settled, and any change
+     * left in their wallet as points — so they can check it was recorded
+     * right. A booking this payment just confirmed is announced by its
+     * confirmation instead, as received() does.
+     */
+    public function receivedAtReception(SettledAtReception $settled): void
+    {
+        $payment = $settled->payment;
+
+        if ($this->confirmations->supersedes($payment)) {
+            return;
+        }
+
+        $change = $settled->changePoints();
+
+        $this->send($payment, $change > 0 ? 'payment.received_at_reception_with_change' : 'payment.received_at_reception', [
+            'amount' => PlainAmount::of((string) $payment->received_amount).' '.$payment->received_currency,
+            'points' => $settled->pointsCharged,
+            'change' => $change,
+        ]);
     }
 
     public function expired(Payment $payment): void

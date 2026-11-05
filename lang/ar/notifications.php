@@ -366,6 +366,15 @@ return [
             'title' => 'تم استلام الدفعة',
             'body' => 'تم استلام دفعتك مقابل :purpose (:points نقطة).',
         ],
+        // Money handed over at the reception desk (PaymentNotifier::receivedAtReception).
+        'received_at_reception' => [
+            'title' => 'تم تسجيل دفعتك في الاستقبال',
+            'body' => 'استلم الاستقبال :amount مقابل :purpose (:points نقطة). اكتملت عملية الدفع بنجاح.',
+        ],
+        'received_at_reception_with_change' => [
+            'title' => 'تم تسجيل دفعتك في الاستقبال',
+            'body' => 'استلم الاستقبال :amount مقابل :purpose (:points نقطة). اكتملت عملية الدفع بنجاح، وأُضيف الباقي :change نقطة إلى محفظتك.',
+        ],
         'expired' => [
             'title' => 'تم إلغاء حجز الباقة',
             'body' => 'لم يتم دفع الباقة التي اخترت دفعها في الاستقبال خلال المهلة، وتم إلغاء حجزها.',
