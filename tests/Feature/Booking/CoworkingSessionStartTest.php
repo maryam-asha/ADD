@@ -131,11 +131,12 @@ class CoworkingSessionStartTest extends TestCase
 
         $response = $this->scan();
 
-        $response->assertStatus(422)
-            ->assertJsonPath('reason', 'plan_expired')
-            ->assertJsonPath('hourly_rate_points', 100)
-            ->assertJsonPath('message', 'Your plan will not cover this session (your plan has expired). It will be billed at 100 points per hour.');
-        $this->assertNotEmpty($response->json('scan_ticket'));
+        $response->assertOk()
+            ->assertJsonPath('data.outcome', 'confirmation_required')
+            ->assertJsonPath('data.reason', 'plan_expired')
+            ->assertJsonPath('data.hourly_rate_points', 100)
+            ->assertJsonPath('data.message', 'Your plan will not cover this session (your plan has expired). It will be billed at 100 points per hour.');
+        $this->assertNotEmpty($response->json('data.scan_ticket'));
         $this->assertSame(0, ArrivalRequest::count());
     }
 
@@ -143,7 +144,7 @@ class CoworkingSessionStartTest extends TestCase
     {
         $member = $this->actingAsLapsedMember();
 
-        $this->accept($this->scan()->json('scan_ticket'))
+        $this->accept($this->scan()->json('data.scan_ticket'))
             ->assertCreated()
             ->assertJsonPath('data.outcome', 'awaiting_confirmation')
             ->assertJsonPath('data.arrival_request.accepted_uncovered', true)
@@ -158,7 +159,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_accepting_the_same_ticket_twice_files_one_request(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
 
         $id = $this->accept($ticket)->assertCreated()->json('data.arrival_request.id');
         $this->accept($ticket)->assertOk()->assertJsonPath('data.arrival_request.id', $id);
@@ -174,17 +175,18 @@ class CoworkingSessionStartTest extends TestCase
 
         $response = $this->scan();
 
-        $response->assertStatus(422)
-            ->assertJsonPath('reason', 'plan_expired')
-            ->assertJsonPath('hourly_rate_points', 0);
-        $this->assertNotEmpty($response->json('scan_ticket'));
+        $response->assertOk()
+            ->assertJsonPath('data.outcome', 'confirmation_required')
+            ->assertJsonPath('data.reason', 'plan_expired')
+            ->assertJsonPath('data.hourly_rate_points', 0);
+        $this->assertNotEmpty($response->json('data.scan_ticket'));
         $this->assertSame(0, WalkinSession::count());
     }
 
     public function test_a_ticket_for_a_kiosk_revoked_since_it_was_issued_is_refused(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
         app(KioskPairingService::class)->revoke($this->kiosk);
 
         $this->accept($ticket)
@@ -196,7 +198,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_a_ticket_for_a_kiosk_deactivated_since_it_was_issued_is_refused(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
         $this->kiosk->update(['is_active' => false]);
 
         $this->accept($ticket)
@@ -218,7 +220,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_a_ticket_without_the_explicit_acceptance_is_refused(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
 
         $this->scan(['scan_ticket' => $ticket])->assertStatus(422)->assertJsonValidationErrors('accept_uncovered');
         $this->assertSame(0, WalkinSession::count());
@@ -227,7 +229,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_a_code_and_a_ticket_together_are_refused(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
 
         $this->scan([
             'qr_value' => $this->qrFor($this->kiosk, $this->secret),
@@ -244,15 +246,16 @@ class CoworkingSessionStartTest extends TestCase
         $this->spendPlanHours($membership, $member, 1.0);
 
         $this->scan()
-            ->assertStatus(422)
-            ->assertJsonPath('reason', 'hours_exhausted')
-            ->assertJsonPath('coverage.hours_remaining', 0);
+            ->assertOk()
+            ->assertJsonPath('data.outcome', 'confirmation_required')
+            ->assertJsonPath('data.reason', 'hours_exhausted')
+            ->assertJsonPath('data.coverage.hours_remaining', 0);
     }
 
     public function test_the_ticket_expires_after_two_minutes(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
         $this->travel(121)->seconds();
 
         $this->accept($ticket)->assertStatus(422)->assertExactJson(['message' => 'This confirmation has expired. Scan the kiosk code again.']);
@@ -261,7 +264,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_another_members_ticket_is_refused(): void
     {
         $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
         $this->actingAsMember();
 
         $this->accept($ticket)->assertStatus(422);
@@ -271,7 +274,7 @@ class CoworkingSessionStartTest extends TestCase
     public function test_coverage_is_evaluated_again_when_the_member_accepts(): void
     {
         $member = $this->actingAsLapsedMember();
-        $ticket = $this->scan()->json('scan_ticket');
+        $ticket = $this->scan()->json('data.scan_ticket');
         $this->subscribe($member, $this->planWithHours(40)); // renewed in between
 
         $this->accept($ticket)
@@ -524,7 +527,7 @@ class CoworkingSessionStartTest extends TestCase
         $this->actingAsLapsedMember();
 
         foreach (range(1, 10) as $attempt) {
-            $this->scan()->assertStatus(422);
+            $this->scan()->assertOk()->assertJsonPath('data.outcome', 'confirmation_required');
         }
 
         $this->scan()->assertStatus(429);

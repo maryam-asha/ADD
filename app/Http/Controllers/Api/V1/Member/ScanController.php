@@ -51,19 +51,21 @@ class ScanController extends Controller
         }
 
         if ($result->outcome === CoworkingStartOutcome::ConfirmationRequired) {
-            // Same message-plus-data 422 shape as api.booking.wallet_choice_required:
-            // the client must answer, then re-submit.
-            return response()->json([
+            // A question for the member, not an error: 200 with its own outcome so
+            // the app switches on data.outcome like every other answer, then
+            // re-submits {scan_ticket, accept_uncovered: true} if they accept.
+            return response()->json(['data' => [
+                'outcome' => $result->outcome->value,
                 'message' => __('api.coworking.confirmation_required', [
                     'reason' => __('api.coworking.reasons.'.$result->coverage->reason->value),
                     'rate' => $result->hourlyRatePoints,
                 ]),
                 'reason' => $result->coverage->reason->value,
-                'coverage' => new SessionCoverageResource($result->coverage->toArray()),
+                'coverage' => (new SessionCoverageResource($result->coverage->toArray()))->resolve($request),
                 'hourly_rate_points' => $result->hourlyRatePoints,
                 'scan_ticket' => $result->ticket->ticket,
                 'ticket_expires_at' => $result->ticket->expiresAt->toIso8601String(),
-            ], 422);
+            ]]);
         }
 
         // A request for reception, either kind: nothing has started yet.
