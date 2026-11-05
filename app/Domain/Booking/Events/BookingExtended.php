@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Events;
 
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\CurrentBookingLocator;
 use App\Support\Time\LocalTime;
 
 /**
@@ -13,6 +14,9 @@ class BookingExtended extends MemberUpdate
 {
     public readonly int $bookingId;
 
+    /** The booking's card state in home's active_booking after this change (CurrentBookingLocator::stateOf); null = no card. */
+    public readonly ?string $state;
+
     public readonly string $endAt;
 
     public function __construct(Booking $booking)
@@ -20,6 +24,7 @@ class BookingExtended extends MemberUpdate
         parent::__construct((int) $booking->user_id);
 
         $this->bookingId = (int) $booking->id;
+        $this->state = app(CurrentBookingLocator::class)->stateOf($booking);
         $this->endAt = app(LocalTime::class)->toLocal($booking->end_at)->toIso8601String();
     }
 
@@ -32,6 +37,7 @@ class BookingExtended extends MemberUpdate
     {
         return [
             'booking_id' => $this->bookingId,
+            'state' => $this->state,
             'end_at' => $this->endAt,
         ];
     }

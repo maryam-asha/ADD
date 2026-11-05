@@ -210,13 +210,13 @@ class BookingDoorControlTest extends TestCase
 
         $this->getJson('/api/v1/member/home')
             ->assertOk()
-            ->assertJsonPath('data.active_booking.state', 'active')
-            ->assertJsonPath('data.active_booking.door.available', true);
+            ->assertJsonPath('data.active_booking.0.state', 'active')
+            ->assertJsonPath('data.active_booking.0.door.available', true);
 
         $booking->update(['checked_in_at' => null]);
 
         $this->getJson('/api/v1/member/home')
-            ->assertJsonPath('data.active_booking.state', 'ready')
-            ->assertJsonPath('data.active_booking.door.available', false);
+            ->assertJsonPath('data.active_booking.0.state', 'ready')
+            ->assertJsonPath('data.active_booking.0.door.available', false);
     }
 }

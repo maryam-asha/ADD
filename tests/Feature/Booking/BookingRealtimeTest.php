@@ -142,7 +142,7 @@ class BookingRealtimeTest extends TestCase
         Event::assertDispatchedTimes(BookingStarted::class, 1);
         Event::assertDispatched(BookingStarted::class, fn (BookingStarted $e) => $this->onChannel($e, "private-member.{$member->id}")
             && $e->broadcastAs() === 'booking.started'
-            && $e->broadcastWith() === ['booking_id' => $booking->id, 'checked_in_via' => 'door']);
+            && $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => 'active', 'checked_in_via' => 'door']);
         Event::assertDispatched(BookingCheckedIn::class, fn (BookingCheckedIn $e) => $this->onChannel($e, 'private-reception')
             && $e->broadcastAs() === 'booking.checked_in'
             && $e->broadcastWith() === ['booking_id' => $booking->id, 'member_id' => $member->id]);
@@ -172,7 +172,7 @@ class BookingRealtimeTest extends TestCase
 
         Event::assertDispatched(BookingExtended::class, fn (BookingExtended $e) => $this->onChannel($e, "private-member.{$member->id}")
             && $e->broadcastAs() === 'booking.extended'
-            && $e->broadcastWith() === ['booking_id' => $booking->id, 'end_at' => '2026-08-17T13:00:00+03:00']);
+            && $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => 'active', 'end_at' => '2026-08-17T13:00:00+03:00']);
     }
 
     /** The wallet paid what was owed on close: the end says `paid`, and the payment is a booking's, not a session's. */
@@ -189,7 +189,7 @@ class BookingRealtimeTest extends TestCase
 
         Event::assertDispatched(BookingEnded::class, fn (BookingEnded $e) => $this->onChannel($e, "private-member.{$member->id}")
             && $e->broadcastAs() === 'booking.ended'
-            && $e->broadcastWith() === ['booking_id' => $booking->id, 'payment_state' => 'paid']);
+            && $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => null, 'payment_state' => 'paid']);
         Event::assertDispatched(BookingCheckedOut::class, fn (BookingCheckedOut $e) => $this->onChannel($e, 'private-reception')
             && $e->broadcastAs() === 'booking.checked_out'
             && $e->broadcastWith() === ['booking_id' => $booking->id, 'member_id' => $member->id, 'payment_state' => 'paid']);
@@ -208,7 +208,8 @@ class BookingRealtimeTest extends TestCase
 
         app(SessionClosureService::class)->closeOut($booking, $this->at('11:00'));
 
-        Event::assertDispatched(BookingEnded::class, fn (BookingEnded $e) => $e->broadcastWith()['payment_state'] === 'unpaid');
+        // Still owed, so its card stays — awaiting payment.
+        Event::assertDispatched(BookingEnded::class, fn (BookingEnded $e) => $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => 'awaiting_payment', 'payment_state' => 'unpaid']);
         Event::assertNotDispatched(BookingPaid::class);
     }
 
@@ -230,7 +231,7 @@ class BookingRealtimeTest extends TestCase
         Event::assertDispatchedTimes(BookingPaid::class, 1);
         Event::assertDispatched(BookingPaid::class, fn (BookingPaid $e) => $this->onChannel($e, "private-member.{$member->id}")
             && $e->broadcastAs() === 'booking.paid'
-            && $e->broadcastWith() === ['booking_id' => $booking->id]);
+            && $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => null]);
         Event::assertNotDispatched(CoworkingSessionPaid::class);
     }
 

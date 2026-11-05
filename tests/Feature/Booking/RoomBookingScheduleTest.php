@@ -94,7 +94,7 @@ class RoomBookingScheduleTest extends TestCase
 
         Event::assertDispatchedTimes(BookingReady::class, 1);
         Event::assertDispatched(BookingReady::class, fn (BookingReady $e) => $e->broadcastAs() === 'booking.ready'
-            && $e->broadcastWith() === ['booking_id' => $booking->id]
+            && $e->broadcastWith() === ['booking_id' => $booking->id, 'state' => 'ready']
             && $e->memberId === $this->member->id);
         $this->assertTrue($booking->fresh()->ready_announced_at->equalTo($this->at('10:00')));
     }

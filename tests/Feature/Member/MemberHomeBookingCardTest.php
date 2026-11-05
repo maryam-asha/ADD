@@ -86,13 +86,13 @@ class MemberHomeBookingCardTest extends TestCase
         $booking = $this->booking();
 
         $this->home()
-            ->assertJsonPath('data.active_booking', null)
+            ->assertJsonPath('data.active_booking', [])
             ->assertJsonPath('data.today.0.id', $booking->id);
 
         Carbon::setTestNow(Carbon::parse('2026-10-13 07:00:00', 'UTC'));
 
         $this->home()
-            ->assertJsonPath('data.active_booking', [
+            ->assertJsonPath('data.active_booking', [[
                 'state' => 'ready',
                 'id' => $booking->id,
                 'reference' => $booking->reference,
@@ -106,7 +106,7 @@ class MemberHomeBookingCardTest extends TestCase
                 'payment' => null,
                 // Door buttons only once checked in.
                 'door' => ['available' => false],
-            ])
+            ]])
             // The card above, so not listed again.
             ->assertJsonPath('data.today', []);
     }
@@ -121,10 +121,10 @@ class MemberHomeBookingCardTest extends TestCase
         ]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking.state', 'active')
-            ->assertJsonPath('data.active_booking.id', $booking->id)
-            ->assertJsonPath('data.active_booking.checked_in_at', '2026-10-13T09:40:00+03:00')
-            ->assertJsonPath('data.active_booking.checked_in_via', 'door')
+            ->assertJsonPath('data.active_booking.0.state', 'active')
+            ->assertJsonPath('data.active_booking.0.id', $booking->id)
+            ->assertJsonPath('data.active_booking.0.checked_in_at', '2026-10-13T09:40:00+03:00')
+            ->assertJsonPath('data.active_booking.0.checked_in_via', 'door')
             ->assertJsonPath('data.active_session', null);
     }
 
@@ -141,7 +141,8 @@ class MemberHomeBookingCardTest extends TestCase
 
         // A room is never the session card, owed or not.
         $response = $this->home()->assertJsonPath('data.active_session', null);
-        $card = $response->json('data.active_booking');
+        $this->assertCount(1, $response->json('data.active_booking'));
+        $card = $response->json('data.active_booking.0');
 
         $this->assertSame(['awaiting_payment', $booking->id, $booking->reference], [$card['state'], $card['id'], $card['reference']]);
         $this->assertSame('2026-10-13T09:00:00+03:00', $card['checked_out_at']);
@@ -150,7 +151,7 @@ class MemberHomeBookingCardTest extends TestCase
 
         $booking->forceFill(['payment_state' => PaymentState::Paid, 'paid_at' => now()])->save();
 
-        $this->home()->assertJsonPath('data.active_booking', null);
+        $this->home()->assertJsonPath('data.active_booking', []);
     }
 
     /** Paid then extended: only the extension is owed. */
@@ -168,10 +169,10 @@ class MemberHomeBookingCardTest extends TestCase
         Payment::factory()->forPayable($booking)->create(['purpose' => PaymentPurpose::Booking, 'status' => PaymentStatus::Accepted, 'settled_at' => now(), 'amount_points' => 200, 'user_id' => $this->member->id]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking.state', 'awaiting_payment')
-            ->assertJsonPath('data.active_booking.id', $booking->id)
-            ->assertJsonPath('data.active_booking.payment.amount_points', 100)
-            ->assertJsonPath('data.active_booking.payment.method', 'paymera');
+            ->assertJsonPath('data.active_booking.0.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_booking.0.id', $booking->id)
+            ->assertJsonPath('data.active_booking.0.payment.amount_points', 100)
+            ->assertJsonPath('data.active_booking.0.payment.method', 'paymera');
     }
 
     public function test_a_paid_closed_room_a_no_show_or_a_cancelled_booking_is_no_card(): void
@@ -189,7 +190,7 @@ class MemberHomeBookingCardTest extends TestCase
         $this->booking(['status' => BookingStatus::Cancelled]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking', null);
+            ->assertJsonPath('data.active_booking', []);
     }
 
     public function test_a_coworking_booking_is_never_the_booking_card_and_a_room_never_the_session_card(): void
@@ -205,7 +206,7 @@ class MemberHomeBookingCardTest extends TestCase
         ]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking', null)
+            ->assertJsonPath('data.active_booking', [])
             ->assertJsonPath('data.active_session.type', 'booking')
             ->assertJsonPath('data.active_session.id', $coworking->id);
 
@@ -218,11 +219,11 @@ class MemberHomeBookingCardTest extends TestCase
 
         $this->home()
             ->assertJsonPath('data.active_session', null)
-            ->assertJsonPath('data.active_booking.id', $room->id);
+            ->assertJsonPath('data.active_booking.0.id', $room->id);
     }
 
-    /** A checked-in room takes the card; once it closes paid, the older one still owed is the card again. */
-    public function test_a_running_room_takes_the_card_and_the_owed_one_comes_back(): void
+    /** A running room and an older one still owed are both cards: live first, then owed; once the running one closes paid it leaves. */
+    public function test_a_running_room_and_an_owed_one_are_both_cards(): void
     {
         $owed = $this->booking([
             'status' => BookingStatus::Completed,
@@ -237,13 +238,41 @@ class MemberHomeBookingCardTest extends TestCase
         ]);
 
         $this->home()
-            ->assertJsonPath('data.active_booking.state', 'active')
-            ->assertJsonPath('data.active_booking.id', $running->id);
+            ->assertJsonCount(2, 'data.active_booking')
+            ->assertJsonPath('data.active_booking.0.state', 'active')
+            ->assertJsonPath('data.active_booking.0.id', $running->id)
+            ->assertJsonPath('data.active_booking.1.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_booking.1.id', $owed->id);
 
         $running->forceFill(['checked_out_at' => now(), 'status' => BookingStatus::Completed, 'payment_state' => PaymentState::Paid, 'paid_at' => now()])->save();
 
         $this->home()
-            ->assertJsonPath('data.active_booking.state', 'awaiting_payment')
-            ->assertJsonPath('data.active_booking.id', $owed->id);
+            ->assertJsonCount(1, 'data.active_booking')
+            ->assertJsonPath('data.active_booking.0.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_booking.0.id', $owed->id);
+    }
+
+    /**
+     * Two rooms at once, a third about to open and two owed: each is its own
+     * card — active by check-in, then ready by start, then owed newest close
+     * first — and none of them is listed again in `today`.
+     */
+    public function test_every_room_booking_is_its_own_card(): void
+    {
+        $hall = Space::factory()->room()->create(['building_id' => $this->room->building_id]);
+        $office = Space::factory()->room()->create(['building_id' => $this->room->building_id]);
+
+        $older = $this->booking(['status' => BookingStatus::Completed, 'start_at' => '2026-10-11 04:00:00', 'end_at' => '2026-10-11 06:00:00', 'checked_in_at' => '2026-10-11 04:00:00', 'checked_out_at' => '2026-10-11 06:00:00']);
+        $newer = $this->booking(['status' => BookingStatus::Completed, 'start_at' => '2026-10-12 04:00:00', 'end_at' => '2026-10-12 06:00:00', 'checked_in_at' => '2026-10-12 04:00:00', 'checked_out_at' => '2026-10-12 06:00:00']);
+        $second = $this->booking(['space_id' => $hall->id, 'start_at' => '2026-10-13 06:30:00', 'checked_in_at' => '2026-10-13 06:45:00']);
+        $first = $this->booking(['start_at' => '2026-10-13 06:00:00', 'checked_in_at' => '2026-10-13 06:00:00']);
+        $ready = $this->booking(['space_id' => $office->id, 'start_at' => '2026-10-13 07:10:00']);
+
+        $response = $this->home()->assertJsonPath('data.today', []);
+
+        $this->assertSame(
+            [['active', $first->id], ['active', $second->id], ['ready', $ready->id], ['awaiting_payment', $newer->id], ['awaiting_payment', $older->id]],
+            array_map(fn (array $card) => [$card['state'], $card['id']], $response->json('data.active_booking')),
+        );
     }
 }

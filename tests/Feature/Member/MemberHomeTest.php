@@ -80,7 +80,7 @@ class MemberHomeTest extends TestCase
             'greeting' => 'Good morning, Omar',
             'unread_notifications' => 0,
             'active_session' => null,
-            'active_booking' => null,
+            'active_booking' => [],
             'banners' => [],
             'today' => [],
             'explore' => [],
@@ -571,7 +571,7 @@ class MemberHomeTest extends TestCase
         $response->assertJsonPath('data.greeting', 'Good morning');
         $response->assertJsonPath('data.unread_notifications', 0);
         $response->assertJsonPath('data.active_session', null);
-        $response->assertJsonPath('data.active_booking', null);
+        $response->assertJsonPath('data.active_booking', []);
         $response->assertJsonPath('data.today', []);
         $response->assertJsonPath('data.banners.0.id', $banner->id);
         $response->assertJsonPath('data.explore.0.id', $service->id);

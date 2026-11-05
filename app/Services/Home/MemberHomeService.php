@@ -73,7 +73,7 @@ class MemberHomeService
                 'greeting' => $this->greeting(null, $localNow, $locale),
                 'unread_notifications' => 0,
                 'active_session' => null,
-                'active_booking' => null,
+                'active_booking' => [],
                 'banners' => $this->banners($locale),
                 'today' => [],
                 'explore' => $this->explore(null, $locale),
@@ -81,21 +81,26 @@ class MemberHomeService
         }
 
         $session = $this->sessions->openSessionFor($member);
-        $current = $this->bookings->for($member);
+        $live = $this->bookings->for($member);
 
-        // The running session's booking and the booking on its own card are
-        // the cards above, so `today` does not list them twice.
+        // The running session's booking and the bookings on their own cards
+        // are the cards above, so `today` does not list them twice.
         $shown = array_values(array_filter([
             $session instanceof Booking ? $session->id : null,
-            $current === null ? null : $current[1]->id,
+            ...array_map(fn (array $card) => $card[1]->id, $live),
         ]));
 
         // Closed and still owing, newest close first (OutstandingItems::closedFor,
-        // the desk's own rules): the newest of each kind stays its card,
-        // awaiting_payment, once nothing live takes the card's place.
+        // the desk's own rules): the newest coworking session stays its card,
+        // awaiting_payment, once nothing live takes the card's place; every
+        // owed room booking is a card of its own, after the live ones.
         $owed = $this->outstanding->closedFor($member->id);
         $owedSession = $owed->first(fn (Booking|WalkinSession $item) => ! $item instanceof Booking || $item->isCoworking());
-        $owedBooking = $owed->first(fn (Booking|WalkinSession $item) => $item instanceof Booking && ! $item->isCoworking());
+        $owedBookings = $owed
+            ->filter(fn (Booking|WalkinSession $item) => $item instanceof Booking && ! $item->isCoworking())
+            ->map(fn (Booking $booking) => ['awaiting_payment', $booking])
+            ->values()
+            ->all();
 
         return [
             'greeting' => $this->greeting($member, $localNow, $locale),
@@ -103,11 +108,10 @@ class MemberHomeService
             'active_session' => $session === null
                 ? $this->awaitingSession($member, $locale) ?? $this->owingSession($owedSession, $member, $locale)
                 : $this->session($session, $locale),
-            'active_booking' => match (true) {
-                $current !== null => $this->booking($current[0], $current[1], $member, $locale),
-                $owedBooking !== null => $this->booking('awaiting_payment', $owedBooking, $member, $locale),
-                default => null,
-            },
+            'active_booking' => array_map(
+                fn (array $card) => $this->booking($card[0], $card[1], $member, $locale),
+                [...$live, ...$owedBookings],
+            ),
             'banners' => $this->banners($locale),
             'today' => $this->today($member, $shown, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
@@ -223,11 +227,13 @@ class MemberHomeService
     }
 
     /**
-     * A room, office or hall booking's own card (CurrentBookingLocator), from
-     * its check-in window (`ready`) through the booking (`active`, checked
-     * in by reception or the door QR) to what it still owes once closed
-     * (`awaiting_payment`, the newest room booking that owes, once no live
-     * one takes its place). It closes itself at `end_at` or at the desk —
+     * One item of `active_booking`: a room, office or hall booking's own card
+     * (CurrentBookingLocator), from its check-in window (`ready`) through the
+     * booking (`active`, checked in by reception or the door QR) to what it
+     * still owes once closed (`awaiting_payment`). The list holds every such
+     * booking — live ones first, then each one owed, newest close first — and
+     * the app matches each real-time event to its card by `id` (the event's
+     * `booking_id`). It closes itself at `end_at` or at the desk —
      * the member does not end it — and `payment`, only once it owes, is the
      * block every booking shows, `method` the one it was booked with:
      * paying is POST member/bookings/{booking}/pay, and BookingPaid tells
