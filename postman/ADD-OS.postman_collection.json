@@ -1811,7 +1811,7 @@
                         },
                         {
                             "name": "Bookings",
-                            "description": "Preview, create (one date or several), list, read, extend, cancel, and pay what a room booking still owes once it has closed. Each error case is a saved example of its request.\n\n## A room, office or hall booking in the app\nAny space that is not a co_space (a coworking booking is a coworking session \u2014 11. Coworking Sessions). The payment method the member books with is kept on the booking and settles whatever it still owes when it closes.\n\n1. **Its check-in window opens** (15 minutes before the start) \u2014 event `booking.ready`; home's `active_booking` shows `state: ready`.\n2. **The member arrives** \u2014 reception checks them in, or they open the room's door with its QR (10. Scan \u2192 Scan QR with the door sticker). No acceptance step: event `booking.started`, `active_booking.state: active`, with `checked_in_at` (never before the start) and `checked_in_via` (`reception` | `door`).\n3. **Extend (optional)** \u2014 Extension Options, then Extend Booking; event `booking.extended` with the new `end_at`. A booking paid from the wallet pays the extension at once when the wallet covers it; otherwise only the extension is owed.\n4. **It ends** \u2014 by itself at `end_at` (bookings:close-ended-rooms, every minute), or earlier only at the desk. There is no end button in the app. It costs its full booked price, however long it was used.\n5. **What it still owes is settled by the method it was booked with** \u2014 `wallet`: taken from the member's own points at once (a short wallet leaves it owed; the booking closes either way); `cash`: the desk is told to collect it; `paymera`: the member pays from the app. Then event `booking.ended` with `payment_state`.\n6. **Still owed** \u2014 the booking is in home's `unpaid` (`kind: booking`) until paid: its button is Pay Booking (After It Closes), with no body to pay by the booked method. Paid by any means, the desk included: event `booking.paid`, and it leaves `unpaid`.\n\n### Events on private-member.{user_id}\nConnect and authorize as in 11. Coworking Sessions (Real-time). On every event the app re-fetches GET member/home.\n\n| Event | data | What the app does |\n|---|---|---|\n| `booking.ready` | `{booking_id}` | The check-in window opened: re-fetch home (`active_booking.state: ready`). Sent once per booking. |\n| `booking.started` | `{booking_id, checked_in_via: \"reception\"\\|\"door\"}` | Checked in: re-fetch home (`state: active`). |\n| `booking.extended` | `{booking_id, end_at}` | Runs longer; `end_at` is its new end (district offset). Sent for coworking bookings too. |\n| `booking.ended` | `{booking_id, payment_state: \"paid\"\\|\"unpaid\"}` | Closed and settled as far as the booked method could: re-fetch home; `unpaid` \u2014 it is now in `unpaid`. |\n| `booking.paid` | `{booking_id}` | A closed booking was paid: re-fetch home; it leaves `unpaid`. |\n\nThe desk hears `booking.checked_in` and `booking.checked_out` on `private-reception` (Admin \u2192 Reception Operations).",
+                            "description": "Preview, create (one date or several), list, read and cancel. Each error case is a saved example of its request.\n\nA room, office or hall booking once it is under way \u2014 its live card, check-in at the door, the door buttons, extending, and paying what it owes once it closes \u2014 is in **14. Active Booking (Room)**.",
                             "item": [
                                 {
                                     "name": "Preview Booking \u2014 Confirmation Screen",
@@ -2979,453 +2979,6 @@
                                         },
                                         "description": "One booking, as the booking screens draw it (submitted, confirmed, rejected, the cancel sheet): `id`, `reference` (the booking number, e.g. `BK-2026-00041`), `status`, `status_label`, `status_note`, `space {id, title, main_image, branch, capacity, hourly_price}`, `seat`, `date_label`, `time_label`, `total {points, price}`, `checked_in_at`, `checked_out_at`, `payment_state`, `payment_id`, `awaiting_payment`, `request_status` (the Submitted \u2192 Under Review \u2192 decision stepper, with `rejection_reason`), `actions {can_cancel, can_extend, extend_disabled_reason}` and `cancellation`.\n\nThe screen headlines are the app's, chosen from `status`. The status stays `confirmed` until checkout, so `checked_in_at` set with `checked_out_at` null means the booking is under way.\n\n`cancellation` is null when the booking cannot be cancelled; otherwise `deadline_label`, and `refund_points` / `refund_price` / `refund_to` \u2014 exactly what cancelling gives back and to which wallet (\"Your wallet\" or the company). 403 for another member's booking. See docs/decisions/booking-outcomes-and-extension.md.\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off."
                                     }
-                                },
-                                {
-                                    "name": "Extension Options",
-                                    "request": {
-                                        "method": "GET",
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "header": [
-                                            {
-                                                "key": "Accept",
-                                                "value": "application/json",
-                                                "type": "text"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extension-options",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "bookings",
-                                                "{{booking_id}}",
-                                                "extension-options"
-                                            ]
-                                        },
-                                        "description": "How far the member's running booking can be extended, and at what price. Extendable only while it runs (start_at \u2264 now < end_at), checked in and not out, on a space with `allows_extension`. `latest_end_at` is the latest the member can stay: the next booking less its buffer, a co-working loan, the seat pool, or the branch's closing \u2014 whichever comes first. Each `options[]` entry is an `additional_minutes` that `POST .../extend` accepts, with the end time and the points it charges. When `can_extend` is false, `options` is empty and `reason` is one of `space_disallows`, `not_checked_in`, `outside_booking_time`, `next_slot_booked`, `branch_closing` (`reason_label` translated). 403 for another member's booking. See docs/decisions/booking-outcomes-and-extension.md."
-                                    },
-                                    "response": []
-                                },
-                                {
-                                    "name": "Extend Booking",
-                                    "request": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{\n  \"additional_minutes\": 60\n}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "bookings",
-                                                "{{booking_id}}",
-                                                "extend"
-                                            ]
-                                        },
-                                        "description": "Extends a running booking: start_at \u2264 now < end_at, checked in and not out, on a space whose `allows_extension` is on. Ask `GET .../extension-options` first \u2014 the same rules decide both, re-checked here under a lock. Other refusals (422): `extension_not_allowed`, `extension_outside_booking_time`, `extension_past_closing` (with the closing time), and `not_checked_in`.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Conflict** \u2014 422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
-                                    },
-                                    "response": [
-                                        {
-                                            "name": "Error: Conflict",
-                                            "originalRequest": {
-                                                "auth": {
-                                                    "type": "bearer",
-                                                    "bearer": [
-                                                        {
-                                                            "key": "token",
-                                                            "value": "{{member_token}}"
-                                                        }
-                                                    ]
-                                                },
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{\n  \"additional_minutes\": 180\n}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "bookings",
-                                                        "{{booking_id}}",
-                                                        "extend"
-                                                    ]
-                                                }
-                                            },
-                                            "status": "Unprocessable Content",
-                                            "code": 422,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"message\": \"This booking cannot be extended past <latest_end_at>.\"\n}"
-                                        }
-                                    ]
-                                },
-                                {
-                                    "name": "Pay Booking (After It Closes)",
-                                    "request": {
-                                        "auth": {
-                                            "type": "bearer",
-                                            "bearer": [
-                                                {
-                                                    "key": "token",
-                                                    "value": "{{member_token}}"
-                                                }
-                                            ]
-                                        },
-                                        "method": "POST",
-                                        "header": [
-                                            {
-                                                "key": "Content-Type",
-                                                "value": "application/json"
-                                            },
-                                            {
-                                                "key": "lang",
-                                                "value": "{{lang}}",
-                                                "type": "text"
-                                            }
-                                        ],
-                                        "body": {
-                                            "mode": "raw",
-                                            "raw": "{}",
-                                            "options": {
-                                                "raw": {
-                                                    "language": "json"
-                                                }
-                                            }
-                                        },
-                                        "url": {
-                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
-                                            "host": [
-                                                "{{base_url}}"
-                                            ],
-                                            "path": [
-                                                "api",
-                                                "v1",
-                                                "member",
-                                                "bookings",
-                                                "{{booking_id}}",
-                                                "pay"
-                                            ]
-                                        },
-                                        "description": "What a closed booking still owes \u2014 an extension, an overstay, or all of it when it was booked to be paid at the desk \u2014 paid from the app: the button on its item in home's `unpaid` (`kind: booking`). A booking still to happen or running is paid through Pay Booking (by booking_id) instead.\n\n### Body (all optional)\n- `payment_method`: `wallet` | `cash` | `paymera`. **Leave it out** to pay by the method the booking was made with (`unpaid[].payment.method`) \u2014 the member is not asked again. Sending another one pays that way and keeps it as the booking's method.\n- `wallet_owner_type` + `wallet_owner_id` (together): which wallet pays with `wallet` \u2014 `user` or `company`.\n- `coupon_code`.\n\n### Answer\n201 `{data: {payment, redirect_url, next}}` \u2014 plus `coupon` inside `data` when a code was sent. `next` is `redirect` (open `redirect_url`, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (the desk hears `coworking.pay_at_reception` with `session_type: booking` and settles it; `payment` and `redirect_url` null). Paid: event `booking.paid`.\n\nErrors: 404 not the member's booking \u00b7 409 already paid \u00b7 422 not closed yet (`This booking or session must be checked out before payment can be settled.`) \u00b7 422 no method sent and none kept (`Choose how to pay for this booking.`) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 503 card payment unavailable; 502 could not start.\n\n### Cases \u2014 see this request's saved examples\n- **Card, by the booked method (next: redirect)** \u2014 201, empty body.\n- **Cash (next: pay_at_reception)** \u2014 201.\n- **Error: No Method Kept** \u2014 422.\n- **Error: Still Running** \u2014 422."
-                                    },
-                                    "response": [
-                                        {
-                                            "name": "Card, by the booked method (next: redirect)",
-                                            "originalRequest": {
-                                                "auth": {
-                                                    "type": "bearer",
-                                                    "bearer": [
-                                                        {
-                                                            "key": "token",
-                                                            "value": "{{member_token}}"
-                                                        }
-                                                    ]
-                                                },
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "bookings",
-                                                        "{{booking_id}}",
-                                                        "pay"
-                                                    ]
-                                                }
-                                            },
-                                            "status": "Created",
-                                            "code": 201,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"data\": {\n        \"payment\": {\n            \"id\": 26,\n            \"status\": \"pending\",\n            \"purpose\": \"booking\",\n            \"method\": \"paymera\",\n            \"charged_amount\": 138400,\n            \"currency\": \"SYP\",\n            \"points_to_credit\": 100,\n            \"amount_points\": 100,\n            \"transaction_id\": null,\n            \"payable\": {\n                \"type\": \"booking\",\n                \"id\": 77\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"gateway_payment_id\": \"7a9b1c2d-example\",\n            \"created_at\": \"2026-10-06T15:10:02.000000Z\"\n        },\n        \"redirect_url\": \"https://egate-t.paymera.cc/start/7a9b1c2d-example/ar\",\n        \"next\": \"redirect\"\n    }\n}"
-                                        },
-                                        {
-                                            "name": "Cash (next: pay_at_reception)",
-                                            "originalRequest": {
-                                                "auth": {
-                                                    "type": "bearer",
-                                                    "bearer": [
-                                                        {
-                                                            "key": "token",
-                                                            "value": "{{member_token}}"
-                                                        }
-                                                    ]
-                                                },
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{\n    \"payment_method\": \"cash\"\n}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "bookings",
-                                                        "{{booking_id}}",
-                                                        "pay"
-                                                    ]
-                                                }
-                                            },
-                                            "status": "Created",
-                                            "code": 201,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"data\": {\n        \"payment\": null,\n        \"redirect_url\": null,\n        \"next\": \"pay_at_reception\"\n    }\n}"
-                                        },
-                                        {
-                                            "name": "Error: No Method Kept",
-                                            "originalRequest": {
-                                                "auth": {
-                                                    "type": "bearer",
-                                                    "bearer": [
-                                                        {
-                                                            "key": "token",
-                                                            "value": "{{member_token}}"
-                                                        }
-                                                    ]
-                                                },
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "bookings",
-                                                        "{{booking_id}}",
-                                                        "pay"
-                                                    ]
-                                                }
-                                            },
-                                            "status": "Unprocessable Content",
-                                            "code": 422,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"message\": \"Choose how to pay for this booking.\"\n}"
-                                        },
-                                        {
-                                            "name": "Error: Still Running",
-                                            "originalRequest": {
-                                                "auth": {
-                                                    "type": "bearer",
-                                                    "bearer": [
-                                                        {
-                                                            "key": "token",
-                                                            "value": "{{member_token}}"
-                                                        }
-                                                    ]
-                                                },
-                                                "method": "POST",
-                                                "header": [
-                                                    {
-                                                        "key": "Content-Type",
-                                                        "value": "application/json"
-                                                    },
-                                                    {
-                                                        "key": "lang",
-                                                        "value": "{{lang}}",
-                                                        "type": "text"
-                                                    }
-                                                ],
-                                                "body": {
-                                                    "mode": "raw",
-                                                    "raw": "{}",
-                                                    "options": {
-                                                        "raw": {
-                                                            "language": "json"
-                                                        }
-                                                    }
-                                                },
-                                                "url": {
-                                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
-                                                    "host": [
-                                                        "{{base_url}}"
-                                                    ],
-                                                    "path": [
-                                                        "api",
-                                                        "v1",
-                                                        "member",
-                                                        "bookings",
-                                                        "{{booking_id}}",
-                                                        "pay"
-                                                    ]
-                                                }
-                                            },
-                                            "status": "Unprocessable Content",
-                                            "code": 422,
-                                            "_postman_previewlanguage": "json",
-                                            "header": [
-                                                {
-                                                    "key": "Content-Type",
-                                                    "value": "application/json"
-                                                }
-                                            ],
-                                            "cookie": [],
-                                            "body": "{\n    \"message\": \"This booking or session must be checked out before payment can be settled.\"\n}"
-                                        }
-                                    ]
                                 },
                                 {
                                     "name": "Cancel Booking",
@@ -13044,7 +12597,7 @@
                                         "home"
                                     ]
                                 },
-                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{state: active|awaiting_confirmation, type: walkin|booking, id, arrival_request_id, space {id, name, type}, branch {id, name}, requested_at, checked_in_at, end_requested}`. state = awaiting_confirmation \u0628\u0639\u062f \u0645\u0633\u062d \u0627\u0644\u0643\u064a\u0648\u0633\u0643 \u0648\u0642\u0628\u0644 \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644: \u0644\u0627 \u062c\u0644\u0633\u0629 \u0628\u0639\u062f\u060c \u0641\u064a\u0643\u0648\u0646 id \u0648checked_in_at \u0628\u0642\u064a\u0645\u0629 null\u060c \u0648arrival_request_id \u0648requested_at \u0644\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u0644\u0651\u0642. state = active \u0644\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629\u060c \u0648\u064a\u0643\u0648\u0646 arrival_request_id \u0648requested_at \u0628\u0642\u064a\u0645\u0629 null. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current. \u0627\u0644\u062c\u0644\u0633\u0629 \u0628\u0639\u062f \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0625\u0646\u0647\u0627\u0621\u0647\u0627 \u0644\u0627 \u062a\u0628\u0642\u0649 \u0647\u0646\u0627: \u0625\u0646 \u0628\u0642\u064a \u0639\u0644\u064a\u0647\u0627 \u0645\u0628\u0644\u063a \u0641\u0647\u064a \u0641\u064a `unpaid`.\n\u2022 `active_booking`: \u062d\u062c\u0632 \u063a\u0631\u0641\u0629 \u0623\u0648 \u0645\u0643\u062a\u0628 \u0623\u0648 \u0642\u0627\u0639\u0629 (\u0644\u064a\u0633 co_space) \u0623\u0648 null \u2014 `{state: ready|active, id, reference, space {id, name, type}, branch {id, name}, start_at, end_at, checked_in_at, checked_in_via: reception|door|null}`. state = ready \u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0628\u062f\u0621 \u0628\u0640 15 \u062f\u0642\u064a\u0642\u0629 \u062d\u062a\u0649 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 (\u0627\u0644\u062d\u062f\u062b `booking.ready`)\u061b state = active \u0628\u0639\u062f \u0623\u0646 \u064a\u0633\u062c\u0644 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u064a\u0641\u062a\u062d \u0627\u0644\u0639\u0636\u0648 \u0627\u0644\u0628\u0627\u0628 \u0628\u0640 QR \u0627\u0644\u063a\u0631\u0641\u0629\u060c \u0628\u0644\u0627 \u0642\u0628\u0648\u0644 \u0645\u0646 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 (\u0627\u0644\u062d\u062f\u062b `booking.started`). \u0644\u0627 \u0632\u0631 \u0625\u0646\u0647\u0627\u0621: \u0627\u0644\u062d\u062c\u0632 \u064a\u064f\u063a\u0644\u0642 \u0648\u062d\u062f\u0647 \u0639\u0646\u062f `end_at` (\u0623\u0648 \u0639\u0646\u062f \u0646\u0647\u0627\u064a\u062a\u0647 \u0627\u0644\u062c\u062f\u064a\u062f\u0629 \u0628\u0639\u062f \u0627\u0644\u062a\u0645\u062f\u064a\u062f\u060c \u0627\u0644\u062d\u062f\u062b `booking.extended`) \u0623\u0648 \u0645\u0646 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0642\u0628\u0644 \u0630\u0644\u0643 (\u0627\u0644\u062d\u062f\u062b `booking.ended`)\u060c \u0648\u064a\u064f\u062d\u0633\u0628 \u0628\u0633\u0639\u0631 \u0627\u0644\u062d\u062c\u0632 \u0643\u0627\u0645\u0644\u0627\u064b. \u062d\u062c\u0632 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 (co_space) \u0644\u0627 \u064a\u0638\u0647\u0631 \u0647\u0646\u0627 \u0623\u0628\u062f\u0627\u064b\u060c \u0628\u0644 \u0641\u064a `active_session`.\n\u2022 `unpaid`: \u0643\u0644 \u062c\u0644\u0633\u0629 \u0648\u0643\u0644 \u062d\u062c\u0632 \u0627\u0646\u062a\u0647\u0649 \u0648\u0645\u0627 \u0632\u0627\u0644 \u0639\u0644\u064a\u0647 \u0645\u0628\u0644\u063a\u060c \u0627\u0644\u0623\u062d\u062f\u062b \u0625\u063a\u0644\u0627\u0642\u0627\u064b \u0623\u0648\u0644\u0627\u064b \u2014 \u064a\u0638\u0647\u0631 \u062f\u0627\u0626\u0645\u0627\u064b\u060c \u062d\u062a\u0649 \u0623\u062b\u0646\u0627\u0621 \u062c\u0644\u0633\u0629 \u0623\u0648 \u062d\u062c\u0632 \u062c\u0627\u0631\u064d\u060c \u0641\u0644\u0627 \u064a\u062e\u062a\u0641\u064a \u0634\u064a\u0621 \u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639. \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0646\u0641\u0633\u0647\u0627 \u0627\u0644\u062a\u064a \u064a\u062d\u0635\u0651\u0644\u0647\u0627 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 (Outstanding). \u0643\u0644 \u0639\u0646\u0635\u0631: `{kind: coworking_session|booking, type: walkin|booking, id, reference, space {id, name, type}, branch {id, name}, checked_in_at, checked_out_at, payment {state: unpaid|pending, method, amount_points, price, price_point, paid_at, payment_id}}`. `kind` \u064a\u062d\u062f\u062f \u0632\u0631 \u0627\u0644\u062f\u0641\u0639: `coworking_session` (\u062c\u0644\u0633\u0629 walk-in \u0623\u0648 \u062d\u062c\u0632 co_space) \u2190 POST coworking-sessions/{type}/{id}/pay (11. Coworking Sessions \u2192 6. Pay Coworking Session)\u061b `booking` (\u063a\u0631\u0641\u0629 \u0623\u0648 \u0645\u0643\u062a\u0628 \u0623\u0648 \u0642\u0627\u0639\u0629) \u2190 POST bookings/{id}/pay (3. Spaces & Bookings \u2192 Bookings \u2192 Pay Booking (After It Closes)). `payment.method` \u0644\u062d\u062c\u0632 \u0647\u0648 \u0627\u0644\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062a\u064a \u062d\u064f\u062c\u0632 \u0628\u0647\u0627\u060c \u0641\u0644\u0627 \u064a\u064f\u0633\u0623\u0644 \u0627\u0644\u0639\u0636\u0648 \u0639\u0646\u0647\u0627 \u062b\u0627\u0646\u064a\u0629\u061b `pending` \u0623\u062b\u0646\u0627\u0621 \u062f\u0641\u0639 \u0628\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0644\u0645 \u064a\u0643\u062a\u0645\u0644. \u064a\u062e\u0631\u062c \u0627\u0644\u0639\u0646\u0635\u0631 \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639 \u0628\u0623\u064a \u0637\u0631\u064a\u0642\u0629 (\u0627\u0644\u062d\u062f\u062b\u0627\u0646 `coworking.session_paid` \u0648`booking.paid`).\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 \u0628\u0637\u0627\u0642\u0629 `active_booking` \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.\n\n### \u0648\u0636\u0639 \u0627\u0644\u0632\u0627\u0626\u0631\n\u064a\u0639\u0645\u0644 \u0628\u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0648\u0628\u062f\u0648\u0646\u0647. \u0628\u0644\u0627 \u062a\u0631\u0648\u064a\u0633\u0629 `Authorization` \u064a\u062c\u064a\u0628 \u0627\u0644\u0632\u0627\u0626\u0631: `greeting` \u0628\u0644\u0627 \u0627\u0633\u0645\u060c \u0648`unread_notifications` = 0\u060c \u0648`active_session` = null\u060c \u0648`active_booking` = null\u060c \u0648`unpaid` = []\u060c \u0648`today` = []\u060c \u0648\u0645\u0639\u0647\u0627 `banners` \u0648`explore` (\u0627\u0644\u062e\u062f\u0645\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629 \u0644\u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062a \u0641\u0642\u0637). \u0645\u0639 token \u0639\u0636\u0648 \u064a\u062c\u064a\u0628 \u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0636\u0648 \u0643\u0645\u0627 \u0641\u0648\u0642. token \u0645\u064f\u0631\u0633\u064e\u0644 \u0644\u0643\u0646\u0647 \u0645\u0646\u062a\u0647\u064d \u0623\u0648 \u0645\u0644\u063a\u0649 \u2190 401 (\u062c\u062f\u0651\u062f\u0647)\u060c \u0648\u0644\u0627 \u064a\u064f\u0642\u0631\u0623 \u0643\u0632\u0627\u0626\u0631\u061b \u062d\u0633\u0627\u0628 \u0644\u064a\u0633 \u0639\u0636\u0648\u0627\u064b \u2190 403. \u0627\u0644\u0646\u0633\u062e\u0629 \u0628\u0644\u0627 \u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0641\u064a 12. App (no login) > Visitor mode.\n\n### \u0645\u062a\u0649 \u064a\u0639\u064a\u062f \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0642\u0631\u0627\u0621\u0629 home\n\u0639\u0646\u062f \u0623\u064a \u062d\u062f\u062b \u0639\u0644\u0649 `private-member.{user_id}`: \u0623\u062d\u062f\u0627\u062b \u0627\u0644\u062c\u0644\u0633\u0627\u062a `coworking.*` (11. Coworking Sessions) \u0648\u0623\u062d\u062f\u0627\u062b \u0627\u0644\u062d\u062c\u0648\u0632\u0627\u062a `booking.*` (3. Spaces & Bookings \u2192 Bookings). \u0627\u0644\u062d\u062f\u062b \u064a\u062d\u0645\u0644 \u0627\u0644\u0645\u0639\u0631\u0651\u0641\u0627\u062a \u0648\u0627\u0644\u062d\u0627\u0644\u0629 \u0641\u0642\u0637\u060c \u0648\u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0647\u0648 \u0645\u0635\u062f\u0631 \u0627\u0644\u062d\u0642\u064a\u0642\u0629.",
+                                "description": "\u0634\u0627\u0634\u0629 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 \u0641\u064a \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0628\u0637\u0644\u0628 \u0648\u0627\u062d\u062f. \u0627\u0644\u0623\u0642\u0633\u0627\u0645 \u062f\u0627\u062e\u0644 `data`:\n\n\u2022 `greeting`: \u0627\u0644\u062a\u062d\u064a\u0629 \u062d\u0633\u0628 \u0633\u0627\u0639\u0629 \u0627\u0644\u0645\u0646\u0637\u0642\u0629 (Asia/Damascus) \u0648\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628\u060c \u0645\u0639 \u0627\u0644\u0627\u0633\u0645 \u0627\u0644\u0623\u0648\u0644 \u2014 \"Good morning, Omar\".\n\u2022 `unread_notifications`: \u0639\u062f\u062f \u0627\u0644\u0625\u0634\u0639\u0627\u0631\u0627\u062a \u063a\u064a\u0631 \u0627\u0644\u0645\u0642\u0631\u0648\u0621\u0629 (\u0627\u0644\u0646\u0642\u0637\u0629 \u0627\u0644\u062d\u0645\u0631\u0627\u0621 \u0639\u0644\u0649 \u0627\u0644\u062c\u0631\u0633).\n\u2022 `active_session`: \u062c\u0644\u0633\u0629 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 null \u2014 `{state: active|awaiting_confirmation, type: walkin|booking, id, arrival_request_id, space {id, name, type}, branch {id, name}, requested_at, checked_in_at, end_requested}`. state = awaiting_confirmation \u0628\u0639\u062f \u0645\u0633\u062d \u0627\u0644\u0643\u064a\u0648\u0633\u0643 \u0648\u0642\u0628\u0644 \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644: \u0644\u0627 \u062c\u0644\u0633\u0629 \u0628\u0639\u062f\u060c \u0641\u064a\u0643\u0648\u0646 id \u0648checked_in_at \u0628\u0642\u064a\u0645\u0629 null\u060c \u0648arrival_request_id \u0648requested_at \u0644\u0644\u0637\u0644\u0628 \u0627\u0644\u0645\u0639\u0644\u0651\u0642. state = active \u0644\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629\u060c \u0648\u064a\u0643\u0648\u0646 arrival_request_id \u0648requested_at \u0628\u0642\u064a\u0645\u0629 null. \u062a\u0641\u0627\u0635\u064a\u0644\u0647\u0627 \u0627\u0644\u0643\u0627\u0645\u0644\u0629 \u0645\u0646 GET coworking-sessions/current. \u0627\u0644\u062c\u0644\u0633\u0629 \u0628\u0639\u062f \u0623\u0646 \u064a\u0624\u0643\u062f \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0625\u0646\u0647\u0627\u0621\u0647\u0627 \u0644\u0627 \u062a\u0628\u0642\u0649 \u0647\u0646\u0627: \u0625\u0646 \u0628\u0642\u064a \u0639\u0644\u064a\u0647\u0627 \u0645\u0628\u0644\u063a \u0641\u0647\u064a \u0641\u064a `unpaid`.\n\u2022 `active_booking`: \u062d\u062c\u0632 \u063a\u0631\u0641\u0629 \u0623\u0648 \u0645\u0643\u062a\u0628 \u0623\u0648 \u0642\u0627\u0639\u0629 (\u0644\u064a\u0633 co_space) \u0623\u0648 null \u2014 `{state: ready|active, id, reference, space {id, name, type}, branch {id, name}, start_at, end_at, checked_in_at, checked_in_via: reception|door|null, door {available}}`. `door.available` = true \u0641\u0642\u0637 \u0639\u0646\u062f\u0645\u0627 state = active \u0648\u0644\u0644\u063a\u0631\u0641\u0629 \u0643\u0648\u062f \u0628\u0627\u0628 \u0641\u0639\u0651\u0627\u0644: \u0639\u0646\u062f\u0647\u0627 \u062a\u0638\u0647\u0631 \u0623\u0632\u0631\u0627\u0631 \u0641\u062a\u062d \u0648\u0642\u0641\u0644 \u0627\u0644\u0628\u0627\u0628 (14. Active Booking (Room) \u2192 Door \u2014 Unlock / Door \u2014 Lock). state = ready \u0645\u0646 \u0642\u0628\u0644 \u0627\u0644\u0628\u062f\u0621 \u0628\u0640 15 \u062f\u0642\u064a\u0642\u0629 \u062d\u062a\u0649 \u062a\u0633\u062c\u064a\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 (\u0627\u0644\u062d\u062f\u062b `booking.ready`)\u061b state = active \u0628\u0639\u062f \u0623\u0646 \u064a\u0633\u062c\u0644 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0627\u0644\u062f\u062e\u0648\u0644 \u0623\u0648 \u064a\u0641\u062a\u062d \u0627\u0644\u0639\u0636\u0648 \u0627\u0644\u0628\u0627\u0628 \u0628\u0640 QR \u0627\u0644\u063a\u0631\u0641\u0629\u060c \u0628\u0644\u0627 \u0642\u0628\u0648\u0644 \u0645\u0646 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 (\u0627\u0644\u062d\u062f\u062b `booking.started`). \u0644\u0627 \u0632\u0631 \u0625\u0646\u0647\u0627\u0621: \u0627\u0644\u062d\u062c\u0632 \u064a\u064f\u063a\u0644\u0642 \u0648\u062d\u062f\u0647 \u0639\u0646\u062f `end_at` (\u0623\u0648 \u0639\u0646\u062f \u0646\u0647\u0627\u064a\u062a\u0647 \u0627\u0644\u062c\u062f\u064a\u062f\u0629 \u0628\u0639\u062f \u0627\u0644\u062a\u0645\u062f\u064a\u062f\u060c \u0627\u0644\u062d\u062f\u062b `booking.extended`) \u0623\u0648 \u0645\u0646 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 \u0642\u0628\u0644 \u0630\u0644\u0643 (\u0627\u0644\u062d\u062f\u062b `booking.ended`)\u060c \u0648\u064a\u064f\u062d\u0633\u0628 \u0628\u0633\u0639\u0631 \u0627\u0644\u062d\u062c\u0632 \u0643\u0627\u0645\u0644\u0627\u064b. \u062d\u062c\u0632 \u0627\u0644\u0639\u0645\u0644 \u0627\u0644\u0645\u0634\u062a\u0631\u0643 (co_space) \u0644\u0627 \u064a\u0638\u0647\u0631 \u0647\u0646\u0627 \u0623\u0628\u062f\u0627\u064b\u060c \u0628\u0644 \u0641\u064a `active_session`.\n\u2022 `unpaid`: \u0643\u0644 \u062c\u0644\u0633\u0629 \u0648\u0643\u0644 \u062d\u062c\u0632 \u0627\u0646\u062a\u0647\u0649 \u0648\u0645\u0627 \u0632\u0627\u0644 \u0639\u0644\u064a\u0647 \u0645\u0628\u0644\u063a\u060c \u0627\u0644\u0623\u062d\u062f\u062b \u0625\u063a\u0644\u0627\u0642\u0627\u064b \u0623\u0648\u0644\u0627\u064b \u2014 \u064a\u0638\u0647\u0631 \u062f\u0627\u0626\u0645\u0627\u064b\u060c \u062d\u062a\u0649 \u0623\u062b\u0646\u0627\u0621 \u062c\u0644\u0633\u0629 \u0623\u0648 \u062d\u062c\u0632 \u062c\u0627\u0631\u064d\u060c \u0641\u0644\u0627 \u064a\u062e\u062a\u0641\u064a \u0634\u064a\u0621 \u063a\u064a\u0631 \u0645\u062f\u0641\u0648\u0639. \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0646\u0641\u0633\u0647\u0627 \u0627\u0644\u062a\u064a \u064a\u062d\u0635\u0651\u0644\u0647\u0627 \u0627\u0644\u0627\u0633\u062a\u0642\u0628\u0627\u0644 (Outstanding). \u0643\u0644 \u0639\u0646\u0635\u0631: `{kind: coworking_session|booking, type: walkin|booking, id, reference, space {id, name, type}, branch {id, name}, checked_in_at, checked_out_at, payment {state: unpaid|pending, method, amount_points, price, price_point, paid_at, payment_id}}`. `kind` \u064a\u062d\u062f\u062f \u0632\u0631 \u0627\u0644\u062f\u0641\u0639: `coworking_session` (\u062c\u0644\u0633\u0629 walk-in \u0623\u0648 \u062d\u062c\u0632 co_space) \u2190 POST coworking-sessions/{type}/{id}/pay (11. Coworking Sessions \u2192 6. Pay Coworking Session)\u061b `booking` (\u063a\u0631\u0641\u0629 \u0623\u0648 \u0645\u0643\u062a\u0628 \u0623\u0648 \u0642\u0627\u0639\u0629) \u2190 POST bookings/{id}/pay (14. Active Booking (Room) \u2192 Pay Booking (After It Closes)). `payment.method` \u0644\u062d\u062c\u0632 \u0647\u0648 \u0627\u0644\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062a\u064a \u062d\u064f\u062c\u0632 \u0628\u0647\u0627\u060c \u0641\u0644\u0627 \u064a\u064f\u0633\u0623\u0644 \u0627\u0644\u0639\u0636\u0648 \u0639\u0646\u0647\u0627 \u062b\u0627\u0646\u064a\u0629\u061b `pending` \u0623\u062b\u0646\u0627\u0621 \u062f\u0641\u0639 \u0628\u0627\u0644\u0628\u0637\u0627\u0642\u0629 \u0644\u0645 \u064a\u0643\u062a\u0645\u0644. \u064a\u062e\u0631\u062c \u0627\u0644\u0639\u0646\u0635\u0631 \u0645\u0646 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0639\u0646\u062f \u0627\u0644\u062f\u0641\u0639 \u0628\u0623\u064a \u0637\u0631\u064a\u0642\u0629 (\u0627\u0644\u062d\u062f\u062b\u0627\u0646 `coworking.session_paid` \u0648`booking.paid`).\n\u2022 `banners`: \u0627\u0644\u0625\u0639\u0644\u0627\u0646\u0627\u062a \u0627\u0644\u062d\u064a\u0629 \u0627\u0644\u0645\u062e\u0635\u0635\u0629 \u0644\u0644\u062a\u0637\u0628\u064a\u0642 (placement = app \u0623\u0648 all) \u0628\u062a\u0631\u062a\u064a\u0628 sort_order \u2014 `{id, type, type_label, subtitle, title, description, cta_label, image_url, link_url}`. \u0627\u0644\u0646\u0635\u0648\u0635 \u0628\u0644\u063a\u0629 \u0627\u0644\u0637\u0644\u0628 \u0648\u0642\u062f \u062a\u0643\u0648\u0646 null (\u0625\u0639\u0644\u0627\u0646 \u0635\u0648\u0631\u0629 \u0641\u0642\u0637). \u0627\u0644\u0632\u0631 \u064a\u0641\u062a\u062d `link_url` (\u0631\u0627\u0628\u0637 \u0648\u064a\u0628 \u0623\u0648 addapp://).\n\u2022 `today`: \u062d\u062c\u0648\u0632\u0627\u062a \u0627\u0644\u0639\u0636\u0648 \u0648\u0641\u0639\u0627\u0644\u064a\u0627\u062a\u0647 \u0627\u0644\u0645\u062a\u0628\u0642\u064a\u0629 \u0627\u0644\u064a\u0648\u0645 (\u064a\u0648\u0645 \u0627\u0644\u0645\u0646\u0637\u0642\u0629)\u060c \u0627\u0644\u0623\u0642\u0631\u0628 \u0623\u0648\u0644\u0627\u064b \u2014 `{kind: booking|event, id, title, space, branch, image_url, start_at, end_at, date_label, time_label, attendees_count (\u0644\u0644\u0641\u0639\u0627\u0644\u064a\u0627\u062a \u0641\u0642\u0637), status, status_label}`. \u0627\u0644\u062d\u062c\u0632 \u0627\u0644\u0630\u064a \u0647\u0648 \u0627\u0644\u062c\u0644\u0633\u0629 \u0627\u0644\u062c\u0627\u0631\u064a\u0629 \u0623\u0648 \u0628\u0637\u0627\u0642\u0629 `active_booking` \u0644\u0627 \u064a\u062a\u0643\u0631\u0631 \u0647\u0646\u0627. \u0644\u0641\u0639\u0627\u0644\u064a\u0629 \u0645\u062a\u0639\u062f\u062f\u0629 \u0627\u0644\u062c\u0644\u0633\u0627\u062a \u062a\u0638\u0647\u0631 \u0623\u0648\u0642\u0627\u062a \u062c\u0644\u0633\u0629 \u0627\u0644\u064a\u0648\u0645.\n\u2022 `explore`: \u062e\u062f\u0645\u0627\u062a \"Explore ADD\" \u0627\u0644\u0645\u0639\u0631\u0648\u0636\u0629 \u0639\u0644\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629 (show_on_home) \u0645\u0631\u062a\u0628\u0629 \u062d\u0633\u0628 \u0627\u0644\u0645\u062d\u0648\u0631 \u062b\u0645 \u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u062e\u062f\u0645\u0629 \u2014 `{id, slug, name, description, image_url, is_coming_soon, axis {slug, name, color}}`. \u0635\u0641\u062d\u0629 \u0627\u0644\u0634\u0631\u062d \u0648\u0632\u0631 \u0627\u0644\u062a\u062c\u0631\u0628\u0629 \u0645\u0646 GET services/{slug} (`about` \u0648`request_method` \u0648`request_config`). \"View all\" \u0647\u0648 GET services/axes.\n\n### \u0648\u0636\u0639 \u0627\u0644\u0632\u0627\u0626\u0631\n\u064a\u0639\u0645\u0644 \u0628\u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0648\u0628\u062f\u0648\u0646\u0647. \u0628\u0644\u0627 \u062a\u0631\u0648\u064a\u0633\u0629 `Authorization` \u064a\u062c\u064a\u0628 \u0627\u0644\u0632\u0627\u0626\u0631: `greeting` \u0628\u0644\u0627 \u0627\u0633\u0645\u060c \u0648`unread_notifications` = 0\u060c \u0648`active_session` = null\u060c \u0648`active_booking` = null\u060c \u0648`unpaid` = []\u060c \u0648`today` = []\u060c \u0648\u0645\u0639\u0647\u0627 `banners` \u0648`explore` (\u0627\u0644\u062e\u062f\u0645\u0627\u062a \u0627\u0644\u0645\u062a\u0627\u062d\u0629 \u0644\u0643\u0644 \u0627\u0644\u0628\u0627\u0642\u0627\u062a \u0641\u0642\u0637). \u0645\u0639 token \u0639\u0636\u0648 \u064a\u062c\u064a\u0628 \u0646\u0633\u062e\u0629 \u0627\u0644\u0639\u0636\u0648 \u0643\u0645\u0627 \u0641\u0648\u0642. token \u0645\u064f\u0631\u0633\u064e\u0644 \u0644\u0643\u0646\u0647 \u0645\u0646\u062a\u0647\u064d \u0623\u0648 \u0645\u0644\u063a\u0649 \u2190 401 (\u062c\u062f\u0651\u062f\u0647)\u060c \u0648\u0644\u0627 \u064a\u064f\u0642\u0631\u0623 \u0643\u0632\u0627\u0626\u0631\u061b \u062d\u0633\u0627\u0628 \u0644\u064a\u0633 \u0639\u0636\u0648\u0627\u064b \u2190 403. \u0627\u0644\u0646\u0633\u062e\u0629 \u0628\u0644\u0627 \u062a\u0633\u062c\u064a\u0644 \u062f\u062e\u0648\u0644 \u0641\u064a 12. App (no login) > Visitor mode.\n\n### \u0645\u062a\u0649 \u064a\u0639\u064a\u062f \u0627\u0644\u062a\u0637\u0628\u064a\u0642 \u0642\u0631\u0627\u0621\u0629 home\n\u0639\u0646\u062f \u0623\u064a \u062d\u062f\u062b \u0639\u0644\u0649 `private-member.{user_id}`: \u0623\u062d\u062f\u0627\u062b \u0627\u0644\u062c\u0644\u0633\u0627\u062a `coworking.*` (11. Coworking Sessions) \u0648\u0623\u062d\u062f\u0627\u062b \u0627\u0644\u062d\u062c\u0648\u0632\u0627\u062a `booking.*` (3. Spaces & Bookings \u2192 Bookings). \u0627\u0644\u062d\u062f\u062b \u064a\u062d\u0645\u0644 \u0627\u0644\u0645\u0639\u0631\u0651\u0641\u0627\u062a \u0648\u0627\u0644\u062d\u0627\u0644\u0629 \u0641\u0642\u0637\u060c \u0648\u0647\u0630\u0627 \u0627\u0644\u0637\u0644\u0628 \u0647\u0648 \u0645\u0635\u062f\u0631 \u0627\u0644\u062d\u0642\u064a\u0642\u0629.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -13107,6 +12660,1314 @@
                                     ],
                                     "cookie": [],
                                     "body": "{\n    \"data\": {\n        \"greeting\": \"Good morning, Omar\",\n        \"unread_notifications\": 2,\n        \"active_session\": {\n            \"state\": \"active\",\n            \"type\": \"walkin\",\n            \"id\": 58,\n            \"arrival_request_id\": null,\n            \"space\": {\n                \"id\": 4,\n                \"name\": \"Open Space\",\n                \"type\": \"co_space\"\n            },\n            \"branch\": {\n                \"id\": 1,\n                \"name\": \"Main Branch\"\n            },\n            \"requested_at\": null,\n            \"checked_in_at\": \"2026-11-04T09:10:00+03:00\",\n            \"end_requested\": false\n        },\n        \"active_booking\": {\n            \"state\": \"ready\",\n            \"id\": 91,\n            \"reference\": \"BK-2026-00091\",\n            \"space\": {\n                \"id\": 7,\n                \"name\": \"Meeting Room 03\",\n                \"type\": \"room\"\n            },\n            \"branch\": {\n                \"id\": 1,\n                \"name\": \"Main Branch\"\n            },\n            \"start_at\": \"2026-11-04T11:00:00+03:00\",\n            \"end_at\": \"2026-11-04T13:00:00+03:00\",\n            \"checked_in_at\": null,\n            \"checked_in_via\": null\n        },\n        \"unpaid\": [\n            {\n                \"kind\": \"booking\",\n                \"type\": \"booking\",\n                \"id\": 77,\n                \"reference\": \"BK-2026-00077\",\n                \"space\": {\n                    \"id\": 7,\n                    \"name\": \"Meeting Room 03\",\n                    \"type\": \"room\"\n                },\n                \"branch\": {\n                    \"id\": 1,\n                    \"name\": \"Main Branch\"\n                },\n                \"checked_in_at\": \"2026-11-03T15:00:00+03:00\",\n                \"checked_out_at\": \"2026-11-03T18:00:00+03:00\",\n                \"payment\": {\n                    \"state\": \"unpaid\",\n                    \"method\": \"paymera\",\n                    \"amount_points\": 100,\n                    \"price\": \"10 $\",\n                    \"price_point\": \"100 pts\",\n                    \"paid_at\": null,\n                    \"payment_id\": 140\n                }\n            },\n            {\n                \"kind\": \"coworking_session\",\n                \"type\": \"walkin\",\n                \"id\": 52,\n                \"reference\": \"WS-2026-00052\",\n                \"space\": {\n                    \"id\": 4,\n                    \"name\": \"Open Space\",\n                    \"type\": \"co_space\"\n                },\n                \"branch\": {\n                    \"id\": 1,\n                    \"name\": \"Main Branch\"\n                },\n                \"checked_in_at\": \"2026-11-02T10:00:00+03:00\",\n                \"checked_out_at\": \"2026-11-02T13:30:00+03:00\",\n                \"payment\": {\n                    \"state\": \"unpaid\",\n                    \"method\": null,\n                    \"amount_points\": 350,\n                    \"price\": \"35 $\",\n                    \"price_point\": \"350 pts\",\n                    \"paid_at\": null,\n                    \"payment_id\": null\n                }\n            }\n        ],\n        \"banners\": [],\n        \"today\": [],\n        \"explore\": []\n    }\n}"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "14. Active Booking (Room)",
+                    "description": "Everything a room, office or hall booking needs once it is under way, in the order the app meets it. Set {{booking_id}} to the booking on home's `active_booking`, and {{lock_qr_value}} to its room door's sticker.\n\n## A room, office or hall booking in the app\nAny space that is not a co_space (a coworking booking is a coworking session \u2014 11. Coworking Sessions). The payment method the member books with is kept on the booking and settles whatever it still owes when it closes.\n\n1. **Its check-in window opens** (15 minutes before the start) \u2014 event `booking.ready`; home's `active_booking` shows `state: ready`.\n2. **The member arrives** \u2014 reception checks them in, or they open the room's door with its QR (Check In \u2014 Scan the Door Sticker). No acceptance step: event `booking.started`, `active_booking.state: active`, with `checked_in_at` (never before the start) and `checked_in_via` (`reception` | `door`).\n3. **The door, from the app** \u2014 while checked in, Door \u2014 Unlock / Door \u2014 Lock open and lock the room without scanning (`active_booking.door.available`).\n4. **Extend (optional)** \u2014 Extension Options, then Extend Booking; event `booking.extended` with the new `end_at`. A booking paid from the wallet pays the extension at once when the wallet covers it; otherwise only the extension is owed.\n5. **It ends** \u2014 by itself at `end_at` (bookings:close-ended-rooms, every minute), or earlier only at the desk. There is no end button in the app. It costs its full booked price, however long it was used.\n6. **What it still owes is settled by the method it was booked with** \u2014 `wallet`: taken from the member's own points at once (a short wallet leaves it owed; the booking closes either way); `cash`: the desk is told to collect it; `paymera`: the member pays from the app. Then event `booking.ended` with `payment_state`.\n7. **Still owed** \u2014 the booking is in home's `unpaid` (`kind: booking`) until paid: its button is Pay Booking (After It Closes), with no body to pay by the booked method. Paid by any means, the desk included: event `booking.paid`, and it leaves `unpaid`.\n\n### Events on private-member.{user_id}\nConnect and authorize as in 11. Coworking Sessions (Real-time). On every event the app re-fetches GET member/home.\n\n| Event | data | What the app does |\n|---|---|---|\n| `booking.ready` | `{booking_id}` | The check-in window opened: re-fetch home (`active_booking.state: ready`). Sent once per booking. |\n| `booking.started` | `{booking_id, checked_in_via: \"reception\"\\|\"door\"}` | Checked in: re-fetch home (`state: active`). |\n| `booking.extended` | `{booking_id, end_at}` | Runs longer; `end_at` is its new end (district offset). Sent for coworking bookings too. |\n| `booking.ended` | `{booking_id, payment_state: \"paid\"\\|\"unpaid\"}` | Closed and settled as far as the booked method could: re-fetch home; `unpaid` \u2014 it is now in `unpaid`. |\n| `booking.paid` | `{booking_id}` | A closed booking was paid: re-fetch home; it leaves `unpaid`. |\n\nThe desk hears `booking.checked_in` and `booking.checked_out` on `private-reception` (Admin \u2192 Reception Operations).",
+                    "item": [
+                        {
+                            "name": "Get Home \u2014 active_booking Card",
+                            "request": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "currency",
+                                        "value": "{{currency}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/home",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "home"
+                                    ]
+                                },
+                                "description": "Same request as 13. Home \u2192 Get Home (its description lists every section). Here, read `data.active_booking`: `state: ready` from 15 minutes before the start until check-in, `state: active` once checked in. `door.available` is true only when `state` is `active` and the room has a live door code \u2014 show the Unlock / Lock buttons only then. Re-fetch on every booking event (see this folder's description).",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Check In \u2014 Scan the Door Sticker",
+                            "event": [
+                                {
+                                    "listen": "prerequest",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "// The kiosk's current code, built from kiosk_secret (saved by \"Pair Kiosk\") the way the kiosk app does it: RFC 6238, HMAC-SHA1, 30 s, 8 digits.",
+                                            "// Leaves coworking_qr_value alone when there is no secret, so a value scanned off a real kiosk can be pasted in instead.",
+                                            "const secret = pm.collectionVariables.get('kiosk_secret');",
+                                            "const kioskId = pm.collectionVariables.get('kiosk_id');",
+                                            "if (secret && kioskId) {",
+                                            "    const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';",
+                                            "    const keyBytes = [];",
+                                            "    let bits = 0, value = 0;",
+                                            "    for (const c of secret.replace(/[\\s=]/g, '').toUpperCase()) {",
+                                            "        value = ((value << 5) | alphabet.indexOf(c)) & 0xffff;",
+                                            "        bits += 5;",
+                                            "        if (bits >= 8) { keyBytes.push((value >>> (bits - 8)) & 0xff); bits -= 8; }",
+                                            "    }",
+                                            "    const toWords = (bytes) => {",
+                                            "        const words = [];",
+                                            "        bytes.forEach((b, i) => { words[i >>> 2] |= b << (24 - (i % 4) * 8); });",
+                                            "        return CryptoJS.lib.WordArray.create(words, bytes.length);",
+                                            "    };",
+                                            "    const step = Math.floor(Date.now() / 1000 / 30);",
+                                            "    const counter = [0, 0, 0, 0, (step >>> 24) & 0xff, (step >>> 16) & 0xff, (step >>> 8) & 0xff, step & 0xff];",
+                                            "    const hash = CryptoJS.HmacSHA1(toWords(counter), toWords(keyBytes)).toString(CryptoJS.enc.Hex).match(/../g).map((h) => parseInt(h, 16));",
+                                            "    const offset = hash[19] & 0x0f;",
+                                            "    const binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];",
+                                            "    pm.collectionVariables.set('coworking_qr_value', `add-cowork:v1:${kioskId}:${String(binary % 100000000).padStart(8, '0')}`);",
+                                            "}"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "const body = pm.response.json();",
+                                            "// Nothing has started yet: reception confirms the request (Admin > Reception Operations > Arrival Requests).",
+                                            "if ((pm.response.code === 200 || pm.response.code === 201) && body.data && body.data.arrival_request) {",
+                                            "    pm.collectionVariables.set('arrival_request_id', body.data.arrival_request.id);",
+                                            "}",
+                                            "if (pm.response.code === 422 && body.scan_ticket) {",
+                                            "    pm.collectionVariables.set('scan_ticket', body.scan_ticket);",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ],
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"qr_value\": \"{{lock_qr_value}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/scan",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "scan"
+                                    ]
+                                },
+                                "description": "Same request as 10. Scan \u2192 Scan QR, sent with the room door's sticker ({{lock_qr_value}}). From the booking's start, the first open checks the booking in (`checked_in_via: door`) and activates its code; reception checking the member in is the other way. After that, the door buttons in this folder open and lock it without scanning."
+                            },
+                            "response": [
+                                {
+                                    "name": "Door Unlocked",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{lock_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"outcome\": \"unlocked\",\n        \"message\": \"Unlocked.\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: Door - No Active Grant",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"qr_value\": \"{{lock_qr_value}}\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/scan",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "scan"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"You do not have active access to this lock right now.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get Booking Detail \u2014 With Status Stepper",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}"
+                                    ]
+                                },
+                                "description": "Same request as 3. Spaces & Bookings \u2192 Bookings \u2192 Get Booking Detail. One booking, as the booking screens draw it (submitted, confirmed, rejected, the cancel sheet): `id`, `reference` (the booking number, e.g. `BK-2026-00041`), `status`, `status_label`, `status_note`, `space {id, title, main_image, branch, capacity, hourly_price}`, `seat`, `date_label`, `time_label`, `total {points, price}`, `checked_in_at`, `checked_out_at`, `payment_state`, `payment_id`, `awaiting_payment`, `request_status` (the Submitted \u2192 Under Review \u2192 decision stepper, with `rejection_reason`), `actions {can_cancel, can_extend, extend_disabled_reason}` and `cancellation`.\n\nThe screen headlines are the app's, chosen from `status`. The status stays `confirmed` until checkout, so `checked_in_at` set with `checked_out_at` null means the booking is under way.\n\n`cancellation` is null when the booking cannot be cancelled; otherwise `deadline_label`, and `refund_points` / `refund_price` / `refund_to` \u2014 exactly what cancelling gives back and to which wallet (\"Your wallet\" or the company). 403 for another member's booking. See docs/decisions/booking-outcomes-and-extension.md.\n\n`discounts`: what was taken off it, as locked when it was priced; renaming or changing the offer later does not rewrite it. One entry per kind: `offer` (`offer_id`), `coupon` (`coupon_id`, `code`), `plan_discount` (`plan_discount_id`), `duration_saving` (a plan's built-in saving; takes nothing off, `name` = what it was compared to). Each: `name`, `discount_type`, `discount_value`, `max_discount_points`, `base_points`, `points`, `percent` (rounded down). Empty when nothing was taken off."
+                            }
+                        },
+                        {
+                            "name": "Door \u2014 Unlock (no scan)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "door",
+                                        "unlock"
+                                    ]
+                                },
+                                "description": "Opens the booked room's door from the live card's button \u2014 no sticker scan. Only once the booking is checked in and until it closes (home `active_booking.state: active`, and `active_booking.door.available: true`). It checks nothing in: arriving is still the desk or the door sticker (Check In \u2014 Scan the Door Sticker). The door is the lock the booking's own code was issued on; a code the desk checked in without activating is activated by this first open. No body. Nothing about the lock comes back.\n\n### Cases \u2014 see this request's saved examples\n- **200** `Unlocked.`\n- **422** `door_requires_check_in` \u2014 not checked in yet, already closed, not confirmed, or a coworking booking.\n- **422** `door_unavailable` \u2014 the booking has no live door code (none issued, revoked, expired).\n- **403** `not_your_booking`.\n- **503** `gateway_offline` / `unlock_failed` \u2014 the lock did not answer; use the keypad code.\n\nEvery attempt that reaches the lock is logged in access_events with channel `app_remote`. Throttled to 10 a minute."
+                            },
+                            "response": [
+                                {
+                                    "name": "Unlocked",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "unlock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Unlocked.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Checked In",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "unlock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The door controls open once your booking is checked in.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Door Unavailable",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "unlock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This room's door cannot be controlled from the app.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Your Booking",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "unlock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Forbidden",
+                                    "code": 403,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This booking does not belong to you.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Gateway Offline",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/unlock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "unlock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Service Unavailable",
+                                    "code": 503,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This lock's gateway is currently offline \u2014 use the keypad code instead.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Door \u2014 Lock",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/lock",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "door",
+                                        "lock"
+                                    ]
+                                },
+                                "description": "Locks the booked room's door from the live card's button. Same rules as Door \u2014 Unlock: checked in and not closed, the booking's own live door code, no body, nothing about the lock comes back.\n\nNot every lock model can be locked remotely \u2014 those answer `remote_lock_unsupported`; test it on the real lock before relying on it.\n\n### Cases \u2014 see this request's saved examples\n- **200** `Locked.`\n- **422** `door_requires_check_in`, `door_unavailable`; **403** `not_your_booking`.\n- **503** `remote_lock_unsupported`, `lock_gateway_offline`, `lock_failed`.\n\nLogged in access_events as event `lock`, channel `app_remote`."
+                            },
+                            "response": [
+                                {
+                                    "name": "Locked",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/lock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "lock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Locked.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Not Checked In",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/lock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "lock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"The door controls open once your booking is checked in.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Remote Lock Unsupported",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/lock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "lock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Service Unavailable",
+                                    "code": 503,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This lock does not support locking from the app.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Gateway Offline",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/door/lock",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "door",
+                                                "lock"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Service Unavailable",
+                                    "code": 503,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This lock's gateway is currently offline, so the door cannot be locked from the app right now.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Extension Options",
+                            "request": {
+                                "method": "GET",
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "header": [
+                                    {
+                                        "key": "Accept",
+                                        "value": "application/json",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extension-options",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "extension-options"
+                                    ]
+                                },
+                                "description": "How far the member's running booking can be extended, and at what price. Extendable only while it runs (start_at \u2264 now < end_at), checked in and not out, on a space with `allows_extension`. `latest_end_at` is the latest the member can stay: the next booking less its buffer, a co-working loan, the seat pool, or the branch's closing \u2014 whichever comes first. Each `options[]` entry is an `additional_minutes` that `POST .../extend` accepts, with the end time and the points it charges. When `can_extend` is false, `options` is empty and `reason` is one of `space_disallows`, `not_checked_in`, `outside_booking_time`, `next_slot_booked`, `branch_closing` (`reason_label` translated). 403 for another member's booking. See docs/decisions/booking-outcomes-and-extension.md."
+                            },
+                            "response": []
+                        },
+                        {
+                            "name": "Extend Booking",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"additional_minutes\": 60\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "extend"
+                                    ]
+                                },
+                                "description": "Extends a running booking: start_at \u2264 now < end_at, checked in and not out, on a space whose `allows_extension` is on. Ask `GET .../extension-options` first \u2014 the same rules decide both, re-checked here under a lock. Other refusals (422): `extension_not_allowed`, `extension_outside_booking_time`, `extension_past_closing` (with the closing time), and `not_checked_in`.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Conflict** \u2014 422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
+                            },
+                            "response": [
+                                {
+                                    "name": "Error: Conflict",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 180\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This booking cannot be extended past <latest_end_at>.\"\n}"
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Pay Booking (After It Closes)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "pay"
+                                    ]
+                                },
+                                "description": "What a closed booking still owes \u2014 an extension, an overstay, or all of it when it was booked to be paid at the desk \u2014 paid from the app: the button on its item in home's `unpaid` (`kind: booking`). A booking still to happen or running is paid through Pay Booking (by booking_id) instead.\n\n### Body (all optional)\n- `payment_method`: `wallet` | `cash` | `paymera`. **Leave it out** to pay by the method the booking was made with (`unpaid[].payment.method`) \u2014 the member is not asked again. Sending another one pays that way and keeps it as the booking's method.\n- `wallet_owner_type` + `wallet_owner_id` (together): which wallet pays with `wallet` \u2014 `user` or `company`.\n- `coupon_code`.\n\n### Answer\n201 `{data: {payment, redirect_url, next}}` \u2014 plus `coupon` inside `data` when a code was sent. `next` is `redirect` (open `redirect_url`, then poll Get Payment Status), `done` (paid from the wallet) or `pay_at_reception` (the desk hears `coworking.pay_at_reception` with `session_type: booking` and settles it; `payment` and `redirect_url` null). Paid: event `booking.paid`.\n\nErrors: 404 not the member's booking \u00b7 409 already paid \u00b7 422 not closed yet (`This booking or session must be checked out before payment can be settled.`) \u00b7 422 no method sent and none kept (`Choose how to pay for this booking.`) \u00b7 422 `{message, current, required, shortage}` when the wallet is short \u00b7 422 `wallet_options` when several wallets could pay and none was named \u00b7 503 card payment unavailable; 502 could not start.\n\n### Cases \u2014 see this request's saved examples\n- **Card, by the booked method (next: redirect)** \u2014 201, empty body.\n- **Cash (next: pay_at_reception)** \u2014 201.\n- **Error: No Method Kept** \u2014 422.\n- **Error: Still Running** \u2014 422."
+                            },
+                            "response": [
+                                {
+                                    "name": "Card, by the booked method (next: redirect)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"payment\": {\n            \"id\": 26,\n            \"status\": \"pending\",\n            \"purpose\": \"booking\",\n            \"method\": \"paymera\",\n            \"charged_amount\": 138400,\n            \"currency\": \"SYP\",\n            \"points_to_credit\": 100,\n            \"amount_points\": 100,\n            \"transaction_id\": null,\n            \"payable\": {\n                \"type\": \"booking\",\n                \"id\": 77\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"gateway_payment_id\": \"7a9b1c2d-example\",\n            \"created_at\": \"2026-10-06T15:10:02.000000Z\"\n        },\n        \"redirect_url\": \"https://egate-t.paymera.cc/start/7a9b1c2d-example/ar\",\n        \"next\": \"redirect\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Cash (next: pay_at_reception)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n    \"payment_method\": \"cash\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Created",
+                                    "code": 201,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"data\": {\n        \"payment\": null,\n        \"redirect_url\": null,\n        \"next\": \"pay_at_reception\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: No Method Kept",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Choose how to pay for this booking.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Still Running",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/pay",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "pay"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"This booking or session must be checked out before payment can be settled.\"\n}"
                                 }
                             ]
                         }
