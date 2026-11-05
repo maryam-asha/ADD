@@ -29,6 +29,12 @@ return [
         'warranty_lead_days' => 30,
     ],
 
+    'warehouses' => [
+        // The host place types a warehouse may sit in; null = every type
+        // its LocationResolver knows. A warehouse may also sit in none.
+        'place_types' => null,
+    ],
+
     'stock' => [
         // The one currency stock is costed in (weighted average cost).
         'currency' => 'USD',

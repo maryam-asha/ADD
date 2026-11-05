@@ -13,6 +13,7 @@ use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
+use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -80,6 +81,15 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
 
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
+
+// Warehouses: where stock is kept
+Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['index', 'show']);
+});
+
+Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['store', 'update', 'destroy']);
+});
 
 // Stock
 Route::middleware('can:'.Abilities::STOCK_VIEW)->group(function () {
