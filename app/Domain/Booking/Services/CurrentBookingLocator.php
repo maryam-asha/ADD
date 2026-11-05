@@ -17,8 +17,9 @@ use Illuminate\Database\Eloquent\Builder;
  *   (BookingCheckInService::EARLY_CHECK_IN_MINUTES before its start) and it
  *   has not ended — the soonest one.
  *
- * Once closed, a booking still owing is in home's `unpaid` list
- * (OutstandingItems::closedFor), never this card. Coworking bookings are
+ * Once closed, a booking still owing is home's card in state
+ * awaiting_payment (MemberHomeService, from OutstandingItems::closedFor),
+ * not located here. Coworking bookings are
  * never here: they are `active_session`, a coworking session like a walk-in.
  */
 class CurrentBookingLocator

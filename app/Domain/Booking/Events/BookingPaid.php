@@ -6,7 +6,7 @@ use App\Domain\Booking\Models\Booking;
 
 /**
  * A closed room booking is paid — from the wallet, by card, or in cash at
- * the desk: it leaves home's `unpaid` list.
+ * the desk: its home card (active_booking, awaiting_payment) goes.
  */
 class BookingPaid extends MemberUpdate
 {

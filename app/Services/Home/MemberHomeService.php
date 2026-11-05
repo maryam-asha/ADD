@@ -74,7 +74,6 @@ class MemberHomeService
                 'unread_notifications' => 0,
                 'active_session' => null,
                 'active_booking' => null,
-                'unpaid' => [],
                 'banners' => $this->banners($locale),
                 'today' => [],
                 'explore' => $this->explore(null, $locale),
@@ -91,12 +90,24 @@ class MemberHomeService
             $current === null ? null : $current[1]->id,
         ]));
 
+        // Closed and still owing, newest close first (OutstandingItems::closedFor,
+        // the desk's own rules): the newest of each kind stays its card,
+        // awaiting_payment, once nothing live takes the card's place.
+        $owed = $this->outstanding->closedFor($member->id);
+        $owedSession = $owed->first(fn (Booking|WalkinSession $item) => ! $item instanceof Booking || $item->isCoworking());
+        $owedBooking = $owed->first(fn (Booking|WalkinSession $item) => $item instanceof Booking && ! $item->isCoworking());
+
         return [
             'greeting' => $this->greeting($member, $localNow, $locale),
             'unread_notifications' => $member->unreadNotifications()->count(),
-            'active_session' => $session === null ? $this->awaitingSession($member, $locale) : $this->session($session, $locale),
-            'active_booking' => $current === null ? null : $this->booking($current[0], $current[1], $locale),
-            'unpaid' => $this->unpaid($member, $locale),
+            'active_session' => $session === null
+                ? $this->awaitingSession($member, $locale) ?? $this->owingSession($owedSession, $member, $locale)
+                : $this->session($session, $locale),
+            'active_booking' => match (true) {
+                $current !== null => $this->booking($current[0], $current[1], $member, $locale),
+                $owedBooking !== null => $this->booking('awaiting_payment', $owedBooking, $member, $locale),
+                default => null,
+            },
             'banners' => $this->banners($locale),
             'today' => $this->today($member, $shown, $now, $dayStart, $dayEnd, $locale),
             'explore' => $this->explore($member, $locale),
@@ -140,6 +151,8 @@ class MemberHomeService
             'requested_at' => null,
             'checked_in_at' => $this->time->toLocal($session->checked_in_at)?->toIso8601String(),
             'end_requested' => $session->pendingEndRequest !== null,
+            'checked_out_at' => null,
+            'payment' => null,
         ];
     }
 
@@ -170,19 +183,59 @@ class MemberHomeService
             'requested_at' => $this->time->toLocal($request->requested_at)?->toIso8601String(),
             'checked_in_at' => null,
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
+        ];
+    }
+
+    /**
+     * The same card once reception has closed the session and money is
+     * still owed (state awaiting_payment): the newest closed coworking
+     * session that owes (a walk-in, or a booking on a coworking space —
+     * room bookings are active_booking), so the member pays from the card
+     * they were watching. `payment` is the block every session shows
+     * (PaymentStatePresenter — `pending` while a card payment is in flight);
+     * paying is POST member/coworking-sessions/{type}/{id}/pay, and
+     * CoworkingSessionPaid tells the app to re-fetch. Null when no session
+     * owes.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function owingSession(Booking|WalkinSession|null $session, User $member, string $locale): ?array
+    {
+        if ($session === null) {
+            return null;
+        }
+
+        return [
+            'state' => 'awaiting_payment',
+            'type' => $session->coworkingType(),
+            'id' => $session->id,
+            'arrival_request_id' => null,
+            'space' => $this->space($session->space, $locale),
+            'branch' => $this->branch($session->space->building?->branch, $locale),
+            'requested_at' => null,
+            'checked_in_at' => $this->time->toLocal($session->checked_in_at)?->toIso8601String(),
+            'end_requested' => false,
+            'checked_out_at' => $this->time->toLocal($session->checked_out_at)?->toIso8601String(),
+            'payment' => $this->payments->for($session, $member),
         ];
     }
 
     /**
      * A room, office or hall booking's own card (CurrentBookingLocator), from
      * its check-in window (`ready`) through the booking (`active`, checked
-     * in by reception or the door QR). It closes itself at `end_at` or at
-     * the desk — the member does not end it — and what it still owes then
-     * is in `unpaid`.
+     * in by reception or the door QR) to what it still owes once closed
+     * (`awaiting_payment`, the newest room booking that owes, once no live
+     * one takes its place). It closes itself at `end_at` or at the desk —
+     * the member does not end it — and `payment`, only once it owes, is the
+     * block every booking shows, `method` the one it was booked with:
+     * paying is POST member/bookings/{booking}/pay, and BookingPaid tells
+     * the app to re-fetch.
      *
      * @return array<string, mixed>
      */
-    private function booking(string $state, Booking $booking, string $locale): array
+    private function booking(string $state, Booking $booking, User $member, string $locale): array
     {
         $booking->loadMissing('space.building.branch');
 
@@ -196,40 +249,12 @@ class MemberHomeService
             'end_at' => $this->time->toLocal($booking->end_at)?->toIso8601String(),
             'checked_in_at' => $this->time->toLocal($booking->checked_in_at)?->toIso8601String(),
             'checked_in_via' => $booking->checked_in_via?->value,
+            'checked_out_at' => $this->time->toLocal($booking->checked_out_at)?->toIso8601String(),
+            'payment' => $state === 'awaiting_payment' ? $this->payments->for($booking, $member) : null,
             // Whether to show the door buttons (POST member/bookings/{id}/door/unlock|lock):
             // only once checked in, and only for a room whose door code is live.
             'door' => ['available' => $state === 'active' && $this->doors->available($booking)],
         ];
-    }
-
-    /**
-     * Every walk-in and booking that has closed and still owes, newest close
-     * first (OutstandingItems::closedFor, the desk's own rules) — shown
-     * whatever else runs, so nothing owed drops out of sight. `kind` says
-     * how it is paid: `coworking_session` (a walk-in, or a booking on a
-     * coworking space) through POST
-     * member/coworking-sessions/{type}/{id}/pay, `booking` (a room, office
-     * or hall) through POST member/bookings/{id}/pay. `payment` is the
-     * block every session shows: what is owed, and for a booking the
-     * method it was booked with.
-     *
-     * @return list<array<string, mixed>>
-     */
-    private function unpaid(User $member, string $locale): array
-    {
-        return $this->outstanding->closedFor($member->id)
-            ->map(fn (Booking|WalkinSession $owed) => [
-                'kind' => $owed instanceof Booking && ! $owed->isCoworking() ? 'booking' : 'coworking_session',
-                'type' => $owed->coworkingType(),
-                'id' => $owed->id,
-                'reference' => $owed->reference,
-                'space' => $this->space($owed->space, $locale),
-                'branch' => $this->branch($owed->space->building?->branch, $locale),
-                'checked_in_at' => $this->time->toLocal($owed->checked_in_at)?->toIso8601String(),
-                'checked_out_at' => $this->time->toLocal($owed->checked_out_at)?->toIso8601String(),
-                'payment' => $this->payments->for($owed, $member),
-            ])
-            ->all();
     }
 
     /**

@@ -156,8 +156,7 @@ class OutstandingItems
     /**
      * The member's walk-ins and bookings that have closed and still owe, by
      * the same rules the desk lists them by, newest close first — the home
-     * screen's `unpaid`, so nothing owed drops out of sight while another
-     * session or booking runs. Upcoming bookings not paid yet are not here:
+     * screen's awaiting_payment cards come from it. Upcoming bookings not paid yet are not here:
      * they are still to happen.
      *
      * @return Collection<int, Booking|WalkinSession>

@@ -81,7 +81,6 @@ class MemberHomeTest extends TestCase
             'unread_notifications' => 0,
             'active_session' => null,
             'active_booking' => null,
-            'unpaid' => [],
             'banners' => [],
             'today' => [],
             'explore' => [],
@@ -137,6 +136,8 @@ class MemberHomeTest extends TestCase
             'requested_at' => null,
             'checked_in_at' => '2026-10-13T08:35:00+03:00',
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
         ]);
     }
 
@@ -165,11 +166,13 @@ class MemberHomeTest extends TestCase
             'requested_at' => '2026-10-13T09:58:00+03:00',
             'checked_in_at' => null,
             'end_requested' => false,
+            'checked_out_at' => null,
+            'payment' => null,
         ]);
     }
 
-    /** Reception closed it and money is owed: it is listed, to pay from, until it is paid. */
-    public function test_an_ended_session_still_owed_is_listed_until_paid(): void
+    /** Reception closed it and money is owed: it stays the card, to pay from, until it is paid. */
+    public function test_an_ended_session_still_owed_stays_the_card_until_paid(): void
     {
         $openSpace = $this->openSpace();
         $session = WalkinSession::factory()->create([
@@ -181,23 +184,63 @@ class MemberHomeTest extends TestCase
             'payment_state' => PaymentState::Unpaid,
         ]);
 
-        $response = $this->home()->assertJsonPath('data.active_session', null);
-        $item = $response->json('data.unpaid.0');
+        $response = $this->home();
+        $card = $response->json('data.active_session');
 
-        $this->assertCount(1, $response->json('data.unpaid'));
-        $this->assertSame(['coworking_session', 'walkin', $session->id, $session->reference], [$item['kind'], $item['type'], $item['id'], $item['reference']]);
-        $this->assertSame(['id' => $openSpace->id, 'name' => 'Open Space', 'type' => 'co_space'], $item['space']);
-        $this->assertSame(['id' => $openSpace->building->branch_id, 'name' => 'Main Branch'], $item['branch']);
-        $this->assertSame(['2026-10-13T08:30:00+03:00', '2026-10-13T09:55:00+03:00'], [$item['checked_in_at'], $item['checked_out_at']]);
-        $this->assertSame(['unpaid', 300], [$item['payment']['state'], $item['payment']['amount_points']]);
+        $this->assertSame(['awaiting_payment', 'walkin', $session->id, null, false], [$card['state'], $card['type'], $card['id'], $card['arrival_request_id'], $card['end_requested']]);
+        $this->assertSame(['id' => $openSpace->id, 'name' => 'Open Space', 'type' => 'co_space'], $card['space']);
+        $this->assertSame(['2026-10-13T08:30:00+03:00', '2026-10-13T09:55:00+03:00'], [$card['checked_in_at'], $card['checked_out_at']]);
+        $this->assertSame(['id' => $openSpace->building->branch_id, 'name' => 'Main Branch'], $card['branch']);
+        $this->assertSame(['unpaid', 300], [$card['payment']['state'], $card['payment']['amount_points']]);
 
         $session->forceFill(['payment_state' => PaymentState::Paid, 'paid_at' => now()])->save();
 
-        $this->home()->assertJsonPath('data.unpaid', []);
+        $this->home()->assertJsonPath('data.active_session', null);
     }
 
-    /** The point of the list: a new session does not hide what an older one still owes. */
-    public function test_an_owed_session_stays_listed_while_another_runs(): void
+    /** Several owed: the card is the newest closed one; a kiosk scan waiting for reception comes first. */
+    public function test_the_owed_card_is_the_newest_and_gives_way_to_a_waiting_scan(): void
+    {
+        $openSpace = $this->openSpace();
+        WalkinSession::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'checked_in_at' => now()->subDays(2),
+            'checked_out_at' => now()->subDays(2)->addHour(),
+            'price_points' => 100,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+        $newer = Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $openSpace->id,
+            'status' => BookingStatus::Completed,
+            'start_at' => now()->subDay(),
+            'end_at' => now()->subDay()->addHours(2),
+            'checked_in_at' => now()->subDay(),
+            'checked_out_at' => now()->subDay()->addHours(2),
+            'price_points' => 200,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+
+        $this->home()
+            ->assertJsonPath('data.active_session.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_session.type', 'booking')
+            ->assertJsonPath('data.active_session.id', $newer->id);
+
+        ArrivalRequest::factory()->create([
+            'user_id' => $this->member->id,
+            'purpose' => ArrivalRequestPurpose::CoworkingStart,
+            'space_id' => $openSpace->id,
+            'status' => ArrivalRequestStatus::Pending,
+            'requested_at' => now()->subMinute(),
+        ]);
+
+        $this->home()
+            ->assertJsonPath('data.active_session.state', 'awaiting_confirmation');
+    }
+
+    /** A running session takes the card; once it closes paid, the older one still owed is the card again. */
+    public function test_a_running_session_takes_the_card_and_the_owed_one_comes_back(): void
     {
         $openSpace = $this->openSpace();
         $owed = WalkinSession::factory()->create([
@@ -216,40 +259,13 @@ class MemberHomeTest extends TestCase
 
         $this->home()
             ->assertJsonPath('data.active_session.state', 'active')
-            ->assertJsonPath('data.active_session.id', $running->id)
-            ->assertJsonCount(1, 'data.unpaid')
-            ->assertJsonPath('data.unpaid.0.id', $owed->id);
-    }
+            ->assertJsonPath('data.active_session.id', $running->id);
 
-    /** Every one owed is listed, newest close first — not only the latest. */
-    public function test_every_owed_session_is_listed_newest_first(): void
-    {
-        $openSpace = $this->openSpace();
-        $older = WalkinSession::factory()->create([
-            'user_id' => $this->member->id,
-            'space_id' => $openSpace->id,
-            'checked_in_at' => now()->subDays(3),
-            'checked_out_at' => now()->subDays(3)->addHour(),
-            'price_points' => 100,
-            'payment_state' => PaymentState::Unpaid,
-        ]);
-        $newer = Booking::factory()->create([
-            'user_id' => $this->member->id,
-            'space_id' => $openSpace->id,
-            'status' => BookingStatus::Completed,
-            'start_at' => now()->subDay(),
-            'end_at' => now()->subDay()->addHours(2),
-            'checked_in_at' => now()->subDay(),
-            'checked_out_at' => now()->subDay()->addHours(2),
-            'price_points' => 200,
-            'payment_state' => PaymentState::Unpaid,
-        ]);
+        $running->forceFill(['checked_out_at' => now(), 'price_points' => 100, 'payment_state' => PaymentState::Paid, 'paid_at' => now()])->save();
 
         $this->home()
-            ->assertJsonPath('data.unpaid.0.type', 'booking')
-            ->assertJsonPath('data.unpaid.0.id', $newer->id)
-            ->assertJsonPath('data.unpaid.1.type', 'walkin')
-            ->assertJsonPath('data.unpaid.1.id', $older->id);
+            ->assertJsonPath('data.active_session.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_session.id', $owed->id);
     }
 
     /** A coworking booking paid when it was made owes only what it ran over. */
@@ -269,25 +285,23 @@ class MemberHomeTest extends TestCase
         $this->acceptedPayment($booking, 200);
 
         $this->home()
-            ->assertJsonPath('data.unpaid.0.kind', 'coworking_session')
-            ->assertJsonPath('data.unpaid.0.type', 'booking')
-            ->assertJsonPath('data.unpaid.0.payment.amount_points', 50);
+            ->assertJsonPath('data.active_session.state', 'awaiting_payment')
+            ->assertJsonPath('data.active_session.type', 'booking')
+            ->assertJsonPath('data.active_session.payment.amount_points', 50);
 
         $this->acceptedPayment($booking, 50);
 
-        $this->home()->assertJsonPath('data.unpaid', []);
+        $this->home()->assertJsonPath('data.active_session', null);
     }
 
-    public function test_a_session_that_owes_nothing_is_not_listed(): void
+    public function test_a_session_that_owes_nothing_is_no_card(): void
     {
         $ended = ['user_id' => $this->member->id, 'space_id' => $this->openSpace()->id, 'checked_in_at' => now()->subHours(2), 'checked_out_at' => now()->subHour()];
         // The plan covered it in full.
         WalkinSession::factory()->create([...$ended, 'price_points' => 0, 'payment_state' => PaymentState::Unpaid]);
         WalkinSession::factory()->create([...$ended, 'price_points' => 300, 'payment_state' => PaymentState::Paid]);
-        // Still running: priced only once it closes.
-        WalkinSession::factory()->create([...$ended, 'checked_out_at' => null, 'price_points' => null]);
 
-        $this->home()->assertJsonPath('data.unpaid', []);
+        $this->home()->assertJsonPath('data.active_session', null);
     }
 
     private function openSpace(): Space
@@ -558,7 +572,6 @@ class MemberHomeTest extends TestCase
         $response->assertJsonPath('data.unread_notifications', 0);
         $response->assertJsonPath('data.active_session', null);
         $response->assertJsonPath('data.active_booking', null);
-        $response->assertJsonPath('data.unpaid', []);
         $response->assertJsonPath('data.today', []);
         $response->assertJsonPath('data.banners.0.id', $banner->id);
         $response->assertJsonPath('data.explore.0.id', $service->id);
