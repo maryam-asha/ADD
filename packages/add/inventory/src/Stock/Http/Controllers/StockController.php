@@ -4,42 +4,41 @@ namespace Add\Inventory\Stock\Http\Controllers;
 
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
-use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Enums\StockMovementType;
-use Add\Inventory\Stock\Http\Requests\StockRequest;
+use Add\Inventory\Stock\Http\Requests\StockOperationRequest;
 use Add\Inventory\Stock\Http\Resources\StockBalanceResource;
 use Add\Inventory\Stock\Http\Resources\StockMovementResource;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
-use Add\Inventory\Stock\Services\StockService;
-use Add\Inventory\Support\Place;
+use Add\Inventory\Stock\Services\StockOperations;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 
 class StockController extends Controller
 {
     /**
      * What is on hand. Filters: `item_id`, `category_id` (with every
-     * category below it), `location[type]` + `location[id]` (with every
-     * place inside it unless `within=0`); empty balances are left out
-     * unless `include_empty=1`.
+     * category below it), `warehouse_id`, or `place[type]` + `place[id]`
+     * (the warehouses sitting anywhere inside it); empty balances are left
+     * out unless `include_empty=1`.
      */
     public function balances(Request $request): AnonymousResourceCollection
     {
         $balances = StockBalance::query()
             ->with('item.unit')
+            ->where('location_type', Warehouse::TYPE)
             ->when($request->filled('item_id'), fn (Builder $query) => $query->where('item_id', $request->integer('item_id')))
             ->when($request->filled('category_id'), function (Builder $query) use ($request) {
                 $category = Category::query()->find($request->integer('category_id'));
                 $query->whereIn('item_id', Item::query()->select('id')->whereIn('category_id', $category?->subtreeIds() ?? []));
             })
-            ->when($this->place($request), fn (Builder $query, Place $place) => $query->at(
-                $request->boolean('within', true) ? Inventory::locations()->within($place) : [$place],
-            ))
+            ->when(Warehouse::idsFromFilter($request->all()), fn (Builder $query, array $ids) => $query->whereIn('location_id', $ids), fn (Builder $query) => $this->unlessFilteredToNone($query, $request))
             ->when(! $request->boolean('include_empty'), fn (Builder $query) => $query->where('quantity', '>', 0))
             ->orderBy('item_id')
             ->orderBy('id')
@@ -49,24 +48,22 @@ class StockController extends Controller
     }
 
     /**
-     * The ledger, newest first. Filters: `item_id`, `location` (+ `within`),
-     * `type`, `source[type]` + `source[id]`, `from` / `to` (days).
+     * The ledger, newest first. Filters: `item_id`, `warehouse_id` or
+     * `place`, `type`, `actor_id`, `operation_id`, `source[type]` +
+     * `source[id]`, `from` / `to` (days).
      */
     public function movements(Request $request): AnonymousResourceCollection
     {
         $source = $request->input('source');
 
         $movements = StockMovement::query()
-            ->with('item')
+            ->with(['item', 'enteredUnit'])
+            ->where('location_type', Warehouse::TYPE)
             ->when($request->filled('item_id'), fn (Builder $query) => $query->where('item_id', $request->integer('item_id')))
-            ->when($this->place($request), fn (Builder $query, Place $place) => $query->where(function (Builder $query) use ($request, $place) {
-                $places = $request->boolean('within', true) ? Inventory::locations()->within($place) : [$place];
-
-                foreach (collect($places)->groupBy('type') as $type => $group) {
-                    $query->orWhere(fn (Builder $q) => $q->where('location_type', $type)->whereIn('location_id', $group->pluck('id')));
-                }
-            }))
+            ->when(Warehouse::idsFromFilter($request->all()), fn (Builder $query, array $ids) => $query->whereIn('location_id', $ids), fn (Builder $query) => $this->unlessFilteredToNone($query, $request))
             ->when(StockMovementType::tryFrom((string) $request->input('type')), fn (Builder $query, StockMovementType $type) => $query->where('type', $type))
+            ->when($request->filled('actor_id'), fn (Builder $query) => $query->where('actor_id', $request->integer('actor_id')))
+            ->when($request->filled('operation_id'), fn (Builder $query) => $query->where('operation_id', (string) $request->input('operation_id')))
             ->when(
                 is_array($source) && is_string($source['type'] ?? null),
                 fn (Builder $query) => $query->where('source_type', $source['type'])
@@ -80,68 +77,69 @@ class StockController extends Controller
         return StockMovementResource::collection($movements);
     }
 
-    public function receive(StockRequest $request, StockService $stock): StockMovementResource
+    public function receive(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return new StockMovementResource($stock->receive(
-            Item::query()->findOrFail($data['item_id']),
-            Place::from($data['location']),
-            $data['quantity'],
-            $data['unit_cost'] ?? null,
-            note: $data['note'] ?? null,
-        ));
+        return $this->created($operations->receive($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null));
     }
 
-    public function issue(StockRequest $request, StockService $stock): StockMovementResource
+    public function issue(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return new StockMovementResource($stock->issue(
-            Item::query()->findOrFail($data['item_id']),
-            Place::from($data['location']),
-            $data['quantity'],
+        return $this->created($operations->issue(
+            $this->warehouse($data['warehouse_id']),
+            $data['lines'],
             IssueReason::from($data['reason']),
-            note: $data['note'] ?? null,
+            $data['note'] ?? null,
         ));
     }
 
-    public function transfer(StockRequest $request, StockService $stock): JsonResponse
+    public function transfer(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return StockMovementResource::collection(collect($stock->transfer(
-            Item::query()->findOrFail($data['item_id']),
-            Place::from($data['from']),
-            Place::from($data['to']),
-            $data['quantity'],
+        return $this->created($operations->transfer(
+            $this->warehouse($data['from_warehouse_id']),
+            $this->warehouse($data['to_warehouse_id']),
+            $data['lines'],
             $data['note'] ?? null,
-        )))->response()->setStatusCode(201);
+        ));
     }
 
     /**
-     * A count that matched the book records nothing.
+     * A count where every line matched the book records nothing.
      */
-    public function adjust(StockRequest $request, StockService $stock): JsonResponse|StockMovementResource
+    public function adjust(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
-        $movement = $stock->adjust(
-            Item::query()->findOrFail($data['item_id']),
-            Place::from($data['location']),
-            $data['counted'],
-            $data['unit_cost'] ?? null,
-            $data['note'] ?? null,
-        );
+        $movements = $operations->adjust($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null);
 
-        return $movement === null
+        return $movements->isEmpty()
             ? response()->json(['message' => __('inventory::stock.count_matched')])
-            : new StockMovementResource($movement);
+            : $this->created($movements);
     }
 
-    private function place(Request $request): ?Place
+    private function warehouse(int|string $id): Warehouse
     {
-        $value = $request->input('location');
+        return Warehouse::query()->findOrFail($id);
+    }
 
-        return is_array($value) && is_string($value['type'] ?? null) && is_numeric($value['id'] ?? null) ? Place::from($value) : null;
+    /**
+     * @param  Collection<int, StockMovement>  $movements
+     */
+    private function created(Collection $movements): JsonResponse
+    {
+        return StockMovementResource::collection($movements->each->load(['item', 'enteredUnit']))->response()->setStatusCode(201);
+    }
+
+    /**
+     * A place filter that matched no warehouse lists nothing, rather than
+     * everything.
+     */
+    private function unlessFilteredToNone(Builder $query, Request $request): Builder
+    {
+        return Warehouse::idsFromFilter($request->all()) === [] ? $query->whereRaw('1 = 0') : $query;
     }
 }

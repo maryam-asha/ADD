@@ -3,6 +3,7 @@
 namespace Add\Inventory\Stock\Models;
 
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Catalog\Models\Unit;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Enums\StockMovementType;
 use Add\Inventory\Support\Casts\PlainDecimal;
@@ -33,6 +34,9 @@ class StockMovement extends Model
         'quantity_after',
         'average_cost_after',
         'transfer_id',
+        'operation_id',
+        'entered_unit_id',
+        'entered_quantity',
         'reason',
         'source_type',
         'source_id',
@@ -49,6 +53,8 @@ class StockMovement extends Model
         'quantity_after' => PlainDecimal::class.':3',
         'average_cost_after' => PlainDecimal::class.':4',
         'reason' => IssueReason::class,
+        'entered_unit_id' => 'integer',
+        'entered_quantity' => PlainDecimal::class.':3',
         'source_id' => 'integer',
         'actor_id' => 'integer',
     ];
@@ -56,6 +62,11 @@ class StockMovement extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    public function enteredUnit(): BelongsTo
+    {
+        return $this->belongsTo(Unit::class, 'entered_unit_id');
     }
 
     public function location(): Place

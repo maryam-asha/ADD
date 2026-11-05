@@ -21,7 +21,8 @@ class ItemSaleResource extends JsonResource
         return [
             'id' => $this->id,
             'member' => ['id' => $this->user->id, 'name' => $this->user->name],
-            'stock_location' => app(Presenter::class)->location($this->location()),
+            // The warehouse the stock was issued from.
+            'warehouse' => app(Presenter::class)->warehouse($this->location_id),
             'lines' => $this->lines->map(fn ($line) => [
                 'item' => ['id' => $line->item->id, 'sku' => $line->item->sku, 'name' => $line->item->name],
                 'quantity' => $line->quantity,

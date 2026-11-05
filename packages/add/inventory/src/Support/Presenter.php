@@ -3,6 +3,7 @@
 namespace Add\Inventory\Support;
 
 use Add\Inventory\Inventory;
+use Add\Inventory\Warehouses\Models\Warehouse;
 
 /**
  * Names for what the package stores only as ids — a place, a custodian, the
@@ -21,6 +22,9 @@ class Presenter
     /** @var array<int, array{id: int, name: ?string}> */
     private array $actors = [];
 
+    /** @var array<int, array<string, mixed>> */
+    private array $warehouses = [];
+
     /**
      * @return array{type: string, id: int, label: ?string, path: list<string>}|null
      */
@@ -32,6 +36,30 @@ class Presenter
 
         return $this->locations[$place->key()] ??= Inventory::locations()->describe($place)
             ?? [...$place->toArray(), 'label' => null, 'path' => []];
+    }
+
+    /**
+     * A warehouse as the stock lists show it. A deleted one keeps its id.
+     *
+     * @return array{id: int, name: ?array<string, string>, code: ?string, place: ?array<string, mixed>}|null
+     */
+    public function warehouse(?int $id): ?array
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        if (! isset($this->warehouses[$id])) {
+            $warehouse = Warehouse::query()->find($id);
+            $this->warehouses[$id] = [
+                'id' => $id,
+                'name' => $warehouse?->name,
+                'code' => $warehouse?->code,
+                'place' => $this->location($warehouse?->place()),
+            ];
+        }
+
+        return $this->warehouses[$id];
     }
 
     /**

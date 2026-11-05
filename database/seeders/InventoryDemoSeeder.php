@@ -19,6 +19,7 @@ use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Services\WarehouseService;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
@@ -46,8 +47,8 @@ use Spatie\Permission\Models\Role;
  * spaces in every status — in service, under repair, retired, lost,
  * disposed of — with their purchase, depreciation, warranty (one about to
  * end), movements, custody (held, returned, handed on) and maintenance
- * (open, closed, a schedule due and one overdue); stock on several places
- * at average cost through receipts, issues, a transfer and counts (one
+ * (open, closed, a schedule due and one overdue); stock in three
+ * warehouses of the branch at average cost through receipts, issues, a transfer and counts (one
  * short, one over, one nearly empty); what reception sells; printing linked
  * to the paper it uses up.
  *
@@ -69,6 +70,9 @@ class InventoryDemoSeeder extends Seeder
 
     /** @var array<string, Place> */
     private array $places = [];
+
+    /** @var array<string, Place> where stock is kept: warehouses */
+    private array $warehouses = [];
 
     /** @var array<string, Unit> */
     private array $units = [];
@@ -110,6 +114,7 @@ class InventoryDemoSeeder extends Seeder
             DB::transaction(function () {
                 $this->seedCatalog();
                 $this->seedAssets();
+                $this->seedWarehouses();
                 $this->seedStock();
                 $this->seedSales();
                 $this->seedAccounts();
@@ -364,10 +369,26 @@ class InventoryDemoSeeder extends Seeder
 
     // ── Stock ───────────────────────────────────────────────────────────────
 
+    /**
+     * The branch's primary warehouse (reception sells and records printing
+     * from it), a store room, and the café's own warehouse, which sells too.
+     */
+    private function seedWarehouses(): void
+    {
+        $warehouses = app(WarehouseService::class);
+        $branch = ['type' => 'branch', 'id' => $this->places['reception']->id];
+
+        $this->warehouses = [
+            'reception' => $warehouses->create(['name' => ['ar' => 'المستودع الرئيسي', 'en' => 'Main warehouse'], 'place' => $branch, 'is_primary' => true])->asPlace(),
+            'store' => $warehouses->create(['name' => ['ar' => 'غرفة التخزين', 'en' => 'Store room'], 'place' => $branch, 'allows_sales' => false, 'address' => 'Ground floor, behind the lift'])->asPlace(),
+            'cafe' => $warehouses->create(['name' => ['ar' => 'مستودع الكافيه', 'en' => 'Café store'], 'place' => $branch])->asPlace(),
+        ];
+    }
+
     private function seedStock(): void
     {
         $stock = app(StockService::class);
-        $p = $this->places;
+        $p = $this->warehouses;
         $i = $this->items;
 
         // Paper at reception (printing draws on it), two deliveries at two prices.

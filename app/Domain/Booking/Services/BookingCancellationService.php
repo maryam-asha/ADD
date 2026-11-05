@@ -4,11 +4,13 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\BookingCancelled;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Settings\Services\SettingService;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Facades\DB;
 
@@ -19,6 +21,7 @@ class BookingCancellationService
         private readonly SettingService $settings,
         private readonly BookingRefunder $refunder,
         private readonly CoworkingBookingPolicy $policy,
+        private readonly RealtimeBroadcaster $realtime,
     ) {}
 
     /**
@@ -186,6 +189,8 @@ class BookingCancellationService
         // longer holds a charge (docs/decisions/plan-discounts-design.md),
         // with the plan hours it took (BookingPlanBenefits).
         $this->planBenefits->voidFor($locked);
+
+        $this->realtime->send(new BookingCancelled($locked));
 
         return $refunded;
     }

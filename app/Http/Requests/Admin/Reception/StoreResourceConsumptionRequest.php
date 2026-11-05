@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests\Admin\Reception;
 
-use Add\Inventory\Support\Rules\PlaceRules;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreResourceConsumptionRequest extends FormRequest
 {
@@ -23,9 +23,9 @@ class StoreResourceConsumptionRequest extends FormRequest
             'resource_type_id' => ['required', 'integer', 'exists:resource_types,id'],
             'quantity' => ['required', 'numeric', 'min:0.01'],
             'note' => ['nullable', 'string', 'max:255'],
-            // Where a type's stock (paper) comes from; by default the branch
-            // of the operator's open cash register.
-            ...PlaceRules::location('stock_location', required: false),
+            // The warehouse a type's stock (paper) comes from; by default the
+            // primary one of the branch of the operator's open cash register.
+            'warehouse_id' => ['nullable', 'integer', Rule::exists('inv_warehouses', 'id')],
         ];
     }
 }

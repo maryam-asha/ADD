@@ -15,6 +15,7 @@ use Illuminate\Validation\Rule;
  */
 class UpdateItemRequest extends FormRequest
 {
+    use ValidatesBarcodeAndUnits;
     use ValidatesProperties;
 
     public function authorize(): bool
@@ -51,6 +52,7 @@ class UpdateItemRequest extends FormRequest
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'is_active' => ['sometimes', 'boolean'],
             ...($this->has('properties') ? $this->propertyRules($category) : []),
+            ...$this->barcodeAndUnitRules($item, $this->input('unit_id', $item->unit_id)),
         ];
     }
 }

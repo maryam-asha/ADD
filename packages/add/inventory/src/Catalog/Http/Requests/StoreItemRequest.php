@@ -9,6 +9,7 @@ use Illuminate\Validation\Rule;
 
 class StoreItemRequest extends FormRequest
 {
+    use ValidatesBarcodeAndUnits;
     use ValidatesProperties;
 
     public function authorize(): bool
@@ -32,6 +33,7 @@ class StoreItemRequest extends FormRequest
             'description' => ['nullable', 'string', 'max:5000'],
             'is_active' => ['sometimes', 'boolean'],
             ...$this->propertyRules($category),
+            ...$this->barcodeAndUnitRules(null, $this->input('unit_id')),
         ];
     }
 }

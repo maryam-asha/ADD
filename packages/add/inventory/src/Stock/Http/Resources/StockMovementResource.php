@@ -26,13 +26,24 @@ class StockMovementResource extends JsonResource
                 'sku' => $this->item->sku,
                 'name' => $this->item->name,
             ],
-            'location' => $presenter->location($this->location()),
+            'warehouse' => $presenter->warehouse($this->location_id),
             'type' => $this->type->value,
             'quantity' => $this->quantity,
             'unit_cost' => $this->unit_cost,
             'quantity_after' => $this->quantity_after,
             'average_cost_after' => $this->average_cost_after,
             'transfer_id' => $this->transfer_id,
+            'operation_id' => $this->operation_id,
+            // What was typed, when it was a pack of the main unit ("2 box");
+            // for a count, the count. `quantity` is always in the main unit.
+            'entered' => $this->entered_unit_id === null ? null : [
+                'unit' => [
+                    'id' => $this->enteredUnit->id,
+                    'code' => $this->enteredUnit->code,
+                    'name' => $this->enteredUnit->name,
+                ],
+                'quantity' => $this->entered_quantity,
+            ],
             'reason' => $this->reason?->value,
             'source' => $this->source_type === null ? null : ['type' => $this->source_type, 'id' => $this->source_id],
             'note' => $this->note,

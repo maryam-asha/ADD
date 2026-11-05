@@ -11,6 +11,8 @@ use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\Decimal;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -20,14 +22,27 @@ use Illuminate\Support\Str;
  * transaction, with the balance row locked — so two receptions selling the
  * last ream cannot both succeed, and the balance always equals its ledger.
  *
- * Cost is a weighted average per item and location: a receipt at a new
+ * Stock is kept only in warehouses: every location here is
+ * `('warehouse', id)` of an active warehouse, and nothing comes into one
+ * that its item scope leaves out (going out is always allowed, so a
+ * warehouse can be emptied).
+ *
+ * Cost is a weighted average per item and warehouse: a receipt at a new
  * cost re-averages what is there; issues and transfers take the average
  * they leave at. Hosts call issue() for their own operations (a sale, a
  * recorded consumption) inside their own transaction, passing what caused
  * it as `$source`.
+ *
+ * `$meta` carries what one multi-line operation shares and what the person
+ * typed: `operation_id`, `entered_unit_id`, `entered_quantity`.
  */
 class StockService
 {
+    private const META = ['operation_id', 'entered_unit_id', 'entered_quantity'];
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
     public function receive(
         Item $item,
         Place $at,
@@ -35,9 +50,10 @@ class StockService
         int|float|string|null $unitCost = null,
         ?Place $source = null,
         ?string $note = null,
+        array $meta = [],
     ): StockMovement {
         $quantity = $this->quantity($item, $quantity);
-        $this->ensureLocation($at);
+        $this->ensureAllows($this->warehouse($at), $item);
 
         if ($unitCost !== null && Decimal::cmp($unitCost, '0') < 0) {
             InventoryException::fail('inventory::stock.negative_cost');
@@ -46,9 +62,13 @@ class StockService
         return DB::transaction(fn () => $this->record($item, $at, StockMovementType::Receipt, $quantity, $unitCost === null ? null : Decimal::round($unitCost, 4), [
             'note' => $note,
             ...$this->source($source),
+            ...$this->meta($meta),
         ]));
     }
 
+    /**
+     * @param  array<string, mixed>  $meta
+     */
     public function issue(
         Item $item,
         Place $at,
@@ -56,14 +76,16 @@ class StockService
         IssueReason $reason,
         ?Place $source = null,
         ?string $note = null,
+        array $meta = [],
     ): StockMovement {
         $quantity = $this->quantity($item, $quantity);
-        $this->ensureLocation($at);
+        $this->warehouse($at);
 
         return DB::transaction(fn () => $this->record($item, $at, StockMovementType::Issue, Decimal::neg($quantity), null, [
             'reason' => $reason,
             'note' => $note,
             ...$this->source($source),
+            ...$this->meta($meta),
         ]));
     }
 
@@ -71,20 +93,21 @@ class StockService
      * Both halves share a `transfer_id`; what arrives keeps the cost it
      * left at.
      *
+     * @param  array<string, mixed>  $meta
      * @return array{0: StockMovement, 1: StockMovement}
      */
-    public function transfer(Item $item, Place $from, Place $to, int|float|string $quantity, ?string $note = null): array
+    public function transfer(Item $item, Place $from, Place $to, int|float|string $quantity, ?string $note = null, array $meta = []): array
     {
         $quantity = $this->quantity($item, $quantity);
 
         if ($from->is($to)) {
-            InventoryException::fail('inventory::stock.same_location');
+            InventoryException::fail('inventory::stock.same_warehouse');
         }
 
-        $this->ensureLocation($from);
-        $this->ensureLocation($to);
+        $this->warehouse($from);
+        $this->ensureAllows($this->warehouse($to), $item);
 
-        return DB::transaction(function () use ($item, $from, $to, $quantity, $note) {
+        return DB::transaction(function () use ($item, $from, $to, $quantity, $note, $meta) {
             // Both rows locked up front, always in the same order, so two
             // opposite transfers cannot deadlock each other.
             $places = [$from, $to];
@@ -93,9 +116,9 @@ class StockService
                 $this->lockedBalance($item, $place);
             }
 
-            $transferId = (string) Str::uuid();
-            $out = $this->record($item, $from, StockMovementType::TransferOut, Decimal::neg($quantity), null, ['transfer_id' => $transferId, 'note' => $note]);
-            $in = $this->record($item, $to, StockMovementType::TransferIn, $quantity, $out->unit_cost, ['transfer_id' => $transferId, 'note' => $note]);
+            $shared = ['transfer_id' => (string) Str::uuid(), 'note' => $note, ...$this->meta($meta)];
+            $out = $this->record($item, $from, StockMovementType::TransferOut, Decimal::neg($quantity), null, $shared);
+            $in = $this->record($item, $to, StockMovementType::TransferIn, $quantity, $out->unit_cost, $shared);
 
             return [$out, $in];
         });
@@ -105,8 +128,10 @@ class StockService
      * A physical count: the ledger takes the difference so the balance
      * becomes what was counted. Null when the count matched. Stock found
      * beyond the book comes in at `$unitCost`, or the current average.
+     *
+     * @param  array<string, mixed>  $meta
      */
-    public function adjust(Item $item, Place $at, int|float|string $counted, int|float|string|null $unitCost = null, ?string $note = null): ?StockMovement
+    public function adjust(Item $item, Place $at, int|float|string $counted, int|float|string|null $unitCost = null, ?string $note = null, array $meta = []): ?StockMovement
     {
         $this->ensureStock($item);
         $counted = Decimal::round($counted, 3);
@@ -116,9 +141,9 @@ class StockService
         }
 
         $this->ensureWhole($item, $counted);
-        $this->ensureLocation($at);
+        $warehouse = $this->warehouse($at);
 
-        return DB::transaction(function () use ($item, $at, $counted, $unitCost, $note) {
+        return DB::transaction(function () use ($item, $at, $warehouse, $counted, $unitCost, $note, $meta) {
             $balance = $this->lockedBalance($item, $at);
             $delta = Decimal::sub($counted, $balance->quantity);
 
@@ -126,14 +151,18 @@ class StockService
                 return null;
             }
 
+            if (Decimal::cmp($delta, '0') > 0) {
+                $this->ensureAllows($warehouse, $item);
+            }
+
             $cost = Decimal::cmp($delta, '0') > 0 && $unitCost !== null ? Decimal::round($unitCost, 4) : null;
 
-            return $this->record($item, $at, StockMovementType::Adjustment, $delta, $cost, ['note' => $note]);
+            return $this->record($item, $at, StockMovementType::Adjustment, $delta, $cost, ['note' => $note, ...$this->meta($meta)]);
         });
     }
 
     /**
-     * What an item holds at a location right now.
+     * What an item holds in a warehouse right now.
      */
     public function onHand(Item $item, Place $at): string
     {
@@ -155,7 +184,12 @@ class StockService
         $after = Decimal::add($balance->quantity, $delta);
 
         if (Decimal::cmp($after, '0') < 0) {
-            throw InsufficientStockException::for($balance->quantity, Decimal::neg($delta), $item->unit?->translate('name'));
+            throw InsufficientStockException::for(
+                $balance->quantity,
+                Decimal::neg($delta),
+                $item->unit?->translate('name'),
+                Warehouse::query()->find($at->id)?->translate('name'),
+            );
         }
 
         $before = $balance->average_cost;
@@ -241,11 +275,38 @@ class StockService
         }
     }
 
-    private function ensureLocation(Place $at): void
+    /**
+     * The active warehouse a location names; nothing else holds stock.
+     */
+    private function warehouse(Place $at): Warehouse
     {
-        if (! Inventory::locations()->exists($at)) {
-            InventoryException::fail('inventory::stock.unknown_location');
+        if ($at->type !== Warehouse::TYPE) {
+            InventoryException::fail('inventory::stock.not_a_warehouse');
         }
+
+        $warehouse = Warehouse::query()->find($at->id);
+
+        if ($warehouse === null || ! $warehouse->is_active) {
+            InventoryException::fail('inventory::stock.warehouse_inactive');
+        }
+
+        return $warehouse;
+    }
+
+    private function ensureAllows(Warehouse $warehouse, Item $item): void
+    {
+        if (! $warehouse->allows($item)) {
+            InventoryException::fail('inventory::stock.outside_scope', ['warehouse' => (string) $warehouse->translate('name')]);
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function meta(array $meta): array
+    {
+        return array_filter(Arr::only($meta, self::META), fn ($value) => $value !== null);
     }
 
     /**

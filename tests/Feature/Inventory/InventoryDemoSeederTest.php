@@ -9,6 +9,7 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\Decimal;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Retail\Models\SaleItem;
@@ -51,6 +52,11 @@ class InventoryDemoSeederTest extends TestCase
         );
         // The history spreads over the past months.
         $this->assertTrue(StockMovement::query()->where('created_at', '<', now()->subMonths(2))->exists());
+        // Stock sits only in warehouses: the branch's primary one, a store
+        // room and the café.
+        $this->assertSame(0, StockMovement::query()->where('location_type', '!=', Warehouse::TYPE)->count());
+        $this->assertSame(1, Warehouse::query()->where('is_primary', true)->count());
+        $this->assertGreaterThanOrEqual(3, Warehouse::query()->count());
         // Every balance is its ledger.
         foreach (StockBalance::query()->get() as $balance) {
             $ledger = Decimal::add('0', ...StockMovement::query()->where('item_id', $balance->item_id)->where('location_type', $balance->location_type)->where('location_id', $balance->location_id)->pluck('quantity')->all());

@@ -7,13 +7,12 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Services\CashRegisterService;
 use App\Domain\Foundation\Models\Branch;
-use App\Domain\Foundation\Models\Building;
-use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
@@ -42,6 +41,8 @@ class ReceptionItemSaleTest extends TestCase
 
     private SaleItem $cola;
 
+    private Warehouse $main;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -53,13 +54,9 @@ class ReceptionItemSaleTest extends TestCase
         Sanctum::actingAs($this->operator, ['*']);
         app(CashRegisterService::class)->openSession($this->operator, $this->branch->id);
 
+        $this->main = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $this->branch->id, 'is_primary' => true]);
         $this->cola = SaleItem::factory()->create(['price_points' => 20]);
-        app(StockService::class)->receive($this->cola->item, $this->branchPlace(), 10, 0.5);
-    }
-
-    private function branchPlace(): Place
-    {
-        return new Place('branch', $this->branch->id);
+        app(StockService::class)->receive($this->cola->item, $this->main->asPlace(), 10, 0.5);
     }
 
     private function member(int $points = 0): User
@@ -84,7 +81,7 @@ class ReceptionItemSaleTest extends TestCase
 
     private function onHand(?Place $at = null): string
     {
-        return app(StockService::class)->onHand($this->cola->item, $at ?? $this->branchPlace());
+        return app(StockService::class)->onHand($this->cola->item, $at ?? $this->main->asPlace());
     }
 
     private function sell(array $body)
@@ -104,8 +101,7 @@ class ReceptionItemSaleTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.total_points', 40)
             ->assertJsonPath('data.lines.0.quantity', 2)
-            ->assertJsonPath('data.stock_location.type', 'branch')
-            ->assertJsonPath('data.stock_location.id', $this->branch->id)
+            ->assertJsonPath('data.warehouse.id', $this->main->id)
             ->json('data');
 
         $this->assertNotNull($sale['paid_at']);
@@ -167,34 +163,6 @@ class ReceptionItemSaleTest extends TestCase
         $this->assertSame(0, Payment::query()->count());
         $this->assertSame(0, $this->balance($member));
         $this->assertSame('10', $this->onHand());
-    }
-
-    public function test_the_stock_comes_from_the_place_named_or_the_open_register(): void
-    {
-        $member = $this->member(100);
-        $counter = Space::factory()->create(['building_id' => Building::factory()->create(['branch_id' => $this->branch->id])->id]);
-        app(StockService::class)->receive($this->cola->item, new Place('space', $counter->id), 5);
-
-        $this->sell([
-            'user_id' => $member->id,
-            'lines' => [['sale_item_id' => $this->cola->id, 'quantity' => 1]],
-            'payment_method' => 'wallet',
-            'stock_location' => ['type' => 'space', 'id' => $counter->id],
-        ])->assertCreated();
-
-        $this->assertSame('4', $this->onHand(new Place('space', $counter->id)));
-        $this->assertSame('10', $this->onHand());
-
-        // An operator with no register open must say where it comes from.
-        $other = User::factory()->create();
-        $other->assignRole('operations');
-        Sanctum::actingAs($other, ['*']);
-
-        $this->sell([
-            'user_id' => $member->id,
-            'lines' => [['sale_item_id' => $this->cola->id, 'quantity' => 1]],
-            'payment_method' => 'wallet',
-        ])->assertUnprocessable()->assertJsonPath('message', __('api.reception.stock_location_required', [], 'en'));
     }
 
     public function test_only_active_sale_items_of_stock_can_be_sold(): void

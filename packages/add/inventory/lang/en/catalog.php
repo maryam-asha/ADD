@@ -17,5 +17,7 @@ return [
     'item_updated' => 'Item updated.',
     'item_kind_locked' => 'This item already has assets or stock history; it cannot move to a category of another kind.',
     'unit_locked' => 'This item already has stock history; its unit can no longer change.',
+    'unit_not_of_item' => 'This unit is not one of this item’s units.',
+    'unit_in_use_by_movements' => 'Stock was already recorded in this unit; it stays, with its factor.',
     'item_has_history' => 'This item already has assets or stock history; deactivate it instead.',
 ];

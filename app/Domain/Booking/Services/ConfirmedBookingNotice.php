@@ -2,9 +2,11 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Booking\Events\BookingCreated;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
+use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -26,7 +28,10 @@ class ConfirmedBookingNotice
     /** @var array<int, true> bookings this request announced */
     private array $announced = [];
 
-    public function __construct(private readonly BookingNotifier $notifier) {}
+    public function __construct(
+        private readonly BookingNotifier $notifier,
+        private readonly RealtimeBroadcaster $realtime,
+    ) {}
 
     public function send(Booking $booking, bool $byReception = false): void
     {
@@ -39,6 +44,8 @@ class ConfirmedBookingNotice
                 $this->notifier->confirmed($fresh, $byReception);
             }
         });
+
+        $this->realtime->send(new BookingCreated($booking));
     }
 
     /** @param  list<Booking>  $bookings  one member's batch, the confirmed ones */
@@ -57,6 +64,8 @@ class ConfirmedBookingNotice
                 $this->notifier->confirmedBatch($fresh);
             }
         });
+
+        $this->realtime->send(...array_map(fn (Booking $b) => new BookingCreated($b), $bookings));
     }
 
     /**

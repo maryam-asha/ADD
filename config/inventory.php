@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Identity\Models\User;
+use App\Domain\Inventory\Adapters\AddLocationResolver;
 
 /*
  * ADD's settings for the inventory package (packages/add/inventory).
@@ -15,6 +16,11 @@ return [
     'currencies' => [
         'table' => 'currencies',
         'column' => 'code',
+    ],
+
+    // A warehouse sits in a branch, or in nothing (an external store).
+    'warehouses' => [
+        'place_types' => [AddLocationResolver::BRANCH],
     ],
 
     // Stock is costed in ADD's base currency.

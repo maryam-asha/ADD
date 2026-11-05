@@ -21,6 +21,8 @@ class SaleItemResource extends JsonResource
             'item' => [
                 'id' => $this->item->id,
                 'sku' => $this->item->sku,
+                'barcode' => $this->item->barcode,
+                'image_url' => $this->item->image_url,
                 'name' => $this->item->name,
                 'unit' => $this->item->unit?->name,
             ],

@@ -68,6 +68,7 @@ use App\Http\Controllers\Api\V1\Admin\Reception\PlanPurchaseController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionPaymentController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSessionsController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionSummaryController;
+use App\Http\Controllers\Api\V1\Admin\Reception\ReceptionWarehouseController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ResourceConsumptionController;
 use App\Http\Controllers\Api\V1\Admin\Reception\SessionEndRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\WalkInSessionController;
@@ -467,6 +468,8 @@ Route::post('reception/access-grants/{accessGrant}/activate', [AccessActivationC
 // PlanResourceGrant (docs/decisions/resource-quota-design.md). Same
 // user_id/company_id owner-resolution pattern as wallet-top-ups above.
 Route::post('reception/resource-consumptions', [ResourceConsumptionController::class, 'store'])->middleware('permission:reception.record_consumption');
+// The warehouses the desk may take stock from (the branch's primary first).
+Route::get('reception/warehouses', [ReceptionWarehouseController::class, 'index'])->middleware('permission:item-sales.create|reception.record_consumption');
 
 // Cash Register Sessions per staff member per shift (S6-BE-03 / PRD 5.9)
 Route::get('reception/cash-register-sessions', [CashRegisterSessionController::class, 'index'])->middleware('permission:cash-register.view');

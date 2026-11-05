@@ -5,11 +5,10 @@ namespace Add\Inventory\Reports\Http\Controllers;
 use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Services\DepreciationCalculator;
-use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Support\Decimal;
-use Add\Inventory\Support\Place;
 use Add\Inventory\Support\Presenter;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,22 +20,22 @@ use Illuminate\Routing\Controller;
 class ReportController extends Controller
 {
     /**
-     * What the stock on hand is worth at its average cost, per location.
-     * Optional `location` (+ `within`) narrows it.
+     * What the stock on hand is worth at its average cost, per warehouse.
+     * Optional `warehouse_id`, or `place` (the warehouses inside it),
+     * narrows it.
      */
     public function stockValuation(Request $request, Presenter $presenter): JsonResponse
     {
-        $place = $this->place($request);
+        $warehouses = Warehouse::idsFromFilter($request->all());
 
         $rows = StockBalance::query()
+            ->where('location_type', Warehouse::TYPE)
             ->where('quantity', '>', 0)
-            ->when($place, fn (Builder $query, Place $place) => $query->at(
-                $request->boolean('within', true) ? Inventory::locations()->within($place) : [$place],
-            ))
+            ->when($warehouses !== null, fn (Builder $query) => $query->whereIn('location_id', $warehouses))
             ->get()
-            ->groupBy(fn (StockBalance $balance) => $balance->location()->key())
+            ->groupBy('location_id')
             ->map(fn ($balances) => [
-                'location' => $presenter->location($balances->first()->location()),
+                'warehouse' => $presenter->warehouse($balances->first()->location_id),
                 'items' => $balances->count(),
                 'value' => Decimal::round(Decimal::add('0', ...$balances->map(fn (StockBalance $b) => Decimal::mul($b->quantity, $b->average_cost))->all()), 2),
             ])
@@ -46,7 +45,7 @@ class ReportController extends Controller
         return response()->json(['data' => [
             'currency' => config('inventory.stock.currency'),
             'total' => Decimal::round(Decimal::add('0', ...$rows->pluck('value')->all()), 2),
-            'locations' => $rows,
+            'warehouses' => $rows,
         ]]);
     }
 
@@ -94,12 +93,5 @@ class ReportController extends Controller
             'assets' => $rows->values(),
             'totals' => collect($totals)->map(fn (array $total, string $currency) => ['currency' => $currency, ...$total])->values(),
         ]]);
-    }
-
-    private function place(Request $request): ?Place
-    {
-        $value = $request->input('location');
-
-        return is_array($value) && is_string($value['type'] ?? null) && is_numeric($value['id'] ?? null) ? Place::from($value) : null;
     }
 }

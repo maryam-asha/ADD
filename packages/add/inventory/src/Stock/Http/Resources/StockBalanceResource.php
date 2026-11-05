@@ -25,7 +25,7 @@ class StockBalanceResource extends JsonResource
                 'name' => $this->item->name,
                 'unit' => ['id' => $this->item->unit->id, 'code' => $this->item->unit->code, 'name' => $this->item->unit->name],
             ],
-            'location' => app(Presenter::class)->location($this->location()),
+            'warehouse' => app(Presenter::class)->warehouse($this->location_id),
             'quantity' => $this->quantity,
             'average_cost' => $this->average_cost,
             'value' => Decimal::round(Decimal::mul($this->quantity, $this->average_cost), 2),

@@ -28,6 +28,11 @@ final class Abilities
 
     public const ASSETS_DISPOSE = 'inventory.assets.dispose';
 
+    public const WAREHOUSES_VIEW = 'inventory.warehouses.view';
+
+    /** Adding, editing, deactivating and deleting warehouses. */
+    public const WAREHOUSES_MANAGE = 'inventory.warehouses.manage';
+
     public const STOCK_VIEW = 'inventory.stock.view';
 
     public const STOCK_RECEIVE = 'inventory.stock.receive';

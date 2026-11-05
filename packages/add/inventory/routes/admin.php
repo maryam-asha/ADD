@@ -13,6 +13,7 @@ use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
+use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -35,6 +36,8 @@ Route::middleware('can:'.Abilities::CATALOG_VIEW)->group(function () use ($catal
     foreach ($catalog as $uri => [$controller, $parameter]) {
         Route::apiResource($uri, $controller)->only(['index', 'show'])->parameters([$uri => $parameter]);
     }
+
+    Route::get('items/barcode/{barcode}', [ItemController::class, 'byBarcode'])->name('items.barcode');
 });
 
 Route::middleware('can:'.Abilities::CATALOG_MANAGE)->group(function () use ($catalog) {
@@ -42,6 +45,7 @@ Route::middleware('can:'.Abilities::CATALOG_MANAGE)->group(function () use ($cat
         Route::apiResource($uri, $controller)->only(['store', 'update', 'destroy'])->parameters([$uri => $parameter]);
     }
 
+    Route::post('items/barcodes', [ItemController::class, 'generateBarcode'])->name('items.barcodes');
     Route::post('categories/{category}/fields', [AttributeDefinitionController::class, 'store'])->name('fields.store');
     Route::match(['put', 'patch'], 'fields/{attributeDefinition}', [AttributeDefinitionController::class, 'update'])->name('fields.update');
     Route::delete('fields/{attributeDefinition}', [AttributeDefinitionController::class, 'destroy'])->name('fields.destroy');
@@ -80,6 +84,15 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
 
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
+
+// Warehouses: where stock is kept
+Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['index', 'show']);
+});
+
+Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
+    Route::apiResource('warehouses', WarehouseController::class)->only(['store', 'update', 'destroy']);
+});
 
 // Stock
 Route::middleware('can:'.Abilities::STOCK_VIEW)->group(function () {

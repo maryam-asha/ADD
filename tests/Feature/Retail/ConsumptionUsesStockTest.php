@@ -6,7 +6,7 @@ use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Stock\Services\StockService;
-use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Finance\Services\CashRegisterService;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
@@ -34,6 +34,8 @@ class ConsumptionUsesStockTest extends TestCase
 
     private Item $paper;
 
+    private Warehouse $store;
+
     private ResourceType $printing;
 
     private User $member;
@@ -50,7 +52,8 @@ class ConsumptionUsesStockTest extends TestCase
         app(CashRegisterService::class)->openSession($operator, $this->branch->id);
 
         $this->paper = Item::factory()->create(['category_id' => Category::factory()->stock()->create()->id]);
-        app(StockService::class)->receive($this->paper, new Place('branch', $this->branch->id), 50);
+        $this->store = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $this->branch->id, 'is_primary' => true]);
+        app(StockService::class)->receive($this->paper, $this->store->asPlace(), 50);
 
         $this->printing = ResourceType::create([
             'slug' => 'printing',
@@ -82,7 +85,7 @@ class ConsumptionUsesStockTest extends TestCase
 
     private function onHand(): string
     {
-        return app(StockService::class)->onHand($this->paper, new Place('branch', $this->branch->id));
+        return app(StockService::class)->onHand($this->paper, $this->store->asPlace());
     }
 
     public function test_a_type_without_stock_uses_none(): void
@@ -92,7 +95,7 @@ class ConsumptionUsesStockTest extends TestCase
         $this->assertSame('50', $this->onHand());
     }
 
-    public function test_a_linked_type_issues_its_stock_from_the_desks_branch(): void
+    public function test_a_linked_type_issues_its_stock_from_the_desks_primary_warehouse(): void
     {
         $this->putJson("/api/v1/admin/resource-types/{$this->printing->id}", [
             'name' => ['en' => 'Printing', 'ar' => 'طباعة'],

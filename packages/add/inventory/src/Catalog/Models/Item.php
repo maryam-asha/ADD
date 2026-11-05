@@ -8,6 +8,8 @@ use Add\Inventory\Database\Factories\ItemFactory;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\Concerns\HasTranslations;
+use Add\Inventory\Support\Decimal;
+use Add\Inventory\Support\InventoryException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -29,8 +31,10 @@ class Item extends Model
         'category_id',
         'unit_id',
         'sku',
+        'barcode',
         'name',
         'description',
+        'image_url',
         'properties',
         'is_active',
     ];
@@ -58,6 +62,34 @@ class Item extends Model
     public function unit(): BelongsTo
     {
         return $this->belongsTo(Unit::class);
+    }
+
+    /**
+     * Its packs: units other than the main one, each with how many main
+     * units it holds.
+     */
+    public function otherUnits(): HasMany
+    {
+        return $this->hasMany(ItemUnit::class);
+    }
+
+    /**
+     * How many main units one of `$unitId` is: 1 for the main unit, the
+     * pack's factor for another of its units.
+     */
+    public function factorFor(int $unitId): string
+    {
+        if ($unitId === $this->unit_id) {
+            return '1';
+        }
+
+        $pack = $this->otherUnits->firstWhere('unit_id', $unitId);
+
+        if ($pack === null) {
+            InventoryException::fail('inventory::catalog.unit_not_of_item');
+        }
+
+        return Decimal::trim($pack->factor);
     }
 
     public function assets(): HasMany
