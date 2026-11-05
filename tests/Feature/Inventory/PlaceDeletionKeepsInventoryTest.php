@@ -4,10 +4,9 @@ namespace Tests\Feature\Inventory;
 
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Services\AssetService;
-use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
-use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Floor;
@@ -23,7 +22,8 @@ use Tests\TestCase;
 /**
  * Inventory stores its place as a type and an id, not a foreign key, so a
  * delete must refuse a place still holding it — itself or one the delete
- * takes with it — or its assets and stock would point at nothing.
+ * takes with it — or its assets would point at nothing. Stock sits in
+ * warehouses, which sit in a branch: a branch keeps its warehouses.
  */
 class PlaceDeletionKeepsInventoryTest extends TestCase
 {
@@ -61,14 +61,6 @@ class PlaceDeletionKeepsInventoryTest extends TestCase
         return app(AssetService::class)->register(Item::factory()->create(), $place)->first();
     }
 
-    private function stockIn(Place $place, int $quantity): Item
-    {
-        $item = Item::factory()->create(['category_id' => Category::factory()->stock()->create()->id]);
-        app(StockService::class)->receive($item, $place, $quantity);
-
-        return $item;
-    }
-
     public function test_a_space_with_an_asset_in_it_is_not_deleted(): void
     {
         $this->assetIn(new Place('space', $this->space->id));
@@ -80,14 +72,29 @@ class PlaceDeletionKeepsInventoryTest extends TestCase
         $this->assertModelExists($this->space);
     }
 
-    public function test_a_building_or_branch_is_refused_for_stock_anywhere_inside_it(): void
+    public function test_a_building_or_branch_is_refused_for_an_asset_anywhere_inside_it(): void
     {
-        $this->stockIn(new Place('space', $this->space->id), 3);
+        $this->assetIn(new Place('space', $this->space->id));
 
         $this->deleteJson("/api/v1/admin/buildings/{$this->building->id}")->assertUnprocessable();
         $this->deleteJson("/api/v1/admin/branches/{$this->branch->id}")->assertUnprocessable();
 
         $this->assertModelExists($this->building);
+        $this->assertModelExists($this->branch);
+    }
+
+    public function test_a_branch_with_a_warehouse_is_not_deleted(): void
+    {
+        Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $this->branch->id]);
+        $this->space->delete();
+        $this->zone->delete();
+        $this->floor->delete();
+        $this->building->delete();
+
+        $this->deleteJson("/api/v1/admin/branches/{$this->branch->id}")
+            ->assertUnprocessable()
+            ->assertJsonPath('message', __('api.admin.branch_has_warehouses'));
+
         $this->assertModelExists($this->branch);
     }
 
@@ -104,18 +111,15 @@ class PlaceDeletionKeepsInventoryTest extends TestCase
 
     public function test_a_floor_is_refused_for_inventory_on_one_of_its_zones(): void
     {
-        $this->stockIn(new Place('zone', $this->zone->id), 1);
+        $this->assetIn(new Place('zone', $this->zone->id));
 
         $this->deleteJson("/api/v1/admin/floors/{$this->floor->id}")->assertUnprocessable();
     }
 
-    public function test_disposed_assets_and_empty_stock_do_not_hold_a_place(): void
+    public function test_disposed_assets_do_not_hold_a_place(): void
     {
-        $place = new Place('space', $this->space->id);
-        $asset = $this->assetIn($place);
+        $asset = $this->assetIn(new Place('space', $this->space->id));
         app(AssetService::class)->dispose($asset, DisposalMethod::Scrapped, now());
-        $item = $this->stockIn($place, 2);
-        app(StockService::class)->adjust($item, $place, 0);
 
         $this->deleteJson("/api/v1/admin/spaces/{$this->space->id}")->assertNoContent();
     }
