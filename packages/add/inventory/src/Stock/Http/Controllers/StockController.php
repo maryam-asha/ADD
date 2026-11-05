@@ -6,18 +6,19 @@ use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Enums\StockMovementType;
-use Add\Inventory\Stock\Http\Requests\StockRequest;
+use Add\Inventory\Stock\Http\Requests\StockOperationRequest;
 use Add\Inventory\Stock\Http\Resources\StockBalanceResource;
 use Add\Inventory\Stock\Http\Resources\StockMovementResource;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
-use Add\Inventory\Stock\Services\StockService;
+use Add\Inventory\Stock\Services\StockOperations;
 use Add\Inventory\Warehouses\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Collection;
 
 class StockController extends Controller
 {
@@ -76,62 +77,61 @@ class StockController extends Controller
         return StockMovementResource::collection($movements);
     }
 
-    public function receive(StockRequest $request, StockService $stock): StockMovementResource
+    public function receive(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return new StockMovementResource($stock->receive(
-            Item::query()->findOrFail($data['item_id']),
-            Warehouse::query()->findOrFail($data['warehouse_id'])->asPlace(),
-            $data['quantity'],
-            $data['unit_cost'] ?? null,
-            note: $data['note'] ?? null,
-        ));
+        return $this->created($operations->receive($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null));
     }
 
-    public function issue(StockRequest $request, StockService $stock): StockMovementResource
+    public function issue(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return new StockMovementResource($stock->issue(
-            Item::query()->findOrFail($data['item_id']),
-            Warehouse::query()->findOrFail($data['warehouse_id'])->asPlace(),
-            $data['quantity'],
+        return $this->created($operations->issue(
+            $this->warehouse($data['warehouse_id']),
+            $data['lines'],
             IssueReason::from($data['reason']),
-            note: $data['note'] ?? null,
+            $data['note'] ?? null,
         ));
     }
 
-    public function transfer(StockRequest $request, StockService $stock): JsonResponse
+    public function transfer(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return StockMovementResource::collection(collect($stock->transfer(
-            Item::query()->findOrFail($data['item_id']),
-            Warehouse::query()->findOrFail($data['from_warehouse_id'])->asPlace(),
-            Warehouse::query()->findOrFail($data['to_warehouse_id'])->asPlace(),
-            $data['quantity'],
+        return $this->created($operations->transfer(
+            $this->warehouse($data['from_warehouse_id']),
+            $this->warehouse($data['to_warehouse_id']),
+            $data['lines'],
             $data['note'] ?? null,
-        )))->response()->setStatusCode(201);
+        ));
     }
 
     /**
-     * A count that matched the book records nothing.
+     * A count where every line matched the book records nothing.
      */
-    public function adjust(StockRequest $request, StockService $stock): JsonResponse|StockMovementResource
+    public function adjust(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
-        $movement = $stock->adjust(
-            Item::query()->findOrFail($data['item_id']),
-            Warehouse::query()->findOrFail($data['warehouse_id'])->asPlace(),
-            $data['counted'],
-            $data['unit_cost'] ?? null,
-            $data['note'] ?? null,
-        );
+        $movements = $operations->adjust($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null);
 
-        return $movement === null
+        return $movements->isEmpty()
             ? response()->json(['message' => __('inventory::stock.count_matched')])
-            : new StockMovementResource($movement);
+            : $this->created($movements);
+    }
+
+    private function warehouse(int|string $id): Warehouse
+    {
+        return Warehouse::query()->findOrFail($id);
+    }
+
+    /**
+     * @param  Collection<int, StockMovement>  $movements
+     */
+    private function created(Collection $movements): JsonResponse
+    {
+        return StockMovementResource::collection($movements->each->load(['item', 'enteredUnit']))->response()->setStatusCode(201);
     }
 
     /**

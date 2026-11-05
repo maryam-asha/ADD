@@ -34,17 +34,17 @@ class StockTest extends TestCase
         $paper = $this->stockItem();
         $store = $this->warehouse();
 
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'quantity' => 10, 'unit_cost' => 2])
-            ->assertCreated()->assertJsonPath('data.average_cost_after', '2');
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'quantity' => 10, 'unit_cost' => 4])
-            ->assertCreated()->assertJsonPath('data.average_cost_after', '3');
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $paper->id, 'quantity' => 10, 'unit_cost' => 2]]])
+            ->assertCreated()->assertJsonPath('data.0.average_cost_after', '2');
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $paper->id, 'quantity' => 10, 'unit_cost' => 4]]])
+            ->assertCreated()->assertJsonPath('data.0.average_cost_after', '3');
 
-        $this->postJson('/api/inventory/stock/issue', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'quantity' => 5, 'reason' => 'internal_use'])
+        $this->postJson('/api/inventory/stock/issue', ['warehouse_id' => $store->id, 'reason' => 'internal_use', 'lines' => [['item_id' => $paper->id, 'quantity' => 5]]])
             ->assertCreated()
-            ->assertJsonPath('data.quantity', '-5')
-            ->assertJsonPath('data.unit_cost', '3')
-            ->assertJsonPath('data.quantity_after', '15')
-            ->assertJsonPath('data.reason', 'internal_use');
+            ->assertJsonPath('data.0.quantity', '-5')
+            ->assertJsonPath('data.0.unit_cost', '3')
+            ->assertJsonPath('data.0.quantity_after', '15')
+            ->assertJsonPath('data.0.reason', 'internal_use');
 
         $this->getJson('/api/inventory/stock/balances')
             ->assertOk()
@@ -60,7 +60,7 @@ class StockTest extends TestCase
         $store = $this->warehouse();
         app(StockService::class)->receive($paper, $this->in($store), 3);
 
-        $this->postJson('/api/inventory/stock/issue', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'quantity' => 4, 'reason' => 'damaged'])
+        $this->postJson('/api/inventory/stock/issue', ['warehouse_id' => $store->id, 'reason' => 'damaged', 'lines' => [['item_id' => $paper->id, 'quantity' => 4]]])
             ->assertUnprocessable();
 
         $this->assertDatabaseCount('inv_stock_movements', 1);
@@ -89,7 +89,7 @@ class StockTest extends TestCase
         $paper = $this->stockItem();
         $store = $this->warehouse();
 
-        $this->postJson('/api/inventory/stock/issue', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'quantity' => 1, 'reason' => 'sale'])
+        $this->postJson('/api/inventory/stock/issue', ['warehouse_id' => $store->id, 'reason' => 'sale', 'lines' => [['item_id' => $paper->id, 'quantity' => 1]]])
             ->assertUnprocessable()->assertJsonValidationErrors('reason');
     }
 
@@ -98,17 +98,17 @@ class StockTest extends TestCase
         $this->actingAsWith(self::ALL);
         $store = $this->warehouse();
 
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $this->stockItem()->id, 'warehouse_id' => $store->id, 'quantity' => 1.5])
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $this->stockItem()->id, 'quantity' => 1.5]]])
             ->assertUnprocessable();
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $this->stockItem(fractional: true)->id, 'warehouse_id' => $store->id, 'quantity' => 1.5])
-            ->assertCreated()->assertJsonPath('data.quantity', '1.5');
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $this->stockItem(fractional: true)->id, 'quantity' => 1.5]]])
+            ->assertCreated()->assertJsonPath('data.0.quantity', '1.5');
     }
 
     public function test_assets_are_not_stock(): void
     {
         $this->actingAsWith(self::ALL);
 
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $this->assetItem()->id, 'warehouse_id' => $this->warehouse()->id, 'quantity' => 1])
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $this->warehouse()->id, 'lines' => [['item_id' => $this->assetItem()->id, 'quantity' => 1]]])
             ->assertUnprocessable()->assertJsonPath('message', __('inventory::stock.not_stock'));
     }
 
@@ -121,10 +121,9 @@ class StockTest extends TestCase
         app(StockService::class)->receive($paper, $this->in($store), 10, 2.5);
 
         $halves = $this->postJson('/api/inventory/stock/transfer', [
-            'item_id' => $paper->id,
             'from_warehouse_id' => $store->id,
             'to_warehouse_id' => $desk->id,
-            'quantity' => 4,
+            'lines' => [['item_id' => $paper->id, 'quantity' => 4]],
         ])->assertCreated()->json('data');
 
         $this->assertSame(['transfer_out', 'transfer_in'], array_column($halves, 'type'));
@@ -133,7 +132,7 @@ class StockTest extends TestCase
         $this->assertSame('4', app(StockService::class)->onHand($paper, $this->in($desk)));
         $this->assertSame('2.5', StockBalance::query()->where('location_id', $desk->id)->firstOrFail()->average_cost);
 
-        $this->postJson('/api/inventory/stock/transfer', ['item_id' => $paper->id, 'from_warehouse_id' => $store->id, 'to_warehouse_id' => $store->id, 'quantity' => 1])
+        $this->postJson('/api/inventory/stock/transfer', ['from_warehouse_id' => $store->id, 'to_warehouse_id' => $store->id, 'lines' => [['item_id' => $paper->id, 'quantity' => 1]]])
             ->assertUnprocessable()->assertJsonPath('message', __('inventory::stock.same_warehouse'));
     }
 
@@ -144,9 +143,9 @@ class StockTest extends TestCase
         $store = $this->warehouse();
         app(StockService::class)->receive($paper, $this->in($store), 10, 1);
 
-        $this->postJson('/api/inventory/stock/adjust', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'counted' => 7])
-            ->assertCreated()->assertJsonPath('data.quantity', '-3')->assertJsonPath('data.type', 'adjustment');
-        $this->postJson('/api/inventory/stock/adjust', ['item_id' => $paper->id, 'warehouse_id' => $store->id, 'counted' => 7])
+        $this->postJson('/api/inventory/stock/adjust', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $paper->id, 'counted' => 7]]])
+            ->assertCreated()->assertJsonPath('data.0.quantity', '-3')->assertJsonPath('data.0.type', 'adjustment');
+        $this->postJson('/api/inventory/stock/adjust', ['warehouse_id' => $store->id, 'lines' => [['item_id' => $paper->id, 'counted' => 7]]])
             ->assertOk()->assertJsonPath('message', __('inventory::stock.count_matched'));
     }
 
@@ -285,7 +284,7 @@ class StockTest extends TestCase
     {
         $this->actingAsWith([Abilities::STOCK_VIEW]);
 
-        $this->postJson('/api/inventory/stock/receive', ['item_id' => $this->stockItem()->id, 'warehouse_id' => $this->warehouse()->id, 'quantity' => 1])
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $this->warehouse()->id, 'lines' => [['item_id' => $this->stockItem()->id, 'quantity' => 1]]])
             ->assertForbidden();
     }
 }
