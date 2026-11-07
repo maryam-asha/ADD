@@ -103,6 +103,7 @@ return [
         'currency_preference_updated' => 'Currency preference updated.',
         'language_preference_updated' => 'Language preference updated.',
         'profile_updated' => 'Profile updated.',
+        'name_required' => 'Keep your name in at least one language.',
         'consent_updated' => 'Consent updated.',
         'door_access_updated' => 'Door access updated.',
         'admin_flag_updated' => 'Admin status updated.',

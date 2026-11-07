@@ -14,7 +14,10 @@ class UserResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            // `name` is the one in the request's language; both are given for editing.
             'name' => $this->name,
+            'name_ar' => $this->name_ar,
+            'name_en' => $this->name_en,
             'phone' => $this->phone,
             'email' => $this->email,
             'preferred_language' => $this->preferred_language,

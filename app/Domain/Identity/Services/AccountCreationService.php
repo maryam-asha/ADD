@@ -21,7 +21,7 @@ use Throwable;
 class AccountCreationService
 {
     /**
-     * @param  array{name?: ?string, phone: string, email: string}  $identity
+     * @param  array{name?: ?string, name_ar?: ?string, name_en?: ?string, phone: string, email: string}  $identity
      * @param  ?string  $role  a staff role to assign, or none (an employee needs none)
      * @param  ?string  $password  the password chosen by the creator; null: a random one,
      *                             and the person is sent a link to choose their own
@@ -29,7 +29,7 @@ class AccountCreationService
     public function create(array $identity, ?string $role = null, ?string $password = null): User
     {
         $user = User::query()->create([
-            ...Arr::only($identity, ['name', 'phone', 'email']),
+            ...Arr::only($identity, ['name', 'name_ar', 'name_en', 'phone', 'email']),
             'password' => Hash::make($password ?? Str::random(64)),
             'preferred_language' => 'ar',
             'preferred_currency' => Currency::query()->where('is_base', true)->value('code'),

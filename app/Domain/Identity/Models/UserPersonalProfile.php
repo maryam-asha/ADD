@@ -18,8 +18,9 @@ class UserPersonalProfile extends Model
         'city',
         'avatar_url',
         'gender',
-        // Filled by HR for employees; not on the member surface.
+        // Also edited by the member from the profile.
         'date_of_birth',
+        // Filled by HR for employees; not on the member surface.
         'nationality',
         'marital_status',
         'personal_email',

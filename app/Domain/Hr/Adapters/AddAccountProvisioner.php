@@ -97,6 +97,7 @@ class AddAccountProvisioner implements AccountProvisioner
 
         $user = $this->accounts->create([
             'name' => is_array($name) ? ($name['ar'] ?? $name['en'] ?? null) : $name,
+            ...(is_array($name) ? ['name_ar' => $name['ar'] ?? null, 'name_en' => $name['en'] ?? null] : []),
             'phone' => $phone,
             'email' => $email,
         ]);
@@ -117,13 +118,13 @@ class AddAccountProvisioner implements AccountProvisioner
     public function search(string $term, int $limit): array
     {
         return User::query()
-            ->where(fn ($q) => $q->where('name', 'like', "%{$term}%")
+            ->where(fn ($q) => $q->nameLike($term)
                 ->orWhere('phone', 'like', "%{$term}%")
                 ->orWhere('email', 'like', "%{$term}%"))
             ->whereDoesntHave('roles', fn ($q) => $q->where('name', 'provider'))
             ->orderBy('name')
             ->limit($limit)
-            ->get(['id', 'name', 'phone', 'email'])
+            ->get(['id', 'name', 'name_ar', 'name_en', 'phone', 'email'])
             ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name, 'phone' => $user->phone, 'email' => $user->email])
             ->all();
     }

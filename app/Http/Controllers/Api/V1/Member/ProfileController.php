@@ -42,13 +42,20 @@ class ProfileController extends Controller
 
     public function update(UpdateProfileRequest $request): JsonResponse
     {
-        $personalFields = ['bio', 'city', 'avatar_url', 'gender'];
+        $accountFields = ['name_ar', 'name_en'];
+        $personalFields = ['bio', 'city', 'avatar_url', 'gender', 'date_of_birth'];
         $professionalFields = ['job_title', 'company_name', 'industry', 'linkedin_url', 'instagram_url', 'behance_url', 'website_url'];
 
         $validated = $request->validated();
         $user = $request->user();
 
-        DB::transaction(function () use ($user, $validated, $personalFields, $professionalFields) {
+        DB::transaction(function () use ($user, $validated, $accountFields, $personalFields, $professionalFields) {
+            $names = array_intersect_key($validated, array_flip($accountFields));
+
+            if ($names !== []) {
+                $user->update($names);
+            }
+
             UserPersonalProfile::updateOrCreate(
                 ['user_id' => $user->id],
                 array_intersect_key($validated, array_flip($personalFields))

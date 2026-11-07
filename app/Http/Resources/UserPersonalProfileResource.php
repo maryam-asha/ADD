@@ -14,6 +14,7 @@ class UserPersonalProfileResource extends JsonResource
             'city' => $this->city,
             'avatar_url' => $this->avatar_url,
             'gender' => $this->gender?->value,
+            'date_of_birth' => $this->date_of_birth?->toDateString(),
         ];
     }
 }

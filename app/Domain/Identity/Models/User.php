@@ -6,6 +6,8 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Enums\ConsentSubjectType;
 use App\Domain\Providers\Models\Provider;
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -32,6 +34,8 @@ class User extends Authenticatable
      */
     protected $fillable = [
         'name',
+        'name_ar',
+        'name_en',
         'phone',
         'email',
         'password',
@@ -64,6 +68,78 @@ class User extends Authenticatable
             'status_changed_at' => 'datetime',
             'anonymized_at' => 'datetime',
         ];
+    }
+
+    /**
+     * The name, in Arabic and English (name_ar / name_en). Sign-up stores the
+     * one name it takes in the language it is written in; the profile edits
+     * both. `name` is kept in step here so search and anything reading the
+     * column directly still find a name:
+     *  - `name` written alone (sign-up, staff, HR) also fills its language;
+     *  - name_ar / name_en written: `name` becomes the one in the account's
+     *    preferred language, else the other.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (User $user) {
+            if ($user->isDirty(['name_ar', 'name_en'])) {
+                $primary = self::pickName($user->getAttributes(), $user->preferred_language ?? 'ar');
+
+                if ($primary !== null) {
+                    $user->setAttribute('name', $primary);
+                }
+
+                return;
+            }
+
+            $raw = $user->getAttributes()['name'] ?? null;
+
+            if ($user->isDirty('name') && filled($raw)) {
+                $user->setAttribute('name_'.self::languageOfName($raw), $raw);
+            }
+        });
+    }
+
+    /**
+     * Read in the request's language (falling back to the other one, then to
+     * the stored column), so every response and notification shows the name
+     * in the language it is rendered in. Queries still use the column.
+     */
+    protected function name(): Attribute
+    {
+        return Attribute::get(fn (?string $value, array $attributes) => self::pickName($attributes, app()->getLocale()) ?? $value);
+    }
+
+    /** "ar" when the name holds Arabic letters, otherwise "en". */
+    public static function languageOfName(string $name): string
+    {
+        return preg_match('/\p{Arabic}/u', $name) ? 'ar' : 'en';
+    }
+
+    /**
+     * @param  array<string, mixed>  $attributes
+     */
+    private static function pickName(array $attributes, ?string $locale): ?string
+    {
+        $order = $locale === 'en' ? ['en', 'ar'] : ['ar', 'en'];
+
+        foreach ($order as $language) {
+            $name = $attributes['name_'.$language] ?? null;
+
+            if (filled($name)) {
+                return $name;
+            }
+        }
+
+        return null;
+    }
+
+    /** Matches the stored name or either language of it. */
+    public function scopeNameLike(Builder $query, string $term): void
+    {
+        $query->where(fn (Builder $names) => $names->where('name', 'like', "%{$term}%")
+            ->orWhere('name_ar', 'like', "%{$term}%")
+            ->orWhere('name_en', 'like', "%{$term}%"));
     }
 
     public function branchMemberships(): HasMany

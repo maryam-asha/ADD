@@ -206,7 +206,7 @@ class PaymentController extends Controller
             ->when($filters['to'] ?? null, fn ($q, $to) => $q->where('created_at', '<', $time->toUtc($to.' 00:00')->addDay()))
             ->when($search !== '', function ($q) use ($search) {
                 $q->where(function ($q) use ($search) {
-                    $q->whereHas('user', fn ($user) => $user->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%"))
+                    $q->whereHas('user', fn ($user) => $user->nameLike($search)->orWhere('phone', 'like', "%{$search}%"))
                         ->orWhere('rrn', $search);
 
                     $number = ltrim($search, '#');

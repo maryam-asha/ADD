@@ -70,7 +70,7 @@ class OutstandingItems
         $search = trim((string) $search);
 
         $items = collect($this->owed(fn (Builder $query) => $search === '' ? $query : $query->whereHas('user', function (Builder $user) use ($search) {
-            $user->where('name', 'like', "%{$search}%")->orWhere('phone', 'like', "%{$search}%");
+            $user->nameLike($search)->orWhere('phone', 'like', "%{$search}%");
         })))
             ->sortBy(fn (array $item) => $item['starts_at'] === null ? PHP_INT_MAX : strtotime($item['starts_at']))
             ->values();

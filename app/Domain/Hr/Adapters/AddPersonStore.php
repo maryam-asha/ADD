@@ -46,7 +46,7 @@ class AddPersonStore implements PersonStore
         }
 
         return match ($field) {
-            'name' => $user->name === null ? null : ['ar' => $user->name, 'en' => $user->name],
+            'name' => $this->nameOf($user),
             'phone' => $user->phone,
             'work_email' => $user->email,
             'national_id', 'bank_account' => $this->sensitive->get($user->id, $field),
@@ -112,11 +112,28 @@ class AddPersonStore implements PersonStore
     {
         $query->where(fn ($people) => $people
             ->whereHas('user', fn ($users) => $users->withTrashed()->where(
-                fn ($match) => $match->where('name', 'like', "%{$term}%")
+                fn ($match) => $match->nameLike($term)
                     ->orWhere('phone', 'like', "%{$term}%")
                     ->orWhere('email', 'like', "%{$term}%"),
             ))
             ->orWhere(fn ($unlinked) => $this->columns->search($unlinked->whereNull('user_id'), $term)));
+    }
+
+    /**
+     * Both languages of the account's name; a language the account has no
+     * name in shows the stored one, as both did before there were two.
+     *
+     * @return ?array{ar: string, en: string}
+     */
+    private function nameOf(User $user): ?array
+    {
+        $stored = $user->getAttributes()['name'] ?? null;
+
+        if ($stored === null) {
+            return null;
+        }
+
+        return ['ar' => $user->name_ar ?? $stored, 'en' => $user->name_en ?? $stored];
     }
 
     private function userOf(Employee $employee): ?User
