@@ -34,11 +34,11 @@ use Illuminate\Support\Str;
  * it as `$source`.
  *
  * `$meta` carries what one multi-line operation shares and what the person
- * typed: `operation_id`, `entered_unit_id`, `entered_quantity`.
+ * typed: `operation_id`, `entered_unit_id`, `entered_quantity`, `line_note`.
  */
 class StockService
 {
-    private const META = ['operation_id', 'entered_unit_id', 'entered_quantity'];
+    private const META = ['operation_id', 'entered_unit_id', 'entered_quantity', 'line_note'];
 
     /**
      * @param  array<string, mixed>  $meta

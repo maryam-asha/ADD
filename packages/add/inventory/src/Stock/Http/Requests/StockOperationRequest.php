@@ -30,13 +30,28 @@ class StockOperationRequest extends FormRequest
             'lines' => ['required', 'array', 'min:1', 'max:100'],
             'lines.*.item_id' => ['required', 'integer', 'distinct', Rule::exists('inv_items', 'id')],
             'lines.*.unit_id' => ['nullable', 'integer', Rule::exists('inv_units', 'id')],
-            'note' => ['nullable', 'string', 'max:2000'],
+            'lines.*.note' => ['nullable', 'string', 'max:500'],
+            // The header: the day it happened (today when left out, never
+            // later), a reference such as a supplier's invoice, why — in
+            // words, required but for a transfer — and a scanned document.
+            'operation_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'reference' => ['nullable', 'string', 'max:60'],
+            'note' => [$this->route()->getName() === 'inventory.stock.transfer' ? 'nullable' : 'required', 'string', 'max:2000'],
+            'attachment_url' => ['nullable', 'string', 'url', 'max:2048'],
         ];
         $quantity = ['lines.*.quantity' => ['required', 'numeric', 'gt:0', 'max:99999999999']];
         $unitCost = ['lines.*.unit_cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999']];
 
         return match ($this->route()->getName()) {
-            'inventory.stock.receive' => [...$warehouse('warehouse_id'), ...$lines, ...$quantity, ...$unitCost],
+            'inventory.stock.receive' => [
+                ...$warehouse('warehouse_id'),
+                ...$lines,
+                ...$quantity,
+                ...$unitCost,
+                // Left out: entered when a line carries a cost, else the average.
+                'cost_method' => ['nullable', Rule::in(['average', 'entered'])],
+                'lines.*.unit_cost' => ['nullable', 'required_if:cost_method,entered', 'numeric', 'min:0', 'max:9999999999'],
+            ],
             'inventory.stock.issue' => [
                 ...$warehouse('warehouse_id'),
                 ...$lines,

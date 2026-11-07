@@ -37,6 +37,7 @@ class StockMovement extends Model
         'operation_id',
         'entered_unit_id',
         'entered_quantity',
+        'line_note',
         'reason',
         'source_type',
         'source_id',

@@ -98,6 +98,8 @@ Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
 Route::middleware('can:'.Abilities::STOCK_VIEW)->group(function () {
     Route::get('stock/balances', [StockController::class, 'balances'])->name('stock.balances');
     Route::get('stock/movements', [StockController::class, 'movements'])->name('stock.movements');
+    Route::get('stock/operations', [StockController::class, 'operations'])->name('stock.operations');
+    Route::get('stock/operations/{operation}', [StockController::class, 'operation'])->name('stock.operation');
 });
 
 Route::post('stock/receive', [StockController::class, 'receive'])
