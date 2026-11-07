@@ -37,6 +37,26 @@ class ItemUnitsAndBarcodeTest extends TestCase
             ->assertJsonPath('data.units.0.factor', '6');
     }
 
+    public function test_the_upload_path_the_host_returns_is_a_valid_image(): void
+    {
+        $this->actingAsWith(self::ALL);
+
+        // ADD's media/upload answers a site-relative URL.
+        $this->postJson('/api/inventory/items', [
+            'name' => ['ar' => 'مياه'],
+            'category_id' => Category::factory()->stock()->create()->id,
+            'unit_id' => Unit::factory()->create()->id,
+            'image_url' => '/storage/uploads/inventory/water.webp',
+        ])->assertCreated()->assertJsonPath('data.image_url', '/storage/uploads/inventory/water.webp');
+
+        $this->postJson('/api/inventory/items', [
+            'name' => ['ar' => 'مياه'],
+            'category_id' => Category::factory()->stock()->create()->id,
+            'unit_id' => Unit::factory()->create()->id,
+            'image_url' => 'javascript:alert(1)',
+        ])->assertUnprocessable()->assertJsonValidationErrors('image_url');
+    }
+
     public function test_main_unit_cannot_be_another_unit(): void
     {
         $this->actingAsWith(self::ALL);

@@ -56,6 +56,21 @@ class MediaUploadTest extends TestCase
         Storage::disk('public')->assertExists($path);
     }
 
+    public function test_a_pdf_is_stored_as_it_is(): void
+    {
+        $this->actingAsAdmin();
+
+        $response = $this->postJson('/api/v1/admin/media/upload', [
+            'file' => UploadedFile::fake()->create('invoice.pdf', 120, 'application/pdf'),
+            'folder' => 'inventory',
+        ])->assertCreated();
+
+        $this->assertStringStartsWith('/storage/uploads/inventory/', $response->json('url'));
+        $this->assertStringEndsWith('.pdf', $response->json('url'));
+        $this->assertSame('application/pdf', $response->json('mime'));
+        Storage::disk('public')->assertExists($response->json('path'));
+    }
+
     public function test_admin_can_upload_specifying_category_folder_like_founders(): void
     {
         $this->actingAsAdmin();

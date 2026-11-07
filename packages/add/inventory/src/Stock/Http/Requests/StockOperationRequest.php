@@ -3,6 +3,7 @@
 namespace Add\Inventory\Stock\Http\Requests;
 
 use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -37,7 +38,7 @@ class StockOperationRequest extends FormRequest
             'operation_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'reference' => ['nullable', 'string', 'max:60'],
             'note' => [$this->route()->getName() === 'inventory.stock.transfer' ? 'nullable' : 'required', 'string', 'max:2000'],
-            'attachment_url' => ['nullable', 'string', 'url', 'max:2048'],
+            'attachment_url' => ['nullable', ...FileUrl::rules()],
         ];
         $quantity = ['lines.*.quantity' => ['required', 'numeric', 'gt:0', 'max:99999999999']];
         $unitCost = ['lines.*.unit_cost' => ['nullable', 'numeric', 'min:0', 'max:9999999999']];

@@ -53,6 +53,18 @@ class StockOperationHeaderTest extends TestCase
         $this->assertSame($operation['id'], StockMovement::query()->sole()->operation_id);
     }
 
+    public function test_the_attachment_may_be_the_hosts_relative_upload_path(): void
+    {
+        $this->actingAsWith(self::ALL);
+
+        $this->postJson('/api/inventory/stock/receive', [
+            'warehouse_id' => $this->warehouse()->id,
+            'note' => 'x',
+            'attachment_url' => '/storage/uploads/inventory/invoice.pdf',
+            'lines' => [['item_id' => $this->stockItem()->id, 'quantity' => 1]],
+        ])->assertCreated()->assertJsonPath('data.attachment_url', '/storage/uploads/inventory/invoice.pdf');
+    }
+
     public function test_the_date_defaults_to_today_and_cannot_be_in_the_future(): void
     {
         $this->actingAsWith(self::ALL);
