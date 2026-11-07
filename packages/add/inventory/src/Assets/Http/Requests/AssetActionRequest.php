@@ -32,7 +32,7 @@ class AssetActionRequest extends FormRequest
             'inventory.assets.status' => [
                 'status' => ['required', Rule::in(array_map(fn (AssetStatus $status) => $status->value, AssetStatus::settable()))],
             ],
-            'inventory.assets.move' => [...PlaceRules::location(), ...$note, ...$past('moved_at')],
+            'inventory.assets.move' => [...PlaceRules::assetLocation(), ...$note, ...$past('moved_at')],
             'inventory.assets.assign' => [...PlaceRules::custodian(), ...$note, ...$past('assigned_at')],
             'inventory.assets.return' => [...$note, ...$past('returned_at')],
             'inventory.assets.dispose' => [

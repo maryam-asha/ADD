@@ -13,6 +13,7 @@ use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
+use Add\Inventory\Support\Http\SettingsController;
 use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -84,6 +85,9 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
 
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
+
+// What the package is set to do, for a host's screens to follow.
+Route::get('settings', SettingsController::class)->name('settings');
 
 // Warehouses: where stock is kept
 Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {

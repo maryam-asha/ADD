@@ -22,7 +22,7 @@ class RegisterAssetRequest extends FormRequest
     {
         return [
             'item_id' => ['required', 'integer', Rule::exists('inv_items', 'id')],
-            ...PlaceRules::location(),
+            ...PlaceRules::assetLocation(),
             // Identical assets registered together, one code each.
             'count' => ['sometimes', 'integer', 'min:1', 'max:'.config('inventory.assets.max_batch')],
             'code' => ['nullable', 'string', 'max:40', Rule::unique('inv_assets', 'code')],

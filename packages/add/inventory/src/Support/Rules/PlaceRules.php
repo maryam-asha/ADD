@@ -24,6 +24,17 @@ final class PlaceRules
     }
 
     /**
+     * Where an asset may be put: the host's places, and warehouses when
+     * assets may be stored in them.
+     *
+     * @return array<string, list<mixed>>
+     */
+    public static function assetLocation(string $field = 'location', bool $required = true): array
+    {
+        return self::rules($field, $required, Inventory::assetPlaces(), 'inventory::catalog.unknown_location');
+    }
+
+    /**
      * @return array<string, list<mixed>>
      */
     public static function custodian(string $field = 'custodian', bool $required = true): array

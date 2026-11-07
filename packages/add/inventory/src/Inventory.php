@@ -2,6 +2,7 @@
 
 namespace Add\Inventory;
 
+use Add\Inventory\Assets\AssetPlaces;
 use Add\Inventory\Contracts\CustodianResolver;
 use Add\Inventory\Contracts\LocationResolver;
 use Add\Inventory\Integrations\OwnLocationResolver;
@@ -39,6 +40,15 @@ final class Inventory
     public static function locations(): LocationResolver
     {
         return app(LocationResolver::class);
+    }
+
+    /**
+     * Where an asset may be: the host's places, plus warehouses when config
+     * inventory.assets.store_in_warehouses is on.
+     */
+    public static function assetPlaces(): LocationResolver
+    {
+        return new AssetPlaces(self::locations());
     }
 
     public static function custodians(): CustodianResolver
