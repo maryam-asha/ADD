@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Kiosk\PairKioskRequest;
 use App\Support\Security\Totp;
 use Illuminate\Http\JsonResponse;
+use Laravel\Sanctum\PersonalAccessToken;
 
 class KioskPairController extends Controller
 {
@@ -24,6 +25,14 @@ class KioskPairController extends Controller
         }
 
         $this->logSensitiveAction('kiosk_paired', $pairing->kiosk);
+
+        // Setup is over, so no staff credential stays on a device in a public
+        // place. A failed code above keeps it, for the operator to retype.
+        $token = $request->user()->currentAccessToken();
+
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        }
 
         // The only response that ever carries the secret; nothing between
         // here and the kiosk may keep a copy.

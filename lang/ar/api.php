@@ -394,6 +394,8 @@ return [
         'not_a_coworking_space' => 'لا يمكن ربط الكشك إلا بمساحة عمل مشتركة.',
         'invalid_pairing_code' => 'رمز الاقتران غير صالح أو منتهي الصلاحية.',
         'secret_revoked' => 'تم إلغاء اقتران الكشك. يجب اقترانه من جديد لاستخدامه.',
+        'two_factor_required' => 'أدخل الرمز من تطبيق المصادقة.',
+        'invalid_two_factor_code' => 'رمز المصادقة غير صحيح.',
     ],
 
     // One group for both co-working features: rooms lent to co-working

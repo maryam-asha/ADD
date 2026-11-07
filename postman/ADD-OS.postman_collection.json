@@ -221,6 +221,11 @@
             "type": "string"
         },
         {
+            "key": "kiosk_operator_token",
+            "value": "",
+            "type": "string"
+        },
+        {
             "key": "coworking_qr_value",
             "value": "",
             "type": "string"
@@ -18497,7 +18502,7 @@
                 },
                 {
                     "name": "Kiosks",
-                    "description": "Kiosk devices that show the rotating code members scan to start a coworking session. Each kiosk serves one co_space. Admin only \u2014 operations gets 403, since a kiosk's pairing is a credential. The TOTP secret never appears in any of these responses: it reaches the device once, through a pairing code (Issue Pairing Code \u2192 Kiosk (device app) \u2192 Pair Kiosk). See docs/decisions/coworking-self-service-sessions.md.",
+                    "description": "Kiosk devices that show the rotating code members scan to start a coworking session. Each kiosk serves one co_space. Admin only \u2014 operations gets 403, since a kiosk's pairing is a credential. The TOTP secret never appears in any of these responses: it reaches the device once, through a pairing code (Issue Pairing Code \u2192 Kiosk (device app) \u2192 Kiosk Operator Login \u2192 Pair Kiosk). See docs/decisions/coworking-self-service-sessions.md.",
                     "item": [
                         {
                             "name": "List Kiosks",
@@ -18972,7 +18977,7 @@
                                         "pairing-code"
                                     ]
                                 },
-                                "description": "8 characters from an alphabet without look-alikes (no 0/O, 1/I), valid 10 minutes, single use. Only its SHA-256 is stored, so this response is the only time it is shown. Issuing again replaces an unused code. Saves kiosk_pairing_code. Type it into the kiosk app (or run Kiosk (device app) \u2192 Pair Kiosk)."
+                                "description": "8 characters from an alphabet without look-alikes (no 0/O, 1/I), valid 10 minutes, single use. Only its SHA-256 is stored, so this response is the only time it is shown. Issuing again replaces an unused code. Saves kiosk_pairing_code. Type it into the kiosk app after signing in there (or run Kiosk (device app) \u2192 Kiosk Operator Login, then Pair Kiosk)."
                             },
                             "response": [
                                 {
@@ -32998,10 +33003,31 @@
         },
         {
             "name": "Kiosk (device app)",
-            "description": "Endpoints the kiosk device calls itself, with no login. Get Kiosk Data is the screen's content (routed in routes/api/v1/public.php as public/kiosk, docs/decisions/kiosk-display.md). Pair Kiosk (routes/api/v1/kiosk.php) is the one-time pairing: after it, the kiosk generates its rotating codes offline. See docs/decisions/coworking-self-service-sessions.md.",
+            "description": "Endpoints the kiosk device calls itself. Get Kiosk Data is the screen's content, and its `requires_pairing` decides which screens the app shows (routed in routes/api/v1/public.php as public/kiosk, docs/decisions/kiosk-display.md). When it is true the app shows a staff login, Kiosk Operator Login, and only then the pairing-code screen, Pair Kiosk (routes/api/v1/kiosk.php). After pairing the device holds no token: it generates its rotating codes offline and signs what it sends with its secret. See docs/decisions/coworking-self-service-sessions.md.",
             "item": [
                 {
                     "name": "Get Kiosk Data",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "// Signs the request the way a paired kiosk does: hex HMAC-SHA256(secret, \"{id}\\n{timestamp}\\n{body}\"), and a GET has an empty body.",
+                                    "// With no kiosk_secret (nothing paired yet) it sends no headers, and the answer is requires_pairing: true.",
+                                    "const secret = pm.collectionVariables.get('kiosk_secret');",
+                                    "const kioskId = pm.collectionVariables.get('kiosk_id');",
+                                    "if (secret && kioskId) {",
+                                    "    const timestamp = String(Math.floor(Date.now() / 1000));",
+                                    "    const signature = CryptoJS.HmacSHA256(`${kioskId}\\n${timestamp}\\n`, secret).toString(CryptoJS.enc.Hex);",
+                                    "    pm.request.headers.upsert({ key: 'X-Kiosk-Id', value: String(kioskId) });",
+                                    "    pm.request.headers.upsert({ key: 'X-Kiosk-Timestamp', value: timestamp });",
+                                    "    pm.request.headers.upsert({ key: 'X-Kiosk-Signature', value: signature });",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
                     "request": {
                         "method": "GET",
                         "header": [
@@ -33023,7 +33049,7 @@
                                 "kiosk"
                             ]
                         },
-                        "description": "docs/decisions/kiosk-display.md. No login. One aggregate call for the kiosk screen, every section inside `data`:\n\n- `banner`: one flat, mixed list of live Announcements (each carries its own `type`: news / event / offer), ordered by sort_order across all types together.\n- `plans`: exactly the member app's package catalog (`GET member/packages` -> `data`), same fields item for item: active, public subscription plans; `pricing` in the base currency (no viewer to pick another); only offers open to everyone in `sale`; `is_current` always false. Full details of one plan (balances, discounts, resources) stay on `member/packages/{plan}`.\n- `social_links`: visible Contact Links.\n- `app_download.app_store` / `app_download.google_play`: Setting rows (Admin > Settings). The client renders every QR itself; this endpoint never generates an image. The kiosk shows one scannable code, its rotating coworking code (Kiosk (device app) \u2192 Pair Kiosk); there is no static arrival QR.\n\nEvery section key is always present, even as an empty array."
+                        "description": "docs/decisions/kiosk-display.md. No login. One aggregate call for the kiosk screen, every section inside `data`:\n\n- `requires_pairing`: which screens the app shows. `false` means this device is a paired, active kiosk, shown by the request carrying a valid signature; show the content and the rotating QR. `true` means anything else (no signature headers, a kiosk unpaired or re-paired on another device since, a deactivated kiosk, or a clock more than 5 minutes off); show Kiosk Operator Login, then Pair Kiosk. It only chooses screens: the protection is on Pair Kiosk. Signature headers, optional, added by this request's pre-request script once kiosk_secret is set: `X-Kiosk-Id`, `X-Kiosk-Timestamp` (unix seconds), `X-Kiosk-Signature` (hex HMAC-SHA256 of the secret over \"{id}\\n{timestamp}\\n\", the body being empty).\n- `banner`: one flat, mixed list of live Announcements (each carries its own `type`: news / event / offer), ordered by sort_order across all types together.\n- `plans`: exactly the member app's package catalog (`GET member/packages` -> `data`), same fields item for item: active, public subscription plans; `pricing` in the base currency (no viewer to pick another); only offers open to everyone in `sale`; `is_current` always false. Full details of one plan (balances, discounts, resources) stay on `member/packages/{plan}`.\n- `social_links`: visible Contact Links.\n- `app_download.app_store` / `app_download.google_play`: Setting rows (Admin > Settings). The client renders every QR itself; this endpoint never generates an image. The kiosk shows one scannable code, its rotating coworking code (Kiosk (device app) \u2192 Pair Kiosk); there is no static arrival QR.\n\nEvery section key is always present, even as an empty array."
                     },
                     "response": [
                         {
@@ -33060,7 +33086,363 @@
                                 }
                             ],
                             "cookie": [],
-                            "body": "{\n    \"data\": {\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"price\": 100,\n                    \"currency\": \"$\",\n                    \"unit\": \"month\",\n                    \"unit_label\": \"month\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        }\n    }\n}"
+                            "body": "{\n    \"data\": {\n        \"requires_pairing\": true,\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"price\": 100,\n                    \"currency\": \"$\",\n                    \"unit\": \"month\",\n                    \"unit_label\": \"month\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        }\n    }\n}"
+                        },
+                        {
+                            "name": "200 OK: Paired Kiosk (signed)",
+                            "originalRequest": {
+                                "method": "GET",
+                                "header": [
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "X-Kiosk-Id",
+                                        "value": "{{kiosk_id}}",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "X-Kiosk-Timestamp",
+                                        "value": "1793000000",
+                                        "type": "text"
+                                    },
+                                    {
+                                        "key": "X-Kiosk-Signature",
+                                        "value": "<hex hmac-sha256>",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/public/kiosk",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "public",
+                                        "kiosk"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"data\": {\n        \"requires_pairing\": false,\n        \"banner\": [\n            {\n                \"id\": 1,\n                \"type\": \"news\",\n                \"image_url\": \"https://cdn.example.local/banners/news.jpg\",\n                \"link_url\": null\n            },\n            {\n                \"id\": 3,\n                \"type\": \"offer\",\n                \"image_url\": \"https://cdn.example.local/banners/offer.jpg\",\n                \"link_url\": \"https://add.example.local/offers/1\"\n            }\n        ],\n        \"plans\": [\n            {\n                \"id\": 1,\n                \"name\": \"Monthly\",\n                \"module\": {\n                    \"id\": 2,\n                    \"name\": \"Dedicated Desk\",\n                    \"slug\": \"dedicated_desk\",\n                    \"icon\": \"briefcase\"\n                },\n                \"subtitle\": \"Perfect for individuals and small teams.\",\n                \"pricing\": {\n                    \"points\": 1000,\n                    \"price\": 100,\n                    \"currency\": \"$\",\n                    \"unit\": \"month\",\n                    \"unit_label\": \"month\"\n                },\n                \"sale\": null,\n                \"saving\": null,\n                \"duration_days\": 30,\n                \"features\": [\n                    {\n                        \"id\": 1,\n                        \"name\": \"High-speed Wi-Fi\",\n                        \"value\": null,\n                        \"icon\": \"wifi\",\n                        \"is_included\": true\n                    }\n                ],\n                \"is_current\": false,\n                \"more_features_count\": 0\n            }\n        ],\n        \"social_links\": [\n            {\n                \"type\": \"website\",\n                \"value\": \"https://www.example.com\",\n                \"label\": \"Website\"\n            },\n            {\n                \"type\": \"phone\",\n                \"value\": \"+1234567890\",\n                \"label\": null\n            },\n            {\n                \"type\": \"facebook\",\n                \"value\": \"https://facebook.example.local/add\",\n                \"label\": \"Facebook\"\n            },\n            {\n                \"type\": \"instagram\",\n                \"value\": \"https://instagram.example.local/add\",\n                \"label\": \"Instagram\"\n            }\n        ],\n        \"app_download\": {\n            \"app_store\": \"https://apps.example.local/ios\",\n            \"google_play\": \"https://apps.example.local/android\"\n        }\n    }\n}"
+                        }
+                    ]
+                },
+                {
+                    "name": "Kiosk Operator Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    pm.collectionVariables.set('kiosk_operator_token', pm.response.json().data.access_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            },
+                            {
+                                "key": "lang",
+                                "value": "{{lang}}",
+                                "type": "text"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "v1",
+                                "kiosk",
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "The kiosk app's setup login, shown when Get Kiosk Data answers `requires_pairing: true`, before the pairing-code screen. No role check: the account must hold the `kiosks.pair` permission, the same grant that issues codes in the dashboard. Answers with `data.access_token`, a Bearer token valid 15 minutes whose only ability is `kiosk-pair`: it opens Pair Kiosk and nothing else (the admin API answers 403). Saves kiosk_operator_token. A new login replaces this account's previous pairing token. Shares the dashboard login's attempt limit: 5 per minute for an email and IP. Sent with Cache-Control: no-store.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Invalid Credentials** \u2014 401, the same answer for a wrong password, an unknown email, an inactive account and an account without `kiosks.pair`.\n- **Error: Two-Factor Code Required** \u2014 422 when the account has two-factor on and the body has no `two_factor_code`. Reached only with the right password; the app shows the code field when `errors.two_factor_code` is present, and sends the same body again with it.\n- **Error: Wrong Two-Factor Code** \u2014 422.\n- **Error: Too Many Attempts** \u2014 429."
+                    },
+                    "response": [
+                        {
+                            "name": "200 OK",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "auth",
+                                        "login"
+                                    ]
+                                }
+                            },
+                            "status": "OK",
+                            "code": 200,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"data\": {\n        \"access_token\": \"3f9a1c7e5b2d4f60a8c1e7d93b5f2a6c4e8d1b7f3a9c5e2d6b4f8a1c7e3d9b5f\",\n        \"expires_at\": \"2026-11-07T08:37:43+00:00\"\n    }\n}"
+                        },
+                        {
+                            "name": "Error: Invalid Credentials",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "auth",
+                                        "login"
+                                    ]
+                                }
+                            },
+                            "status": "Unauthorized",
+                            "code": 401,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"These credentials do not match our records.\"\n}"
+                        },
+                        {
+                            "name": "Error: Two-Factor Code Required",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "auth",
+                                        "login"
+                                    ]
+                                }
+                            },
+                            "status": "Unprocessable Content",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"The given data is invalid.\",\n    \"errors\": {\n        \"two_factor_code\": [\n            \"Enter the code from your authenticator app.\"\n        ]\n    }\n}"
+                        },
+                        {
+                            "name": "Error: Wrong Two-Factor Code",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\",\n  \"two_factor_code\": \"000000\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "auth",
+                                        "login"
+                                    ]
+                                }
+                            },
+                            "status": "Unprocessable Content",
+                            "code": 422,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"The given data is invalid.\",\n    \"errors\": {\n        \"two_factor_code\": [\n            \"This authenticator code is not valid.\"\n        ]\n    }\n}"
+                        },
+                        {
+                            "name": "Error: Too Many Attempts",
+                            "originalRequest": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{admin_password}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/auth/login",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "auth",
+                                        "login"
+                                    ]
+                                }
+                            },
+                            "status": "Too Many Requests",
+                            "code": 429,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"Too many attempts. Please wait before trying again.\"\n}"
                         }
                     ]
                 },
@@ -33076,12 +33458,24 @@
                                     "    const data = pm.response.json().data;",
                                     "    pm.collectionVariables.set('kiosk_id', data.kiosk_id);",
                                     "    pm.collectionVariables.set('kiosk_secret', data.secret);",
+                                    "    // The pairing ended the login token on the server.",
+                                    "    pm.collectionVariables.set('kiosk_operator_token', '');",
                                     "}"
                                 ]
                             }
                         }
                     ],
                     "request": {
+                        "auth": {
+                            "type": "bearer",
+                            "bearer": [
+                                {
+                                    "key": "token",
+                                    "value": "{{kiosk_operator_token}}",
+                                    "type": "string"
+                                }
+                            ]
+                        },
                         "method": "POST",
                         "header": [
                             {
@@ -33115,12 +33509,22 @@
                                 "pair"
                             ]
                         },
-                        "description": "Called by the kiosk app, no login. Trades a pairing code (Admin \u2192 Kiosks \u2192 Issue Pairing Code; case, spaces and dashes are ignored) for the kiosk's TOTP secret \u2014 the only response that ever carries it, sent with Cache-Control: no-store. Every pairing generates a new secret, so pairing a replacement device cuts off the old one. Throttled to 5 per minute. Saves kiosk_id and kiosk_secret (Member \u2192 10. Scan (Kiosk & Doors) \u2192 Scan QR uses them).\n\nWhat the kiosk app does with it: keep `secret` in secure storage (Keychain / Keystore), never in plain preferences or logs; show a QR holding `{qr_prefix}:{kiosk_id}:{code}` where code = TOTP(secret) with `totp.algorithm` / `totp.digits` / `totp.period` (SHA1, 8, 30 \u2014 any RFC 6238 library), refreshed every period; keep the device clock NTP-synced (one step of drift is tolerated). It never calls the API again after pairing.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Invalid or Expired Code** \u2014 422 `{\"message\":\"This pairing code is invalid or has expired.\"}` \u2014 the same answer for a wrong, expired or already-used code and for an inactive kiosk.\n- **Error: Too Many Attempts** \u2014 429 after 5 attempts in a minute."
+                        "description": "Called by the kiosk app after Kiosk Operator Login, with its token as the Bearer (kiosk_operator_token; the account must still hold `kiosks.pair`). Trades a pairing code (Admin \u2192 Kiosks \u2192 Issue Pairing Code; case, spaces and dashes are ignored) for the kiosk's TOTP secret \u2014 the only response that ever carries it, sent with Cache-Control: no-store. Every pairing generates a new secret, so pairing a replacement device cuts off the old one. Throttled to 5 per minute. Saves kiosk_id and kiosk_secret (Member \u2192 10. Scan (Kiosk & Doors) \u2192 Scan QR uses them). A successful pairing deletes the login token on the server, so no staff credential stays on the device; a failed code keeps it, so the operator can retype.\n\nWhat the kiosk app does with it: keep `secret` in secure storage (Keychain / Keystore), never in plain preferences or logs; show a QR holding `{qr_prefix}:{kiosk_id}:{code}` where code = TOTP(secret) with `totp.algorithm` / `totp.digits` / `totp.period` (SHA1, 8, 30 \u2014 any RFC 6238 library), refreshed every period; keep the device clock NTP-synced (one step of drift is tolerated). After pairing it needs no login or token: it signs Get Kiosk Data with the secret, and shows the login and this screen again when `requires_pairing` turns true.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Not Signed In** \u2014 401 with no token, an expired one (15 minutes), or one already spent on a pairing.\n- **Error: Not Allowed** \u2014 403 for a token without the `kiosk-pair` ability (a member-app token, for one) or an account that no longer holds `kiosks.pair`.\n- **Error: Invalid or Expired Code** \u2014 422 `{\"message\":\"This pairing code is invalid or has expired.\"}` \u2014 the same answer for a wrong, expired or already-used code and for an inactive kiosk.\n- **Error: Too Many Attempts** \u2014 429 after 5 attempts in a minute."
                     },
                     "response": [
                         {
                             "name": "200 OK",
                             "originalRequest": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{kiosk_operator_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
                                 "method": "POST",
                                 "header": [
                                     {
@@ -33168,8 +33572,136 @@
                             "body": "{\n    \"data\": {\n        \"kiosk_id\": 1,\n        \"name\": \"Main entrance (left)\",\n        \"secret\": \"NR5QC4D5SKNMLGKZGKPMUQRQUKSIJ3WN\",\n        \"totp\": {\n            \"algorithm\": \"SHA1\",\n            \"digits\": 8,\n            \"period\": 30\n        },\n        \"qr_prefix\": \"add-cowork:v1\"\n    }\n}"
                         },
                         {
+                            "name": "Error: Not Signed In",
+                            "originalRequest": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{kiosk_operator_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"pairing_code\": \"MDAUCU97\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/pair",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "pair"
+                                    ]
+                                }
+                            },
+                            "status": "Unauthorized",
+                            "code": 401,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"Unauthenticated.\"\n}"
+                        },
+                        {
+                            "name": "Error: Not Allowed",
+                            "originalRequest": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{kiosk_operator_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n  \"pairing_code\": \"MDAUCU97\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                },
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/kiosk/pair",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "kiosk",
+                                        "pair"
+                                    ]
+                                }
+                            },
+                            "status": "Forbidden",
+                            "code": 403,
+                            "_postman_previewlanguage": "json",
+                            "header": [
+                                {
+                                    "key": "Content-Type",
+                                    "value": "application/json"
+                                }
+                            ],
+                            "cookie": [],
+                            "body": "{\n    \"message\": \"This action is unauthorized.\"\n}"
+                        },
+                        {
                             "name": "Error: Invalid or Expired Code",
                             "originalRequest": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{kiosk_operator_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
                                 "method": "POST",
                                 "header": [
                                     {
@@ -33219,6 +33751,16 @@
                         {
                             "name": "Error: Too Many Attempts",
                             "originalRequest": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{kiosk_operator_token}}",
+                                            "type": "string"
+                                        }
+                                    ]
+                                },
                                 "method": "POST",
                                 "header": [
                                     {

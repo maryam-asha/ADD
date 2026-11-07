@@ -6,15 +6,17 @@ use App\Domain\Booking\DataTransferObjects\IssuedPairingCode;
 use App\Domain\Booking\DataTransferObjects\KioskPairing;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Identity\Models\User;
 use App\Support\Security\Totp;
 use Illuminate\Support\Facades\DB;
+use Laravel\Sanctum\NewAccessToken;
 
 /**
  * How a kiosk gets its TOTP secret (docs/decisions/coworking-self-service-sessions.md):
- * an admin issues a short single-use code, the kiosk app trades it once for
- * a freshly generated secret. Every pairing rotates the secret, so replacing
- * a device is re-pairing, and nothing is ever pushed to a device that was
- * not just paired.
+ * an admin issues a short single-use code, an operator signed in on the kiosk
+ * app trades it once for a freshly generated secret. Every pairing rotates the
+ * secret, so replacing a device is re-pairing, and nothing is ever pushed to a
+ * device that was not just paired.
  */
 class KioskPairingService
 {
@@ -24,6 +26,34 @@ class KioskPairingService
 
     /** No 0/O or 1/I: the code is read off one screen and typed into another. */
     private const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+    /** Who may pair: the same grant that issues the codes in the dashboard. */
+    public const PAIR_PERMISSION = 'kiosks.pair';
+
+    /**
+     * All an operator's kiosk-login token can do. Deliberately not `dashboard`:
+     * the token sits on a device in a public place, so it must not open the
+     * admin API, however much its owner's permissions would allow.
+     */
+    public const OPERATOR_ABILITY = 'kiosk-pair';
+
+    public const OPERATOR_TOKEN_TTL_MINUTES = 15;
+
+    private const OPERATOR_TOKEN_NAME = 'kiosk-pairing';
+
+    /** Replaces any token from an earlier login, so an abandoned setup leaves one at most. */
+    public function issueOperatorToken(User $user): NewAccessToken
+    {
+        return DB::transaction(function () use ($user) {
+            $user->tokens()->where('name', self::OPERATOR_TOKEN_NAME)->delete();
+
+            return $user->createToken(
+                self::OPERATOR_TOKEN_NAME,
+                [self::OPERATOR_ABILITY],
+                now()->addMinutes(self::OPERATOR_TOKEN_TTL_MINUTES),
+            );
+        });
+    }
 
     public function issueCode(Kiosk $kiosk): IssuedPairingCode
     {

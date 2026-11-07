@@ -150,6 +150,8 @@ class KioskPairingTest extends TestCase
 
     public function test_the_pairing_endpoint_is_throttled(): void
     {
+        $this->actingAsAdmin();
+
         foreach (range(1, 5) as $attempt) {
             $this->pair('WRONGONE')->assertStatus(422);
         }
@@ -164,6 +166,8 @@ class KioskPairingTest extends TestCase
      */
     public function test_the_pairing_throttle_has_its_own_bucket(): void
     {
+        $this->actingAsAdmin();
+
         foreach (range(1, 5) as $attempt) {
             $this->postJson('/api/v1/auth/refresh', []);
         }

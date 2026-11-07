@@ -2,8 +2,11 @@
 
 namespace Tests\Feature\Public;
 
+use App\Domain\Booking\Models\Kiosk;
+use App\Domain\Booking\Services\KioskPairingService;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\ContactLink;
+use App\Domain\Hr\Kiosk\KioskRequestSignature;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Domain\Membership\Models\Plan;
@@ -11,6 +14,7 @@ use App\Domain\Settings\Enums\SettingValueType;
 use App\Domain\Settings\Services\SettingService;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -34,6 +38,71 @@ class KioskControllerTest extends TestCase
         $response->assertJsonPath('data.banner', []);
         $response->assertJsonPath('data.plans', []);
         $response->assertJsonPath('data.social_links', []);
+    }
+
+    /**
+     * The headers a kiosk holding this secret sends, over the empty body of a
+     * real GET. Not getJson(), which sends "[]" as the body.
+     */
+    private function signedKiosk(Kiosk $kiosk, string $secret, ?int $timestamp = null): TestResponse
+    {
+        return $this->withHeaders(KioskRequestSignature::headersFor($kiosk, $secret, '', $timestamp))
+            ->get('/api/v1/public/kiosk');
+    }
+
+    private function pairedKiosk(): array
+    {
+        $pairings = app(KioskPairingService::class);
+        $kiosk = Kiosk::factory()->create();
+
+        return [$kiosk, $pairings->pair($pairings->issueCode($kiosk)->code)->secret];
+    }
+
+    public function test_a_device_that_does_not_identify_itself_needs_pairing(): void
+    {
+        $this->getJson('/api/v1/public/kiosk')
+            ->assertOk()
+            ->assertJsonPath('data.requires_pairing', true);
+    }
+
+    public function test_a_paired_kiosk_signing_with_its_secret_does_not_need_pairing(): void
+    {
+        [$kiosk, $secret] = $this->pairedKiosk();
+
+        $this->signedKiosk($kiosk, $secret)
+            ->assertOk()
+            ->assertJsonPath('data.requires_pairing', false);
+    }
+
+    public function test_a_revoked_kiosk_learns_it_needs_pairing_again(): void
+    {
+        [$kiosk, $secret] = $this->pairedKiosk();
+
+        app(KioskPairingService::class)->revoke($kiosk);
+
+        $this->signedKiosk($kiosk, $secret)->assertJsonPath('data.requires_pairing', true);
+    }
+
+    public function test_a_device_replaced_by_a_new_pairing_learns_it_needs_pairing_again(): void
+    {
+        [$kiosk, $oldSecret] = $this->pairedKiosk();
+        $pairings = app(KioskPairingService::class);
+        $newSecret = $pairings->pair($pairings->issueCode($kiosk->fresh())->code)->secret;
+
+        $this->signedKiosk($kiosk, $oldSecret)->assertJsonPath('data.requires_pairing', true);
+        $this->signedKiosk($kiosk, $newSecret)->assertJsonPath('data.requires_pairing', false);
+    }
+
+    public function test_a_stale_signature_or_a_deactivated_kiosk_needs_pairing(): void
+    {
+        [$kiosk, $secret] = $this->pairedKiosk();
+
+        $this->signedKiosk($kiosk, $secret, time() - KioskRequestSignature::MAX_SKEW_SECONDS - 1)
+            ->assertJsonPath('data.requires_pairing', true);
+
+        $kiosk->update(['is_active' => false]);
+
+        $this->signedKiosk($kiosk, $secret)->assertJsonPath('data.requires_pairing', true);
     }
 
     public function test_banner_is_one_flat_list_with_a_type_property_per_item_respecting_the_live_window(): void

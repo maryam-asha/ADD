@@ -5,10 +5,12 @@ namespace App\Http\Controllers\Api\V1\Public;
 use App\Domain\Ecosystem\Enums\AnnouncementPlacement;
 use App\Domain\Ecosystem\Models\Announcement;
 use App\Domain\Ecosystem\Models\ContactLink;
+use App\Domain\Hr\Kiosk\KioskRequestSignature;
 use App\Domain\Membership\Services\PackageBrowseService;
 use App\Domain\Settings\Services\SettingService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 
 /**
  * One unauthenticated aggregate for the reception kiosk screen
@@ -22,9 +24,17 @@ use Illuminate\Http\JsonResponse;
  */
 class KioskController extends Controller
 {
-    public function show(SettingService $settings, PackageBrowseService $packages): JsonResponse
-    {
+    public function show(
+        Request $request,
+        SettingService $settings,
+        PackageBrowseService $packages,
+        KioskRequestSignature $signature,
+    ): JsonResponse {
         return response()->json(['data' => [
+            // Which setup screens the app shows, not a guard: the proof is on
+            // kiosk/pair. A paired kiosk signs this request, so one revoked or
+            // replaced since its last call stops verifying and finds out here.
+            'requires_pairing' => $signature->verify($request) === null,
             'banner' => $this->liveAnnouncements(),
             // The member app's package catalog (member/packages), item for item.
             'plans' => $packages->listPublicPackages(),

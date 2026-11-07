@@ -396,6 +396,8 @@ return [
         'not_a_coworking_space' => 'A kiosk can only serve a coworking space.',
         'invalid_pairing_code' => 'This pairing code is invalid or has expired.',
         'secret_revoked' => 'The kiosk has been unpaired. Pair it again to use it.',
+        'two_factor_required' => 'Enter the code from your authenticator app.',
+        'invalid_two_factor_code' => 'This authenticator code is not valid.',
     ],
 
     // One group for both co-working features: rooms lent to co-working
