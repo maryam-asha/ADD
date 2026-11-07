@@ -6,12 +6,13 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Enums\OperationKind;
+use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Stock\Models\StockOperation;
 use Add\Inventory\Support\Decimal;
+use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Warehouses\Models\Warehouse;
 use Closure;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -47,15 +48,23 @@ class StockOperations
             $reason = isset($data['reason']) ? IssueReason::from($data['reason']) : null;
             $costMethod = $kind === OperationKind::Receive ? $this->costMethod($data) : null;
             $id = (string) Str::uuid();
+            // The reason stays on each ledger row too, so the ledger reads on its own.
+            $note = $data['note'] ?? null;
 
-            $rows = $this->run($data['lines'], $id, function (Item $item, array $line, string $factor, array $meta) use ($kind, $from, $to, $reason, $costMethod) {
+            $rows = $this->run($data['lines'], $id, function (Item $item, array $line, string $factor, array $meta) use ($data, $kind, $from, $to, $reason, $costMethod, $note) {
                 $cost = $costMethod === 'average' || ! isset($line['unit_cost']) ? null : Decimal::round(Decimal::div($line['unit_cost'], $factor), 4);
 
+                // Chosen as such (the dashboard always says), "the current
+                // average" must have one to give.
+                if (($data['cost_method'] ?? null) === 'average') {
+                    $this->ensureAverage($item, $from);
+                }
+
                 return match ($kind) {
-                    OperationKind::Receive => [$this->stock->receive($item, $from->asPlace(), $this->toMain($line['quantity'], $factor), $cost, meta: $meta)],
-                    OperationKind::Issue, OperationKind::WriteOff => [$this->stock->issue($item, $from->asPlace(), $this->toMain($line['quantity'], $factor), $reason, meta: $meta)],
-                    OperationKind::Transfer => $this->stock->transfer($item, $from->asPlace(), $to->asPlace(), $this->toMain($line['quantity'], $factor), meta: $meta),
-                    OperationKind::Adjust => [$this->stock->adjust($item, $from->asPlace(), $this->toMain($line['counted'], $factor), $cost, meta: $meta)],
+                    OperationKind::Receive => [$this->stock->receive($item, $from->asPlace(), $this->toMain($line['quantity'], $factor), $cost, note: $note, meta: $meta)],
+                    OperationKind::Issue, OperationKind::WriteOff => [$this->stock->issue($item, $from->asPlace(), $this->toMain($line['quantity'], $factor), $reason, note: $note, meta: $meta)],
+                    OperationKind::Transfer => $this->stock->transfer($item, $from->asPlace(), $to->asPlace(), $this->toMain($line['quantity'], $factor), $note, $meta),
+                    OperationKind::Adjust => [$this->stock->adjust($item, $from->asPlace(), $this->toMain($line['counted'], $factor), $cost, $note, $meta)],
                 };
             });
 
@@ -68,7 +77,7 @@ class StockOperations
                 'kind' => $kind,
                 'warehouse_id' => $from->id,
                 'to_warehouse_id' => $to?->id,
-                'operation_date' => $data['operation_date'] ?? Carbon::today()->toDateString(),
+                'operation_date' => $data['operation_date'] ?? Inventory::today()->toDateString(),
                 'reference' => $data['reference'] ?? null,
                 'reason' => $reason,
                 'note' => $data['note'] ?? null,
@@ -92,6 +101,23 @@ class StockOperations
         }
 
         return collect($data['lines'])->contains(fn (array $line) => isset($line['unit_cost'])) ? 'entered' : 'average';
+    }
+
+    /**
+     * Receiving "at the current average" needs one: an item never costed in
+     * the warehouse would come in at nothing.
+     */
+    private function ensureAverage(Item $item, Warehouse $at): void
+    {
+        $average = StockBalance::query()
+            ->where('item_id', $item->id)
+            ->where('location_type', Warehouse::TYPE)
+            ->where('location_id', $at->id)
+            ->value('average_cost');
+
+        if ($average === null || Decimal::isZero($average)) {
+            InventoryException::fail('inventory::stock.no_average_cost', ['item' => (string) $item->translate('name')]);
+        }
     }
 
     /**

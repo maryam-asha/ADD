@@ -11,5 +11,6 @@ return [
     'not_a_warehouse' => 'Stock is kept only in warehouses.',
     'warehouse_inactive' => 'This warehouse does not exist or is not active.',
     'outside_scope' => 'This item is not among the items :warehouse may hold.',
+    'no_average_cost' => ':item has no average cost in this warehouse yet; enter its unit cost.',
     'count_matched' => 'The count matches the book; nothing changed.',
 ];

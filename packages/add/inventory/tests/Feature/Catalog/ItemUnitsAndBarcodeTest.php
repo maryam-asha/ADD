@@ -55,6 +55,16 @@ class ItemUnitsAndBarcodeTest extends TestCase
             'unit_id' => Unit::factory()->create()->id,
             'image_url' => 'javascript:alert(1)',
         ])->assertUnprocessable()->assertJsonValidationErrors('image_url');
+
+        // A backslash or a second slash reads as another host in a browser.
+        foreach (['/\\evil.example/x.png', '//evil.example/x.png'] as $bad) {
+            $this->postJson('/api/inventory/items', [
+                'name' => ['ar' => 'مياه'],
+                'category_id' => Category::factory()->stock()->create()->id,
+                'unit_id' => Unit::factory()->create()->id,
+                'image_url' => $bad,
+            ])->assertUnprocessable()->assertJsonValidationErrors('image_url');
+        }
     }
 
     public function test_main_unit_cannot_be_another_unit(): void

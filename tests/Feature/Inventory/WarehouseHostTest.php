@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Inventory;
 
+use Add\Inventory\Inventory;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Space;
@@ -48,6 +49,12 @@ class WarehouseHostTest extends TestCase
 
         $this->assertTrue($keeper->refresh()->hasPermissionTo('inventory.warehouses.view'));
         $this->assertFalse($viewer->refresh()->hasPermissionTo('inventory.warehouses.view'));
+    }
+
+    public function test_inventory_days_follow_adds_timezone_setting(): void
+    {
+        // Laravel runs in UTC; ADD's day is the app.timezone setting's.
+        $this->assertSame('Asia/Damascus', Inventory::timezone());
     }
 
     public function test_a_warehouse_sits_in_a_branch_or_in_nothing(): void

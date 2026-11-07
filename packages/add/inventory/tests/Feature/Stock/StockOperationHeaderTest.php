@@ -4,6 +4,7 @@ namespace Add\Inventory\Tests\Feature\Stock;
 
 use Add\Inventory\Authorization\Abilities;
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Tests\Concerns\BuildsInventory;
@@ -13,6 +14,13 @@ use Illuminate\Support\Carbon;
 class StockOperationHeaderTest extends TestCase
 {
     use BuildsInventory;
+
+    protected function tearDown(): void
+    {
+        Inventory::resolveTimezoneUsing(null);
+        Carbon::setTestNow();
+        parent::tearDown();
+    }
 
     private const ALL = [
         Abilities::STOCK_VIEW,
@@ -47,6 +55,8 @@ class StockOperationHeaderTest extends TestCase
             ->assertJsonPath('data.warehouse.id', $store->id)
             ->assertJsonPath('data.actor.id', $actor->id)
             ->assertJsonPath('data.movements.0.line_note', 'Two cartons dented')
+            // The ledger row keeps the reason too, for the ledger tab.
+            ->assertJsonPath('data.movements.0.note', 'Supplier delivery')
             ->assertJsonPath('data.movements.0.quantity', '10')
             ->json('data');
 
@@ -88,6 +98,33 @@ class StockOperationHeaderTest extends TestCase
         $this->postJson('/api/inventory/stock/issue', ['warehouse_id' => $from->id, 'reason' => 'internal_use', 'lines' => $line])->assertUnprocessable()->assertJsonValidationErrors('note');
         $this->postJson('/api/inventory/stock/adjust', ['warehouse_id' => $from->id, 'lines' => [['item_id' => $item->id, 'counted' => 2]]])->assertUnprocessable()->assertJsonValidationErrors('note');
         $this->postJson('/api/inventory/stock/transfer', ['from_warehouse_id' => $from->id, 'to_warehouse_id' => $to->id, 'lines' => $line])->assertCreated();
+    }
+
+    public function test_today_is_the_hosts_day_not_utcs(): void
+    {
+        $this->actingAsWith(self::ALL);
+        Inventory::resolveTimezoneUsing(fn () => 'Asia/Damascus');
+        // 22:30 UTC is already 01:30 the next day in Damascus.
+        Carbon::setTestNow(Carbon::parse('2026-11-07 22:30:00', 'UTC'));
+        $payload = ['warehouse_id' => $this->warehouse()->id, 'note' => 'x', 'lines' => [['item_id' => $this->stockItem()->id, 'quantity' => 1]]];
+
+        $this->postJson('/api/inventory/stock/receive', [...$payload, 'operation_date' => '2026-11-08'])
+            ->assertCreated()->assertJsonPath('data.operation_date', '2026-11-08');
+        $this->postJson('/api/inventory/stock/receive', $payload)
+            ->assertCreated()->assertJsonPath('data.operation_date', '2026-11-08');
+        $this->postJson('/api/inventory/stock/receive', [...$payload, 'operation_date' => '2026-11-09'])
+            ->assertUnprocessable()->assertJsonValidationErrors('operation_date');
+    }
+
+    public function test_average_cost_needs_an_average_to_use(): void
+    {
+        $this->actingAsWith(self::ALL);
+        $store = $this->warehouse();
+        $fresh = $this->stockItem();
+
+        $this->postJson('/api/inventory/stock/receive', ['warehouse_id' => $store->id, 'note' => 'x', 'cost_method' => 'average', 'lines' => [['item_id' => $fresh->id, 'quantity' => 5]]])
+            ->assertUnprocessable()->assertJsonPath('message', __('inventory::stock.no_average_cost', ['item' => $fresh->translate('name')]));
+        $this->assertDatabaseCount('inv_stock_movements', 0);
     }
 
     public function test_entered_cost_needs_a_cost_per_line_and_average_cost_ignores_one(): void

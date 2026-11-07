@@ -5,6 +5,8 @@ namespace Add\Inventory;
 use Add\Inventory\Contracts\CustodianResolver;
 use Add\Inventory\Contracts\LocationResolver;
 use Add\Inventory\Integrations\OwnLocationResolver;
+use Carbon\CarbonImmutable;
+use Closure;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Validation\Rule;
 
@@ -76,6 +78,38 @@ final class Inventory
             'size:3',
             ...($table ? [Rule::exists($table, config('inventory.currencies.column', 'code'))] : []),
         ];
+    }
+
+    /** @var (Closure(): string)|null */
+    private static ?Closure $timezoneResolver = null;
+
+    /**
+     * Where "today" is decided: the host may keep its timezone somewhere
+     * the config does not (ADD: the `app.timezone` setting, while Laravel
+     * runs in UTC). Null puts back the default, config inventory.timezone
+     * or app.timezone.
+     *
+     * @param  (Closure(): string)|null  $resolver
+     */
+    public static function resolveTimezoneUsing(?Closure $resolver): void
+    {
+        self::$timezoneResolver = $resolver;
+    }
+
+    public static function timezone(): string
+    {
+        return self::$timezoneResolver !== null
+            ? (self::$timezoneResolver)()
+            : (string) (config('inventory.timezone') ?? config('app.timezone', 'UTC'));
+    }
+
+    /**
+     * The day it is where the business is — what an operation's date
+     * defaults to and may not go past.
+     */
+    public static function today(): CarbonImmutable
+    {
+        return CarbonImmutable::now(self::timezone())->startOfDay();
     }
 
     /**

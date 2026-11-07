@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Stock\Http\Requests;
 
+use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Foundation\Http\FormRequest;
@@ -35,7 +36,7 @@ class StockOperationRequest extends FormRequest
             // The header: the day it happened (today when left out, never
             // later), a reference such as a supplier's invoice, why — in
             // words, required but for a transfer — and a scanned document.
-            'operation_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
+            'operation_date' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:'.Inventory::today()->toDateString()],
             'reference' => ['nullable', 'string', 'max:60'],
             'note' => [$this->route()->getName() === 'inventory.stock.transfer' ? 'nullable' : 'required', 'string', 'max:2000'],
             'attachment_url' => ['nullable', ...FileUrl::rules()],
