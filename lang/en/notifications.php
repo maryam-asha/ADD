@@ -78,7 +78,7 @@ return [
         ],
         'extended' => [
             'title' => 'Booking Extended',
-            'body' => 'Your booking for :space has been extended until :end_time.',
+            'body' => 'Your booking for :space has been extended until :end_time.:payment',
         ],
         'cancelled' => [
             'title' => 'Your booking was cancelled',

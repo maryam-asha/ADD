@@ -3,6 +3,7 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Enums\PaymentSource;
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Enums\PaymentStatus;
@@ -52,6 +53,28 @@ class BookingPaymentLine
         $method = $bookings->first()->chosen_payment_method;
 
         return $this->line($method === CashMethod::KEY ? 'cash_due' : 'due', ['points' => $owed]);
+    }
+
+    /**
+     * The sentence an extension notice ends with, read once the extension
+     * is saved: the difference taken from the member's wallet when the
+     * booking is still paid (BookingExtensionService charged it), else what
+     * the booking now owes — at the desk for one booked for cash, otherwise
+     * in the app or at the desk. An extension that cost nothing has none.
+     */
+    public function forExtension(Booking $booking, int $differencePoints): array
+    {
+        if ($differencePoints <= 0) {
+            return $this->none();
+        }
+
+        if ($booking->payment_state === PaymentState::Paid) {
+            return $this->line('wallet', ['points' => $differencePoints]);
+        }
+
+        $owed = max(0, (int) $booking->price_points - $booking->pointsPaid());
+
+        return $this->line($booking->chosen_payment_method === CashMethod::KEY ? 'cash_due' : 'due', ['points' => $owed]);
     }
 
     /** @return Collection<int, Payment> the booking's own payments that went through — not its extensions' */

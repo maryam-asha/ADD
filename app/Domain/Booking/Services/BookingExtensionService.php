@@ -38,6 +38,7 @@ class BookingExtensionService
         private readonly PaymentService $payments,
         private readonly QuoteRecorder $recorder,
         private readonly RealtimeBroadcaster $realtime,
+        private readonly BookingNotifier $notifier,
     ) {}
 
     /**
@@ -135,6 +136,16 @@ class BookingExtensionService
             ])->save();
 
             $this->realtime->send(new BookingExtended($lockedBooking));
+
+            // Told once it is saved, read again then, so the payment line
+            // says what actually happened to the added time.
+            DB::afterCommit(function () use ($lockedBooking, $differencePoints) {
+                $fresh = Booking::query()->with(['space', 'user', 'payments'])->find($lockedBooking->id);
+
+                if ($fresh !== null) {
+                    $this->notifier->extended($fresh, $differencePoints);
+                }
+            });
 
             return $moved ? $lockedBooking->fresh()->seatingSpace() : null;
         });

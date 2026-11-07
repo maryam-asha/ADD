@@ -78,7 +78,7 @@ return [
         ],
         'extended' => [
             'title' => 'تم تمديد الحجز',
-            'body' => 'تم تمديد حجزك لـ :space حتى :end_time.',
+            'body' => 'تم تمديد حجزك لـ :space حتى :end_time.:payment',
         ],
         'cancelled' => [
             'title' => 'تم إلغاء حجزك',

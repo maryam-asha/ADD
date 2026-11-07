@@ -128,6 +128,18 @@ class BookingNotifier
         ]);
     }
 
+    /**
+     * Extended — from the app or by the desk — until its new end, and how
+     * the added time was paid (BookingPaymentLine::forExtension).
+     */
+    public function extended(Booking $booking, int $differencePoints): void
+    {
+        $this->tellMember($booking, 'booking.extended', [
+            'end_time' => NotificationText::localTime($booking->end_at),
+            'payment' => $this->paymentLine->forExtension($booking, $differencePoints),
+        ]);
+    }
+
     /** Whoever may approve bookings (`reception.approve`), in the dashboard. */
     public function pendingApproval(Booking $booking): void
     {
