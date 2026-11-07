@@ -54,22 +54,18 @@ class BookingController extends Controller
      * none for all — as a page and its `meta`
      * (docs/decisions/booking-outcomes-and-extension.md).
      *
-     * What has not started comes first, soonest first, then everything else,
-     * latest first: the design's "Upcoming" above the rest, whatever is asked
-     * for. No per-tab `counts`: the screen shows none, and each cost a query.
+     * Newest booking first (by `id`), whatever is asked for. No per-tab
+     * `counts`: the screen shows none, and each cost a query.
      */
     public function index(ListBookingsRequest $request): JsonResponse
     {
         $statuses = $request->statuses();
         $perPage = (int) ($request->validated('per_page') ?? 15);
-        $now = now();
 
         $paginator = Booking::query()
             ->where('user_id', $request->user()->id)
             ->when($statuses !== [], fn ($query) => $query->whereIn('status', $statuses))
-            ->orderByRaw('CASE WHEN start_at > ? THEN 0 ELSE 1 END', [$now])
-            ->orderByRaw('CASE WHEN start_at > ? THEN start_at END ASC', [$now])
-            ->orderByDesc('start_at')
+            ->orderByDesc('id')
             // The card reads its space and nothing else; without this, that
             // is a query per card.
             ->with('space')

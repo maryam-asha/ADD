@@ -146,10 +146,10 @@ class MemberBookingStatusesTest extends TestCase
     }
 
     /**
-     * What has not started comes first, soonest first, then the rest, latest
-     * first — the design's "Upcoming" above "Completed", whatever the filter.
+     * Newest booking first (by `id`), whatever the filter and whenever it
+     * starts.
      */
-    public function test_bookings_yet_to_start_come_first_then_the_rest_latest_first(): void
+    public function test_bookings_are_listed_newest_first(): void
     {
         // now() is 12:00 (setUp).
         $laterToday = $this->booking(16, 17);
@@ -157,7 +157,7 @@ class MemberBookingStatusesTest extends TestCase
         $morning = $this->booking(8, 9, ['status' => BookingStatus::Completed]);
         $running = $this->booking(11, 13);
 
-        $this->assertSame([$soon->id, $laterToday->id, $running->id, $morning->id], $this->listedIds());
+        $this->assertSame([$running->id, $morning->id, $soon->id, $laterToday->id], $this->listedIds());
     }
 
     /** No per-tab counts (user decision, 2026-10-03): the page and its `meta`. */
