@@ -3,6 +3,7 @@
 namespace Tests\Feature\Finance;
 
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\PendingPaymentsChanged;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Models\ExchangeRate;
@@ -13,6 +14,7 @@ use App\Notifications\GeneralNotification;
 use App\Services\Notification\NotificationText;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
@@ -155,6 +157,49 @@ class ReceptionPendingPaymentsTest extends TestCase
 
         $text = $this->notice($member, 'payment.received_at_reception');
         $this->assertSame('Reception received 10 USD for a booking (100 points). Your payment is complete.', $text['en']['body']);
+    }
+
+    public function test_the_desk_is_told_live_when_something_is_paid(): void
+    {
+        $member = $this->member('Sara Haddad', '+963911111111');
+        $booking = $this->unpaidBooking($member, ['checked_in_at' => now()->subHours(2), 'checked_out_at' => now()->subHour()]);
+        Event::fake([PendingPaymentsChanged::class]);
+
+        $this->postJson('/api/v1/admin/reception/payments/settle', [
+            'purpose' => 'booking', 'payable_id' => $booking->id, 'collected_via' => 'cash',
+        ])->assertCreated();
+
+        Event::assertDispatched(PendingPaymentsChanged::class, fn (PendingPaymentsChanged $e) => $e->memberId === $member->id
+            && $e->broadcastAs() === 'payments.pending_changed');
+    }
+
+    public function test_the_desk_is_told_live_when_something_becomes_owed(): void
+    {
+        $member = $this->member('Sara Haddad', '+963911111111');
+        $session = WalkinSession::factory()->create([
+            'user_id' => $member->id,
+            'checked_in_at' => now()->subHours(2),
+            'checked_out_at' => null,
+            'price_points' => 0,
+            'payment_state' => PaymentState::Unpaid,
+        ]);
+        Event::fake([PendingPaymentsChanged::class]);
+
+        // Closed unpaid: now the desk's to collect.
+        $session->forceFill(['checked_out_at' => now(), 'price_points' => 40])->save();
+
+        Event::assertDispatchedTimes(PendingPaymentsChanged::class, 1);
+    }
+
+    public function test_an_unrelated_change_tells_the_desk_nothing(): void
+    {
+        $member = $this->member('Sara Haddad', '+963911111111');
+        $booking = $this->unpaidBooking($member);
+        Event::fake([PendingPaymentsChanged::class]);
+
+        $booking->forceFill(['note' => 'by the window'])->save();
+
+        Event::assertNotDispatched(PendingPaymentsChanged::class);
     }
 
     /**

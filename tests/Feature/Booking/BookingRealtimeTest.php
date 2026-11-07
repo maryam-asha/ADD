@@ -275,7 +275,9 @@ class BookingRealtimeTest extends TestCase
         app(BookingCheckInService::class)->checkIn($booking, SessionStartSource::Door);
 
         $this->assertNotNull($booking->fresh()->checked_in_at);
-        Log::shouldHaveReceived('warning')->with('[Realtime] broadcast failed', \Mockery::on(fn ($context) => $context['error'] === 'Pusher is down'))->twice();
+        // booking.started, booking.checked_in, and payments.pending_changed: an
+        // unpaid booking in progress leaves the desk's list until it closes.
+        Log::shouldHaveReceived('warning')->with('[Realtime] broadcast failed', \Mockery::on(fn ($context) => $context['error'] === 'Pusher is down'))->times(3);
     }
 
     public function test_confirmed_booking_creation_announces_booking_created_on_reception(): void

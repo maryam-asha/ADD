@@ -14,6 +14,7 @@ use App\Domain\Finance\Payments\Fulfillers\WalkinSessionFulfiller;
 use App\Domain\Finance\Payments\Fulfillers\WalletTopUpFulfiller;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Payments\PendingPaymentsWatcher;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Support\ServiceProvider;
 
@@ -55,5 +56,11 @@ class PaymentServiceProvider extends ServiceProvider
         // Not a singleton: it holds no state of its own, and building it per
         // use keeps its collaborators whatever the container resolves now.
         $this->app->bind(PaymentService::class);
+    }
+
+    public function boot(): void
+    {
+        // The desk's pending-payments list follows every change to what is owed.
+        PendingPaymentsWatcher::register();
     }
 }
