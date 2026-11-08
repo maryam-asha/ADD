@@ -7,4 +7,5 @@ return [
     'locked_assets_exist' => 'Assets are already coded in this shape; it cannot change now.',
     'locked_assets_in_warehouses' => 'Assets sit in warehouses; move them to their places before turning this off.',
     'locked_stock_moved' => 'Stock has been costed in this currency; it cannot change now.',
+    'locked_method_in_use' => 'Assets are depreciated by this method; it cannot be removed now.',
 ];

@@ -3,6 +3,7 @@
 namespace Add\Inventory\Assets\Models;
 
 use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Database\Factories\AssetFactory;
@@ -43,6 +44,7 @@ class Asset extends Model
         'reference',
         'attachments',
         'useful_life_months',
+        'depreciation_method',
         'salvage_value',
         'warranty_until',
         'warranty_alerted_at',
@@ -62,6 +64,7 @@ class Asset extends Model
         'attachments' => 'array',
         'purchase_cost' => PlainDecimal::class.':2',
         'useful_life_months' => 'integer',
+        'depreciation_method' => DepreciationMethod::class,
         'salvage_value' => PlainDecimal::class.':2',
         'warranty_until' => DateOnly::class,
         'warranty_alerted_at' => 'datetime',

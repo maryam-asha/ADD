@@ -2,11 +2,13 @@
 
 namespace Add\Inventory\Assets\Http\Requests;
 
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\Decimal;
 use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Contracts\Validation\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * The descriptive and financial fields of an asset, shared by registering
@@ -35,6 +37,7 @@ trait AssetDetailRules
             'attachments' => [...$sometimes, 'nullable', 'array', 'max:10'],
             'attachments.*' => ['required', ...FileUrl::rules()],
             'useful_life_months' => [...$sometimes, 'nullable', 'integer', 'min:1', 'max:1200'],
+            'depreciation_method' => [...$sometimes, 'nullable', Rule::in(DepreciationMethod::enabledValues())],
             'salvage_value' => [...$sometimes, 'nullable', 'numeric', 'min:0'],
             'warranty_until' => [...$sometimes, 'nullable', 'date_format:Y-m-d'],
             'notes' => [...$sometimes, 'nullable', 'string', 'max:5000'],

@@ -49,6 +49,7 @@ class AssetResource extends JsonResource
             'reference' => $this->reference,
             'attachments' => $this->attachments ?? [],
             'useful_life_months' => $this->useful_life_months,
+            'depreciation_method' => $this->depreciation_method?->value,
             'salvage_value' => $this->salvage_value,
             'depreciation' => app(DepreciationCalculator::class)->for($this->resource),
             'warranty_until' => $this->warranty_until?->toDateString(),

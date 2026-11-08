@@ -3,6 +3,7 @@
 namespace Add\Inventory\Support\Http;
 
 use Add\Inventory\Assets\AssetPlaces;
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Catalog\Enums\SkuMode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
@@ -19,6 +20,8 @@ class SettingsController extends Controller
             'assets_in_warehouses' => AssetPlaces::warehousesAllowed(),
             // auto | on_create | editable: whether an item's code is typed, and when.
             'item_code_mode' => SkuMode::current()->value,
+            // The methods an asset may be depreciated by; the first is the default.
+            'depreciation_methods' => DepreciationMethod::enabledValues(),
         ]]);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Settings;
 
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Catalog\Enums\SkuMode;
 use Add\Inventory\Catalog\Services\ItemCodeSequence;
@@ -38,6 +39,12 @@ final class SettingsRegistry
             new SettingDefinition('assets.max_lines', 'assets', 'integer', ['required', 'integer', 'min:1', 'max:200']),
             new SettingDefinition('assets.maintenance_lead_days', 'assets', 'integer', ['required', 'integer', 'min:0', 'max:365']),
             new SettingDefinition('assets.warranty_lead_days', 'assets', 'integer', ['required', 'integer', 'min:0', 'max:365']),
+
+            new SettingDefinition('assets.depreciation_methods', 'depreciation', 'list', ['required', 'array', 'min:1'], array_column(DepreciationMethod::cases(), 'value'), lockedWhen: function ($current, $next) {
+                $removed = is_array($next) ? array_diff((array) $current, $next) : [];
+
+                return $removed !== [] && Asset::query()->whereIn('depreciation_method', $removed)->exists() ? 'inventory::settings.locked_method_in_use' : null;
+            }),
 
             new SettingDefinition('stock.currency', 'stock', 'string', ['required', ...Inventory::currencyRules()], lockedWhen: fn () => StockMovement::query()->exists() ? 'inventory::settings.locked_stock_moved' : null),
         ];

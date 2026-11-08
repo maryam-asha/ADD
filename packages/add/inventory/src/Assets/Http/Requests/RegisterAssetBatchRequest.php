@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Assets\Http\Requests;
 
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\Decimal;
@@ -46,6 +47,7 @@ class RegisterAssetBatchRequest extends FormRequest
             'lines.*.count' => ['sometimes', 'integer', 'min:1', 'max:'.config('inventory.assets.max_batch')],
             'lines.*.serial_number' => ['nullable', 'string', 'max:100'],
             'lines.*.purchase_cost' => ['nullable', 'numeric', 'min:0', 'max:999999999999'],
+            'lines.*.depreciation_method' => ['nullable', Rule::in(DepreciationMethod::enabledValues())],
             'lines.*.useful_life_months' => ['nullable', 'integer', 'min:1', 'max:1200'],
             'lines.*.salvage_value' => ['nullable', 'numeric', 'min:0'],
             'lines.*.warranty_until' => ['nullable', 'date_format:Y-m-d'],

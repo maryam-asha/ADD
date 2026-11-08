@@ -31,6 +31,11 @@ return [
         // it is handed out (moved to where it is used).
         'store_in_warehouses' => false,
 
+        // How assets may be depreciated: 'straight_line' (evenly each month)
+        // and 'declining_balance' (twice that rate on what is left). An asset
+        // takes one of these; the first is the default.
+        'depreciation_methods' => ['straight_line'],
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 
