@@ -34,7 +34,7 @@ class SettingsStore
     /**
      * Every setting as the page shows it.
      *
-     * @return list<array{key: string, group: string, type: string, options: list<string>, value: mixed, default: mixed, locked: bool, locked_reason: ?string}>
+     * @return list<array{key: string, group: string, type: string, options: list<string>, value: mixed, default: mixed, locked: bool, locked_reason: ?string, locked_options: list<string>}>
      */
     public function describe(): array
     {
@@ -42,7 +42,17 @@ class SettingsStore
 
         return array_values(array_map(function (SettingDefinition $setting) {
             $value = config('inventory.'.$setting->key);
-            $reason = $setting->lockReason($value, null);
+            // A switch that is on is locked when it cannot be turned off; a
+            // list keeps the options in use (the rest may still change).
+            $reason = match ($setting->type) {
+                'boolean' => $value === true ? $setting->lockReason(true, false) : null,
+                'list' => null,
+                default => $setting->lockReason($value, null),
+            };
+            $lockedOptions = $setting->type !== 'list' ? [] : array_values(array_filter(
+                (array) $value,
+                fn ($option) => $setting->lockReason($value, array_values(array_diff((array) $value, [$option]))) !== null,
+            ));
 
             return [
                 'key' => $setting->key,
@@ -53,6 +63,7 @@ class SettingsStore
                 'default' => $this->defaults[$setting->key] ?? null,
                 'locked' => $reason !== null,
                 'locked_reason' => $reason === null ? null : __($reason),
+                'locked_options' => $lockedOptions,
             ];
         }, SettingsRegistry::definitions()));
     }

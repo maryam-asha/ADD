@@ -156,6 +156,11 @@ class CatalogService
             if ($target->kind !== $item->kind() && $item->hasHistory()) {
                 InventoryException::fail('inventory::catalog.item_kind_locked');
             }
+
+            // Its assets would gain or lose a place they do (not) have.
+            if ($target->intangible !== $item->category->intangible && Asset::query()->where('item_id', $item->id)->exists()) {
+                InventoryException::fail('inventory::catalog.intangible_has_assets');
+            }
         }
 
         $category = isset($data['category_id']) ? Category::query()->findOrFail($data['category_id']) : $item->category;

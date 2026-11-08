@@ -115,7 +115,9 @@ class MaintenanceService
         return MaintenanceSchedule::query()
             ->where('is_active', true)
             ->where('next_due_on', '<=', now()->addDays($days)->toDateString())
-            ->whereHas('asset', fn (Builder $asset) => $asset->where('status', '!=', AssetStatus::Disposed))
+            ->whereHas('asset', fn (Builder $asset) => $asset
+                ->whereNotIn('status', [AssetStatus::Disposed, AssetStatus::Draft])
+                ->whereHas('item.category', fn (Builder $category) => $category->where('intangible', false)))
             ->orderBy('next_due_on');
     }
 }

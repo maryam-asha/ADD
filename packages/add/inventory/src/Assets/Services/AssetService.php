@@ -3,6 +3,7 @@
 namespace Add\Inventory\Assets\Services;
 
 use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Models\AssetAddition;
@@ -12,6 +13,7 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Events\AssetDisposed;
 use Add\Inventory\Events\AssetPlacedInService;
 use Add\Inventory\Events\CapitalAdditionRecorded;
+use Add\Inventory\Events\CapitalAdditionRemoved;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
@@ -55,6 +57,9 @@ class AssetService
         if ($count > 1 && isset($details['code'])) {
             InventoryException::fail('inventory::assets.code_for_one');
         }
+
+        // Not sent, or sent empty: the first method the package offers.
+        $details['depreciation_method'] ??= DepreciationMethod::enabled()[0]->value;
 
         if ($item->isIntangible() && $location !== null) {
             InventoryException::fail('inventory::assets.intangible_not_in_place');
@@ -197,6 +202,7 @@ class AssetService
         DB::transaction(function () use ($addition) {
             $this->lock($addition->asset);
             $addition->delete();
+            CapitalAdditionRemoved::dispatch($addition->id, $addition->asset_id, $addition->amount, $addition->added_on->toDateString());
         });
     }
 

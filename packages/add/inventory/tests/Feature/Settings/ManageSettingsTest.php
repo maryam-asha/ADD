@@ -18,7 +18,7 @@ class ManageSettingsTest extends TestCase
 
         $row = fn () => collect($this->getJson('/api/inventory/settings/manage')->assertOk()->json('data'))->firstWhere('key', 'assets.code_prefix');
 
-        $this->assertSame(['key' => 'assets.code_prefix', 'group' => 'assets', 'type' => 'string', 'options' => [], 'value' => 'AST-', 'default' => 'AST-', 'locked' => false, 'locked_reason' => null], $row());
+        $this->assertSame(['key' => 'assets.code_prefix', 'group' => 'assets', 'type' => 'string', 'options' => [], 'value' => 'AST-', 'default' => 'AST-', 'locked' => false, 'locked_reason' => null, 'locked_options' => []], $row());
 
         Asset::factory()->create();
         $this->assertTrue($row()['locked']);

@@ -7,6 +7,7 @@ use Add\Inventory\Inventory;
 use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Support\Facades\DB;
 
 /**
  * A capital addition on an asset: dated within the asset's life so far
@@ -44,6 +45,13 @@ class AssetAdditionRequest extends FormRequest
 
             if ($start !== null && is_string($addedOn) && $addedOn < $start && ! $validator->errors()->has('added_on')) {
                 $validator->errors()->add('added_on', __('inventory::assets.addition_before_start'));
+            }
+
+            // A month whose depreciation is closed is booked: nothing joins it.
+            $closed = DB::table('inv_sequences')->where('name', 'depreciation.closed')->value('value');
+
+            if ($closed !== null && is_string($addedOn) && (int) str_replace('-', '', substr($addedOn, 0, 7)) <= (int) $closed && ! $validator->errors()->has('added_on')) {
+                $validator->errors()->add('added_on', __('inventory::assets.addition_in_closed_month'));
             }
         });
     }

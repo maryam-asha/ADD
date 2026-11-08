@@ -10,6 +10,7 @@ use Add\Inventory\Authorization\Abilities;
 use Add\Inventory\Contracts\InventoryNotifier;
 use Add\Inventory\Events\DepreciationMonthClosed;
 use Add\Inventory\Inventory;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -59,7 +60,7 @@ class RunDaily extends Command
                 $ending++;
             });
 
-        $this->closeLastMonth();
+        $this->closeMonths();
 
         $this->info("Maintenance due: {$due}. Warranties ending: {$ending}.");
 
@@ -67,27 +68,32 @@ class RunDaily extends Command
     }
 
     /**
-     * Last month's depreciation is final: announced once, on the first run
-     * of a new month (the month closed is remembered in inv_sequences).
+     * Every month up to last month is final: each announced once, in order
+     * — a month the scheduler missed is closed on its next run (the last
+     * month closed is remembered in inv_sequences; the first run closes
+     * only last month).
      */
-    private function closeLastMonth(): void
+    private function closeMonths(): void
     {
-        $month = Inventory::today()->startOfMonth()->subMonth();
-        $key = (int) $month->format('Ym');
+        $last = Inventory::today()->startOfMonth()->subMonth();
 
-        $first = DB::transaction(function () use ($key) {
+        $months = DB::transaction(function () use ($last) {
             $closed = DB::table('inv_sequences')->where('name', 'depreciation.closed')->lockForUpdate()->value('value');
+            $month = $closed === null ? $last : CarbonImmutable::createFromFormat('!Ym', (string) $closed)->addMonth();
+            $months = [];
 
-            if ($closed !== null && (int) $closed >= $key) {
-                return false;
+            for (; $month->lte($last); $month = $month->addMonth()) {
+                $months[] = $month;
             }
 
-            DB::table('inv_sequences')->upsert(['name' => 'depreciation.closed', 'value' => $key], ['name'], ['value']);
+            if ($months !== []) {
+                DB::table('inv_sequences')->upsert(['name' => 'depreciation.closed', 'value' => (int) $last->format('Ym')], ['name'], ['value']);
+            }
 
-            return true;
+            return $months;
         });
 
-        if ($first) {
+        foreach ($months as $month) {
             DepreciationMonthClosed::dispatch($month->year, $month->month);
         }
     }

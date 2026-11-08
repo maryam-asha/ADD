@@ -42,4 +42,5 @@ return [
     'approved' => 'Asset approved.',
     'only_drafts_deleted' => 'Only drafts are deleted; an approved asset is disposed of.',
     'draft_deleted' => 'Draft deleted.',
+    'addition_in_closed_month' => "This month's depreciation is closed; date the addition after it.",
 ];
