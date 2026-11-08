@@ -155,6 +155,7 @@ return [
         'device_updated' => 'تم تحديث الجهاز.',
         'device_qr_value_regenerated' => 'تم إعادة توليد رمز QR الخاص بالجهاز.',
         'device_not_a_lock' => 'يوجد رمز QR للأقفال فقط.',
+        'lock_not_on_coworking' => 'يُركّب القفل على غرفة أو مكتب فقط؛ مساحة العمل المشتركة لا قفل لها.',
         'device_capability_updated' => 'تم تحديث خاصية الجهاز.',
         'founder_updated' => 'تم تحديث المؤسس.',
         'partner_updated' => 'تم تحديث الشريك.',

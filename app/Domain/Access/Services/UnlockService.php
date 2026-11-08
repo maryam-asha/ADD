@@ -25,16 +25,23 @@ use App\Domain\Membership\Enums\OwnerType;
  * row either way. docs/decisions/qr-lock-unlock.md §4.
  *
  * A member need not pass the desk first (2026-10-28): their own booking's
- * code still waiting on reception (`issued`) opens the door from the app
- * while the booking runs — from its start, as on the keypad, since before
- * it the room may still be someone else's — and that first open activates
- * the code. Reception activating it stays the other way in.
+ * code still waiting on reception (`issued`) opens the door from the app,
+ * and that first open activates the code and checks the booking in.
+ * Reception activating it stays the other way in.
+ *
+ * A booking's door opens to the scan only within BookingDoorWindow (product
+ * owner, 2026-11-08): from the early check-in allowance before it starts —
+ * activated or not, so a code the desk activated early opens nothing sooner —
+ * until the overrun grace after it ends, for a member who came; one who never
+ * did is not let in once it has ended. The app's lock/unlock buttons are not
+ * this: they need the booking checked in (BookingDoorService).
  */
 class UnlockService
 {
     public function __construct(
         private readonly TTLockClient $ttlock,
         private readonly AccessArrivalCheckIn $arrivals,
+        private readonly BookingDoorWindow $window,
     ) {}
 
     public function unlock(User $user, string $qrValue): void
@@ -79,10 +86,11 @@ class UnlockService
     }
 
     /**
-     * The member's own booking code the desk has not activated yet, while the
-     * booking runs: confirmed, started, not ended, and not past the time the
-     * code had to be activated by (access:expire-unactivated-grants is about
-     * to end it).
+     * The member's own booking code the desk has not activated yet: the scan
+     * is their arrival, so the booking is confirmed, within its door window
+     * and not ended yet (a member who never came is not let in afterwards),
+     * and the code is not past the time it had to be activated by
+     * (access:expire-unactivated-grants is about to end it).
      */
     private function runningBookingGrantFor(User $user, Device $lock): ?AccessGrant
     {
@@ -98,22 +106,24 @@ class UnlockService
             ->where('must_activate_by', '>=', $now)
             ->whereHas('booking', fn ($booking) => $booking
                 ->where('status', BookingStatus::Confirmed)
-                ->where('start_at', '<=', $now)
                 ->where('end_at', '>', $now))
-            ->first();
+            ->with('booking.space')
+            ->get()
+            ->first(fn (AccessGrant $grant) => $this->window->contains($grant->booking, $now));
     }
 
     private function activeGrantFor(User $user, Device $lock): ?AccessGrant
     {
-        $now = now();
         $base = fn () => AccessGrant::query()
             ->where('lock_id', $lock->id)
-            ->where('status', AccessGrantStatus::Activated)
-            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '>=', $now));
+            ->where('status', AccessGrantStatus::Activated);
 
-        $userGrant = $base()->where('grantee_type', OwnerType::User)->where('grantee_id', $user->id)->first();
+        $userGrant = $base()->where('grantee_type', OwnerType::User)->where('grantee_id', $user->id)
+            ->with('booking.space')
+            ->get()
+            ->first(fn (AccessGrant $grant) => $this->isUsable($grant));
 
-        if ($userGrant && $this->isUsable($userGrant)) {
+        if ($userGrant !== null) {
             return $userGrant;
         }
 
@@ -123,35 +133,40 @@ class UnlockService
             return null;
         }
 
-        $companyGrant = $base()->where('grantee_type', OwnerType::Company)->whereIn('grantee_id', $companyIds)->first();
-
-        return $companyGrant && $this->isUsable($companyGrant) ? $companyGrant : null;
+        return $base()->where('grantee_type', OwnerType::Company)->whereIn('grantee_id', $companyIds)
+            ->get()
+            ->first(fn (AccessGrant $grant) => $this->isUsable($grant));
     }
 
     /**
-     * Defense-in-depth for a cancelled booking's grant (final-review C1) —
-     * the primary fix is the scheduled RevokeAccessGrantsOnBookingCancellation
-     * command, but a grant can still be `Activated` for a few minutes
-     * between cancellation and the next run. `loadMissing` is a single
-     * additional query per candidate grant (a no-op once already loaded),
-     * never N+1 across candidates — this method runs at most twice per
-     * unlock attempt (once for the user grant, once for a company grant).
+     * A booking's code opens its door only within BookingDoorWindow, and only
+     * while the booking stands — confirmed, or completed by a checkout, the
+     * room still the member's through the grace (a cancelled booking's code
+     * may still be `activated` for a few minutes before
+     * RevokeAccessGrantsOnBookingCancellation reaches it). Past the end it
+     * opens only for a member who came: the grace is for leaving, not
+     * arriving. Any other code (an office's, or one tied to no booking) runs
+     * to its own expires_at.
      */
     private function isUsable(AccessGrant $grant): bool
     {
-        // source_id is always set for a real booking-sourced grant
-        // (PasscodeIssuanceService::issueForBooking() always passes
-        // $booking->id) — null here means this grant isn't actually tied
-        // to a real booking row, so there's nothing to check.
+        $now = now();
+
         if ($grant->source_type !== AccessSourceType::Booking || $grant->source_id === null) {
-            return true;
+            return $grant->expires_at === null || $grant->expires_at->greaterThanOrEqualTo($now);
         }
 
-        $grant->loadMissing('booking');
+        $booking = $grant->booking;
 
-        // A checkout completes the booking, but the room stays the member's
-        // until end_at — the grant's own period still bounds it.
-        return in_array($grant->booking?->status, [BookingStatus::Confirmed, BookingStatus::Completed], true);
+        if ($booking === null || ! in_array($booking->status, [BookingStatus::Confirmed, BookingStatus::Completed], true)) {
+            return false;
+        }
+
+        if ($now->greaterThanOrEqualTo($booking->end_at) && $booking->checked_in_at === null) {
+            return false;
+        }
+
+        return $this->window->contains($booking, $now);
     }
 
     private function logEvent(Device $lock, ?AccessGrant $grant, AccessEventType $type, User $actor): void

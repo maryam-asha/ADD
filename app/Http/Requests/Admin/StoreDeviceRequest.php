@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Admin;
 
+use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Foundation\Models\Space;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -19,7 +21,18 @@ class StoreDeviceRequest extends FormRequest
     {
         return [
             'branch_id' => ['required', 'integer', 'exists:branches,id'],
-            'space_id' => ['nullable', 'integer', 'exists:spaces,id'],
+            // A lock closes a room or an office, never the shared coworking
+            // space (product owner, 2026-11-08 — a standing rule).
+            'space_id' => array_filter([
+                'nullable', 'integer', 'exists:spaces,id',
+                $this->input('type') === 'lock'
+                    ? function (string $attribute, mixed $value, \Closure $fail): void {
+                        if (Space::query()->whereKey($value)->where('space_type', SpaceType::CoSpace)->exists()) {
+                            $fail(__('api.admin.lock_not_on_coworking'));
+                        }
+                    }
+                    : null,
+            ]),
             'type' => ['required', Rule::in([
                 'lock', 'gateway', 'camera', 'gate', 'printer', 'display', 'occupancy_sensor', 'attendance_terminal',
             ])],

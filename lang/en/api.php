@@ -155,6 +155,7 @@ return [
         'device_updated' => 'Device updated.',
         'device_qr_value_regenerated' => 'The device QR value has been regenerated.',
         'device_not_a_lock' => 'Only lock devices have a QR value.',
+        'lock_not_on_coworking' => 'A lock goes on a room or an office; the shared coworking space has no lock.',
         'device_capability_updated' => 'Device capability updated.',
         'founder_updated' => 'Founder updated.',
         'partner_updated' => 'Partner updated.',

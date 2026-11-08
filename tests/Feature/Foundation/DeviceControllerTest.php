@@ -210,6 +210,21 @@ class DeviceControllerTest extends TestCase
             ->assertCreated();
     }
 
+    /** A standing rule (2026-11-08): the shared coworking space never has a lock. */
+    public function test_a_lock_is_refused_on_the_coworking_space_and_taken_on_a_room(): void
+    {
+        $this->actingAsAdmin();
+        $coworking = Space::factory()->create();
+        $room = Space::factory()->room()->create();
+        $lock = fn (Space $space, string $ref) => [
+            'branch_id' => $space->building->branch_id, 'space_id' => $space->id,
+            'type' => 'lock', 'hardware_mac' => "AA:{$ref}", 'external_ref' => $ref,
+        ];
+
+        $this->postJson('/api/v1/admin/devices', $lock($coworking, '1'))->assertStatus(422)->assertJsonValidationErrors('space_id');
+        $this->postJson('/api/v1/admin/devices', $lock($room, '2'))->assertCreated();
+    }
+
     public function test_updating_a_lock_keeps_its_own_ttlock_id(): void
     {
         $this->actingAsAdmin();
