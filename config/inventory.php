@@ -18,6 +18,12 @@ return [
         'column' => 'code',
     ],
 
+    // ADD has no coding scheme of its own: every item code is numbered
+    // (ITM-00001) and none is typed.
+    'items' => [
+        'sku_mode' => 'auto',
+    ],
+
     // Assets go straight to the place they are used; turn this on when ADD
     // starts storing them in a warehouse before handing them out.
     'assets' => [

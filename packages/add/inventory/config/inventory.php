@@ -9,6 +9,11 @@ return [
     'user_name_attribute' => 'name',
 
     'items' => [
+        // Who sets an item's code: 'auto' (always numbered here, never typed),
+        // 'on_create' (typed when the item is made, numbered when left out,
+        // fixed after) or 'editable' (typed and changed at any time).
+        'sku_mode' => 'on_create',
+
         // An item saved without a SKU gets prefix + its id, zero-padded.
         'sku_prefix' => 'ITM-',
         'sku_pad' => 5,

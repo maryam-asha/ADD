@@ -65,6 +65,12 @@ class WarehouseHostTest extends TestCase
         $this->getJson('/api/v1/inventory/settings')->assertOk()->assertJsonPath('data.assets_in_warehouses', false);
     }
 
+    public function test_add_numbers_item_codes_itself(): void
+    {
+        // ADD has no coding scheme of its own: every item is numbered (ITM-00001).
+        $this->getJson('/api/v1/inventory/settings')->assertOk()->assertJsonPath('data.item_code_mode', 'auto');
+    }
+
     public function test_a_warehouse_sits_in_a_branch_or_in_nothing(): void
     {
         $branch = Branch::factory()->create();
