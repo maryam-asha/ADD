@@ -40,9 +40,11 @@ class DepreciationCalculator
         $months = $asOf->lt($start) ? 0 : (int) $start->diffInMonths($asOf);
         $months = min($months, $asset->useful_life_months);
 
-        $salvage = $asset->salvage_value ?? '0';
+        // An intangible asset is amortized: straight line, nothing left.
+        $intangible = (bool) $asset->item?->isIntangible();
+        $salvage = $intangible ? '0' : ($asset->salvage_value ?? '0');
 
-        [$accumulated, $monthly] = $asset->depreciation_method === DepreciationMethod::DecliningBalance
+        [$accumulated, $monthly] = ! $intangible && $asset->depreciation_method === DepreciationMethod::DecliningBalance
             ? $this->decliningBalance($asset->purchase_cost, $salvage, $asset->useful_life_months, $months)
             : $this->straightLine($asset->purchase_cost, $salvage, $asset->useful_life_months, $months);
 
@@ -58,7 +60,7 @@ class DepreciationCalculator
     /**
      * Cost less salvage spread evenly over the life.
      *
-     * \return array{0: string, 1: string} accumulated after `$months`, and a month's charge
+     * @return array{0: string, 1: string} accumulated after `$months`, and a month's charge
      */
     private function straightLine(string $cost, string $salvage, int $life, int $months): array
     {
@@ -78,7 +80,7 @@ class DepreciationCalculator
      * Twice the straight-line rate (2 / life) on the book value left each
      * month, never below salvage, and at salvage once the life is over.
      *
-     * \return array{0: string, 1: string} accumulated after `$months`, and the latest month's charge
+     * @return array{0: string, 1: string} accumulated after `$months`, and the latest month's charge
      */
     private function decliningBalance(string $cost, string $salvage, int $life, int $months): array
     {

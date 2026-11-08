@@ -31,4 +31,6 @@ return [
     'disposed_done' => 'تم التخلص من الأصل.',
     'maintenance_closed_done' => 'تم إغلاق الصيانة.',
     'schedule_updated' => 'تم تحديث جدول الصيانة.',
+    'intangible_has_no_place' => 'الأصل غير الملموس ليس له مكان، فلا يُنقل ولا يُصان.',
+    'intangible_not_in_place' => 'الأصل غير الملموس لا يُسجَّل في مكان؛ سجّله وحده.',
 ];

@@ -27,6 +27,7 @@ class Category extends Model
     protected $fillable = [
         'parent_id',
         'kind',
+        'intangible',
         'name',
         'icon',
         'show_to_members',
@@ -38,12 +39,14 @@ class Category extends Model
      */
     protected $attributes = [
         'show_to_members' => false,
+        'intangible' => false,
         'order' => 0,
     ];
 
     protected $casts = [
         'parent_id' => 'integer',
         'kind' => ItemKind::class,
+        'intangible' => 'boolean',
         'name' => 'array',
         'show_to_members' => 'boolean',
         'order' => 'integer',

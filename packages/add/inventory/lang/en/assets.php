@@ -31,4 +31,6 @@ return [
     'disposed_done' => 'Asset disposed of.',
     'maintenance_closed_done' => 'Maintenance closed.',
     'schedule_updated' => 'Maintenance schedule updated.',
+    'intangible_has_no_place' => 'An intangible asset has no place: it is not moved or maintained.',
+    'intangible_not_in_place' => 'An intangible asset is not registered in a place; register it on its own.',
 ];

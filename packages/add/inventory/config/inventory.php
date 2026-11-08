@@ -36,6 +36,11 @@ return [
         // takes one of these; the first is the default.
         'depreciation_methods' => ['straight_line'],
 
+        // Whether an asset category may be marked intangible (a software
+        // licence): its assets sit nowhere, take no maintenance, and are
+        // amortized on a straight line with no salvage.
+        'intangible' => false,
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 

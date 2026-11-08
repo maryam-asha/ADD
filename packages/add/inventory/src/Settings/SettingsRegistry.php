@@ -5,6 +5,7 @@ namespace Add\Inventory\Settings;
 use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Catalog\Enums\SkuMode;
+use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Services\ItemCodeSequence;
 use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Models\StockMovement;
@@ -40,6 +41,8 @@ final class SettingsRegistry
             new SettingDefinition('assets.maintenance_lead_days', 'assets', 'integer', ['required', 'integer', 'min:0', 'max:365']),
             new SettingDefinition('assets.warranty_lead_days', 'assets', 'integer', ['required', 'integer', 'min:0', 'max:365']),
 
+            new SettingDefinition('assets.intangible', 'depreciation', 'boolean', ['required', 'boolean'], lockedWhen: fn ($current, $next) => $next === false
+                && Category::query()->where('intangible', true)->exists() ? 'inventory::settings.locked_intangible_exists' : null),
             new SettingDefinition('assets.depreciation_methods', 'depreciation', 'list', ['required', 'array', 'min:1'], array_column(DepreciationMethod::cases(), 'value'), lockedWhen: function ($current, $next) {
                 $removed = is_array($next) ? array_diff((array) $current, $next) : [];
 

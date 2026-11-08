@@ -67,7 +67,7 @@ class AssetController extends Controller
         $data = $request->validated();
         $assets = $service->register(
             Item::query()->findOrFail($data['item_id']),
-            Place::from($data['location']),
+            isset($data['location']) ? Place::from($data['location']) : null,
             Arr::except($data, ['item_id', 'location', 'count']),
             $data['count'] ?? 1,
         );

@@ -46,6 +46,11 @@ class CatalogService
     public function updateCategory(Category $category, array $data): Category
     {
         return DB::transaction(function () use ($category, $data) {
+            if (array_key_exists('intangible', $data) && (bool) $data['intangible'] !== $category->intangible
+                && Asset::query()->whereHas('item', fn ($item) => $item->where('category_id', $category->id))->exists()) {
+                InventoryException::fail('inventory::catalog.intangible_has_assets');
+            }
+
             $parentId = array_key_exists('parent_id', $data) && $data['parent_id'] !== null ? (int) $data['parent_id'] : null;
 
             if (array_key_exists('parent_id', $data) && $parentId !== $category->parent_id) {

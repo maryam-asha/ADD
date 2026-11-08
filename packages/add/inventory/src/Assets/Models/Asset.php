@@ -112,9 +112,12 @@ class Asset extends Model
         return $this->hasMany(MaintenanceSchedule::class);
     }
 
-    public function location(): Place
+    /**
+     * Where it is; null for an intangible asset, which sits nowhere.
+     */
+    public function location(): ?Place
     {
-        return new Place($this->location_type, $this->location_id);
+        return $this->location_type === null ? null : new Place($this->location_type, $this->location_id);
     }
 
     public function isDisposed(): bool

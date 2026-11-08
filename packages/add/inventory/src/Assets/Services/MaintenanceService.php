@@ -34,6 +34,10 @@ class MaintenanceService
             InventoryException::fail('inventory::assets.schedule_of_another_asset');
         }
 
+        if ($asset->item->isIntangible()) {
+            InventoryException::fail('inventory::assets.intangible_has_no_place');
+        }
+
         return DB::transaction(function () use ($asset, $type, $description, $vendor, $schedule, $openedAt) {
             $asset = Asset::query()->lockForUpdate()->findOrFail($asset->id);
 

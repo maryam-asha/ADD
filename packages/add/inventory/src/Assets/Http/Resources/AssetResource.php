@@ -37,6 +37,8 @@ class AssetResource extends JsonResource
                 ],
             ],
             'location' => $presenter->location($this->location()),
+            // No body: no place, no QR to scan, no maintenance; amortized.
+            'intangible' => $this->item->isIntangible(),
             'custodian' => $this->whenLoaded('currentAssignment', fn () => $this->currentAssignment === null ? null : [
                 ...$presenter->custodian($this->currentAssignment->custodian()),
                 'since' => $this->currentAssignment->assigned_at->toIso8601String(),

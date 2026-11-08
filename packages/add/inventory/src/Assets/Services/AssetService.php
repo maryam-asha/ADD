@@ -34,7 +34,7 @@ class AssetService
      * @param  array<string, mixed>  $details
      * @return Collection<int, Asset>
      */
-    public function register(Item $item, Place $location, array $details = [], int $count = 1): Collection
+    public function register(Item $item, ?Place $location, array $details = [], int $count = 1): Collection
     {
         if (! $item->isAsset()) {
             InventoryException::fail('inventory::assets.not_asset');
@@ -52,7 +52,13 @@ class AssetService
             InventoryException::fail('inventory::assets.code_for_one');
         }
 
-        $this->ensureLocation($location, $item);
+        if ($item->isIntangible() && $location !== null) {
+            InventoryException::fail('inventory::assets.intangible_not_in_place');
+        }
+
+        if (! $item->isIntangible()) {
+            $this->ensureLocation($location ?? InventoryException::fail('inventory::assets.unknown_location'), $item);
+        }
 
         return DB::transaction(function () use ($item, $location, $details, $count) {
             $assets = collect();
@@ -63,21 +69,23 @@ class AssetService
                     'item_id' => $item->id,
                     'qr_token' => Str::random(40),
                     'status' => AssetStatus::InService,
-                    'location_type' => $location->type,
-                    'location_id' => $location->id,
+                    'location_type' => $location?->type,
+                    'location_id' => $location?->id,
                 ]);
 
                 if ($asset->code === null) {
                     $asset->update(['code' => config('inventory.assets.code_prefix').str_pad((string) $asset->id, (int) config('inventory.assets.code_pad'), '0', STR_PAD_LEFT)]);
                 }
 
-                AssetMovement::query()->create([
-                    'asset_id' => $asset->id,
-                    'to_type' => $location->type,
-                    'to_id' => $location->id,
-                    'actor_id' => Inventory::actorId(),
-                    'moved_at' => now(),
-                ]);
+                if ($location !== null) {
+                    AssetMovement::query()->create([
+                        'asset_id' => $asset->id,
+                        'to_type' => $location->type,
+                        'to_id' => $location->id,
+                        'actor_id' => Inventory::actorId(),
+                        'moved_at' => now(),
+                    ]);
+                }
 
                 $assets->push($asset);
             }
@@ -104,6 +112,10 @@ class AssetService
 
     public function move(Asset $asset, Place $to, ?string $note = null, ?CarbonInterface $movedAt = null): AssetMovement
     {
+        if ($asset->item->isIntangible()) {
+            InventoryException::fail('inventory::assets.intangible_has_no_place');
+        }
+
         $this->ensureLocation($to, $asset->item);
 
         return DB::transaction(function () use ($asset, $to, $note, $movedAt) {

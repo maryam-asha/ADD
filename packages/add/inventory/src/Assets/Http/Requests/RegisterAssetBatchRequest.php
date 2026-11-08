@@ -87,6 +87,8 @@ class RegisterAssetBatchRequest extends FormRequest
 
                 if ($item !== null && ! $item->isAsset()) {
                     $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.not_asset'));
+                } elseif ($item !== null && $item->isIntangible()) {
+                    $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.intangible_not_in_place'));
                 } elseif ($item !== null && ! $item->is_active) {
                     $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.item_inactive'));
                 }

@@ -22,6 +22,8 @@ class SettingsController extends Controller
             'item_code_mode' => SkuMode::current()->value,
             // The methods an asset may be depreciated by; the first is the default.
             'depreciation_methods' => DepreciationMethod::enabledValues(),
+            // Whether an asset category may be marked intangible.
+            'intangible_assets' => (bool) config('inventory.assets.intangible'),
         ]]);
     }
 }

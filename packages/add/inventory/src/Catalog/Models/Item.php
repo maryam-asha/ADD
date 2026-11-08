@@ -112,6 +112,14 @@ class Item extends Model
         return $this->category->kind;
     }
 
+    /**
+     * An asset with no body (a licence): it sits nowhere.
+     */
+    public function isIntangible(): bool
+    {
+        return $this->isAsset() && $this->category->intangible;
+    }
+
     public function isStock(): bool
     {
         return $this->kind() === ItemKind::Stock;
