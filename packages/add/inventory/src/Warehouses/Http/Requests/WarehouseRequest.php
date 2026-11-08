@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Warehouses\Http\Requests;
 
+use Add\Inventory\Assets\AssetPlaces;
 use Add\Inventory\Catalog\Enums\ItemKind;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Inventory;
@@ -49,7 +50,8 @@ class WarehouseRequest extends FormRequest
         $stockItem = function (string $attribute, mixed $value, Closure $fail) {
             $item = is_numeric($value) ? Item::query()->with('category')->find($value) : null;
 
-            if ($item !== null && $item->kind() !== ItemKind::Stock) {
+            // Asset items too, when assets may be stored in warehouses.
+            if ($item !== null && $item->kind() !== ItemKind::Stock && ! AssetPlaces::warehousesAllowed()) {
                 $fail(__('inventory::warehouses.not_stock_item'));
             }
         };

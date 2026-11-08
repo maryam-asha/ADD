@@ -3,6 +3,7 @@
 namespace Add\Inventory\Catalog\Http\Requests;
 
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Validation\Rule;
 
 /**
@@ -21,7 +22,7 @@ trait ValidatesBarcodeAndUnits
 
         return [
             'barcode' => [...$sometimes, 'nullable', 'string', 'max:32', 'regex:/^[0-9A-Za-z\-]+$/', Rule::unique('inv_items', 'barcode')->ignore($item)],
-            'image_url' => [...$sometimes, 'nullable', 'string', 'url', 'max:2048'],
+            'image_url' => [...$sometimes, 'nullable', ...FileUrl::rules()],
             'units' => ['sometimes', 'array', 'max:20'],
             'units.*.unit_id' => [
                 'required',

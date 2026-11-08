@@ -11,6 +11,7 @@ use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +52,7 @@ class AssetService
             InventoryException::fail('inventory::assets.code_for_one');
         }
 
-        $this->ensureLocation($location);
+        $this->ensureLocation($location, $item);
 
         return DB::transaction(function () use ($item, $location, $details, $count) {
             $assets = collect();
@@ -87,7 +88,7 @@ class AssetService
 
     public function move(Asset $asset, Place $to, ?string $note = null, ?CarbonInterface $movedAt = null): AssetMovement
     {
-        $this->ensureLocation($to);
+        $this->ensureLocation($to, $asset->item);
 
         return DB::transaction(function () use ($asset, $to, $note, $movedAt) {
             $asset = $this->lock($asset);
@@ -244,10 +245,22 @@ class AssetService
         }
     }
 
-    private function ensureLocation(Place $location): void
+    /**
+     * A host place, or an active warehouse whose scope lets it hold the item
+     * (when assets may be stored in warehouses).
+     */
+    private function ensureLocation(Place $location, Item $item): void
     {
-        if (! Inventory::locations()->exists($location)) {
+        if (! Inventory::assetPlaces()->exists($location)) {
             InventoryException::fail('inventory::assets.unknown_location');
+        }
+
+        if ($location->type === Warehouse::TYPE) {
+            $warehouse = Warehouse::query()->findOrFail($location->id);
+
+            if (! $warehouse->allows($item)) {
+                InventoryException::fail('inventory::stock.outside_scope', ['warehouse' => (string) $warehouse->translate('name')]);
+            }
         }
     }
 }

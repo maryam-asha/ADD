@@ -45,7 +45,7 @@ class AssetController extends Controller
             })
             ->when(AssetStatus::tryFrom((string) $request->input('status')), fn (Builder $query, AssetStatus $status) => $query->where('status', $status))
             ->when($this->place($request, 'location'), fn (Builder $query, Place $place) => $query->at(
-                $request->boolean('within', true) ? Inventory::locations()->within($place) : [$place],
+                $request->boolean('within', true) ? Inventory::assetPlaces()->within($place) : [$place],
             ))
             ->when($this->place($request, 'custodian'), fn (Builder $query, Place $custodian) => $query->whereHas(
                 'currentAssignment',

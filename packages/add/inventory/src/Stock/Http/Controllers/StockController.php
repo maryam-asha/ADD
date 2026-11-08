@@ -5,12 +5,15 @@ namespace Add\Inventory\Stock\Http\Controllers;
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Stock\Enums\OperationKind;
 use Add\Inventory\Stock\Enums\StockMovementType;
 use Add\Inventory\Stock\Http\Requests\StockOperationRequest;
 use Add\Inventory\Stock\Http\Resources\StockBalanceResource;
 use Add\Inventory\Stock\Http\Resources\StockMovementResource;
+use Add\Inventory\Stock\Http\Resources\StockOperationResource;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
+use Add\Inventory\Stock\Models\StockOperation;
 use Add\Inventory\Stock\Services\StockOperations;
 use Add\Inventory\Warehouses\Models\Warehouse;
 use Illuminate\Database\Eloquent\Builder;
@@ -18,12 +21,12 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Collection;
 
 class StockController extends Controller
 {
     /**
-     * What is on hand. Filters: `item_id`, `category_id` (with every
+     * What is on hand. Filters: `item_id`, `search` (item name, code or
+     * barcode), `category_id` (with every
      * category below it), `warehouse_id`, or `place[type]` + `place[id]`
      * (the warehouses sitting anywhere inside it); empty balances are left
      * out unless `include_empty=1`.
@@ -34,6 +37,12 @@ class StockController extends Controller
             ->with('item.unit')
             ->where('location_type', Warehouse::TYPE)
             ->when($request->filled('item_id'), fn (Builder $query) => $query->where('item_id', $request->integer('item_id')))
+            ->when($request->filled('search'), function (Builder $query) use ($request) {
+                $needle = '%'.$request->string('search').'%';
+                $query->whereIn('item_id', Item::query()->select('id')->where(
+                    fn (Builder $q) => $q->where('sku', 'like', $needle)->orWhere('barcode', 'like', $needle)->orWhere('name', 'like', $needle),
+                ));
+            })
             ->when($request->filled('category_id'), function (Builder $query) use ($request) {
                 $category = Category::query()->find($request->integer('category_id'));
                 $query->whereIn('item_id', Item::query()->select('id')->whereIn('category_id', $category?->subtreeIds() ?? []));
@@ -77,35 +86,50 @@ class StockController extends Controller
         return StockMovementResource::collection($movements);
     }
 
+    /**
+     * Operations as staff recorded them, the latest day first. Filters:
+     * `warehouse_id` (from or to), `kind`, `actor_id`, `from` / `to` (on
+     * the operation's date).
+     */
+    public function operations(Request $request): AnonymousResourceCollection
+    {
+        $operations = StockOperation::query()
+            // A transfer's two halves are one line of the operation.
+            ->withCount(['movements as lines_count' => fn (Builder $query) => $query->where('type', '!=', StockMovementType::TransferIn)])
+            ->when($request->filled('warehouse_id'), fn (Builder $query) => $query->where(
+                fn (Builder $q) => $q->where('warehouse_id', $request->integer('warehouse_id'))->orWhere('to_warehouse_id', $request->integer('warehouse_id')),
+            ))
+            ->when(OperationKind::tryFrom((string) $request->input('kind')), fn (Builder $query, OperationKind $kind) => $query->where('kind', $kind))
+            ->when($request->filled('actor_id'), fn (Builder $query) => $query->where('actor_id', $request->integer('actor_id')))
+            ->when($request->filled('from'), fn (Builder $query) => $query->where('operation_date', '>=', $request->date('from')->toDateString()))
+            ->when($request->filled('to'), fn (Builder $query) => $query->where('operation_date', '<=', $request->date('to')->toDateString()))
+            ->orderByDesc('operation_date')
+            ->orderByDesc('created_at')
+            ->paginate(min(100, max(1, $request->integer('per_page', 25))));
+
+        return StockOperationResource::collection($operations);
+    }
+
+    public function operation(StockOperation $operation): StockOperationResource
+    {
+        return new StockOperationResource($operation->load(['movements.item', 'movements.enteredUnit']));
+    }
+
     public function receive(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
-        $data = $request->validated();
-
-        return $this->created($operations->receive($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null));
+        return $this->recorded($operations->record(OperationKind::Receive, $request->validated()));
     }
 
     public function issue(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
         $data = $request->validated();
 
-        return $this->created($operations->issue(
-            $this->warehouse($data['warehouse_id']),
-            $data['lines'],
-            IssueReason::from($data['reason']),
-            $data['note'] ?? null,
-        ));
+        return $this->recorded($operations->record(OperationKind::forIssue(IssueReason::from($data['reason'])), $data));
     }
 
     public function transfer(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
-        $data = $request->validated();
-
-        return $this->created($operations->transfer(
-            $this->warehouse($data['from_warehouse_id']),
-            $this->warehouse($data['to_warehouse_id']),
-            $data['lines'],
-            $data['note'] ?? null,
-        ));
+        return $this->recorded($operations->record(OperationKind::Transfer, $request->validated()));
     }
 
     /**
@@ -113,25 +137,14 @@ class StockController extends Controller
      */
     public function adjust(StockOperationRequest $request, StockOperations $operations): JsonResponse
     {
-        $data = $request->validated();
-        $movements = $operations->adjust($this->warehouse($data['warehouse_id']), $data['lines'], $data['note'] ?? null);
+        return $this->recorded($operations->record(OperationKind::Adjust, $request->validated()));
+    }
 
-        return $movements->isEmpty()
+    private function recorded(?StockOperation $operation): JsonResponse
+    {
+        return $operation === null
             ? response()->json(['message' => __('inventory::stock.count_matched')])
-            : $this->created($movements);
-    }
-
-    private function warehouse(int|string $id): Warehouse
-    {
-        return Warehouse::query()->findOrFail($id);
-    }
-
-    /**
-     * @param  Collection<int, StockMovement>  $movements
-     */
-    private function created(Collection $movements): JsonResponse
-    {
-        return StockMovementResource::collection($movements->each->load(['item', 'enteredUnit']))->response()->setStatusCode(201);
+            : $this->operation($operation)->response()->setStatusCode(201);
     }
 
     /**

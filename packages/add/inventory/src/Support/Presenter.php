@@ -34,7 +34,7 @@ class Presenter
             return null;
         }
 
-        return $this->locations[$place->key()] ??= Inventory::locations()->describe($place)
+        return $this->locations[$place->key()] ??= Inventory::assetPlaces()->describe($place)
             ?? [...$place->toArray(), 'label' => null, 'path' => []];
     }
 

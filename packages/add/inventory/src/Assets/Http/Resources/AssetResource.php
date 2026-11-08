@@ -45,6 +45,8 @@ class AssetResource extends JsonResource
             'purchase_cost' => $this->purchase_cost,
             'currency' => $this->currency,
             'supplier' => $this->supplier,
+            'reference' => $this->reference,
+            'attachment_url' => $this->attachment_url,
             'useful_life_months' => $this->useful_life_months,
             'salvage_value' => $this->salvage_value,
             'depreciation' => app(DepreciationCalculator::class)->for($this->resource),

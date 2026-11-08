@@ -152,7 +152,15 @@ class CatalogService
             }
         }
 
-        if (isset($data['unit_id']) && (int) $data['unit_id'] !== $item->unit_id && $item->stockMovements()->exists()) {
+        $category = isset($data['category_id']) ? Category::query()->findOrFail($data['category_id']) : $item->category;
+        $unitId = array_key_exists('unit_id', $data) ? $data['unit_id'] : $item->unit_id;
+
+        // Stock is counted in a unit: an item becoming (or staying) stock keeps one.
+        if ($category->kind === ItemKind::Stock && $unitId === null) {
+            InventoryException::fail('inventory::catalog.unit_required');
+        }
+
+        if (array_key_exists('unit_id', $data) && $data['unit_id'] !== null && (int) $data['unit_id'] !== $item->unit_id && $item->stockMovements()->exists()) {
             InventoryException::fail('inventory::catalog.unit_locked');
         }
 

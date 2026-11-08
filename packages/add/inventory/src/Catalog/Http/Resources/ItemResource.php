@@ -30,7 +30,8 @@ class ItemResource extends JsonResource
                 'id' => $this->category->id,
                 'name' => $this->category->name,
             ],
-            'unit' => new UnitResource($this->unit),
+            // None for an asset item that is counted one by one.
+            'unit' => $this->unit === null ? null : new UnitResource($this->unit),
             // Its packs: how many main units one of each holds.
             'units' => $this->whenLoaded('otherUnits', fn () => $this->otherUnits->map(fn (ItemUnit $pack) => [
                 'unit' => new UnitResource($pack->unit),

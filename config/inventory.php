@@ -18,6 +18,12 @@ return [
         'column' => 'code',
     ],
 
+    // Assets go straight to the place they are used; turn this on when ADD
+    // starts storing them in a warehouse before handing them out.
+    'assets' => [
+        'store_in_warehouses' => false,
+    ],
+
     // A warehouse sits in a branch, or in nothing (an external store).
     'warehouses' => [
         'place_types' => [AddLocationResolver::BRANCH],

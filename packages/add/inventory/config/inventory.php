@@ -20,6 +20,10 @@ return [
         'code_prefix' => 'AST-',
         'code_pad' => 6,
 
+        // Whether an asset may sit in a warehouse — bought and stored before
+        // it is handed out (moved to where it is used).
+        'store_in_warehouses' => false,
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 

@@ -13,6 +13,7 @@ use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
+use Add\Inventory\Support\Http\SettingsController;
 use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
 use Illuminate\Support\Facades\Route;
 
@@ -85,6 +86,9 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
 
+// What the package is set to do, for a host's screens to follow.
+Route::get('settings', SettingsController::class)->name('settings');
+
 // Warehouses: where stock is kept
 Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
     Route::apiResource('warehouses', WarehouseController::class)->only(['index', 'show']);
@@ -98,6 +102,8 @@ Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
 Route::middleware('can:'.Abilities::STOCK_VIEW)->group(function () {
     Route::get('stock/balances', [StockController::class, 'balances'])->name('stock.balances');
     Route::get('stock/movements', [StockController::class, 'movements'])->name('stock.movements');
+    Route::get('stock/operations', [StockController::class, 'operations'])->name('stock.operations');
+    Route::get('stock/operations/{operation}', [StockController::class, 'operation'])->name('stock.operation');
 });
 
 Route::post('stock/receive', [StockController::class, 'receive'])

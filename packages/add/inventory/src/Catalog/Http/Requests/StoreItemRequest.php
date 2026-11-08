@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Catalog\Http\Requests;
 
+use Add\Inventory\Catalog\Enums\ItemKind;
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Support\TranslatableField;
 use Illuminate\Foundation\Http\FormRequest;
@@ -27,7 +28,8 @@ class StoreItemRequest extends FormRequest
         return [
             ...TranslatableField::rules('name'),
             'category_id' => ['required', 'integer', Rule::exists('inv_categories', 'id')],
-            'unit_id' => ['required', 'integer', Rule::exists('inv_units', 'id')],
+            // Stock is counted in a unit; an asset item one by one, so it may have none.
+            'unit_id' => [Rule::requiredIf($category?->kind !== ItemKind::Asset), 'nullable', 'integer', Rule::exists('inv_units', 'id')],
             // Generated from the id when left out.
             'sku' => ['nullable', 'string', 'max:40', Rule::unique('inv_items', 'sku')],
             'description' => ['nullable', 'string', 'max:5000'],

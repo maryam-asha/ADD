@@ -2,12 +2,15 @@
 
 namespace Add\Inventory\Warehouses\Services;
 
+use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
 use Add\Inventory\Warehouses\Enums\ItemScope;
 use Add\Inventory\Warehouses\Models\Warehouse;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
@@ -44,8 +47,14 @@ class WarehouseService
             $warehouse = Warehouse::query()->lockForUpdate()->findOrFail($warehouse->id);
             $this->fill($warehouse, $data);
 
-            if ($warehouse->isDirty('is_active') && ! $warehouse->is_active && $this->holdsStock($warehouse)) {
-                InventoryException::fail('inventory::warehouses.holds_stock');
+            if ($warehouse->isDirty('is_active') && ! $warehouse->is_active) {
+                if ($this->holdsStock($warehouse)) {
+                    InventoryException::fail('inventory::warehouses.holds_stock');
+                }
+
+                if ($this->assetsIn($warehouse)->where('status', '!=', AssetStatus::Disposed)->exists()) {
+                    InventoryException::fail('inventory::warehouses.holds_assets');
+                }
             }
 
             if ($warehouse->item_scope === ItemScope::Selected && ($warehouse->isDirty('item_scope') || array_key_exists('item_ids', $data))) {
@@ -65,6 +74,11 @@ class WarehouseService
     {
         if (StockMovement::query()->where('location_type', Warehouse::TYPE)->where('location_id', $warehouse->id)->exists()) {
             InventoryException::fail('inventory::warehouses.has_history');
+        }
+
+        // Even a disposed asset keeps its last place.
+        if ($this->assetsIn($warehouse)->exists()) {
+            InventoryException::fail('inventory::warehouses.holds_assets');
         }
 
         $warehouse->delete();
@@ -123,9 +137,22 @@ class WarehouseService
             ->whereNotIn('item_id', $itemIds)
             ->exists();
 
-        if ($stranded) {
+        $strandedAssets = $this->assetsIn($warehouse)
+            ->where('status', '!=', AssetStatus::Disposed)
+            ->whereNotIn('item_id', $itemIds)
+            ->exists();
+
+        if ($stranded || $strandedAssets) {
             InventoryException::fail('inventory::warehouses.scope_strands_stock');
         }
+    }
+
+    /**
+     * @return Builder<Asset>
+     */
+    private function assetsIn(Warehouse $warehouse): Builder
+    {
+        return Asset::query()->where('location_type', Warehouse::TYPE)->where('location_id', $warehouse->id);
     }
 
     /**
