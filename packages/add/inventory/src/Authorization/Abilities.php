@@ -48,6 +48,9 @@ final class Abilities
     /** Stock valuation and the asset register with book values. */
     public const REPORTS_VIEW = 'inventory.reports.view';
 
+    /** Change the package's settings from the dashboard. */
+    public const SETTINGS_MANAGE = 'inventory.settings.manage';
+
     /**
      * @return list<string>
      */
