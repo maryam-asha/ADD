@@ -33,9 +33,11 @@ class RegisterAssetBatchRequest extends FormRequest
         return [
             ...PlaceRules::assetLocation(),
             'purchased_on' => ['nullable', 'date_format:Y-m-d'],
+            'in_service_on' => ['nullable', 'date_format:Y-m-d'],
             'supplier' => ['nullable', 'string', 'max:255'],
             'reference' => ['nullable', 'string', 'max:60'],
-            'attachment_url' => ['nullable', ...FileUrl::rules()],
+            'attachments' => ['nullable', 'array', 'max:10'],
+            'attachments.*' => ['required', ...FileUrl::rules()],
             'currency' => ['nullable', ...Inventory::currencyRules()],
             'notes' => ['nullable', 'string', 'max:5000'],
 
@@ -61,6 +63,13 @@ class RegisterAssetBatchRequest extends FormRequest
 
             if (! is_array($lines) || $validator->errors()->has('lines')) {
                 return;
+            }
+
+            $purchased = $this->input('purchased_on');
+            $inService = $this->input('in_service_on');
+
+            if (is_string($purchased) && is_string($inService) && $inService < $purchased && ! $validator->errors()->has('in_service_on')) {
+                $validator->errors()->add('in_service_on', __('inventory::assets.in_service_before_purchase'));
             }
 
             $costed = array_filter($lines, fn ($line) => is_array($line) && is_numeric($line['purchase_cost'] ?? null));

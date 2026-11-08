@@ -92,7 +92,7 @@ class AssetController extends Controller
                 'count' => $line['count'] ?? 1,
                 'details' => Arr::except($line, ['item_id', 'count']),
             ], $data['lines']),
-            Arr::only($data, ['purchased_on', 'supplier', 'reference', 'attachment_url', 'currency', 'notes']),
+            Arr::only($data, ['purchased_on', 'in_service_on', 'supplier', 'reference', 'attachments', 'currency', 'notes']),
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);

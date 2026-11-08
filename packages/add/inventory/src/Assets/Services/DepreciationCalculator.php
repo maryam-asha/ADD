@@ -8,7 +8,8 @@ use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
 /**
- * Straight-line depreciation by whole months from the purchase date: the
+ * Straight-line depreciation by whole months from the day the asset was
+ * put in service (else its purchase date): the
  * cost less its salvage value, spread evenly over its useful life. Never
  * stored — computed from the asset as of a day (today, or the day it was
  * disposed of, whichever is first), so a correction to the cost or the life
@@ -17,13 +18,15 @@ use Carbon\CarbonInterface;
 class DepreciationCalculator
 {
     /**
-     * Null when the asset lacks a cost, a purchase date or a useful life.
+     * Null when the asset lacks a cost, a start date or a useful life.
      *
      * @return array{monthly: string, months_elapsed: int, accumulated: string, book_value: string, fully_depreciated: bool}|null
      */
     public function for(Asset $asset, ?CarbonInterface $asOf = null): ?array
     {
-        if ($asset->purchase_cost === null || $asset->purchased_on === null || ! $asset->useful_life_months) {
+        $start = $asset->in_service_on ?? $asset->purchased_on;
+
+        if ($asset->purchase_cost === null || $start === null || ! $asset->useful_life_months) {
             return null;
         }
 
@@ -33,7 +36,7 @@ class DepreciationCalculator
             $asOf = $asset->disposed_on;
         }
 
-        $months = $asOf->lt($asset->purchased_on) ? 0 : (int) $asset->purchased_on->diffInMonths($asOf);
+        $months = $asOf->lt($start) ? 0 : (int) $start->diffInMonths($asOf);
         $months = min($months, $asset->useful_life_months);
 
         $depreciable = Decimal::sub($asset->purchase_cost, $asset->salvage_value ?? '0');

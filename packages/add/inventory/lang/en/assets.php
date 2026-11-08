@@ -23,6 +23,7 @@ return [
     'closed_before_opened' => 'Maintenance cannot close before it opened.',
     'currency_for_cost' => 'Choose the currency of the cost.',
     'serial_for_one' => 'A serial number is for a single asset; make the count 1.',
+    'in_service_before_purchase' => 'An asset is not put in service before it is bought.',
     'salvage_over_cost' => 'The salvage value cannot exceed the purchase cost.',
     'updated' => 'Asset updated.',
     'status_updated' => 'Asset status updated.',
