@@ -58,6 +58,7 @@ class ReportController extends Controller
     {
         $assets = Asset::query()
             ->with('item')
+            ->where('status', '!=', AssetStatus::Draft)
             ->when(! $request->boolean('include_disposed'), fn (Builder $query) => $query->where('status', '!=', AssetStatus::Disposed))
             ->orderBy('id')
             ->get();

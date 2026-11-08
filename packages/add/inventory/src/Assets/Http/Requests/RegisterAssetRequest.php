@@ -10,11 +10,7 @@ use Illuminate\Validation\Rule;
 class RegisterAssetRequest extends FormRequest
 {
     use AssetDetailRules;
-
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use DecidesDraft;
 
     public function messages(): array
     {
@@ -41,6 +37,7 @@ class RegisterAssetRequest extends FormRequest
             'count' => ['sometimes', 'integer', 'min:1', 'max:'.config('inventory.assets.max_batch')],
             'code' => ['nullable', 'string', 'max:40', Rule::unique('inv_assets', 'code')],
             ...$this->detailRules(),
+            ...$this->draftRules(),
         ];
     }
 }

@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Settings;
 
+use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Models\AssetAddition;
@@ -37,6 +38,8 @@ final class SettingsRegistry
             new SettingDefinition('assets.code_pad', 'assets', 'integer', ['required', 'integer', 'min:1', 'max:12'], lockedWhen: $assetsExist),
             new SettingDefinition('assets.store_in_warehouses', 'assets', 'boolean', ['required', 'boolean'], lockedWhen: fn ($current, $next) => $next === false
                 && Asset::query()->where('location_type', Warehouse::TYPE)->exists() ? 'inventory::settings.locked_assets_in_warehouses' : null),
+            new SettingDefinition('assets.drafts', 'assets', 'boolean', ['required', 'boolean'], lockedWhen: fn ($current, $next) => $next === false
+                && Asset::query()->where('status', AssetStatus::Draft)->exists() ? 'inventory::settings.locked_drafts_exist' : null),
             new SettingDefinition('assets.max_batch', 'assets', 'integer', ['required', 'integer', 'min:1', 'max:1000']),
             new SettingDefinition('assets.max_lines', 'assets', 'integer', ['required', 'integer', 'min:1', 'max:200']),
             new SettingDefinition('assets.maintenance_lead_days', 'assets', 'integer', ['required', 'integer', 'min:0', 'max:365']),

@@ -72,6 +72,7 @@ Route::middleware('can:'.Abilities::ASSETS_MANAGE)->group(function () {
     Route::match(['put', 'patch'], 'assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::patch('assets/{asset}/status', [AssetController::class, 'status'])->name('assets.status');
     Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
     Route::post('assets/{asset}/additions', [AssetAdditionController::class, 'store'])->name('asset-additions.store');
     Route::delete('asset-additions/{addition}', [AssetAdditionController::class, 'destroy'])->name('asset-additions.destroy');
 });
@@ -88,6 +89,9 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
     Route::match(['put', 'patch'], 'maintenance-schedules/{schedule}', [MaintenanceScheduleController::class, 'update'])->name('maintenance-schedules.update');
     Route::delete('maintenance-schedules/{schedule}', [MaintenanceScheduleController::class, 'destroy'])->name('maintenance-schedules.destroy');
 });
+
+Route::post('assets/{asset}/approve', [AssetController::class, 'approve'])
+    ->middleware('can:'.Abilities::ASSETS_APPROVE)->name('assets.approve');
 
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');

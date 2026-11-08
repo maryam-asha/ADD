@@ -35,7 +35,7 @@ class AssetService
      * @param  array<string, mixed>  $details
      * @return Collection<int, Asset>
      */
-    public function register(Item $item, ?Place $location, array $details = [], int $count = 1): Collection
+    public function register(Item $item, ?Place $location, array $details = [], int $count = 1, bool $draft = false): Collection
     {
         if (! $item->isAsset()) {
             InventoryException::fail('inventory::assets.not_asset');
@@ -61,7 +61,7 @@ class AssetService
             $this->ensureLocation($location ?? InventoryException::fail('inventory::assets.unknown_location'), $item);
         }
 
-        return DB::transaction(function () use ($item, $location, $details, $count) {
+        return DB::transaction(function () use ($item, $location, $details, $count, $draft) {
             $assets = collect();
 
             for ($i = 0; $i < $count; $i++) {
@@ -69,23 +69,13 @@ class AssetService
                     ...$details,
                     'item_id' => $item->id,
                     'qr_token' => Str::random(40),
-                    'status' => AssetStatus::InService,
+                    'status' => $draft ? AssetStatus::Draft : AssetStatus::InService,
                     'location_type' => $location?->type,
                     'location_id' => $location?->id,
                 ]);
 
-                if ($asset->code === null) {
-                    $asset->update(['code' => config('inventory.assets.code_prefix').str_pad((string) $asset->id, (int) config('inventory.assets.code_pad'), '0', STR_PAD_LEFT)]);
-                }
-
-                if ($location !== null) {
-                    AssetMovement::query()->create([
-                        'asset_id' => $asset->id,
-                        'to_type' => $location->type,
-                        'to_id' => $location->id,
-                        'actor_id' => Inventory::actorId(),
-                        'moved_at' => now(),
-                    ]);
+                if (! $draft) {
+                    $this->putInService($asset);
                 }
 
                 $assets->push($asset);
@@ -104,11 +94,69 @@ class AssetService
      * @param  array<string, mixed>  $shared
      * @return Collection<int, Asset>
      */
-    public function registerBatch(Place $location, array $lines, array $shared = []): Collection
+    public function registerBatch(Place $location, array $lines, array $shared = [], bool $draft = false): Collection
     {
         return DB::transaction(fn () => collect($lines)->flatMap(
-            fn (array $line) => $this->register($line['item'], $location, [...$shared, ...$line['details']], $line['count'])
+            fn (array $line) => $this->register($line['item'], $location, [...$shared, ...$line['details']], $line['count'], $draft)
         )->values());
+    }
+
+    /**
+     * A draft approved into service (config inventory.assets.drafts).
+     */
+    public function approve(Asset $asset): Asset
+    {
+        return DB::transaction(function () use ($asset) {
+            $asset = $this->lock($asset);
+
+            if ($asset->status !== AssetStatus::Draft) {
+                InventoryException::fail('inventory::assets.not_draft');
+            }
+
+            $asset->update(['status' => AssetStatus::InService]);
+            $this->putInService($asset);
+
+            return $asset;
+        });
+    }
+
+    /**
+     * Only a draft is deleted: it never existed for anyone but its author.
+     */
+    public function deleteDraft(Asset $asset): void
+    {
+        DB::transaction(function () use ($asset) {
+            $asset = $this->lock($asset);
+
+            if ($asset->status !== AssetStatus::Draft) {
+                InventoryException::fail('inventory::assets.only_drafts_deleted');
+            }
+
+            $asset->delete();
+        });
+    }
+
+    /**
+     * What an asset takes on entering service: its readable code (unless
+     * one was given) and its arrival at its place.
+     */
+    private function putInService(Asset $asset): void
+    {
+        if ($asset->code === null) {
+            $asset->update(['code' => config('inventory.assets.code_prefix').str_pad((string) $asset->id, (int) config('inventory.assets.code_pad'), '0', STR_PAD_LEFT)]);
+        }
+
+        $location = $asset->location();
+
+        if ($location !== null) {
+            AssetMovement::query()->create([
+                'asset_id' => $asset->id,
+                'to_type' => $location->type,
+                'to_id' => $location->id,
+                'actor_id' => Inventory::actorId(),
+                'moved_at' => now(),
+            ]);
+        }
     }
 
     /**
@@ -301,6 +349,10 @@ class AssetService
 
     private function ensureNotDisposed(Asset $asset): void
     {
+        if ($asset->status === AssetStatus::Draft) {
+            InventoryException::fail('inventory::assets.draft');
+        }
+
         if ($asset->isDisposed()) {
             InventoryException::fail('inventory::assets.disposed');
         }

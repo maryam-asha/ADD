@@ -37,4 +37,9 @@ return [
     'addition_needs_cost' => "Record the asset's cost before adding capital to it.",
     'addition_before_start' => 'An addition cannot predate the asset being put in service.',
     'addition_removed' => 'Capital addition removed.',
+    'draft' => 'The asset is a draft; approve it first.',
+    'not_draft' => 'The asset is not a draft.',
+    'approved' => 'Asset approved.',
+    'only_drafts_deleted' => 'Only drafts are deleted; an approved asset is disposed of.',
+    'draft_deleted' => 'Draft deleted.',
 ];

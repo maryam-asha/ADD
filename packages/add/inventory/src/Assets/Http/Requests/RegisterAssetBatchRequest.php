@@ -21,10 +21,7 @@ use Illuminate\Validation\Rule;
  */
 class RegisterAssetBatchRequest extends FormRequest
 {
-    public function authorize(): bool
-    {
-        return true;
-    }
+    use DecidesDraft;
 
     /**
      * @return array<string, mixed>
@@ -41,6 +38,7 @@ class RegisterAssetBatchRequest extends FormRequest
             'attachments.*' => ['required', ...FileUrl::rules()],
             'currency' => ['nullable', ...Inventory::currencyRules()],
             'notes' => ['nullable', 'string', 'max:5000'],
+            ...$this->draftRules(),
 
             'lines' => ['required', 'array', 'min:1', 'max:'.config('inventory.assets.max_lines')],
             'lines.*.item_id' => ['required', 'integer', Rule::exists('inv_items', 'id')],

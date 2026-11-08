@@ -26,6 +26,8 @@ class SettingsController extends Controller
             'intangible_assets' => (bool) config('inventory.assets.intangible'),
             // Whether capital additions may be recorded on an asset.
             'capital_additions' => (bool) config('inventory.assets.capital_additions'),
+            // Whether a registered asset waits as a draft for approval.
+            'asset_drafts' => (bool) config('inventory.assets.drafts'),
         ]]);
     }
 }

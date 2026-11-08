@@ -68,8 +68,9 @@ class AssetController extends Controller
         $assets = $service->register(
             Item::query()->findOrFail($data['item_id']),
             isset($data['location']) ? Place::from($data['location']) : null,
-            Arr::except($data, ['item_id', 'location', 'count']),
+            Arr::except($data, ['item_id', 'location', 'count', 'draft']),
             $data['count'] ?? 1,
+            $request->wantsDraft(),
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
@@ -93,9 +94,31 @@ class AssetController extends Controller
                 'details' => Arr::except($line, ['item_id', 'count']),
             ], $data['lines']),
             Arr::only($data, ['purchased_on', 'in_service_on', 'supplier', 'reference', 'attachments', 'currency', 'notes']),
+            $request->wantsDraft(),
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
+    }
+
+    /**
+     * A draft approved into service: it takes its code and arrives at its
+     * place.
+     */
+    public function approve(Asset $asset, AssetService $service): JsonResponse
+    {
+        $service->approve($asset);
+
+        return response()->json(['message' => __('inventory::assets.approved')]);
+    }
+
+    /**
+     * Only a draft is deleted; a registered asset is disposed of.
+     */
+    public function destroy(Asset $asset, AssetService $service): JsonResponse
+    {
+        $service->deleteDraft($asset);
+
+        return response()->json(['message' => __('inventory::assets.draft_deleted')]);
     }
 
     public function show(Asset $asset): AssetResource

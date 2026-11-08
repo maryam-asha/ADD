@@ -45,6 +45,10 @@ return [
         // on it that raises its cost, depreciated over what is left of its life.
         'capital_additions' => false,
 
+        // Whether a registered asset is a draft until someone holding
+        // inventory.assets.approve approves it into service.
+        'drafts' => false,
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 

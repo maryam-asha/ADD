@@ -10,4 +10,5 @@ return [
     'locked_method_in_use' => 'Assets are depreciated by this method; it cannot be removed now.',
     'locked_intangible_exists' => 'Intangible categories exist; this cannot be turned off.',
     'locked_additions_exist' => 'Capital additions are recorded; this cannot be turned off.',
+    'locked_drafts_exist' => 'Draft assets exist; approve or delete them before turning this off.',
 ];

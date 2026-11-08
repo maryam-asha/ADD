@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Assets\Services;
 
+use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Support\Decimal;
@@ -26,6 +27,10 @@ class DepreciationCalculator
     public function for(Asset $asset, ?CarbonInterface $asOf = null): ?array
     {
         $start = $asset->in_service_on ?? $asset->purchased_on;
+
+        if ($asset->status === AssetStatus::Draft) {
+            return null;
+        }
 
         if ($asset->purchase_cost === null || $start === null || ! $asset->useful_life_months) {
             return null;

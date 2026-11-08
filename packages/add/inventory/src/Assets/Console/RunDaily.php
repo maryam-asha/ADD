@@ -42,7 +42,7 @@ class RunDaily extends Command
 
         Asset::query()
             ->whereNull('warranty_alerted_at')
-            ->where('status', '!=', AssetStatus::Disposed)
+            ->whereNotIn('status', [AssetStatus::Disposed, AssetStatus::Draft])
             ->whereNotNull('warranty_until')
             ->where('warranty_until', '>=', now()->toDateString())
             ->where('warranty_until', '<=', now()->addDays((int) config('inventory.assets.warranty_lead_days'))->toDateString())
