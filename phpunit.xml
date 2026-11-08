@@ -41,6 +41,12 @@
         <env name="OTP_FIXED_CODE" value=""/>
         <env name="OTP_DRIVER" value="mock"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
+        <!-- Never the real TTLock account from .env: a test fakes TTLock or has none. -->
+        <env name="TTLOCK_BASE_URL" value="https://api.sciener.test"/>
+        <env name="TTLOCK_CLIENT_ID" value=""/>
+        <env name="TTLOCK_CLIENT_SECRET" value=""/>
+        <env name="TTLOCK_USERNAME" value=""/>
+        <env name="TTLOCK_PASSWORD" value=""/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>

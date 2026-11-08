@@ -2,6 +2,7 @@
 
 namespace App\Domain\Booking\Services;
 
+use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Events\BookingExtended;
@@ -39,6 +40,7 @@ class BookingExtensionService
         private readonly QuoteRecorder $recorder,
         private readonly RealtimeBroadcaster $realtime,
         private readonly BookingNotifier $notifier,
+        private readonly PasscodeIssuanceService $passcodes,
     ) {}
 
     /**
@@ -143,6 +145,8 @@ class BookingExtensionService
                 $fresh = Booking::query()->with(['space', 'user', 'payments'])->find($lockedBooking->id);
 
                 if ($fresh !== null) {
+                    // The door runs to the new end too (never throws).
+                    $this->passcodes->extendForBooking($fresh);
                     $this->notifier->extended($fresh, $differencePoints);
                 }
             });

@@ -65,12 +65,9 @@ return [
     ],
 
     'ttlock' => [
-        // Verified against https://euopen.ttlock.com/doc/api/ — no EU-specific
-        // host was found documented anywhere on that portal; every example
-        // shows this generic host. UNVERIFIED against a real account —
-        // confirm before relying on it in production (see
-        // docs/decisions/qr-lock-unlock.md's verification findings).
-        'base_url' => env('TTLOCK_BASE_URL', 'https://api.sciener.com'),
+        // Checked against the real account on 2026-11-08: the EU API host is
+        // euapi.ttlock.com (euopen.ttlock.com is only the docs portal).
+        'base_url' => env('TTLOCK_BASE_URL', 'https://euapi.ttlock.com'),
         'client_id' => env('TTLOCK_CLIENT_ID'),
         'client_secret' => env('TTLOCK_CLIENT_SECRET'),
         'username' => env('TTLOCK_USERNAME'),

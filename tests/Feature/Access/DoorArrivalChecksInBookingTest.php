@@ -5,15 +5,19 @@ namespace Tests\Feature\Access;
 use App\Domain\Access\Enums\AccessGrantStatus;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Access\Services\BookingDoorWindow;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Services\BookingCheckInService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Settings\Enums\SettingValueType;
+use App\Domain\Settings\Services\SettingService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -131,12 +135,61 @@ class DoorArrivalChecksInBookingTest extends TestCase
         $this->assertTrue($booking->fresh()->checked_in_at->equalTo($first));
     }
 
-    public function test_an_early_open_still_opens_the_door_but_starts_nothing(): void
+    /** A code the desk activated an hour early opens nothing until the early allowance (2026-11-08). */
+    public function test_an_activated_code_opens_nothing_before_the_early_allowance(): void
     {
         [$member, $booking] = $this->bookedRoom(now()->addHour());
 
+        $this->scanDoorAs($member)->assertForbidden();
+
+        $this->assertNull($booking->fresh()->checked_in_at);
+        Http::assertNotSent(fn ($request) => str_contains($request->url(), '/v3/lock/unlock'));
+    }
+
+    /** Within the early allowance the scan opens the door and checks in; the session still starts at start_at. */
+    public function test_arriving_within_the_early_allowance_opens_and_checks_in_from_the_start(): void
+    {
+        $startAt = now()->addMinutes(BookingCheckInService::EARLY_CHECK_IN_MINUTES - 5);
+        [$member, $booking, $grant] = $this->bookedRoom($startAt, AccessGrantStatus::Issued);
+
         $this->openDoorAs($member);
 
+        $this->assertSame(AccessGrantStatus::Activated, $grant->fresh()->status);
+        $this->assertTrue($booking->fresh()->checked_in_at->equalTo($startAt));
+    }
+
+    /** The overrun grace is for leaving: a member who came opens the door until it runs out. */
+    public function test_after_the_end_the_door_opens_through_the_grace_for_a_member_who_came(): void
+    {
+        [$member, $booking] = $this->bookedRoom(now()->subHours(2));
+        $booking->update(['status' => BookingStatus::Completed, 'checked_in_at' => $booking->start_at, 'checked_out_at' => $booking->end_at]);
+
+        Carbon::setTestNow($booking->end_at->copy()->addMinutes(BookingDoorWindow::DEFAULT_OVERRUN_GRACE_MINUTES - 1));
+        $this->openDoorAs($member);
+
+        Carbon::setTestNow($booking->end_at->copy()->addMinutes(BookingDoorWindow::DEFAULT_OVERRUN_GRACE_MINUTES + 1));
+        $this->scanDoorAs($member)->assertForbidden();
+    }
+
+    public function test_the_grace_follows_its_setting(): void
+    {
+        app(SettingService::class)->set(BookingDoorWindow::OVERRUN_GRACE_KEY, 0, SettingValueType::Int);
+        [$member, $booking] = $this->bookedRoom(now()->subHours(2));
+        $booking->update(['checked_in_at' => $booking->start_at]);
+
+        Carbon::setTestNow($booking->end_at->copy()->addMinute());
+
+        $this->scanDoorAs($member)->assertForbidden();
+    }
+
+    /** A member who never came is not let in once the booking has ended, even with an activated code. */
+    public function test_after_the_end_a_member_who_never_came_is_not_let_in(): void
+    {
+        [$member, $booking] = $this->bookedRoom(now()->subHours(2));
+
+        Carbon::setTestNow($booking->end_at->copy()->addMinutes(2));
+
+        $this->scanDoorAs($member)->assertForbidden();
         $this->assertNull($booking->fresh()->checked_in_at);
     }
 
@@ -197,10 +250,10 @@ class DoorArrivalChecksInBookingTest extends TestCase
         $this->assertSame(SessionStartSource::Door, $booking->checked_in_via);
     }
 
-    /** Before its start the room may still be someone else's: a code the desk has not activated opens nothing. */
-    public function test_a_code_the_desk_has_not_activated_does_not_open_before_the_booking_starts(): void
+    /** Before the early allowance the room may still be someone else's: the code opens nothing. */
+    public function test_a_code_does_not_open_before_the_early_allowance(): void
     {
-        [$member, $booking, $grant] = $this->bookedRoom(now()->addMinutes(10), AccessGrantStatus::Issued);
+        [$member, $booking, $grant] = $this->bookedRoom(now()->addMinutes(BookingCheckInService::EARLY_CHECK_IN_MINUTES + 5), AccessGrantStatus::Issued);
 
         $this->scanDoorAs($member)->assertForbidden();
 

@@ -3,6 +3,8 @@
 use App\Domain\Experience\Models\Event;
 use App\Domain\Forms\Enums\FormPurpose;
 use App\Domain\Services\Models\ServiceType;
+use App\Http\Controllers\Api\V1\Admin\AccessEventController;
+use App\Http\Controllers\Api\V1\Admin\AccessGrantController;
 use App\Http\Controllers\Api\V1\Admin\AdminEventAttendeeController;
 use App\Http\Controllers\Api\V1\Admin\AdminNotificationController;
 use App\Http\Controllers\Api\V1\Admin\AdminServiceRequestController;
@@ -28,6 +30,7 @@ use App\Http\Controllers\Api\V1\Admin\DashboardController;
 use App\Http\Controllers\Api\V1\Admin\DashboardDeviceTokenController;
 use App\Http\Controllers\Api\V1\Admin\DashboardStatsController;
 use App\Http\Controllers\Api\V1\Admin\DeviceCapabilityController;
+use App\Http\Controllers\Api\V1\Admin\DeviceControlController;
 use App\Http\Controllers\Api\V1\Admin\DeviceController;
 use App\Http\Controllers\Api\V1\Admin\DiscountReportController;
 use App\Http\Controllers\Api\V1\Admin\ErrorLogController;
@@ -170,8 +173,22 @@ Route::put('space-type-amenities/{spaceType}', [SpaceTypeAmenityController::clas
 $permitted(Route::apiResource('seats-desks', SeatDeskController::class)
     ->parameters(['seats-desks' => 'seatDesk']), 'seats-desks');
 
+// The TTLock account's own locks and gateways, to link a device row to one;
+// before the resource, or `ttlock-account` is read as a {device}.
+Route::get('devices/ttlock-account', [DeviceControlController::class, 'account'])->middleware('permission:devices.create|devices.update');
+Route::post('devices/sync', [DeviceControlController::class, 'sync'])->middleware('permission:devices.update');
 $permitted(Route::apiResource('devices', DeviceController::class), 'devices');
 Route::post('devices/{device}/regenerate-qr-value', [DeviceController::class, 'regenerateQrValue'])->middleware('permission:devices.update');
+// Opening or locking any door from the dashboard is its own grant: it needs
+// no code and lets anyone in.
+Route::post('devices/{device}/unlock', [DeviceControlController::class, 'unlock'])->middleware('permission:devices.control');
+Route::post('devices/{device}/lock', [DeviceControlController::class, 'lock'])->middleware('permission:devices.control');
+
+// Door codes and the access log (docs/decisions/qr-lock-unlock.md). Neither
+// ever carries a code itself.
+Route::get('access-grants', [AccessGrantController::class, 'index'])->middleware('permission:access-grants.view');
+Route::post('access-grants/{accessGrant}/revoke', [AccessGrantController::class, 'revoke'])->middleware('permission:access-grants.revoke');
+Route::get('access-events', [AccessEventController::class, 'index'])->middleware('permission:access-events.view');
 
 // Multi-word resource name — same reason as community-members below.
 $permitted(Route::apiResource('device-capabilities', DeviceCapabilityController::class)
@@ -424,6 +441,8 @@ Route::get('reception/bookings/{booking}/extension-options', [BookingReceptionCo
 // grant a given booking needs activated, since there was previously no way
 // to discover a grant's id from its booking.
 Route::get('reception/bookings/{booking}/access-grant', [AccessActivationController::class, 'forBooking'])->middleware('permission:reception.view');
+// A new door code for a booking whose code expired unused, was stopped or got lost.
+Route::post('reception/bookings/{booking}/access-grant/reissue', [AccessActivationController::class, 'reissue'])->middleware('permission:reception.check_in');
 
 Route::post('reception/walk-ins', [WalkInSessionController::class, 'store'])->middleware('permission:reception.check_in');
 Route::post('reception/walk-ins/{walkinSession}/check-out', [WalkInSessionController::class, 'checkOut'])->middleware('permission:reception.check_in');

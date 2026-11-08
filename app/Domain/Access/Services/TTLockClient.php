@@ -74,6 +74,54 @@ class TTLockClient
         ]));
     }
 
+    /**
+     * Every lock on the account, across pages: lockId, lockMac, lockAlias,
+     * electricQuantity (battery %), hasGateway (1/0), … — never lockData,
+     * which nothing here keeps.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listLocks(): array
+    {
+        return array_map(
+            fn (array $lock) => array_diff_key($lock, array_flip(['lockData', 'lockKey', 'aesKeyStr', 'adminPwd', 'noKeyPwd', 'deletePwd'])),
+            $this->pages('/v3/lock/list'),
+        );
+    }
+
+    /**
+     * Every gateway on the account: gatewayId, gatewayMac, isOnline (1/0),
+     * lockNum (locks it has found), networkName, ….
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listGateways(): array
+    {
+        return $this->pages('/v3/gateway/list');
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function pages(string $path): array
+    {
+        $rows = [];
+        $page = 1;
+
+        do {
+            $response = $this->callV3($path, ['pageNo' => $page, 'pageSize' => 100], 'get');
+
+            if (! isset($response['list']) || ! is_array($response['list'])) {
+                $this->assertSuccess($response);
+                throw TTLockException::vendorError(-1, "TTLock response missing list for {$path}");
+            }
+
+            array_push($rows, ...$response['list']);
+            $pages = (int) ($response['pages'] ?? 1);
+            $page++;
+        } while ($page <= $pages);
+
+        return $rows;
+    }
+
     private function assertSuccess(array $response): void
     {
         if (! array_key_exists('errcode', $response)) {
@@ -94,7 +142,8 @@ class TTLockClient
         };
     }
 
-    private function callV3(string $path, array $params): array
+    /** Reads (the lists) are GETs; every change is a form POST. */
+    private function callV3(string $path, array $params, string $method = 'post'): array
     {
         $params['clientId'] = config('services.ttlock.client_id');
         $params['accessToken'] = $this->accessToken();
@@ -103,10 +152,11 @@ class TTLockClient
         $params['date'] = (int) (microtime(true) * 1000);
 
         try {
-            $response = Http::asForm()
+            $request = Http::asForm()
                 ->baseUrl(config('services.ttlock.base_url'))
-                ->timeout(10)
-                ->post($path, $params);
+                ->timeout(10);
+
+            $response = $method === 'get' ? $request->get($path, $params) : $request->post($path, $params);
         } catch (ConnectionException $e) {
             throw TTLockException::networkError($e->getMessage());
         }

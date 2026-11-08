@@ -2,10 +2,13 @@
 
 namespace App\Console\Commands;
 
+use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Enums\AccessRevokeReason;
 use App\Domain\Access\Services\AccessNotifier;
 use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Settings\Services\SettingService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Log;
@@ -14,8 +17,8 @@ use Illuminate\Support\Facades\Log;
  * A confirmed booking's cancellation window closing (or a same-day
  * booking, immediately) is when its space's lock gets a Period passcode
  * — docs/decisions/qr-lock-unlock.md §2. Skips any booking that already
- * has a grant (source_type=booking, source_id=this booking) so a re-run
- * before the next window doesn't double-issue.
+ * has a live or expired grant (source_type=booking, source_id=this booking)
+ * so a re-run before the next window doesn't double-issue.
  */
 class IssueAccessGrantsOnCancellationWindowClose extends Command
 {
@@ -28,7 +31,19 @@ class IssueAccessGrantsOnCancellationWindowClose extends Command
         Booking::query()
             ->where('status', BookingStatus::Confirmed)
             ->where('end_at', '>', now())
-            ->whereDoesntHave('accessGrants')
+            // Only a door that exists and is open for use: a space with no
+            // lock (co-working, most rooms) has nothing to issue, and one in
+            // maintenance would only have the code revoked again.
+            ->whereHas('space', fn ($space) => $space
+                ->where('status', OperationalStatus::Active)
+                ->whereHas('devices', fn ($device) => $device->where('type', 'lock')))
+            // A live code, one left unused until it expired, or one staff
+            // stopped (both re-issued by the desk, never here) ends it; any
+            // other revoked one does not — a booking whose door maintenance
+            // closed gets a new code when the space is active again.
+            ->whereDoesntHave('accessGrants', fn ($grant) => $grant->where(fn ($ending) => $ending
+                ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated, AccessGrantStatus::Expired])
+                ->orWhere('revoke_reason', AccessRevokeReason::Staff)))
             ->with('space')
             ->chunkById(100, function ($bookings) use ($issuance, $settings, $notices) {
                 foreach ($bookings as $booking) {

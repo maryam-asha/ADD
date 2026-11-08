@@ -57,6 +57,7 @@ class QrValueIsRandomNotSequentialTest extends TestCase
                     'branch_id' => $branch->id,
                     'type' => 'lock',
                     'hardware_mac' => 'lock-'.Str::random(10),
+                    'external_ref' => (string) (1000 + $i),
                 ]);
 
                 return Device::find($response->json('data.id'))->qr_value;
