@@ -29,7 +29,8 @@ class RegisterAssetBatchRequest extends FormRequest
     public function rules(): array
     {
         return [
-            ...PlaceRules::assetLocation(),
+            // Needed by every line but an intangible one, which sits nowhere.
+            ...PlaceRules::assetLocation('location', $this->hasTangibleLine()),
             'purchased_on' => ['nullable', 'date_format:Y-m-d'],
             'in_service_on' => ['nullable', 'date_format:Y-m-d'],
             'supplier' => ['nullable', 'string', 'max:255'],
@@ -50,6 +51,19 @@ class RegisterAssetBatchRequest extends FormRequest
             'lines.*.salvage_value' => ['nullable', 'numeric', 'min:0'],
             'lines.*.warranty_until' => ['nullable', 'date_format:Y-m-d'],
         ];
+    }
+
+    private function hasTangibleLine(): bool
+    {
+        $ids = array_filter(array_column(array_filter((array) $this->input('lines'), 'is_array'), 'item_id'), 'is_numeric');
+
+        if ($ids === []) {
+            return true;
+        }
+
+        $items = Item::query()->with('category')->findMany($ids);
+
+        return $items->count() < count(array_unique($ids)) || $items->contains(fn (Item $item) => ! $item->isIntangible());
     }
 
     /**
@@ -85,8 +99,6 @@ class RegisterAssetBatchRequest extends FormRequest
 
                 if ($item !== null && ! $item->isAsset()) {
                     $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.not_asset'));
-                } elseif ($item !== null && $item->isIntangible()) {
-                    $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.intangible_not_in_place'));
                 } elseif ($item !== null && ! $item->is_active) {
                     $validator->errors()->add("lines.{$i}.item_id", __('inventory::assets.item_inactive'));
                 }

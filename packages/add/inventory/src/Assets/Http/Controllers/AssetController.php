@@ -87,7 +87,7 @@ class AssetController extends Controller
         $items = Item::query()->findMany(array_column($data['lines'], 'item_id'))->keyBy('id');
 
         $assets = $service->registerBatch(
-            Place::from($data['location']),
+            isset($data['location']) ? Place::from($data['location']) : null,
             array_map(fn (array $line) => [
                 'item' => $items->get($line['item_id']),
                 'count' => $line['count'] ?? 1,

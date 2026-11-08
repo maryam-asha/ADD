@@ -97,10 +97,11 @@ class AssetService
      * @param  array<string, mixed>  $shared
      * @return Collection<int, Asset>
      */
-    public function registerBatch(Place $location, array $lines, array $shared = [], bool $draft = false): Collection
+    public function registerBatch(?Place $location, array $lines, array $shared = [], bool $draft = false): Collection
     {
+        // An intangible line sits nowhere; every other one at the place.
         return DB::transaction(fn () => collect($lines)->flatMap(
-            fn (array $line) => $this->register($line['item'], $location, [...$shared, ...$line['details']], $line['count'], $draft)
+            fn (array $line) => $this->register($line['item'], $line['item']->isIntangible() ? null : $location, [...$shared, ...$line['details']], $line['count'], $draft)
         )->values());
     }
 

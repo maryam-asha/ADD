@@ -90,14 +90,22 @@ class IntangibleAssetTest extends TestCase
         app(SettingsStore::class)->save(['assets.intangible' => false]);
     }
 
-    public function test_an_intangible_item_cannot_be_registered_in_a_place_batch(): void
+    public function test_intangible_lines_in_a_batch_sit_nowhere(): void
     {
         $this->actingAsWith(self::ALL);
+        $licence = $this->licence();
+        $chair = $this->assetItem();
 
-        $this->postJson('/api/inventory/assets/batch', [
+        $assets = $this->postJson('/api/inventory/assets/batch', [
             'location' => $this->at(Location::factory()->create()),
-            'lines' => [['item_id' => $this->licence()->id]],
-        ])->assertUnprocessable()->assertJsonValidationErrors(['lines.0.item_id' => __('inventory::assets.intangible_not_in_place')]);
+            'lines' => [['item_id' => $licence->id], ['item_id' => $chair->id]],
+        ])->assertCreated()->json('data');
+        $this->assertNull($assets[0]['location']);
+        $this->assertNotNull($assets[1]['location']);
+
+        $this->postJson('/api/inventory/assets/batch', ['lines' => [['item_id' => $licence->id, 'count' => 2]]])->assertCreated()->assertJsonCount(2, 'data');
+        $this->postJson('/api/inventory/assets/batch', ['lines' => [['item_id' => $licence->id], ['item_id' => $chair->id]]])
+            ->assertUnprocessable()->assertJsonValidationErrors('location');
     }
 
     public function test_a_categorys_intangible_flag_is_fixed_once_it_has_assets(): void
