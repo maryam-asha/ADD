@@ -14,6 +14,8 @@ return [
     'parent_in_subtree' => 'A category cannot move under itself or one of its own subcategories.',
     'field_updated' => 'Field updated.',
     'key_taken' => 'The field ":key" is already defined in this branch of the catalog.',
+    'sku_numbered' => 'Item codes are numbered automatically; one cannot be typed.',
+    'sku_fixed' => 'An item’s code is fixed once it is saved.',
     'item_updated' => 'Item updated.',
     'item_kind_locked' => 'This item already has assets or stock history; it cannot move to a category of another kind.',
     'unit_required' => 'A stock item needs its unit.',

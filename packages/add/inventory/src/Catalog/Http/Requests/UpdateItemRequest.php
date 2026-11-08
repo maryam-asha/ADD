@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Catalog\Http\Requests;
 
+use Add\Inventory\Catalog\Enums\SkuMode;
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Support\TranslatableField;
@@ -34,6 +35,14 @@ class UpdateItemRequest extends FormRequest
     }
 
     /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['sku.prohibited' => __(SkuMode::current() === SkuMode::Auto ? 'inventory::catalog.sku_numbered' : 'inventory::catalog.sku_fixed')];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function rules(): array
@@ -48,7 +57,10 @@ class UpdateItemRequest extends FormRequest
             ...TranslatableField::sometimes('name'),
             'category_id' => ['sometimes', 'integer', Rule::exists('inv_categories', 'id')],
             'unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('inv_units', 'id')],
-            'sku' => ['sometimes', 'string', 'max:40', Rule::unique('inv_items', 'sku')->ignore($item)],
+            // Changed later only when codes stay editable (SkuMode::Editable).
+            'sku' => SkuMode::current()->typedOnUpdate()
+                ? ['sometimes', 'string', 'max:40', Rule::unique('inv_items', 'sku')->ignore($item)]
+                : ['prohibited'],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'is_active' => ['sometimes', 'boolean'],
             ...($this->has('properties') ? $this->propertyRules($category) : []),

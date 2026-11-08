@@ -3,6 +3,7 @@
 namespace Add\Inventory\Support\Http;
 
 use Add\Inventory\Assets\AssetPlaces;
+use Add\Inventory\Catalog\Enums\SkuMode;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Routing\Controller;
 
@@ -16,6 +17,8 @@ class SettingsController extends Controller
     {
         return response()->json(['data' => [
             'assets_in_warehouses' => AssetPlaces::warehousesAllowed(),
+            // auto | on_create | editable: whether an item's code is typed, and when.
+            'item_code_mode' => SkuMode::current()->value,
         ]]);
     }
 }

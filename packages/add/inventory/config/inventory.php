@@ -9,7 +9,14 @@ return [
     'user_name_attribute' => 'name',
 
     'items' => [
-        // An item saved without a SKU gets prefix + its id, zero-padded.
+        // Who sets an item's code: 'auto' (always numbered here, never typed),
+        // 'on_create' (typed when the item is made, numbered when left out,
+        // fixed after) or 'editable' (typed and changed at any time).
+        'sku_mode' => 'on_create',
+
+        // A numbered code is the prefix and the next number of the package's
+        // own counter (not the item's id), zero-padded to sku_pad digits:
+        // ITM-00001, ITM-00002… The characters are the host's to choose.
         'sku_prefix' => 'ITM-',
         'sku_pad' => 5,
     ],

@@ -98,11 +98,12 @@ class CatalogService
     public function createItem(array $data): Item
     {
         return DB::transaction(function () use ($data) {
-            $item = Item::query()->create(Arr::except($data, 'units'));
-
-            if ($item->sku === null) {
-                $item->update(['sku' => config('inventory.items.sku_prefix').str_pad((string) $item->id, (int) config('inventory.items.sku_pad'), '0', STR_PAD_LEFT)]);
+            // Numbered from the package's own counter when none was given.
+            if (($data['sku'] ?? null) === null) {
+                $data['sku'] = app(ItemCodeSequence::class)->next();
             }
+
+            $item = Item::query()->create(Arr::except($data, 'units'));
 
             if (array_key_exists('units', $data)) {
                 $this->syncUnits($item, $data['units']);
