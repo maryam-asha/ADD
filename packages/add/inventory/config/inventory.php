@@ -41,6 +41,10 @@ return [
         // amortized on a straight line with no salvage.
         'intangible' => false,
 
+        // Whether capital additions may be recorded on an asset: money spent
+        // on it that raises its cost, depreciated over what is left of its life.
+        'capital_additions' => false,
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 

@@ -24,6 +24,8 @@ class SettingsController extends Controller
             'depreciation_methods' => DepreciationMethod::enabledValues(),
             // Whether an asset category may be marked intangible.
             'intangible_assets' => (bool) config('inventory.assets.intangible'),
+            // Whether capital additions may be recorded on an asset.
+            'capital_additions' => (bool) config('inventory.assets.capital_additions'),
         ]]);
     }
 }

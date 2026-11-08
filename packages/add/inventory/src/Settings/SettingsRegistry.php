@@ -4,6 +4,7 @@ namespace Add\Inventory\Settings;
 
 use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Models\Asset;
+use Add\Inventory\Assets\Models\AssetAddition;
 use Add\Inventory\Catalog\Enums\SkuMode;
 use Add\Inventory\Catalog\Models\Category;
 use Add\Inventory\Catalog\Services\ItemCodeSequence;
@@ -43,6 +44,8 @@ final class SettingsRegistry
 
             new SettingDefinition('assets.intangible', 'depreciation', 'boolean', ['required', 'boolean'], lockedWhen: fn ($current, $next) => $next === false
                 && Category::query()->where('intangible', true)->exists() ? 'inventory::settings.locked_intangible_exists' : null),
+            new SettingDefinition('assets.capital_additions', 'depreciation', 'boolean', ['required', 'boolean'], lockedWhen: fn ($current, $next) => $next === false
+                && AssetAddition::query()->exists() ? 'inventory::settings.locked_additions_exist' : null),
             new SettingDefinition('assets.depreciation_methods', 'depreciation', 'list', ['required', 'array', 'min:1'], array_column(DepreciationMethod::cases(), 'value'), lockedWhen: function ($current, $next) {
                 $removed = is_array($next) ? array_diff((array) $current, $next) : [];
 

@@ -48,13 +48,49 @@ class DepreciationCalculator
             ? $this->decliningBalance($asset->purchase_cost, $salvage, $asset->useful_life_months, $months)
             : $this->straightLine($asset->purchase_cost, $salvage, $asset->useful_life_months, $months);
 
+        [$addedAccumulated, $addedMonthly, $added] = $this->additions($asset, $start, $asOf, $asset->useful_life_months);
+        $accumulated = Decimal::round(Decimal::add($accumulated, $addedAccumulated), 2);
+
         return [
-            'monthly' => $monthly,
+            'monthly' => Decimal::round(Decimal::add($monthly, $addedMonthly), 2),
             'months_elapsed' => $months,
             'accumulated' => $accumulated,
-            'book_value' => Decimal::sub($asset->purchase_cost, $accumulated),
+            'book_value' => Decimal::round(Decimal::sub(Decimal::add($asset->purchase_cost, $added), $accumulated), 2),
             'fully_depreciated' => $months >= $asset->useful_life_months,
         ];
+    }
+
+    /**
+     * Capital additions, each on a straight line over the months of the
+     * asset's life left on the day it was added; one added after the life
+     * is over raises the cost and is not depreciated.
+     *
+     * @return array{0: string, 1: string, 2: string} accumulated, this month's charge, and their total
+     */
+    private function additions(Asset $asset, CarbonInterface $start, CarbonInterface $asOf, int $life): array
+    {
+        $accumulated = '0';
+        $monthly = '0';
+        $total = '0';
+
+        foreach ($asset->exists ? $asset->additions : [] as $addition) {
+            $total = Decimal::add($total, $addition->amount);
+            $offset = $addition->added_on->lt($start) ? 0 : (int) $start->diffInMonths($addition->added_on);
+            $remaining = $life - $offset;
+
+            if ($remaining <= 0) {
+                continue;
+            }
+
+            $months = $asOf->lt($addition->added_on) ? 0 : min((int) $addition->added_on->diffInMonths($asOf), $remaining);
+            $accumulated = Decimal::add($accumulated, Decimal::div(Decimal::mul($addition->amount, $months), $remaining));
+
+            if ($months < $remaining) {
+                $monthly = Decimal::add($monthly, Decimal::div($addition->amount, $remaining));
+            }
+        }
+
+        return [$accumulated, $monthly, $total];
     }
 
     /**

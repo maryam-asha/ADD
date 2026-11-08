@@ -9,4 +9,5 @@ return [
     'locked_stock_moved' => 'Stock has been costed in this currency; it cannot change now.',
     'locked_method_in_use' => 'Assets are depreciated by this method; it cannot be removed now.',
     'locked_intangible_exists' => 'Intangible categories exist; this cannot be turned off.',
+    'locked_additions_exist' => 'Capital additions are recorded; this cannot be turned off.',
 ];

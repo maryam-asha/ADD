@@ -5,6 +5,7 @@ namespace Add\Inventory\Assets\Services;
 use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Models\Asset;
+use Add\Inventory\Assets\Models\AssetAddition;
 use Add\Inventory\Assets\Models\AssetAssignment;
 use Add\Inventory\Assets\Models\AssetMovement;
 use Add\Inventory\Catalog\Models\Item;
@@ -108,6 +109,38 @@ class AssetService
         return DB::transaction(fn () => collect($lines)->flatMap(
             fn (array $line) => $this->register($line['item'], $location, [...$shared, ...$line['details']], $line['count'])
         )->values());
+    }
+
+    /**
+     * A capital addition (config inventory.assets.capital_additions): it
+     * raises the asset's cost, in the asset's currency.
+     *
+     * @param  array{added_on: string, amount: int|float|string, description: string, reference?: ?string, attachments?: ?list<string>}  $data
+     */
+    public function addCapital(Asset $asset, array $data): AssetAddition
+    {
+        if (! config('inventory.assets.capital_additions')) {
+            InventoryException::fail('inventory::assets.additions_off');
+        }
+
+        return DB::transaction(function () use ($asset, $data) {
+            $asset = $this->lock($asset);
+            $this->ensureNotDisposed($asset);
+
+            if ($asset->purchase_cost === null) {
+                InventoryException::fail('inventory::assets.addition_needs_cost');
+            }
+
+            return $asset->additions()->create([...$data, 'actor_id' => Inventory::actorId()]);
+        });
+    }
+
+    public function removeCapital(AssetAddition $addition): void
+    {
+        DB::transaction(function () use ($addition) {
+            $this->lock($addition->asset);
+            $addition->delete();
+        });
     }
 
     public function move(Asset $asset, Place $to, ?string $note = null, ?CarbonInterface $movedAt = null): AssetMovement

@@ -1,5 +1,6 @@
 <?php
 
+use Add\Inventory\Assets\Http\Controllers\AssetAdditionController;
 use Add\Inventory\Assets\Http\Controllers\AssetController;
 use Add\Inventory\Assets\Http\Controllers\CustodyController;
 use Add\Inventory\Assets\Http\Controllers\MaintenanceController;
@@ -61,6 +62,7 @@ Route::middleware('can:'.Abilities::ASSETS_VIEW)->group(function () {
     Route::get('custody', [CustodyController::class, 'index'])->name('custody.index');
     Route::get('maintenance', [MaintenanceController::class, 'index'])->name('maintenance.index');
     Route::get('assets/{asset}/maintenance-schedules', [MaintenanceScheduleController::class, 'index'])->name('maintenance-schedules.index');
+    Route::get('assets/{asset}/additions', [AssetAdditionController::class, 'index'])->name('asset-additions.index');
     Route::get('maintenance-schedules/due', [MaintenanceScheduleController::class, 'due'])->name('maintenance-schedules.due');
 });
 
@@ -70,6 +72,8 @@ Route::middleware('can:'.Abilities::ASSETS_MANAGE)->group(function () {
     Route::match(['put', 'patch'], 'assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::patch('assets/{asset}/status', [AssetController::class, 'status'])->name('assets.status');
     Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');
+    Route::post('assets/{asset}/additions', [AssetAdditionController::class, 'store'])->name('asset-additions.store');
+    Route::delete('asset-additions/{addition}', [AssetAdditionController::class, 'destroy'])->name('asset-additions.destroy');
 });
 
 Route::middleware('can:'.Abilities::ASSETS_CUSTODY)->group(function () {

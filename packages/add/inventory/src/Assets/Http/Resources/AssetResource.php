@@ -4,6 +4,7 @@ namespace Add\Inventory\Assets\Http\Resources;
 
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Assets\Services\DepreciationCalculator;
+use Add\Inventory\Support\Decimal;
 use Add\Inventory\Support\Presenter;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -53,6 +54,9 @@ class AssetResource extends JsonResource
             'useful_life_months' => $this->useful_life_months,
             'depreciation_method' => $this->depreciation_method?->value,
             'salvage_value' => $this->salvage_value,
+            // Capital additions raise the cost the asset is carried at.
+            'additions_total' => Decimal::round(Decimal::add('0', ...$this->additions->pluck('amount')->all()), 2),
+            'total_cost' => $this->purchase_cost === null ? null : Decimal::round(Decimal::add($this->purchase_cost, ...$this->additions->pluck('amount')->all()), 2),
             'depreciation' => app(DepreciationCalculator::class)->for($this->resource),
             'warranty_until' => $this->warranty_until?->toDateString(),
             'disposal' => $this->disposed_on === null ? null : [

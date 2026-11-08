@@ -82,6 +82,14 @@ class Asset extends Model
         return $this->belongsTo(Item::class);
     }
 
+    /**
+     * Capital additions: money spent on it that raised its cost.
+     */
+    public function additions(): HasMany
+    {
+        return $this->hasMany(AssetAddition::class);
+    }
+
     public function movements(): HasMany
     {
         return $this->hasMany(AssetMovement::class)->orderBy('moved_at')->orderBy('id');

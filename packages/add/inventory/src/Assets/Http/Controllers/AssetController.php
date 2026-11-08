@@ -27,7 +27,7 @@ use Illuminate\Support\Arr;
 
 class AssetController extends Controller
 {
-    private const LIST_RELATIONS = ['item.category', 'currentAssignment'];
+    private const LIST_RELATIONS = ['item.category', 'currentAssignment', 'additions'];
 
     /**
      * Filters: `item_id`, `category_id` (with every category below it),

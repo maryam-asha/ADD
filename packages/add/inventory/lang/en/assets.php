@@ -33,4 +33,8 @@ return [
     'schedule_updated' => 'Maintenance schedule updated.',
     'intangible_has_no_place' => 'An intangible asset has no place: it is not moved or maintained.',
     'intangible_not_in_place' => 'An intangible asset is not registered in a place; register it on its own.',
+    'additions_off' => 'Capital additions are off in the settings.',
+    'addition_needs_cost' => "Record the asset's cost before adding capital to it.",
+    'addition_before_start' => 'An addition cannot predate the asset being put in service.',
+    'addition_removed' => 'Capital addition removed.',
 ];
