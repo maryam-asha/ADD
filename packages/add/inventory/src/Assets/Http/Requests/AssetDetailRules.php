@@ -5,6 +5,7 @@ namespace Add\Inventory\Assets\Http\Requests;
 use Add\Inventory\Assets\Models\Asset;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\Decimal;
+use Add\Inventory\Support\Rules\FileUrl;
 use Illuminate\Contracts\Validation\Validator;
 
 /**
@@ -26,6 +27,9 @@ trait AssetDetailRules
             'purchase_cost' => [...$sometimes, 'nullable', 'numeric', 'min:0', 'max:999999999999'],
             'currency' => [...$sometimes, 'nullable', 'required_with:purchase_cost', ...Inventory::currencyRules()],
             'supplier' => [...$sometimes, 'nullable', 'string', 'max:255'],
+            // The supplier's invoice number, and the invoice uploaded.
+            'reference' => [...$sometimes, 'nullable', 'string', 'max:60'],
+            'attachment_url' => [...$sometimes, 'nullable', ...FileUrl::rules()],
             'useful_life_months' => [...$sometimes, 'nullable', 'integer', 'min:1', 'max:1200'],
             'salvage_value' => [...$sometimes, 'nullable', 'numeric', 'min:0'],
             'warranty_until' => [...$sometimes, 'nullable', 'date_format:Y-m-d'],

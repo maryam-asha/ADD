@@ -39,6 +39,8 @@ class Asset extends Model
         'purchase_cost',
         'currency',
         'supplier',
+        'reference',
+        'attachment_url',
         'useful_life_months',
         'salvage_value',
         'warranty_until',

@@ -47,7 +47,7 @@ class UpdateItemRequest extends FormRequest
         return [
             ...TranslatableField::sometimes('name'),
             'category_id' => ['sometimes', 'integer', Rule::exists('inv_categories', 'id')],
-            'unit_id' => ['sometimes', 'integer', Rule::exists('inv_units', 'id')],
+            'unit_id' => ['sometimes', 'nullable', 'integer', Rule::exists('inv_units', 'id')],
             'sku' => ['sometimes', 'string', 'max:40', Rule::unique('inv_items', 'sku')->ignore($item)],
             'description' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'is_active' => ['sometimes', 'boolean'],
