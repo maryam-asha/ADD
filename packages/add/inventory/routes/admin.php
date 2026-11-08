@@ -12,6 +12,7 @@ use Add\Inventory\Catalog\Http\Controllers\LocationController;
 use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
+use Add\Inventory\Settings\Http\ManageSettingsController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
 use Add\Inventory\Support\Http\SettingsController;
 use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
@@ -89,6 +90,12 @@ Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
 
 // What the package is set to do, for a host's screens to follow.
 Route::get('settings', SettingsController::class)->name('settings');
+
+// The settings page: what the dashboard may change over the config file.
+Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
+    Route::get('settings/manage', [ManageSettingsController::class, 'index'])->name('settings.manage');
+    Route::patch('settings', [ManageSettingsController::class, 'update'])->name('settings.update');
+});
 
 // Warehouses: where stock is kept
 Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
