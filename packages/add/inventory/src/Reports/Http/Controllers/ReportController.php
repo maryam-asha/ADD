@@ -57,7 +57,8 @@ class ReportController extends Controller
     public function assetRegister(Request $request, DepreciationCalculator $depreciation, Presenter $presenter): JsonResponse
     {
         $assets = Asset::query()
-            ->with('item')
+            ->with(['item.category', 'additions'])
+            ->where('status', '!=', AssetStatus::Draft)
             ->when(! $request->boolean('include_disposed'), fn (Builder $query) => $query->where('status', '!=', AssetStatus::Disposed))
             ->orderBy('id')
             ->get();

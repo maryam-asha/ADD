@@ -2,6 +2,7 @@
 
 namespace Add\Inventory\Assets\Http\Controllers;
 
+use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Http\Requests\MaintenanceRequest;
 use Add\Inventory\Assets\Http\Resources\MaintenanceScheduleResource;
 use Add\Inventory\Assets\Models\Asset;
@@ -36,6 +37,14 @@ class MaintenanceScheduleController extends Controller
     {
         if ($asset->isDisposed()) {
             InventoryException::fail('inventory::assets.disposed');
+        }
+
+        if ($asset->status === AssetStatus::Draft) {
+            InventoryException::fail('inventory::assets.draft');
+        }
+
+        if ($asset->item->isIntangible()) {
+            InventoryException::fail('inventory::assets.intangible_has_no_place');
         }
 
         return new MaintenanceScheduleResource($asset->maintenanceSchedules()->create($request->validated()));

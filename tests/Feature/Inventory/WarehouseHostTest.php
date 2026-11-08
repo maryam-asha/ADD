@@ -71,6 +71,11 @@ class WarehouseHostTest extends TestCase
         $this->getJson('/api/v1/inventory/settings')->assertOk()->assertJsonPath('data.item_code_mode', 'auto');
     }
 
+    public function test_admin_can_manage_inventory_settings(): void
+    {
+        $this->getJson('/api/v1/inventory/settings/manage')->assertOk()->assertJsonFragment(['key' => 'items.sku_mode', 'value' => 'auto']);
+    }
+
     public function test_a_warehouse_sits_in_a_branch_or_in_nothing(): void
     {
         $branch = Branch::factory()->create();

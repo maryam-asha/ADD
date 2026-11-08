@@ -8,7 +8,11 @@ use Add\Inventory\Assets\Models\MaintenanceSchedule;
 use Add\Inventory\Assets\Services\MaintenanceService;
 use Add\Inventory\Authorization\Abilities;
 use Add\Inventory\Contracts\InventoryNotifier;
+use Add\Inventory\Events\DepreciationMonthClosed;
+use Add\Inventory\Inventory;
+use Carbon\CarbonImmutable;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Announces, once each, the servicing coming due (or overdue) and the
@@ -18,7 +22,7 @@ class RunDaily extends Command
 {
     protected $signature = 'inventory:run-daily';
 
-    protected $description = 'Announce maintenance coming due and warranties ending';
+    protected $description = 'Announce maintenance coming due, warranties ending, and the close of last month\'s depreciation';
 
     public function handle(MaintenanceService $maintenance, InventoryNotifier $notifier): int
     {
@@ -42,7 +46,7 @@ class RunDaily extends Command
 
         Asset::query()
             ->whereNull('warranty_alerted_at')
-            ->where('status', '!=', AssetStatus::Disposed)
+            ->whereNotIn('status', [AssetStatus::Disposed, AssetStatus::Draft])
             ->whereNotNull('warranty_until')
             ->where('warranty_until', '>=', now()->toDateString())
             ->where('warranty_until', '<=', now()->addDays((int) config('inventory.assets.warranty_lead_days'))->toDateString())
@@ -56,8 +60,41 @@ class RunDaily extends Command
                 $ending++;
             });
 
+        $this->closeMonths();
+
         $this->info("Maintenance due: {$due}. Warranties ending: {$ending}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Every month up to last month is final: each announced once, in order
+     * — a month the scheduler missed is closed on its next run (the last
+     * month closed is remembered in inv_sequences; the first run closes
+     * only last month).
+     */
+    private function closeMonths(): void
+    {
+        $last = Inventory::today()->startOfMonth()->subMonth();
+
+        $months = DB::transaction(function () use ($last) {
+            $closed = DB::table('inv_sequences')->where('name', 'depreciation.closed')->lockForUpdate()->value('value');
+            $month = $closed === null ? $last : CarbonImmutable::createFromFormat('!Ym', (string) $closed)->addMonth();
+            $months = [];
+
+            for (; $month->lte($last); $month = $month->addMonth()) {
+                $months[] = $month;
+            }
+
+            if ($months !== []) {
+                DB::table('inv_sequences')->upsert(['name' => 'depreciation.closed', 'value' => (int) $last->format('Ym')], ['name'], ['value']);
+            }
+
+            return $months;
+        });
+
+        foreach ($months as $month) {
+            DepreciationMonthClosed::dispatch($month->year, $month->month);
+        }
     }
 }

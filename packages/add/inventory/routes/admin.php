@@ -1,5 +1,6 @@
 <?php
 
+use Add\Inventory\Assets\Http\Controllers\AssetAdditionController;
 use Add\Inventory\Assets\Http\Controllers\AssetController;
 use Add\Inventory\Assets\Http\Controllers\CustodyController;
 use Add\Inventory\Assets\Http\Controllers\MaintenanceController;
@@ -12,6 +13,7 @@ use Add\Inventory\Catalog\Http\Controllers\LocationController;
 use Add\Inventory\Catalog\Http\Controllers\UnitController;
 use Add\Inventory\Inventory;
 use Add\Inventory\Reports\Http\Controllers\ReportController;
+use Add\Inventory\Settings\Http\ManageSettingsController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
 use Add\Inventory\Support\Http\SettingsController;
 use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
@@ -60,14 +62,19 @@ Route::middleware('can:'.Abilities::ASSETS_VIEW)->group(function () {
     Route::get('custody', [CustodyController::class, 'index'])->name('custody.index');
     Route::get('maintenance', [MaintenanceController::class, 'index'])->name('maintenance.index');
     Route::get('assets/{asset}/maintenance-schedules', [MaintenanceScheduleController::class, 'index'])->name('maintenance-schedules.index');
+    Route::get('assets/{asset}/additions', [AssetAdditionController::class, 'index'])->name('asset-additions.index');
     Route::get('maintenance-schedules/due', [MaintenanceScheduleController::class, 'due'])->name('maintenance-schedules.due');
 });
 
 Route::middleware('can:'.Abilities::ASSETS_MANAGE)->group(function () {
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::post('assets/batch', [AssetController::class, 'storeBatch'])->name('assets.store-batch');
     Route::match(['put', 'patch'], 'assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::patch('assets/{asset}/status', [AssetController::class, 'status'])->name('assets.status');
     Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');
+    Route::delete('assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    Route::post('assets/{asset}/additions', [AssetAdditionController::class, 'store'])->name('asset-additions.store');
+    Route::delete('asset-additions/{addition}', [AssetAdditionController::class, 'destroy'])->name('asset-additions.destroy');
 });
 
 Route::middleware('can:'.Abilities::ASSETS_CUSTODY)->group(function () {
@@ -83,11 +90,20 @@ Route::middleware('can:'.Abilities::ASSETS_MAINTENANCE)->group(function () {
     Route::delete('maintenance-schedules/{schedule}', [MaintenanceScheduleController::class, 'destroy'])->name('maintenance-schedules.destroy');
 });
 
+Route::post('assets/{asset}/approve', [AssetController::class, 'approve'])
+    ->middleware('can:'.Abilities::ASSETS_APPROVE)->name('assets.approve');
+
 Route::post('assets/{asset}/dispose', [AssetController::class, 'dispose'])
     ->middleware('can:'.Abilities::ASSETS_DISPOSE)->name('assets.dispose');
 
 // What the package is set to do, for a host's screens to follow.
 Route::get('settings', SettingsController::class)->name('settings');
+
+// The settings page: what the dashboard may change over the config file.
+Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
+    Route::get('settings/manage', [ManageSettingsController::class, 'index'])->name('settings.manage');
+    Route::patch('settings', [ManageSettingsController::class, 'update'])->name('settings.update');
+});
 
 // Warehouses: where stock is kept
 Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {

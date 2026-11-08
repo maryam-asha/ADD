@@ -48,6 +48,12 @@ final class Abilities
     /** Stock valuation and the asset register with book values. */
     public const REPORTS_VIEW = 'inventory.reports.view';
 
+    /** Approve a draft asset into service (config inventory.assets.drafts). */
+    public const ASSETS_APPROVE = 'inventory.assets.approve';
+
+    /** Change the package's settings from the dashboard. */
+    public const SETTINGS_MANAGE = 'inventory.settings.manage';
+
     /**
      * @return list<string>
      */

@@ -23,4 +23,7 @@ return [
     'unit_not_of_item' => 'This unit is not one of this item’s units.',
     'unit_in_use_by_movements' => 'Stock was already recorded in this unit; it stays, with its factor.',
     'item_has_history' => 'This item already has assets or stock history; deactivate it instead.',
+    'intangible_off' => 'Intangible assets are off in the settings.',
+    'intangible_assets_only' => 'Only asset categories may be intangible.',
+    'intangible_has_assets' => 'Assets are registered in this category; whether it is intangible cannot change.',
 ];

@@ -9,6 +9,9 @@ namespace Add\Inventory\Assets\Enums;
  */
 enum AssetStatus: string
 {
+    // Saved, not yet approved (config inventory.assets.drafts): no code, no
+    // movement, no depreciation, no action until it is approved.
+    case Draft = 'draft';
     case InService = 'in_service';
     case InMaintenance = 'in_maintenance';
     // Still owned, out of use (stored, kept as a spare).

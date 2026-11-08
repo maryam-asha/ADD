@@ -23,6 +23,7 @@ class CategoryResource extends JsonResource
             'id' => $this->id,
             'parent_id' => $this->parent_id,
             'kind' => $this->kind->value,
+            'intangible' => $this->intangible,
             'name' => $this->name,
             'icon' => $this->icon,
             'show_to_members' => $this->show_to_members,

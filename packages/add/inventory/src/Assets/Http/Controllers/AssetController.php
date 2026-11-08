@@ -5,6 +5,7 @@ namespace Add\Inventory\Assets\Http\Controllers;
 use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Http\Requests\AssetActionRequest;
+use Add\Inventory\Assets\Http\Requests\RegisterAssetBatchRequest;
 use Add\Inventory\Assets\Http\Requests\RegisterAssetRequest;
 use Add\Inventory\Assets\Http\Requests\UpdateAssetRequest;
 use Add\Inventory\Assets\Http\Resources\AssetAssignmentResource;
@@ -26,7 +27,7 @@ use Illuminate\Support\Arr;
 
 class AssetController extends Controller
 {
-    private const LIST_RELATIONS = ['item.category', 'currentAssignment'];
+    private const LIST_RELATIONS = ['item.category', 'currentAssignment', 'additions'];
 
     /**
      * Filters: `item_id`, `category_id` (with every category below it),
@@ -66,12 +67,58 @@ class AssetController extends Controller
         $data = $request->validated();
         $assets = $service->register(
             Item::query()->findOrFail($data['item_id']),
-            Place::from($data['location']),
-            Arr::except($data, ['item_id', 'location', 'count']),
+            isset($data['location']) ? Place::from($data['location']) : null,
+            Arr::except($data, ['item_id', 'location', 'count', 'draft']),
             $data['count'] ?? 1,
+            $request->wantsDraft(),
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Several asset items registered in one place at once (a room's
+     * contents): the place and the purchase's shared fields once, a line
+     * per item.
+     */
+    public function storeBatch(RegisterAssetBatchRequest $request, AssetService $service): JsonResponse
+    {
+        $data = $request->validated();
+        $items = Item::query()->findMany(array_column($data['lines'], 'item_id'))->keyBy('id');
+
+        $assets = $service->registerBatch(
+            isset($data['location']) ? Place::from($data['location']) : null,
+            array_map(fn (array $line) => [
+                'item' => $items->get($line['item_id']),
+                'count' => $line['count'] ?? 1,
+                'details' => Arr::except($line, ['item_id', 'count']),
+            ], $data['lines']),
+            Arr::only($data, ['purchased_on', 'in_service_on', 'supplier', 'reference', 'attachments', 'currency', 'notes']),
+            $request->wantsDraft(),
+        );
+
+        return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
+    }
+
+    /**
+     * A draft approved into service: it takes its code and arrives at its
+     * place.
+     */
+    public function approve(Asset $asset, AssetService $service): JsonResponse
+    {
+        $service->approve($asset);
+
+        return response()->json(['message' => __('inventory::assets.approved')]);
+    }
+
+    /**
+     * Only a draft is deleted; a registered asset is disposed of.
+     */
+    public function destroy(Asset $asset, AssetService $service): JsonResponse
+    {
+        $service->deleteDraft($asset);
+
+        return response()->json(['message' => __('inventory::assets.draft_deleted')]);
     }
 
     public function show(Asset $asset): AssetResource

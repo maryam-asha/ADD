@@ -3,6 +3,7 @@
 namespace Add\Inventory\Assets\Models;
 
 use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Catalog\Models\Item;
 use Add\Inventory\Database\Factories\AssetFactory;
@@ -36,12 +37,14 @@ class Asset extends Model
         'location_type',
         'location_id',
         'purchased_on',
+        'in_service_on',
         'purchase_cost',
         'currency',
         'supplier',
         'reference',
-        'attachment_url',
+        'attachments',
         'useful_life_months',
+        'depreciation_method',
         'salvage_value',
         'warranty_until',
         'warranty_alerted_at',
@@ -57,8 +60,11 @@ class Asset extends Model
         'status' => AssetStatus::class,
         'location_id' => 'integer',
         'purchased_on' => DateOnly::class,
+        'in_service_on' => DateOnly::class,
+        'attachments' => 'array',
         'purchase_cost' => PlainDecimal::class.':2',
         'useful_life_months' => 'integer',
+        'depreciation_method' => DepreciationMethod::class,
         'salvage_value' => PlainDecimal::class.':2',
         'warranty_until' => DateOnly::class,
         'warranty_alerted_at' => 'datetime',
@@ -74,6 +80,14 @@ class Asset extends Model
     public function item(): BelongsTo
     {
         return $this->belongsTo(Item::class);
+    }
+
+    /**
+     * Capital additions: money spent on it that raised its cost.
+     */
+    public function additions(): HasMany
+    {
+        return $this->hasMany(AssetAddition::class);
     }
 
     public function movements(): HasMany
@@ -106,9 +120,12 @@ class Asset extends Model
         return $this->hasMany(MaintenanceSchedule::class);
     }
 
-    public function location(): Place
+    /**
+     * Where it is; null for an intangible asset, which sits nowhere.
+     */
+    public function location(): ?Place
     {
-        return new Place($this->location_type, $this->location_id);
+        return $this->location_type === null ? null : new Place($this->location_type, $this->location_id);
     }
 
     public function isDisposed(): bool

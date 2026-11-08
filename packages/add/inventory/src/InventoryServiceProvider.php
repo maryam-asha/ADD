@@ -9,6 +9,7 @@ use Add\Inventory\Contracts\LocationResolver;
 use Add\Inventory\Integrations\LogInventoryNotifier;
 use Add\Inventory\Integrations\NullCustodianResolver;
 use Add\Inventory\Integrations\OwnLocationResolver;
+use Add\Inventory\Settings\SettingsStore;
 use Add\Inventory\Support\Presenter;
 use Illuminate\Support\ServiceProvider;
 
@@ -24,6 +25,9 @@ class InventoryServiceProvider extends ServiceProvider
         $this->app->singletonIf(CustodianResolver::class, NullCustodianResolver::class);
         $this->app->singletonIf(InventoryNotifier::class, LogInventoryNotifier::class);
 
+        // The settings saved from the dashboard, laid over the config.
+        $this->app->singleton(SettingsStore::class);
+
         // Remembers names for one request only.
         $this->app->scoped(Presenter::class);
     }
@@ -32,6 +36,7 @@ class InventoryServiceProvider extends ServiceProvider
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'inventory');
+        $this->app->make(SettingsStore::class)->apply();
 
         if ($this->app->runningInConsole()) {
             $this->commands([RunDaily::class]);

@@ -31,8 +31,29 @@ return [
         // it is handed out (moved to where it is used).
         'store_in_warehouses' => false,
 
+        // How assets may be depreciated: 'straight_line' (evenly each month)
+        // and 'declining_balance' (twice that rate on what is left). An asset
+        // takes one of these; the first is the default.
+        'depreciation_methods' => ['straight_line'],
+
+        // Whether an asset category may be marked intangible (a software
+        // licence): its assets sit nowhere, take no maintenance, and are
+        // amortized on a straight line with no salvage.
+        'intangible' => false,
+
+        // Whether capital additions may be recorded on an asset: money spent
+        // on it that raises its cost, depreciated over what is left of its life.
+        'capital_additions' => false,
+
+        // Whether a registered asset is a draft until someone holding
+        // inventory.assets.approve approves it into service.
+        'drafts' => false,
+
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
+
+        // Most lines (asset items) one registration in a place may carry.
+        'max_lines' => 50,
 
         // How many days ahead inventory:run-daily warns of maintenance due
         // and of warranties ending.

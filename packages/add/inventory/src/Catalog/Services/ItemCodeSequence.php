@@ -33,6 +33,15 @@ class ItemCodeSequence
         return $code;
     }
 
+    /**
+     * Whether any code has been numbered in the current shape — after
+     * which its characters and digits may no longer change.
+     */
+    public function used(): bool
+    {
+        return (int) DB::table('inv_sequences')->where('name', self::NAME)->value('value') > 0 || $this->highestUsed() > 0;
+    }
+
     private function lockedValue(): int
     {
         $read = fn () => DB::table('inv_sequences')->where('name', self::NAME)->lockForUpdate()->value('value');

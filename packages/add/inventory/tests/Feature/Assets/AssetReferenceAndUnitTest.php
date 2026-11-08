@@ -30,12 +30,12 @@ class AssetReferenceAndUnitTest extends TestCase
             'location' => $this->at(Location::factory()->create()),
             'count' => 2,
             'reference' => 'INV-2026-114',
-            'attachment_url' => '/storage/uploads/inventory/inv-114.pdf',
+            'attachments' => ['/storage/uploads/inventory/inv-114.pdf'],
         ])->assertCreated()->json('data');
 
         foreach ($assets as $asset) {
             $this->assertSame('INV-2026-114', $asset['reference']);
-            $this->assertSame('/storage/uploads/inventory/inv-114.pdf', $asset['attachment_url']);
+            $this->assertSame(['/storage/uploads/inventory/inv-114.pdf'], $asset['attachments']);
         }
     }
 
@@ -44,10 +44,10 @@ class AssetReferenceAndUnitTest extends TestCase
         $this->actingAsWith(self::ALL);
         $id = $this->postJson('/api/inventory/assets', ['item_id' => $this->assetItem()->id, 'location' => $this->at(Location::factory()->create())])->json('data.0.id');
 
-        $this->patchJson("/api/inventory/assets/{$id}", ['reference' => 'INV-9', 'attachment_url' => 'https://cdn.example.test/inv-9.pdf'])->assertOk();
-        $this->getJson("/api/inventory/assets/{$id}")->assertOk()->assertJsonPath('data.reference', 'INV-9')->assertJsonPath('data.attachment_url', 'https://cdn.example.test/inv-9.pdf');
+        $this->patchJson("/api/inventory/assets/{$id}", ['reference' => 'INV-9', 'attachments' => ['https://cdn.example.test/inv-9.pdf']])->assertOk();
+        $this->getJson("/api/inventory/assets/{$id}")->assertOk()->assertJsonPath('data.reference', 'INV-9')->assertJsonPath('data.attachments', ['https://cdn.example.test/inv-9.pdf']);
 
-        $this->patchJson("/api/inventory/assets/{$id}", ['attachment_url' => 'javascript:alert(1)'])->assertUnprocessable()->assertJsonValidationErrors('attachment_url');
+        $this->patchJson("/api/inventory/assets/{$id}", ['attachments' => ['javascript:alert(1)']])->assertUnprocessable()->assertJsonValidationErrors('attachments.0');
         $this->patchJson("/api/inventory/assets/{$id}", ['reference' => str_repeat('x', 61)])->assertUnprocessable()->assertJsonValidationErrors('reference');
     }
 

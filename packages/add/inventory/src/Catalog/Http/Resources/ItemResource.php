@@ -29,6 +29,7 @@ class ItemResource extends JsonResource
             'category' => [
                 'id' => $this->category->id,
                 'name' => $this->category->name,
+                'intangible' => $this->category->intangible,
             ],
             // None for an asset item that is counted one by one.
             'unit' => $this->unit === null ? null : new UnitResource($this->unit),

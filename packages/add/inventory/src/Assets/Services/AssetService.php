@@ -3,11 +3,17 @@
 namespace Add\Inventory\Assets\Services;
 
 use Add\Inventory\Assets\Enums\AssetStatus;
+use Add\Inventory\Assets\Enums\DepreciationMethod;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Models\Asset;
+use Add\Inventory\Assets\Models\AssetAddition;
 use Add\Inventory\Assets\Models\AssetAssignment;
 use Add\Inventory\Assets\Models\AssetMovement;
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Events\AssetDisposed;
+use Add\Inventory\Events\AssetPlacedInService;
+use Add\Inventory\Events\CapitalAdditionRecorded;
+use Add\Inventory\Events\CapitalAdditionRemoved;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
@@ -34,7 +40,7 @@ class AssetService
      * @param  array<string, mixed>  $details
      * @return Collection<int, Asset>
      */
-    public function register(Item $item, Place $location, array $details = [], int $count = 1): Collection
+    public function register(Item $item, ?Place $location, array $details = [], int $count = 1, bool $draft = false): Collection
     {
         if (! $item->isAsset()) {
             InventoryException::fail('inventory::assets.not_asset');
@@ -52,9 +58,18 @@ class AssetService
             InventoryException::fail('inventory::assets.code_for_one');
         }
 
-        $this->ensureLocation($location, $item);
+        // Not sent, or sent empty: the first method the package offers.
+        $details['depreciation_method'] ??= DepreciationMethod::enabled()[0]->value;
 
-        return DB::transaction(function () use ($item, $location, $details, $count) {
+        if ($item->isIntangible() && $location !== null) {
+            InventoryException::fail('inventory::assets.intangible_not_in_place');
+        }
+
+        if (! $item->isIntangible()) {
+            $this->ensureLocation($location ?? InventoryException::fail('inventory::assets.unknown_location'), $item);
+        }
+
+        return DB::transaction(function () use ($item, $location, $details, $count, $draft) {
             $assets = collect();
 
             for ($i = 0; $i < $count; $i++) {
@@ -62,22 +77,14 @@ class AssetService
                     ...$details,
                     'item_id' => $item->id,
                     'qr_token' => Str::random(40),
-                    'status' => AssetStatus::InService,
-                    'location_type' => $location->type,
-                    'location_id' => $location->id,
+                    'status' => $draft ? AssetStatus::Draft : AssetStatus::InService,
+                    'location_type' => $location?->type,
+                    'location_id' => $location?->id,
                 ]);
 
-                if ($asset->code === null) {
-                    $asset->update(['code' => config('inventory.assets.code_prefix').str_pad((string) $asset->id, (int) config('inventory.assets.code_pad'), '0', STR_PAD_LEFT)]);
+                if (! $draft) {
+                    $this->putInService($asset);
                 }
-
-                AssetMovement::query()->create([
-                    'asset_id' => $asset->id,
-                    'to_type' => $location->type,
-                    'to_id' => $location->id,
-                    'actor_id' => Inventory::actorId(),
-                    'moved_at' => now(),
-                ]);
 
                 $assets->push($asset);
             }
@@ -86,8 +93,125 @@ class AssetService
         });
     }
 
+    /**
+     * Several asset items put in one place together, all or none: each line
+     * is `['item' => Item, 'count' => int, 'details' => [...]]`, and what the
+     * purchase shares is laid under every line's own details.
+     *
+     * @param  list<array{item: Item, count: int, details: array<string, mixed>}>  $lines
+     * @param  array<string, mixed>  $shared
+     * @return Collection<int, Asset>
+     */
+    public function registerBatch(?Place $location, array $lines, array $shared = [], bool $draft = false): Collection
+    {
+        // An intangible line sits nowhere; every other one at the place.
+        return DB::transaction(fn () => collect($lines)->flatMap(
+            fn (array $line) => $this->register($line['item'], $line['item']->isIntangible() ? null : $location, [...$shared, ...$line['details']], $line['count'], $draft)
+        )->values());
+    }
+
+    /**
+     * A draft approved into service (config inventory.assets.drafts).
+     */
+    public function approve(Asset $asset): Asset
+    {
+        return DB::transaction(function () use ($asset) {
+            $asset = $this->lock($asset);
+
+            if ($asset->status !== AssetStatus::Draft) {
+                InventoryException::fail('inventory::assets.not_draft');
+            }
+
+            $asset->update(['status' => AssetStatus::InService]);
+            $this->putInService($asset);
+
+            return $asset;
+        });
+    }
+
+    /**
+     * Only a draft is deleted: it never existed for anyone but its author.
+     */
+    public function deleteDraft(Asset $asset): void
+    {
+        DB::transaction(function () use ($asset) {
+            $asset = $this->lock($asset);
+
+            if ($asset->status !== AssetStatus::Draft) {
+                InventoryException::fail('inventory::assets.only_drafts_deleted');
+            }
+
+            $asset->delete();
+        });
+    }
+
+    /**
+     * What an asset takes on entering service: its readable code (unless
+     * one was given) and its arrival at its place.
+     */
+    private function putInService(Asset $asset): void
+    {
+        if ($asset->code === null) {
+            $asset->update(['code' => config('inventory.assets.code_prefix').str_pad((string) $asset->id, (int) config('inventory.assets.code_pad'), '0', STR_PAD_LEFT)]);
+        }
+
+        $location = $asset->location();
+
+        if ($location !== null) {
+            AssetMovement::query()->create([
+                'asset_id' => $asset->id,
+                'to_type' => $location->type,
+                'to_id' => $location->id,
+                'actor_id' => Inventory::actorId(),
+                'moved_at' => now(),
+            ]);
+        }
+
+        AssetPlacedInService::dispatch($asset);
+    }
+
+    /**
+     * A capital addition (config inventory.assets.capital_additions): it
+     * raises the asset's cost, in the asset's currency.
+     *
+     * @param  array{added_on: string, amount: int|float|string, description: string, reference?: ?string, attachments?: ?list<string>}  $data
+     */
+    public function addCapital(Asset $asset, array $data): AssetAddition
+    {
+        if (! config('inventory.assets.capital_additions')) {
+            InventoryException::fail('inventory::assets.additions_off');
+        }
+
+        return DB::transaction(function () use ($asset, $data) {
+            $asset = $this->lock($asset);
+            $this->ensureNotDisposed($asset);
+
+            if ($asset->purchase_cost === null) {
+                InventoryException::fail('inventory::assets.addition_needs_cost');
+            }
+
+            $addition = $asset->additions()->create([...$data, 'actor_id' => Inventory::actorId()]);
+            CapitalAdditionRecorded::dispatch($addition);
+
+            return $addition;
+        });
+    }
+
+    public function removeCapital(AssetAddition $addition): void
+    {
+        DB::transaction(function () use ($addition) {
+            $this->lock($addition->asset);
+            $addition->delete();
+            CapitalAdditionRemoved::dispatch($addition->id, $addition->asset_id, $addition->amount, $addition->added_on->toDateString());
+        });
+    }
+
     public function move(Asset $asset, Place $to, ?string $note = null, ?CarbonInterface $movedAt = null): AssetMovement
     {
+        if ($asset->item->isIntangible()) {
+            InventoryException::fail('inventory::assets.intangible_has_no_place');
+        }
+
         $this->ensureLocation($to, $asset->item);
 
         return DB::transaction(function () use ($asset, $to, $note, $movedAt) {
@@ -228,6 +352,7 @@ class AssetService
                 'disposal_note' => $note,
             ]);
             $asset->maintenanceSchedules()->update(['is_active' => false]);
+            AssetDisposed::dispatch($asset);
 
             return $asset;
         });
@@ -240,6 +365,10 @@ class AssetService
 
     private function ensureNotDisposed(Asset $asset): void
     {
+        if ($asset->status === AssetStatus::Draft) {
+            InventoryException::fail('inventory::assets.draft');
+        }
+
         if ($asset->isDisposed()) {
             InventoryException::fail('inventory::assets.disposed');
         }
