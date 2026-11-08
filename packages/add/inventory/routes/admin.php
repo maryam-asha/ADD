@@ -65,6 +65,7 @@ Route::middleware('can:'.Abilities::ASSETS_VIEW)->group(function () {
 
 Route::middleware('can:'.Abilities::ASSETS_MANAGE)->group(function () {
     Route::post('assets', [AssetController::class, 'store'])->name('assets.store');
+    Route::post('assets/batch', [AssetController::class, 'storeBatch'])->name('assets.store-batch');
     Route::match(['put', 'patch'], 'assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
     Route::patch('assets/{asset}/status', [AssetController::class, 'status'])->name('assets.status');
     Route::post('assets/{asset}/move', [AssetController::class, 'move'])->name('assets.move');

@@ -21,6 +21,8 @@ return [
     'schedule_of_another_asset' => 'This schedule belongs to another asset.',
     'maintenance_closed' => 'This maintenance is already closed.',
     'closed_before_opened' => 'Maintenance cannot close before it opened.',
+    'currency_for_cost' => 'Choose the currency of the cost.',
+    'serial_for_one' => 'A serial number is for a single asset; make the count 1.',
     'salvage_over_cost' => 'The salvage value cannot exceed the purchase cost.',
     'updated' => 'Asset updated.',
     'status_updated' => 'Asset status updated.',

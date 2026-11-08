@@ -21,6 +21,8 @@ return [
     'schedule_of_another_asset' => 'هذا الجدول يخص أصلاً آخر.',
     'maintenance_closed' => 'هذه الصيانة مغلقة بالفعل.',
     'closed_before_opened' => 'لا يمكن إغلاق الصيانة قبل تاريخ فتحها.',
+    'currency_for_cost' => 'اختر عملة التكلفة.',
+    'serial_for_one' => 'الرقم التسلسلي لأصل واحد فقط، اجعل العدد 1.',
     'salvage_over_cost' => 'قيمة الخردة لا يمكن أن تتجاوز تكلفة الشراء.',
     'updated' => 'تم تحديث الأصل.',
     'status_updated' => 'تم تحديث حالة الأصل.',

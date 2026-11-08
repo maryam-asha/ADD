@@ -5,6 +5,7 @@ namespace Add\Inventory\Assets\Http\Controllers;
 use Add\Inventory\Assets\Enums\AssetStatus;
 use Add\Inventory\Assets\Enums\DisposalMethod;
 use Add\Inventory\Assets\Http\Requests\AssetActionRequest;
+use Add\Inventory\Assets\Http\Requests\RegisterAssetBatchRequest;
 use Add\Inventory\Assets\Http\Requests\RegisterAssetRequest;
 use Add\Inventory\Assets\Http\Requests\UpdateAssetRequest;
 use Add\Inventory\Assets\Http\Resources\AssetAssignmentResource;
@@ -69,6 +70,29 @@ class AssetController extends Controller
             Place::from($data['location']),
             Arr::except($data, ['item_id', 'location', 'count']),
             $data['count'] ?? 1,
+        );
+
+        return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Several asset items registered in one place at once (a room's
+     * contents): the place and the purchase's shared fields once, a line
+     * per item.
+     */
+    public function storeBatch(RegisterAssetBatchRequest $request, AssetService $service): JsonResponse
+    {
+        $data = $request->validated();
+        $items = Item::query()->findMany(array_column($data['lines'], 'item_id'))->keyBy('id');
+
+        $assets = $service->registerBatch(
+            Place::from($data['location']),
+            array_map(fn (array $line) => [
+                'item' => $items->get($line['item_id']),
+                'count' => $line['count'] ?? 1,
+                'details' => Arr::except($line, ['item_id', 'count']),
+            ], $data['lines']),
+            Arr::only($data, ['purchased_on', 'supplier', 'reference', 'attachment_url', 'currency', 'notes']),
         );
 
         return AssetResource::collection($assets->each->load(self::LIST_RELATIONS))->response()->setStatusCode(201);

@@ -86,6 +86,22 @@ class AssetService
         });
     }
 
+    /**
+     * Several asset items put in one place together, all or none: each line
+     * is `['item' => Item, 'count' => int, 'details' => [...]]`, and what the
+     * purchase shares is laid under every line's own details.
+     *
+     * @param  list<array{item: Item, count: int, details: array<string, mixed>}>  $lines
+     * @param  array<string, mixed>  $shared
+     * @return Collection<int, Asset>
+     */
+    public function registerBatch(Place $location, array $lines, array $shared = []): Collection
+    {
+        return DB::transaction(fn () => collect($lines)->flatMap(
+            fn (array $line) => $this->register($line['item'], $location, [...$shared, ...$line['details']], $line['count'])
+        )->values());
+    }
+
     public function move(Asset $asset, Place $to, ?string $note = null, ?CarbonInterface $movedAt = null): AssetMovement
     {
         $this->ensureLocation($to, $asset->item);

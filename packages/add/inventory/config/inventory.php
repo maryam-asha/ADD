@@ -34,6 +34,9 @@ return [
         // Most identical assets one registration may create at once.
         'max_batch' => 100,
 
+        // Most lines (asset items) one registration in a place may carry.
+        'max_lines' => 50,
+
         // How many days ahead inventory:run-daily warns of maintenance due
         // and of warranties ending.
         'maintenance_lead_days' => 7,
