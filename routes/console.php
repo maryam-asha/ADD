@@ -95,6 +95,8 @@ Schedule::command('access:expire-unactivated-grants')->everyFiveMinutes()->witho
 // instead, so a same-day booking's grant doesn't survive its own
 // cancellation.
 Schedule::command('access:revoke-grants-on-booking-cancellation')->everyFiveMinutes()->withoutOverlapping();
+// Lock/gateway status and lock battery from the TTLock account (read-only).
+Schedule::command('access:sync-devices')->everyFifteenMinutes()->withoutOverlapping();
 
 /*
  * Events (docs/decisions/event-approval-and-custom-forms.md) — a pending

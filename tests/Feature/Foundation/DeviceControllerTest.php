@@ -48,6 +48,7 @@ class DeviceControllerTest extends TestCase
             'branch_id' => $branch->id,
             'type' => 'lock',
             'hardware_mac' => 'AA:BB:CC:DD:EE:01',
+            'external_ref' => '33804038',
         ]);
 
         $response->assertCreated();
@@ -64,6 +65,7 @@ class DeviceControllerTest extends TestCase
             'branch_id' => $branch->id,
             'type' => 'lock',
             'hardware_mac' => 'AA:BB:CC:DD:EE:01',
+            'external_ref' => '33804038',
             'status' => null,
         ]);
 
@@ -94,6 +96,7 @@ class DeviceControllerTest extends TestCase
             'branch_id' => $device->branch_id,
             'type' => $device->type,
             'hardware_mac' => 'AA:BB:CC:DD:EE:01',
+            'external_ref' => '33804038',
             'status' => 'online',
         ]);
 
@@ -134,7 +137,7 @@ class DeviceControllerTest extends TestCase
         $this->actingAsAdmin();
         $branch = Branch::factory()->create();
 
-        $response = $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => 'AA:BB:CC:DD:EE:01']);
+        $response = $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => 'AA:BB:CC:DD:EE:01', 'external_ref' => '33804038']);
 
         $response->assertCreated();
         $device = Device::find($response->json('data.id'));
@@ -188,6 +191,33 @@ class DeviceControllerTest extends TestCase
         $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => null])
             ->assertStatus(422)
             ->assertJsonValidationErrors('hardware_mac');
+    }
+
+    public function test_a_lock_needs_its_ttlock_id_once_per_type_and_pairs_only_through_a_gateway(): void
+    {
+        $this->actingAsAdmin();
+        $branch = Branch::factory()->create();
+        $camera = Device::factory()->create(['type' => 'camera']);
+        Device::factory()->create(['type' => 'lock', 'external_ref' => '33804038']);
+        $lock = fn (array $extra) => array_merge(['branch_id' => $branch->id, 'type' => 'lock', 'hardware_mac' => 'AA:BB:CC:DD:EE:09'], $extra);
+
+        $this->postJson('/api/v1/admin/devices', $lock([]))->assertStatus(422)->assertJsonValidationErrors('external_ref');
+        $this->postJson('/api/v1/admin/devices', $lock(['external_ref' => '33804038']))->assertStatus(422)->assertJsonValidationErrors('external_ref');
+        $this->postJson('/api/v1/admin/devices', $lock(['external_ref' => '1', 'parent_device_id' => $camera->id]))
+            ->assertStatus(422)->assertJsonValidationErrors('parent_device_id');
+        // The same id on another type is another device.
+        $this->postJson('/api/v1/admin/devices', ['branch_id' => $branch->id, 'type' => 'gateway', 'hardware_mac' => 'GW:01', 'external_ref' => '33804038'])
+            ->assertCreated();
+    }
+
+    public function test_updating_a_lock_keeps_its_own_ttlock_id(): void
+    {
+        $this->actingAsAdmin();
+        $device = Device::factory()->create(['type' => 'lock', 'hardware_mac' => 'AA:01', 'external_ref' => '33804038']);
+
+        $this->putJson("/api/v1/admin/devices/{$device->id}", [
+            'branch_id' => $device->branch_id, 'type' => 'lock', 'hardware_mac' => 'AA:01', 'external_ref' => '33804038',
+        ])->assertOk();
     }
 
     public function test_admin_can_regenerate_a_locks_qr_value(): void

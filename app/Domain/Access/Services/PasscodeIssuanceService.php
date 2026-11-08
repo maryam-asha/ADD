@@ -5,15 +5,18 @@ namespace App\Domain\Access\Services;
 use App\Domain\Access\Enums\AccessEventChannel;
 use App\Domain\Access\Enums\AccessEventType;
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Enums\AccessRevokeReason;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Access\Exceptions\LockAccessDeniedException;
 use App\Domain\Access\Models\AccessEvent;
 use App\Domain\Access\Models\AccessGrant;
+use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\SessionStartSource;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Services\AccessArrivalCheckIn;
 use App\Domain\Foundation\Enums\AllocationModel;
+use App\Domain\Foundation\Enums\OperationalStatus;
 use App\Domain\Foundation\Models\Device;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
@@ -54,7 +57,9 @@ class PasscodeIssuanceService
             'grantee_id' => $booking->user_id,
             'source_type' => AccessSourceType::Booking,
             'source_id' => $booking->id,
-            'allocation_model' => $booking->space->allocation_model,
+            // Optional on a space, required on a grant: a space left without
+            // one is still booked, so its code is a booking's.
+            'allocation_model' => $booking->space->allocation_model ?? AllocationModel::BookingHourly,
             'passcode_type' => PasscodeType::Period,
             'passcode_value' => $vendor['passcode'],
             'vendor_keyboard_pwd_id' => $vendor['vendor_passcode_id'],
@@ -63,6 +68,54 @@ class PasscodeIssuanceService
             'expires_at' => $booking->end_at,
             'status' => AccessGrantStatus::Issued,
         ]);
+    }
+
+    /**
+     * The desk giving a booking a new door code: one that expired unused,
+     * was stopped, or that the member lost. The new code is put on the lock
+     * first and only then are the booking's live ones revoked, so a vendor
+     * failure leaves the door as it was. Under the booking's row lock, so two
+     * clicks make one code.
+     *
+     * @throws LockAccessDeniedException
+     */
+    public function reissueForBooking(Booking $booking): AccessGrant
+    {
+        return DB::transaction(function () use ($booking) {
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+            $locked->load('space');
+
+            if ($locked->status !== BookingStatus::Confirmed || $locked->end_at->lte(now())) {
+                throw new LockAccessDeniedException('api.access.reissue_not_allowed', 422);
+            }
+
+            if (! $this->hasLock($locked->space)) {
+                throw new LockAccessDeniedException('api.access.space_has_no_lock', 422);
+            }
+
+            if ($locked->space->status !== OperationalStatus::Active) {
+                throw new LockAccessDeniedException('api.access.space_not_active', 422);
+            }
+
+            try {
+                $grant = $this->issueForBooking($locked);
+            } catch (\Throwable $e) {
+                Log::error('Failed to re-issue an access grant for a booking', [
+                    'booking_id' => $locked->id, 'error' => $e->getMessage(),
+                ]);
+
+                throw new LockAccessDeniedException('api.access.issue_failed', 503);
+            }
+
+            $lock = $grant->lock;
+            $locked->accessGrants()
+                ->whereKeyNot($grant->id)
+                ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
+                ->get()
+                ->each(fn (AccessGrant $old) => $this->revoke($old, $lock, AccessRevokeReason::Replaced));
+
+            return $grant;
+        });
     }
 
     /**
@@ -106,7 +159,7 @@ class PasscodeIssuanceService
             ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
             ->with('lock')
             ->get()
-            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $grant->lock));
+            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $grant->lock, AccessRevokeReason::Lease));
     }
 
     public function hasLock(Space $space): bool
@@ -152,9 +205,32 @@ class PasscodeIssuanceService
             ->where('lock_id', $lock->id)
             ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
             ->get()
-            ->map(fn (AccessGrant $grant) => $this->revoke($grant, $lock))
+            ->map(fn (AccessGrant $grant) => $this->revoke($grant, $lock, AccessRevokeReason::Maintenance))
             ->filter()
             ->values();
+    }
+
+    /**
+     * Staff stopping one booking's code from the dashboard — the code comes
+     * off the lock and is never re-issued on its own (the desk can re-issue
+     * it). An office's code follows its lease instead: the hourly lease run
+     * would only open the door again, so ending it is ending the lease.
+     *
+     * @throws LockAccessDeniedException
+     */
+    public function revokeByStaff(AccessGrant $grant, User $staff): AccessGrant
+    {
+        if ($grant->source_type === AccessSourceType::Tenancy || $grant->office_lease_id !== null) {
+            throw new LockAccessDeniedException('api.access.tenancy_grant_follows_lease', 422);
+        }
+
+        $revoked = $this->revoke($grant, $grant->lock, AccessRevokeReason::Staff, $staff);
+
+        if ($revoked === null) {
+            throw new LockAccessDeniedException('api.access.grant_not_live', 409);
+        }
+
+        return $revoked;
     }
 
     /**
@@ -172,7 +248,84 @@ class PasscodeIssuanceService
         $booking->accessGrants()
             ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
             ->get()
-            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $lock));
+            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $lock, AccessRevokeReason::Cancellation));
+    }
+
+    /**
+     * A booking that grew keeps its door to the new end: every live grant of
+     * it runs to end_at in our records — what the QR and the door buttons
+     * check — and gets a keypad code lasting as long, the old one deleted
+     * once the new one is on the lock. A vendor failure keeps the old code
+     * (logged) and still moves expires_at, so the app keeps opening the door.
+     * Never throws: the extension is already saved.
+     */
+    public function extendForBooking(Booking $booking): void
+    {
+        $booking->accessGrants()
+            ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
+            ->where(fn ($q) => $q->whereNull('expires_at')->orWhere('expires_at', '<', $booking->end_at))
+            ->with('lock')
+            ->get()
+            ->each(function (AccessGrant $grant) use ($booking) {
+                try {
+                    $this->extendGrant($grant, $booking);
+                } catch (\Throwable $e) {
+                    Log::error('Failed to extend the access grant of an extended booking', [
+                        'access_grant_id' => $grant->id,
+                        'booking_id' => $booking->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            });
+    }
+
+    private function extendGrant(AccessGrant $grant, Booking $booking): void
+    {
+        $vendor = null;
+
+        try {
+            // From now when the booking is under way: the lock wants a
+            // period code used within 24h of its start.
+            $vendor = $this->ttlock->addPeriodPasscode($grant->lock, $booking->start_at->copy()->max(now()), $booking->end_at);
+        } catch (\Throwable $e) {
+            Log::error('Failed to issue a longer TTLock passcode for an extended booking; the old code stays', [
+                'access_grant_id' => $grant->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $replaced = DB::transaction(function () use ($grant, $booking, $vendor) {
+            $locked = AccessGrant::query()->whereKey($grant->getKey())->lockForUpdate()->firstOrFail();
+
+            // Revoked or expired in the meantime: the door stays closed.
+            if (! in_array($locked->status, [AccessGrantStatus::Issued, AccessGrantStatus::Activated], true)) {
+                return null;
+            }
+
+            $oldVendorId = $locked->vendor_keyboard_pwd_id;
+            $locked->expires_at = $booking->end_at;
+
+            if ($vendor !== null) {
+                $locked->passcode_value = $vendor['passcode'];
+                $locked->vendor_keyboard_pwd_id = $vendor['vendor_passcode_id'];
+            }
+
+            $locked->save();
+
+            return ['old' => $oldVendorId];
+        });
+
+        if ($vendor === null) {
+            return;
+        }
+
+        // The old code goes once the new one is recorded; a grant that ended
+        // meanwhile takes the new one with it instead.
+        $this->deleteVendorCode(
+            $grant->id,
+            $replaced === null ? $vendor['vendor_passcode_id'] : $replaced['old'],
+            $grant->lock,
+        );
     }
 
     public function expireOverdue(): int
@@ -209,16 +362,21 @@ class PasscodeIssuanceService
      * @return AccessGrant|null the grant, revoked by this call; null when it
      *                          was no longer live
      */
-    private function revoke(AccessGrant $grant, Device $lock): ?AccessGrant
+    private function revoke(AccessGrant $grant, Device $lock, AccessRevokeReason $reason, ?User $by = null): ?AccessGrant
     {
-        $revoked = DB::transaction(function () use ($grant) {
+        $revoked = DB::transaction(function () use ($grant, $reason, $by) {
             $locked = AccessGrant::query()->whereKey($grant->getKey())->lockForUpdate()->firstOrFail();
 
             if (! in_array($locked->status, [AccessGrantStatus::Issued, AccessGrantStatus::Activated], true)) {
                 return null;
             }
 
-            $locked->forceFill(['status' => AccessGrantStatus::Revoked])->save();
+            $locked->forceFill([
+                'status' => AccessGrantStatus::Revoked,
+                'revoke_reason' => $reason,
+                'revoked_by' => $by?->id,
+                'revoked_at' => now(),
+            ])->save();
 
             return $locked;
         });
@@ -234,16 +392,21 @@ class PasscodeIssuanceService
 
     private function deleteVendorPasscode(AccessGrant $grant, Device $lock): void
     {
-        if ($grant->vendor_keyboard_pwd_id === null) {
+        $this->deleteVendorCode($grant->id, $grant->vendor_keyboard_pwd_id, $lock);
+    }
+
+    private function deleteVendorCode(int $grantId, ?int $vendorPasscodeId, Device $lock): void
+    {
+        if ($vendorPasscodeId === null) {
             Log::warning('Skipping TTLock passcode deletion for an access grant with no vendor_keyboard_pwd_id', [
-                'access_grant_id' => $grant->id,
+                'access_grant_id' => $grantId,
             ]);
 
             return;
         }
 
         try {
-            $this->ttlock->deletePasscode($lock, $grant->vendor_keyboard_pwd_id);
+            $this->ttlock->deletePasscode($lock, $vendorPasscodeId);
         } catch (\Throwable $e) {
             // Widened from `catch (TTLockException $e)`: any vendor-call
             // failure — including one Fix 4 didn't anticipate — must not
@@ -252,7 +415,7 @@ class PasscodeIssuanceService
             // process every other grant in the same call regardless of
             // this one's outcome).
             Log::error('Failed to delete TTLock passcode for an access grant', [
-                'access_grant_id' => $grant->id,
+                'access_grant_id' => $grantId,
                 'error' => $e->getMessage(),
             ]);
         }

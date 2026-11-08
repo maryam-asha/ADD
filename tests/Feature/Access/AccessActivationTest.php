@@ -71,7 +71,8 @@ class AccessActivationTest extends TestCase
         $response = $this->getJson("/api/v1/admin/reception/bookings/{$booking->id}/access-grant");
 
         $response->assertOk();
-        $response->assertExactJson(['id' => $newest->id, 'status' => $newest->status->value]);
+        $response->assertJsonPath('id', $newest->id);
+        $response->assertJsonPath('status', $newest->status->value);
         $this->assertNotEquals($older->id, $response->json('id'));
     }
 

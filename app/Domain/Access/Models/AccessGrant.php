@@ -3,11 +3,13 @@
 namespace App\Domain\Access\Models;
 
 use App\Domain\Access\Enums\AccessGrantStatus;
+use App\Domain\Access\Enums\AccessRevokeReason;
 use App\Domain\Access\Enums\AccessSourceType;
 use App\Domain\Access\Enums\PasscodeType;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\AllocationModel;
 use App\Domain\Foundation\Models\Device;
+use App\Domain\Identity\Models\User;
 use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Membership\Enums\OwnerType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -31,6 +33,7 @@ class AccessGrant extends Model
         'office_lease_id',
         'allocation_model', 'passcode_type', 'passcode_value', 'vendor_keyboard_pwd_id',
         'issued_at', 'must_activate_by', 'activated_at', 'expires_at', 'status',
+        'revoke_reason', 'revoked_by', 'revoked_at',
     ];
 
     /**
@@ -51,6 +54,8 @@ class AccessGrant extends Model
             'passcode_type' => PasscodeType::class,
             'passcode_value' => 'encrypted',
             'status' => AccessGrantStatus::class,
+            'revoke_reason' => AccessRevokeReason::class,
+            'revoked_at' => 'datetime',
             'issued_at' => 'datetime',
             'must_activate_by' => 'datetime',
             'activated_at' => 'datetime',
@@ -80,6 +85,11 @@ class AccessGrant extends Model
     public function lease(): BelongsTo
     {
         return $this->belongsTo(OfficeLease::class, 'office_lease_id');
+    }
+
+    public function revokedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revoked_by');
     }
 
     public function events(): HasMany
