@@ -22,6 +22,9 @@ return [
     // (ITM-00001) and none is typed.
     'items' => [
         'sku_mode' => 'auto',
+        // ITM-00001, ITM-00002… from the package's own counter.
+        'sku_prefix' => 'ITM-',
+        'sku_pad' => 5,
     ],
 
     // Assets go straight to the place they are used; turn this on when ADD
