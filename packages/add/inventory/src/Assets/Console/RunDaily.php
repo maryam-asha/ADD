@@ -8,7 +8,10 @@ use Add\Inventory\Assets\Models\MaintenanceSchedule;
 use Add\Inventory\Assets\Services\MaintenanceService;
 use Add\Inventory\Authorization\Abilities;
 use Add\Inventory\Contracts\InventoryNotifier;
+use Add\Inventory\Events\DepreciationMonthClosed;
+use Add\Inventory\Inventory;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Announces, once each, the servicing coming due (or overdue) and the
@@ -18,7 +21,7 @@ class RunDaily extends Command
 {
     protected $signature = 'inventory:run-daily';
 
-    protected $description = 'Announce maintenance coming due and warranties ending';
+    protected $description = 'Announce maintenance coming due, warranties ending, and the close of last month\'s depreciation';
 
     public function handle(MaintenanceService $maintenance, InventoryNotifier $notifier): int
     {
@@ -56,8 +59,36 @@ class RunDaily extends Command
                 $ending++;
             });
 
+        $this->closeLastMonth();
+
         $this->info("Maintenance due: {$due}. Warranties ending: {$ending}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Last month's depreciation is final: announced once, on the first run
+     * of a new month (the month closed is remembered in inv_sequences).
+     */
+    private function closeLastMonth(): void
+    {
+        $month = Inventory::today()->startOfMonth()->subMonth();
+        $key = (int) $month->format('Ym');
+
+        $first = DB::transaction(function () use ($key) {
+            $closed = DB::table('inv_sequences')->where('name', 'depreciation.closed')->lockForUpdate()->value('value');
+
+            if ($closed !== null && (int) $closed >= $key) {
+                return false;
+            }
+
+            DB::table('inv_sequences')->upsert(['name' => 'depreciation.closed', 'value' => $key], ['name'], ['value']);
+
+            return true;
+        });
+
+        if ($first) {
+            DepreciationMonthClosed::dispatch($month->year, $month->month);
+        }
     }
 }

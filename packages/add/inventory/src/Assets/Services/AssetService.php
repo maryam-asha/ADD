@@ -9,6 +9,9 @@ use Add\Inventory\Assets\Models\AssetAddition;
 use Add\Inventory\Assets\Models\AssetAssignment;
 use Add\Inventory\Assets\Models\AssetMovement;
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Events\AssetDisposed;
+use Add\Inventory\Events\AssetPlacedInService;
+use Add\Inventory\Events\CapitalAdditionRecorded;
 use Add\Inventory\Inventory;
 use Add\Inventory\Support\InventoryException;
 use Add\Inventory\Support\Place;
@@ -157,6 +160,8 @@ class AssetService
                 'moved_at' => now(),
             ]);
         }
+
+        AssetPlacedInService::dispatch($asset);
     }
 
     /**
@@ -179,7 +184,10 @@ class AssetService
                 InventoryException::fail('inventory::assets.addition_needs_cost');
             }
 
-            return $asset->additions()->create([...$data, 'actor_id' => Inventory::actorId()]);
+            $addition = $asset->additions()->create([...$data, 'actor_id' => Inventory::actorId()]);
+            CapitalAdditionRecorded::dispatch($addition);
+
+            return $addition;
         });
     }
 
@@ -337,6 +345,7 @@ class AssetService
                 'disposal_note' => $note,
             ]);
             $asset->maintenanceSchedules()->update(['is_active' => false]);
+            AssetDisposed::dispatch($asset);
 
             return $asset;
         });

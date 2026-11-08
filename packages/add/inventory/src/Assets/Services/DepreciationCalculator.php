@@ -66,6 +66,20 @@ class DepreciationCalculator
     }
 
     /**
+     * What the asset's depreciation takes in one calendar month: the
+     * running total at the month's end less the one at its start ("0"
+     * outside its life, for a draft, or without a cost).
+     */
+    public function forMonth(Asset $asset, int $year, int $month): string
+    {
+        $from = CarbonImmutable::create($year, $month, 1)->startOfDay();
+        $before = $this->for($asset, $from)['accumulated'] ?? '0';
+        $after = $this->for($asset, $from->addMonth())['accumulated'] ?? '0';
+
+        return Decimal::round(Decimal::sub($after, $before), 2);
+    }
+
+    /**
      * Capital additions, each on a straight line over the months of the
      * asset's life left on the day it was added; one added after the life
      * is over raises the cost and is not depreciated.
