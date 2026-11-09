@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Payments;
 
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
@@ -65,6 +66,10 @@ class PaymentMethodOptions
                 $option['available'] = false;
                 $option['reason'] = __('api.payment.reception_only');
                 $option['hint'] = __('api.payment.reception_only_hints.'.$purpose->value);
+            } elseif ($key === CashMethod::KEY && $this->sessionInProgress($payable)) {
+                $option['available'] = false;
+                $option['reason'] = __('api.payment.session_in_progress');
+                $option['hint'] = __('api.payment.session_in_progress_hint');
             } elseif ($key === WalletMethod::KEY) {
                 $option = $this->walletOption($option, $purpose, $member, $points);
             }
@@ -84,6 +89,19 @@ class PaymentMethodOptions
     {
         return $key === CashMethod::KEY
             && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
+    }
+
+    /**
+     * A booking checked in and not yet checked out: reception settles it at
+     * checkout, so the app has no cash to promise — the member who wants to
+     * pay now goes to the desk. (An open walk-in never gets here: it has no
+     * price until checkout, so quote() refuses it.)
+     */
+    private function sessionInProgress(?Model $payable): bool
+    {
+        return $payable instanceof Booking
+            && $payable->checked_in_at !== null
+            && $payable->checked_out_at === null;
     }
 
     private function pointsDue(?PaymentPurpose $purpose, ?User $member, ?Model $payable, ?Plan $plan): ?int

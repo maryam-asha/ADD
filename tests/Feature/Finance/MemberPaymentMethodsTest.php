@@ -211,6 +211,40 @@ class MemberPaymentMethodsTest extends TestCase
     }
 
     /**
+     * A session still running is settled at reception when it ends: cash is
+     * shown unavailable, telling the member to settle at the desk.
+     */
+    public function test_cash_is_unavailable_while_the_booking_is_in_progress(): void
+    {
+        $member = $this->member(300);
+        $booking = $this->unpaidBooking($member);
+        $booking->forceFill(['checked_in_at' => now()->subMinutes(30), 'checked_out_at' => null])->save();
+
+        $cash = collect($this->methods(['purpose' => 'booking', 'payable_id' => $booking->id])
+            ->assertOk()->json('data.methods'))->firstWhere('key', 'cash');
+
+        $this->assertFalse($cash['available']);
+        $this->assertSame(__('api.payment.session_in_progress', [], 'en'), $cash['reason']);
+        $this->assertSame(__('api.payment.session_in_progress_hint', [], 'en'), $cash['hint']);
+    }
+
+    public function test_cash_stays_available_once_the_booking_has_ended_or_before_it_starts(): void
+    {
+        $member = $this->member(300);
+        $upcoming = $this->unpaidBooking($member);
+        $ended = $this->unpaidBooking($member);
+        $ended->forceFill(['checked_in_at' => now()->subHour(), 'checked_out_at' => now()->subMinute()])->save();
+
+        foreach ([$upcoming, $ended] as $booking) {
+            $cash = collect($this->methods(['purpose' => 'booking', 'payable_id' => $booking->id])
+                ->assertOk()->json('data.methods'))->firstWhere('key', 'cash');
+
+            $this->assertTrue($cash['available']);
+            $this->assertNull($cash['hint']);
+        }
+    }
+
+    /**
      * Nothing is required: without a purpose every enabled method is listed,
      * and a plan or a record named without its id is simply not priced.
      */
