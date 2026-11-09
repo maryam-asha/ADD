@@ -106,6 +106,8 @@ class MemberHomeBookingCardTest extends TestCase
                 'payment' => null,
                 // Door buttons only once checked in.
                 'door' => ['available' => false],
+                // Checking out too: nothing to leave before checking in.
+                'check_out' => ['available' => false],
             ]])
             // The card above, so not listed again.
             ->assertJsonPath('data.today', []);

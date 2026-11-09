@@ -14,4 +14,6 @@ enum AccessRevokeReason: string
     case Lease = 'lease';
     // Stopped by hand from the dashboard; never re-issued on its own.
     case Staff = 'staff';
+    // The member checked out of the booking before its end.
+    case CheckedOut = 'checked_out';
 }

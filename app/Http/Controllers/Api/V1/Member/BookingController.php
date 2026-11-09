@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\V1\Member;
 
 use App\Concerns\LogsSensitiveActions;
+use App\Domain\Access\Enums\AccessRevokeReason;
+use App\Domain\Access\Services\PasscodeIssuanceService;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Events\CoworkingPaymentAtReception;
 use App\Domain\Booking\Exceptions\BatchUnavailableException;
@@ -16,6 +18,7 @@ use App\Domain\Booking\Services\BookingCreationService;
 use App\Domain\Booking\Services\BookingExtensionService;
 use App\Domain\Booking\Services\BookingPlanCoverage;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\PayableCheckout;
@@ -42,6 +45,7 @@ use App\Support\Presenters\CouponOutcomePresenter;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Throwable;
 
 class BookingController extends Controller
@@ -422,6 +426,40 @@ class BookingController extends Controller
         return response()->json(['message' => $movedTo === null
             ? __('api.booking.extended')
             : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($movedTo, app()->getLocale())['formatted']])]);
+    }
+
+    /**
+     * The member checking out of a checked-in room, office or hall booking
+     * (its home card's button): it closes now at its full booked price, no
+     * refund for leaving early (SessionClosureService::checkOutByMember()),
+     * and its door code stops working. A coworking booking is refused — it
+     * ends through coworking-sessions/current/end-request. What it still
+     * owes is then paid through POST bookings/{booking}/pay.
+     */
+    public function checkOut(Request $request, Booking $booking, SessionClosureService $closures, PasscodeIssuanceService $passcodes): JsonResponse
+    {
+        $this->assertOwned($booking, $request);
+
+        try {
+            $closures->checkOutByMember($booking);
+        } catch (ReceptionActionException $e) {
+            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        }
+
+        // The booking is closed whatever the lock says: a vendor failure is
+        // logged, never the member's error.
+        try {
+            $passcodes->revokeForBooking($booking, AccessRevokeReason::CheckedOut);
+        } catch (Throwable $e) {
+            Log::error('Failed to revoke the door code of a booking the member checked out of', [
+                'booking_id' => $booking->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        $this->logSensitiveAction('booking_checked_out_by_member', $booking, ['amount_owed' => (string) $booking->amount_owed]);
+
+        return response()->json(['message' => __('api.booking.checked_out')]);
     }
 
     /**

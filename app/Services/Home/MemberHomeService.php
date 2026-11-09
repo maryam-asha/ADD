@@ -233,8 +233,10 @@ class MemberHomeService
      * still owes once closed (`awaiting_payment`). The list holds every such
      * booking — live ones first, then each one owed, newest close first — and
      * the app matches each real-time event to its card by `id` (the event's
-     * `booking_id`). It closes itself at `end_at` or at the desk —
-     * the member does not end it — and `payment`, only once it owes, is the
+     * `booking_id`). It closes itself at `end_at`, at the desk, or when the
+     * member checks out (`check_out.available`: POST
+     * member/bookings/{id}/check-out, once checked in) — and `payment`, only
+     * once it owes, is the
      * block every booking shows, `method` the one it was booked with:
      * paying is POST member/bookings/{booking}/pay, and BookingPaid tells
      * the app to re-fetch.
@@ -260,6 +262,8 @@ class MemberHomeService
             // Whether to show the door buttons (POST member/bookings/{id}/door/unlock|lock):
             // only once checked in, and only for a room whose door code is live.
             'door' => ['available' => $state === 'active' && $this->doors->available($booking)],
+            // Whether to show the check-out button (POST member/bookings/{id}/check-out).
+            'check_out' => ['available' => $state === 'active'],
         ];
     }
 

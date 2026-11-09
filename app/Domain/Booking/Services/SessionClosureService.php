@@ -121,6 +121,32 @@ class SessionClosureService
     }
 
     /**
+     * The member checking out of a checked-in room, office or hall booking
+     * from the app: it closes now (never later than its end_at, which is
+     * when it would have closed itself), termination_source = member, at
+     * its full booked price — leaving early is not refunded (product owner,
+     * 2026-11-09). A coworking booking is refused: it ends through the end
+     * request reception confirms. Same lock-then-check as closeOut().
+     */
+    public function checkOutByMember(Booking $booking): void
+    {
+        DB::transaction(function () use ($booking) {
+            $this->couponLedger->lockForPricing(null);
+            $locked = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
+
+            if ($locked->isCoworking()) {
+                throw new ReceptionActionException('api.booking.check_out_coworking');
+            }
+
+            $this->assertOpenForClosure($locked);
+
+            $this->finalizeRoomClosure($locked, now()->min($locked->end_at), TerminationSource::Member);
+        });
+
+        $booking->refresh();
+    }
+
+    /**
      * Reception collected cash for exactly what is owed
      * and confirms it here. The money goes through the ledger like every
      * other payment (PaymentService::settleAtReception). The audit entry is

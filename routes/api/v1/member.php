@@ -91,6 +91,10 @@ Route::post('bookings/preview', [BookingController::class, 'preview']);
 Route::post('bookings/batch', [BookingController::class, 'storeBatch']);
 Route::get('bookings/{booking}', [BookingController::class, 'show']);
 Route::post('bookings/{booking}/cancel', [BookingController::class, 'cancel']);
+// The member leaving a checked-in room, office or hall before its end: it
+// closes now at its full booked price and its door code is revoked
+// (coworking ends through coworking-sessions/current/end-request).
+Route::post('bookings/{booking}/check-out', [BookingController::class, 'checkOut']);
 // The live room card's door buttons: open or lock the booked room's door
 // without its sticker, once the booking is checked in and until it closes.
 Route::post('bookings/{booking}/door/unlock', [BookingDoorController::class, 'unlock'])->middleware('throttle:10,1,member-door');

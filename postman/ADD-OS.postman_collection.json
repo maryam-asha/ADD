@@ -12974,6 +12974,99 @@
                             }
                         },
                         {
+                            "name": "Check Out (leave before the end)",
+                            "request": {
+                                "auth": {
+                                    "type": "bearer",
+                                    "bearer": [
+                                        {
+                                            "key": "token",
+                                            "value": "{{member_token}}"
+                                        }
+                                    ]
+                                },
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    },
+                                    {
+                                        "key": "lang",
+                                        "value": "{{lang}}",
+                                        "type": "text"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/check-out",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "api",
+                                        "v1",
+                                        "member",
+                                        "bookings",
+                                        "{{booking_id}}",
+                                        "check-out"
+                                    ]
+                                },
+                                "description": "The member leaving a checked-in room, office or hall before its end, from the live card's button (home `active_booking.state: active`, and `active_booking.check_out.available: true`). No body.\n\nIt closes now (never later than `end_at`) with `termination_source: member` and status `completed`, at the full booked price: leaving early is not refunded. The booking's door code is revoked (`revoke_reason: checked_out`), so the keypad code and the door buttons stop working; a lock that does not answer is logged, never the member's error. Reception gets `booking.checked_out` and the member `booking.ended` on their channels. Anything still owed is then paid through Pay a Closed Booking (POST bookings/{booking}/pay), its card staying `awaiting_payment` until then.\n\nA coworking booking is refused: it ends through coworking-sessions/current/end-request, which reception confirms.\n\n### Cases\n- **200** `checked_out` \u2014 \"You have checked out. Thank you for your visit.\"\n- **422** `not_checked_in` \u2014 the booking has not been checked in yet.\n- **409** `already_checked_out` \u2014 already closed.\n- **422** `check_out_coworking` \u2014 a shared-workspace booking.\n- **403** `not_your_booking`."
+                            },
+                            "response": [
+                                {
+                                    "name": "Checked out",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/check-out",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "check-out"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "body": "{\n    \"message\": \"You have checked out. Thank you for your visit.\"\n}"
+                                }
+                            ]
+                        },
+                        {
                             "name": "Door \u2014 Unlock (no scan)",
                             "request": {
                                 "auth": {

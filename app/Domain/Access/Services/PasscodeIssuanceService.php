@@ -241,14 +241,20 @@ class PasscodeIssuanceService
      * shape exactly, scoped to one booking's own grants instead of every
      * grant on a space's lock.
      */
-    public function revokeForBooking(Booking $booking): void
+    public function revokeForBooking(Booking $booking, AccessRevokeReason $reason = AccessRevokeReason::Cancellation): void
     {
+        $grants = $booking->accessGrants()
+            ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
+            ->get();
+
+        // No live code (a room without a lock, or one already gone): nothing to do.
+        if ($grants->isEmpty()) {
+            return;
+        }
+
         $lock = $this->lockFor($booking->space);
 
-        $booking->accessGrants()
-            ->whereIn('status', [AccessGrantStatus::Issued, AccessGrantStatus::Activated])
-            ->get()
-            ->each(fn (AccessGrant $grant) => $this->revoke($grant, $lock, AccessRevokeReason::Cancellation));
+        $grants->each(fn (AccessGrant $grant) => $this->revoke($grant, $lock, $reason));
     }
 
     /**

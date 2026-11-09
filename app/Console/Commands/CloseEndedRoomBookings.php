@@ -12,8 +12,8 @@ use Illuminate\Console\Command;
 /**
  * A checked-in room, office or hall booking closes itself at its end — its
  * extended end, once extended — with termination_source = auto, at exactly
- * `end_at`: the member never ends a room from the app, and reception may
- * close it earlier (product owner, 2026-11-03). It costs its booked price
+ * `end_at`; reception, or the member from the app (product owner,
+ * 2026-11-09), may close it earlier. It costs its booked price
  * either way (SessionClosureService), and what it owes is settled by the
  * method it was booked with. Coworking bookings end through reception's
  * confirmation, not here.

@@ -350,6 +350,8 @@ return [
         // Member booking lifecycle: list, detail, cancellation, preview.
         'cancelled' => 'Booking cancelled.',
         'not_your_booking' => 'This booking does not belong to you.',
+        'checked_out' => 'You have checked out. Thank you for your visit.',
+        'check_out_coworking' => 'A shared workspace booking ends through reception: ask to end your session instead.',
         'payment_method_required' => 'Choose how to pay for this booking.',
         'start_in_the_past' => 'A booking cannot start in the past.',
         'batch_partially_unavailable' => 'Some of the selected dates are not available. Nothing was booked.',
