@@ -5054,7 +5054,7 @@
                                                     "key": "purpose",
                                                     "value": "booking",
                                                     "disabled": true,
-                                                    "description": "wallet_top_up | plan_purchase | booking | coworking_session | event_registration \u2014 keeps only the methods that can pay for it"
+                                                    "description": "wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration \u2014 keeps only the methods that can pay for it"
                                                 },
                                                 {
                                                     "key": "payable_id",
@@ -5076,7 +5076,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "The payment methods the member may use: the unavailable ones (`available: false`) first, then in config/payments.php order \u2014 a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | coworking_session | event_registration) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` \u2014 the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say \u2014 null for every method today (a top-up no longer offers cash, so there is no \"hand the cash to reception\" hint).\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet \u203a Get Top-up Options**.\n\n`coupon_code` (optional, with `plan_id` or `payable_id`) \u2014 `amount_points`/`price` and whether the wallet covers it are worked out after the code."
+                                        "description": "The payment methods the member may use: the unavailable ones (`available: false`) first, then in config/payments.php order \u2014 a gateway added in config appears here with no app change.\n\nThe `wallet` method carries the member's points: `balance` (the most they can spend from any wallet they may use) and `wallets` (personal and company, each with `usable_balance`). With nothing to spend it is `available: false` with `reason` \"No balance in your wallet\".\n\nEvery parameter is optional: `purpose` (wallet_top_up | plan_purchase | booking | booking_extension | coworking_session | event_registration) keeps only the methods that can pay for it; with `payable_id` (the member's own record) or `plan_id` it also returns `amount_points`/`price` and whether the wallet covers it. 401 without a member token.\n\n`min_top_up` (only for `purpose=wallet_top_up`, otherwise null): `{points, amount, currency}` \u2014 the smallest top-up (10 points by default, `PAYMENTS_MIN_TOP_UP_POINTS`) and what it costs in the charged currency, as a whole amount (e.g. `\"13840\"`). Show it on the top-up screen.\n\nEvery method also has `hint`: what the member does next when the label alone does not say \u2014 null for every method today (a top-up no longer offers cash, so there is no \"hand the cash to reception\" hint).\n\nThe top-up screen's call (`purpose=wallet_top_up`) is saved under **Wallet \u203a Get Top-up Options**.\n\n`coupon_code` (optional, with `plan_id` or `payable_id`) \u2014 `amount_points`/`price` and whether the wallet covers it are worked out after the code.\n\n`purpose=booking_extension` lists what an extension can be paid by (wallet, cash, card). Nothing is priced \u2014 compare the wallet's `balance` with the chosen `options[].price_points` from extension-options."
                                     },
                                     "response": [
                                         {
@@ -13691,7 +13691,7 @@
                                 ],
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n  \"additional_minutes\": 60\n}",
+                                    "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"wallet\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -13712,9 +13712,369 @@
                                         "extend"
                                     ]
                                 },
-                                "description": "Extends a running booking: start_at \u2264 now < end_at, checked in and not out, on a space whose `allows_extension` is on. Ask `GET .../extension-options` first \u2014 the same rules decide both, re-checked here under a lock. Other refusals (422): `extension_not_allowed`, `extension_outside_booking_time`, `extension_past_closing` (with the closing time), and `not_checked_in`.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Conflict** \u2014 422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
+                                "description": "Extends a running booking: start_at \u2264 now < end_at, checked in and not out, on a space whose `allows_extension` is on. Ask `GET .../extension-options` first \u2014 the same rules decide both, re-checked here under a lock. Other refusals (422): `extension_not_allowed`, `extension_outside_booking_time`, `extension_past_closing` (with the closing time), and `not_checked_in`.\n\n### Body\n- `additional_minutes` \u2014 required, integer \u2265 1: one of the `options[].minutes` of extension-options.\n- `payment_method` \u2014 how the added time is paid: `wallet` | `cash` | a card gateway (`paymera`). **Required when the extension costs anything** (`options[].price_points` > 0) \u2014 never assumed from how the booking itself was paid. List the choices with `GET member/payment-methods?purpose=booking_extension`.\n- `wallet_owner_type` (`user` | `company`) + `wallet_owner_id` \u2014 with `wallet`: which wallet pays. Left out, the only wallet the member may spend from; with several, 422 `wallet_options`.\n\n### Answer\n`message` as before, plus `data`: `payment`, `redirect_url` and `next`.\n- `wallet` \u2014 the points are spent with the extension: `next: done`, `payment` the accepted extension payment. A wallet that falls short refuses the whole extension (422 insufficient points) \u2014 nothing is extended.\n- card \u2014 the extension is saved, then the card payment opens: `next: redirect`, load `redirect_url` in the WebView. The booking owes the difference (`payment_state: unpaid`) until the bank pays it, then it is paid again. If the page could not be opened, `data.payment_error` says why and the extension stays owed.\n- `cash` \u2014 the extension is saved and owed (`payment_state: unpaid`, `chosen_payment_method: cash`): `payment: null`, `next: pay_at_reception`. Reception is told to collect it when the booking closes.\n- an extension that costs nothing: `payment: null`, `next: done`; `payment_method` is ignored.\n\n### Cases \u2014 see this request's saved examples\n- **Paid From Wallet** \u2014 200, `next: done`.\n- **Card (next: redirect)** \u2014 200 with `redirect_url`.\n- **Cash (next: pay_at_reception)** \u2014 200, owed at the desk.\n- **Error: No Payment Method** \u2014 422 `{\"message\": \"Choose how to pay for this booking.\"}`.\n- **Error: Wallet Too Short** \u2014 422 insufficient points; not extended.\n- **Error: Wallet Choice Required** \u2014 422 with `wallet_options`.\n- **Error: Conflict** \u2014 422 `{\"message\": \"This booking cannot be extended past <latest_end_at>.\"}` when a confirmed or pending booking follows on the same space."
                             },
                             "response": [
+                                {
+                                    "name": "Paid From Wallet",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Booking extended.\",\n    \"data\": {\n        \"payment\": {\n            \"id\": 41,\n            \"status\": \"accepted\",\n            \"purpose\": \"booking_extension\",\n            \"method\": \"wallet\",\n            \"charged_amount\": null,\n            \"currency\": null,\n            \"points_to_credit\": 0,\n            \"amount_points\": 100,\n            \"transaction_id\": 912,\n            \"payable\": {\n                \"type\": \"booking\",\n                \"id\": 77\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"gateway_payment_id\": null,\n            \"created_at\": \"2026-11-09T08:30:02.000000Z\"\n        },\n        \"redirect_url\": null,\n        \"next\": \"done\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Card (next: redirect)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"paymera\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Booking extended.\",\n    \"data\": {\n        \"payment\": {\n            \"id\": 42,\n            \"status\": \"pending\",\n            \"purpose\": \"booking_extension\",\n            \"method\": \"paymera\",\n            \"charged_amount\": 138400,\n            \"currency\": \"SYP\",\n            \"points_to_credit\": 100,\n            \"amount_points\": 100,\n            \"transaction_id\": null,\n            \"payable\": {\n                \"type\": \"booking\",\n                \"id\": 77\n            },\n            \"expires_at\": null,\n            \"plan_id\": null,\n            \"membership_id\": null,\n            \"rrn\": null,\n            \"gateway_payment_id\": \"7a9b1c2d-example\",\n            \"created_at\": \"2026-11-09T08:30:02.000000Z\"\n        },\n        \"redirect_url\": \"https://egate-t.paymera.cc/start/7a9b1c2d-example/ar\",\n        \"next\": \"redirect\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Cash (next: pay_at_reception)",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"cash\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "OK",
+                                    "code": 200,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Booking extended.\",\n    \"data\": {\n        \"payment\": null,\n        \"redirect_url\": null,\n        \"next\": \"pay_at_reception\"\n    }\n}"
+                                },
+                                {
+                                    "name": "Error: No Payment Method",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Choose how to pay for this booking.\"\n}"
+                                },
+                                {
+                                    "name": "Error: Wallet Too Short",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"Insufficient points. 100 points required, you have 50 points (short 50).\",\n    \"current\": 50,\n    \"required\": 100,\n    \"shortage\": 50\n}"
+                                },
+                                {
+                                    "name": "Error: Wallet Choice Required",
+                                    "originalRequest": {
+                                        "auth": {
+                                            "type": "bearer",
+                                            "bearer": [
+                                                {
+                                                    "key": "token",
+                                                    "value": "{{member_token}}"
+                                                }
+                                            ]
+                                        },
+                                        "method": "POST",
+                                        "header": [
+                                            {
+                                                "key": "Content-Type",
+                                                "value": "application/json"
+                                            },
+                                            {
+                                                "key": "lang",
+                                                "value": "{{lang}}",
+                                                "type": "text"
+                                            }
+                                        ],
+                                        "body": {
+                                            "mode": "raw",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"wallet\"\n}",
+                                            "options": {
+                                                "raw": {
+                                                    "language": "json"
+                                                }
+                                            }
+                                        },
+                                        "url": {
+                                            "raw": "{{base_url}}/api/v1/member/bookings/{{booking_id}}/extend",
+                                            "host": [
+                                                "{{base_url}}"
+                                            ],
+                                            "path": [
+                                                "api",
+                                                "v1",
+                                                "member",
+                                                "bookings",
+                                                "{{booking_id}}",
+                                                "extend"
+                                            ]
+                                        }
+                                    },
+                                    "status": "Unprocessable Content",
+                                    "code": 422,
+                                    "_postman_previewlanguage": "json",
+                                    "header": [
+                                        {
+                                            "key": "Content-Type",
+                                            "value": "application/json"
+                                        }
+                                    ],
+                                    "cookie": [],
+                                    "body": "{\n    \"message\": \"More than one wallet can cover this booking. Please choose one.\",\n    \"wallet_options\": [\n        {\n            \"wallet_id\": 20,\n            \"owner_type\": \"user\",\n            \"owner_id\": 15,\n            \"owner_label\": \"Personal wallet\",\n            \"category\": \"space_specific\",\n            \"category_balance\": 0,\n            \"general_balance\": 900,\n            \"usable_balance\": 900\n        },\n        {\n            \"wallet_id\": 21,\n            \"owner_type\": \"company\",\n            \"owner_id\": 3,\n            \"owner_label\": \"Acme LLC\",\n            \"category\": \"space_specific\",\n            \"category_balance\": 0,\n            \"general_balance\": 500,\n            \"usable_balance\": 500\n        }\n    ]\n}"
+                                },
                                 {
                                     "name": "Error: Conflict",
                                     "originalRequest": {
@@ -13741,7 +14101,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"additional_minutes\": 180\n}",
+                                            "raw": "{\n  \"additional_minutes\": 180,\n  \"payment_method\": \"wallet\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -20254,7 +20614,7 @@
                                         ],
                                         "body": {
                                             "mode": "raw",
-                                            "raw": "{\n  \"additional_minutes\": 60\n}",
+                                            "raw": "{\n  \"additional_minutes\": 60,\n  \"payment_method\": \"cash\"\n}",
                                             "options": {
                                                 "raw": {
                                                     "language": "json"
@@ -20276,7 +20636,7 @@
                                                 "extend"
                                             ]
                                         },
-                                        "description": "**Reception, on the member's behalf** (the request as saved). \n\n### Cases \u2014 see this request's saved examples\n- **Error: Conflict** \u2014 422 -- states the latest possible end time explicitly."
+                                        "description": "**Reception, on the member's behalf** (the request as saved).\n\n### Body\n- `additional_minutes` \u2014 required, integer \u2265 1.\n- `payment_method` \u2014 optional, how the added time is paid: `wallet` takes it from the member's wallet now (short, nothing is extended \u2014 422 insufficient points); `cash` leaves it owed, collected at the desk (`chosen_payment_method` becomes `cash`). Left out, the booking simply owes the difference \u2014 the wallet is never charged unless `wallet` is sent.\n- `wallet_owner_type` (`user` | `company`) + `wallet_owner_id` \u2014 with `wallet`: which of the member's wallets pays; with several and none named, 422 `wallet_options`.\n\nAnswers `{\"message\": \"Booking extended.\"}`.\n\n### Cases \u2014 see this request's saved examples\n- **Error: Conflict** \u2014 422 -- states the latest possible end time explicitly."
                                     },
                                     "response": [
                                         {
@@ -20296,7 +20656,7 @@
                                                 ],
                                                 "body": {
                                                     "mode": "raw",
-                                                    "raw": "{\n  \"additional_minutes\": 180\n}",
+                                                    "raw": "{\n  \"additional_minutes\": 180,\n  \"payment_method\": \"cash\"\n}",
                                                     "options": {
                                                         "raw": {
                                                             "language": "json"

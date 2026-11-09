@@ -38,7 +38,8 @@ use LogicException;
  *   one the member may spend from); short, nothing is extended.
  * - a card: opened once the extension is saved (openCardPayment()); the
  *   booking owes the difference until the bank pays it.
- * - `cash` (reception only): owed, collected at the desk.
+ * - `cash`: owed, collected at the desk when the booking closes
+ *   (ClosedBookingSettlement tells reception).
  * - none (reception only): owed, paid at the desk, from the app or at
  *   check-out, as any booking still owing.
  */

@@ -27,8 +27,8 @@ use Tests\TestCase;
 
 /**
  * An extension is paid by the method chosen for it, never one assumed from
- * how the booking itself was paid: the member names it (wallet or card),
- * reception may name wallet or cash or leave it owed.
+ * how the booking itself was paid: the member names it (wallet, card or
+ * cash), reception may name wallet or cash or leave it owed.
  */
 class ExtensionPaymentMethodTest extends TestCase
 {
@@ -165,16 +165,24 @@ class ExtensionPaymentMethodTest extends TestCase
         $this->assertSame(900, $this->balanceOf($member));
     }
 
-    public function test_the_member_cannot_choose_cash_for_an_extension(): void
+    public function test_choosing_cash_leaves_the_extension_to_the_desk(): void
     {
         $member = $this->member(1000);
         $booking = $this->walletPaidRunningBooking($member);
 
         $this->memberExtends($member, $booking, ['payment_method' => 'cash'])
-            ->assertUnprocessable()
-            ->assertJsonValidationErrors('payment_method');
+            ->assertOk()
+            ->assertJsonPath('message', 'Booking extended.')
+            ->assertJsonPath('data.payment', null)
+            ->assertJsonPath('data.redirect_url', null)
+            ->assertJsonPath('data.next', 'pay_at_reception');
 
-        $this->assertNotExtended($booking);
+        $booking->refresh();
+        $this->assertSame(200, $booking->price_points);
+        $this->assertSame(PaymentState::Unpaid, $booking->payment_state);
+        $this->assertSame('cash', $booking->chosen_payment_method);
+        $this->assertSame(900, $this->balanceOf($member));
+        $this->assertSame(0, Payment::query()->where('purpose', PaymentPurpose::BookingExtension)->count());
     }
 
     public function test_choosing_the_wallet_pays_the_extension_with_it(): void
@@ -283,7 +291,6 @@ class ExtensionPaymentMethodTest extends TestCase
 
         $this->assertTrue($methods['wallet']['available']);
         $this->assertTrue($methods['paymera']['available']);
-        $this->assertFalse($methods['cash']['available']);
-        $this->assertSame(__('api.payment.reception_only_hints.booking_extension', [], 'en'), $methods['cash']['hint']);
+        $this->assertTrue($methods['cash']['available']);
     }
 }

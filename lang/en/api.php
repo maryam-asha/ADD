@@ -501,7 +501,6 @@ return [
         'reception_only_hints' => [
             'wallet_top_up' => 'To top up with cash, visit reception.',
             'plan_purchase' => 'To pay for the package in cash, visit reception.',
-            'booking_extension' => 'To pay for the extension in cash, ask reception to extend your booking.',
         ],
         'session_in_progress' => 'Your session is still in progress.',
         'session_in_progress_hint' => 'To pay in cash, settle your session at reception.',

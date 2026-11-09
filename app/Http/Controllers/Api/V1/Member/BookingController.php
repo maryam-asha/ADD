@@ -21,6 +21,7 @@ use App\Domain\Booking\Services\BookingPresentationService;
 use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentStart;
@@ -415,9 +416,10 @@ class BookingController extends Controller
      * (`payment_method`, required when it costs anything): `wallet` spends
      * the points with the extension — short, nothing is extended — and a
      * card answers with its `redirect_url`, the extension standing whatever
-     * the bank says. `data` carries `payment`, `redirect_url` and `next`
-     * (`done` | `redirect`), and `payment_error` when the card page could
-     * not be opened — the extension is then owed.
+     * the bank says, and `cash` leaves it owed, collected at the desk when
+     * the booking closes. `data` carries `payment`, `redirect_url` and `next`
+     * (`done` | `redirect` | `pay_at_reception`), and `payment_error` when
+     * the card page could not be opened — the extension is then owed.
      */
     public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
     {
@@ -445,7 +447,14 @@ class BookingController extends Controller
             'payment_method' => $outcome->differencePoints > 0 ? $request->validated('payment_method') : null,
         ]);
 
-        $payment = ['payment' => $outcome->walletPayment === null ? null : new PaymentResource($outcome->walletPayment), 'redirect_url' => null, 'next' => PaymentStart::DONE];
+        // Cash leaves the extension owed: the desk collects it at check-out.
+        $atReception = $outcome->differencePoints > 0 && $request->validated('payment_method') === CashMethod::KEY;
+
+        $payment = [
+            'payment' => $outcome->walletPayment === null ? null : new PaymentResource($outcome->walletPayment),
+            'redirect_url' => null,
+            'next' => $atReception ? PaymentStart::PAY_AT_RECEPTION : PaymentStart::DONE,
+        ];
 
         if ($outcome->gateway !== null) {
             try {

@@ -41,14 +41,15 @@ class CashMethod implements PaymentMethodDriver
     }
 
     /**
-     * Not an extension: it is settled from the wallet as it happens, or the
-     * booking is left owing it. Not a member's top-up: cash for points is
-     * taken by reception (admin/reception/wallet-top-ups), which writes its
-     * own row and never asks this. Not a plan: a plan is paid when bought.
+     * An extension too: chosen in the app, it is left owing and collected at
+     * the desk when the booking closes (BookingExtensionService). Not a
+     * member's top-up: cash for points is taken by reception
+     * (admin/reception/wallet-top-ups), which writes its own row and never
+     * asks this. Not a plan: a plan is paid when bought.
      */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return ! in_array($purpose, [PaymentPurpose::BookingExtension, PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
+        return ! in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
     }
 
     /** Nothing is written now: reception records the payment when paid. */

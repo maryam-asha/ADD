@@ -84,14 +84,11 @@ class PaymentMethodOptions
         return ['amount_points' => $points, 'methods' => $methods];
     }
 
-    /**
-     * Cash for a top-up, a plan or an extension: the desk takes it (reception
-     * extends the booking), the app does not.
-     */
+    /** Cash for a top-up or a plan: the desk takes it, the app does not. */
     private function paidAtReceptionOnly(string $key, PaymentPurpose $purpose): bool
     {
         return $key === CashMethod::KEY
-            && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase, PaymentPurpose::BookingExtension], true);
+            && in_array($purpose, [PaymentPurpose::WalletTopUp, PaymentPurpose::PlanPurchase], true);
     }
 
     /**

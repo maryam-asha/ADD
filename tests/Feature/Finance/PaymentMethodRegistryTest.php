@@ -167,7 +167,7 @@ class PaymentMethodRegistryTest extends TestCase
             array_keys($this->registry()->availableFor(PaymentPurpose::EventRegistration))
         );
         $this->assertSame(
-            ['wallet', 'paymera'],
+            ['wallet', 'cash', 'paymera'],
             array_keys($this->registry()->availableFor(PaymentPurpose::BookingExtension))
         );
     }

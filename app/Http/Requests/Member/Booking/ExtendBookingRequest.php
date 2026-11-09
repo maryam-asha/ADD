@@ -10,10 +10,10 @@ use Illuminate\Validation\Rule;
 /**
  * Extending a running booking from the app, and how the added time is
  * paid: `wallet` (from `wallet_owner_type`/`wallet_owner_id`, or the only
- * wallet the member may spend from) or a card. Never assumed from how the
- * booking itself was paid — an extension that costs anything is refused
- * without one (BookingExtensionService). Cash is not offered: it is paid at
- * the desk, which extends the booking itself.
+ * wallet the member may spend from), a card, or `cash` (owed, collected at
+ * the desk when the booking closes). Never assumed from how the booking
+ * itself was paid — an extension that costs anything is refused without one
+ * (BookingExtensionService).
  */
 class ExtendBookingRequest extends FormRequest
 {
