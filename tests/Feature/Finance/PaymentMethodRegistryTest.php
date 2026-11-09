@@ -156,7 +156,7 @@ class PaymentMethodRegistryTest extends TestCase
             ['paymera', 'fake'],
             array_keys($this->registry()->availableFor(PaymentPurpose::WalletTopUp))
         );
-        // Paymera pays for anything but an extension; the fake gateway only
+        // Paymera pays for anything, an extension too; the fake gateway only
         // takes top-ups.
         $this->assertSame(
             ['wallet', 'cash', 'paymera', 'offline'],
@@ -167,7 +167,7 @@ class PaymentMethodRegistryTest extends TestCase
             array_keys($this->registry()->availableFor(PaymentPurpose::EventRegistration))
         );
         $this->assertSame(
-            ['wallet'],
+            ['wallet', 'paymera'],
             array_keys($this->registry()->availableFor(PaymentPurpose::BookingExtension))
         );
     }
@@ -244,11 +244,11 @@ class PaymentMethodRegistryTest extends TestCase
         $this->assertSame('paymera.callback', $paymera->callbackRouteName());
         $this->assertTrue($paymera->supports(PaymentPurpose::WalletTopUp));
         $this->assertTrue($paymera->supports(PaymentPurpose::PlanPurchase));
-        // A card pays for anything the member pays for in the app, but never
-        // an extension, which is settled from the wallet as it happens.
+        // A card pays for anything the member pays for in the app, an
+        // extension included when the member chooses the card for it.
         $this->assertTrue($paymera->supports(PaymentPurpose::Booking));
         $this->assertTrue($paymera->supports(PaymentPurpose::CoworkingSession));
-        $this->assertFalse($paymera->supports(PaymentPurpose::BookingExtension));
+        $this->assertTrue($paymera->supports(PaymentPurpose::BookingExtension));
 
         // Translated, not the raw key path.
         $this->assertNotSame('api.payment.methods.paymera', $paymera->label());

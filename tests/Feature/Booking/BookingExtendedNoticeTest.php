@@ -90,11 +90,11 @@ class BookingExtendedNoticeTest extends TestCase
     }
 
     /** By an hour, to 12:00. */
-    private function extend(Booking $booking): void
+    private function extend(Booking $booking, ?string $method = null): void
     {
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus')->utc());
 
-        app(BookingExtensionService::class)->extend($booking, 60);
+        app(BookingExtensionService::class)->extend($booking, 60, $method);
     }
 
     /** @return array{title: string, body: string} */
@@ -109,7 +109,7 @@ class BookingExtendedNoticeTest extends TestCase
         $booking = $this->booking($member, method: 'wallet');
         app(PaymentService::class)->start(PaymentPurpose::Booking, $member, 'wallet', ['payable' => $booking]);
 
-        $this->extend($booking);
+        $this->extend($booking, 'wallet');
 
         $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
         $this->assertSame('تم تمديد الحجز', $this->notice($member, 'ar')['title']);

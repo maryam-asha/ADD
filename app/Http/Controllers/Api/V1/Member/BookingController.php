@@ -38,6 +38,7 @@ use App\Http\Requests\Member\Booking\PreviewBookingRequest;
 use App\Http\Requests\Member\Booking\StoreBookingBatchRequest;
 use App\Http\Requests\Member\Booking\StoreBookingRequest;
 use App\Http\Resources\BookingResource;
+use App\Http\Resources\Finance\PaymentResource;
 use App\Http\Resources\MemberBookingDetailResource;
 use App\Http\Resources\MemberBookingResource;
 use App\Services\Realtime\RealtimeBroadcaster;
@@ -409,23 +410,64 @@ class BookingController extends Controller
         ]);
     }
 
+    /**
+     * The added time is paid by the method the member chooses here
+     * (`payment_method`, required when it costs anything): `wallet` spends
+     * the points with the extension — short, nothing is extended — and a
+     * card answers with its `redirect_url`, the extension standing whatever
+     * the bank says. `data` carries `payment`, `redirect_url` and `next`
+     * (`done` | `redirect`), and `payment_error` when the card page could
+     * not be opened — the extension is then owed.
+     */
     public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
     {
         $this->assertOwned($booking, $request);
 
+        $member = $request->user();
+
         try {
-            $movedTo = $extensions->extend($booking, $request->validated('additional_minutes'));
-        } catch (ReceptionActionException $e) {
-            return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+            $outcome = $extensions->extend(
+                $booking,
+                $request->validated('additional_minutes'),
+                $request->validated('payment_method'),
+                [
+                    'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                    'wallet_owner_id' => $request->validated('wallet_owner_id'),
+                ],
+                methodRequired: true,
+            );
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
         }
 
-        $this->logSensitiveAction('booking_extended', $booking, ['additional_minutes' => $request->validated('additional_minutes')]);
+        $this->logSensitiveAction('booking_extended', $booking, [
+            'additional_minutes' => $request->validated('additional_minutes'),
+            'payment_method' => $outcome->differencePoints > 0 ? $request->validated('payment_method') : null,
+        ]);
+
+        $payment = ['payment' => $outcome->walletPayment === null ? null : new PaymentResource($outcome->walletPayment), 'redirect_url' => null, 'next' => PaymentStart::DONE];
+
+        if ($outcome->gateway !== null) {
+            try {
+                ['payment' => $opened, 'start' => $start] = $extensions->openCardPayment($booking, $outcome);
+                $payment = ['payment' => new PaymentResource($opened), 'redirect_url' => $start->redirectUrl, 'next' => $start->kind];
+            } catch (Throwable $e) {
+                $failure = $e instanceof ReceptionActionException
+                    ? ['key' => $e->messageKey]
+                    : ($this->gatewayFailure($e, $member->id) ?? throw $e);
+
+                $payment = ['payment' => null, 'redirect_url' => null, 'next' => PaymentStart::DONE, 'payment_error' => __($failure['key'])];
+            }
+        }
 
         // The room the member sat in goes back to being a room: they are
         // told where to move, the one time it matters.
-        return response()->json(['message' => $movedTo === null
-            ? __('api.booking.extended')
-            : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($movedTo, app()->getLocale())['formatted']])]);
+        return response()->json([
+            'message' => $outcome->movedTo === null
+                ? __('api.booking.extended')
+                : __('api.booking.extended_seat_moved', ['place' => app(BookingPresentationService::class)->seat($outcome->movedTo, app()->getLocale())['formatted']]),
+            'data' => $payment,
+        ]);
     }
 
     /**

@@ -179,7 +179,7 @@ class BookingRefundToPayingWalletTest extends TestCase
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus')->utc());
         $booking->forceFill(['checked_in_at' => now()])->save();
 
-        app(BookingExtensionService::class)->extend($booking, 60);
+        app(BookingExtensionService::class)->extend($booking, 60, 'wallet');
 
         $extension = Payment::where('purpose', PaymentPurpose::BookingExtension)->sole();
         $this->assertSame('booking', $extension->payable_type);

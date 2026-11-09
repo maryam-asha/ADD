@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Payments\Fulfillers;
 
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
@@ -14,10 +15,10 @@ use LogicException;
  * The extra points a checked-in booking costs when it is made longer.
  *
  * The amount is the difference BookingExtensionService computes, passed in
- * when the payment is opened; there is no price here to re-read. Paying it
- * changes nothing on the booking — the booking is already paid, and the
- * extension service writes its new end and state itself. The row exists so
- * a later refund returns these points too, to the wallet that paid them.
+ * when the payment is opened; there is no price here to re-read. Paid by
+ * the method the member chose for it: from the wallet with the extension,
+ * or by card once it is saved. The row exists so a later refund returns
+ * these points too, to the wallet that paid them.
  */
 class BookingExtensionFulfiller implements PaymentFulfiller
 {
@@ -60,5 +61,23 @@ class BookingExtensionFulfiller implements PaymentFulfiller
         }
     }
 
-    public function fulfil(Payment $payment): void {}
+    /**
+     * A booking left owing only this extension is paid again once it is —
+     * a card's answer arriving after the extension was saved. Read under its
+     * lock; this payment is not yet among those Booking::pointsPaid counts.
+     */
+    public function fulfil(Payment $payment): void
+    {
+        $booking = Booking::query()->whereKey($payment->payable_id)->lockForUpdate()->first();
+
+        if ($booking === null || $booking->payment_state === PaymentState::Paid) {
+            return;
+        }
+
+        $owed = (int) $booking->price_points - $booking->pointsPaid() - (int) $payment->amount_points;
+
+        if ($booking->price_points !== null && $owed <= 0) {
+            $booking->forceFill(['payment_state' => PaymentState::Paid])->save();
+        }
+    }
 }

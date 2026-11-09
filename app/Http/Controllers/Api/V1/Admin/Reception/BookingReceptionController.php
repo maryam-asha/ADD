@@ -270,15 +270,36 @@ class BookingReceptionController extends Controller
         ]);
     }
 
+    /**
+     * `payment_method` says how the added time is paid: `wallet` from the
+     * member's wallet now (short, nothing is extended), `cash` at the desk;
+     * left out, the booking owes it.
+     */
     public function extend(ExtendBookingRequest $request, Booking $booking, BookingExtensionService $extensions): JsonResponse
     {
         try {
-            $movedTo = $extensions->extend($booking, $request->validated('additional_minutes'));
+            $movedTo = $extensions->extend(
+                $booking,
+                $request->validated('additional_minutes'),
+                $request->validated('payment_method'),
+                [
+                    'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                    'wallet_owner_id' => $request->validated('wallet_owner_id'),
+                ],
+            )->movedTo;
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (WalletChoiceRequiredException $e) {
+            return response()->json([
+                'message' => __('api.booking.wallet_choice_required'),
+                'wallet_options' => $e->options,
+            ], 422);
         }
 
-        $this->logSensitiveAction('booking_extended', $booking, ['additional_minutes' => $request->validated('additional_minutes')]);
+        $this->logSensitiveAction('booking_extended', $booking, [
+            'additional_minutes' => $request->validated('additional_minutes'),
+            'payment_method' => $request->validated('payment_method'),
+        ]);
 
         // The room the member sat in goes back to being a room: they are
         // told where to move, the one time it matters.

@@ -165,11 +165,14 @@ class BookingControllerTest extends TestCase
             'checked_in_at' => Carbon::parse('2026-08-17 10:00:00', 'Asia/Damascus')->setTimezone('UTC'),
         ]);
 
+        (new WalletService)->creditGeneral(Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $member->id]), 500, WalletTransactionSource::TopUp);
+
         $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/extend", [
             'additional_minutes' => 60,
+            'payment_method' => 'wallet',
         ]);
 
-        $response->assertOk()->assertExactJson(['message' => 'Booking extended.']);
+        $response->assertOk()->assertJsonPath('message', 'Booking extended.')->assertJsonPath('data.next', 'done');
         $this->assertTrue($booking->fresh()->end_at->equalTo(Carbon::parse('2026-08-17 12:00:00', 'Asia/Damascus')));
     }
 

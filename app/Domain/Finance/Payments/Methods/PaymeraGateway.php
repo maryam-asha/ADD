@@ -54,12 +54,12 @@ class PaymeraGateway implements PaymentGateway
 
     /**
      * Card money buys points, which then pay for whatever the payment is
-     * for. Everything a member pays for from the app; not an extension,
-     * which is only ever settled from the wallet as it happens.
+     * for. Everything a member pays for from the app — an extension too,
+     * when the member chooses the card for it (BookingExtensionService).
      */
     public function supports(PaymentPurpose $purpose): bool
     {
-        return $purpose !== PaymentPurpose::BookingExtension;
+        return true;
     }
 
     public function start(Payment $payment, array $context = []): PaymentStart

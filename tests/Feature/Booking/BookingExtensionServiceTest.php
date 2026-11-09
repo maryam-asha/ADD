@@ -217,7 +217,7 @@ class BookingExtensionServiceTest extends TestCase
             'payment_source' => PaymentSource::Wallet,
         ]);
 
-        $this->extensions->extend($booking, 60);
+        $this->extensions->extend($booking, 60, 'wallet');
 
         $this->assertSame(1, $wallet->transactions()->where('amount', -100)->count());
         $this->assertSame(PaymentState::Paid, $booking->fresh()->payment_state);

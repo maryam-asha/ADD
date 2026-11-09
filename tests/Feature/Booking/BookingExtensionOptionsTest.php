@@ -8,6 +8,10 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Membership\Enums\OwnerType;
+use App\Domain\Membership\Enums\WalletTransactionSource;
+use App\Domain\Membership\Models\Wallet;
+use App\Domain\Membership\Services\WalletService;
 use Carbon\Carbon;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -37,6 +41,12 @@ class BookingExtensionOptionsTest extends TestCase
 
         $this->member = User::factory()->create();
         $this->member->assignRole('member');
+        // Enough to pay any extension here from the wallet.
+        app(WalletService::class)->creditGeneral(
+            Wallet::create(['owner_type' => OwnerType::User, 'owner_id' => $this->member->id]),
+            1000,
+            WalletTransactionSource::TopUp,
+        );
         Sanctum::actingAs($this->member, ['*']);
     }
 
@@ -276,6 +286,7 @@ class BookingExtensionOptionsTest extends TestCase
     {
         return $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/extend", [
             'additional_minutes' => $minutes,
+            'payment_method' => 'wallet',
         ]);
     }
 

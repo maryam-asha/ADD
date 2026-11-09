@@ -57,10 +57,11 @@ class BookingPaymentLine
 
     /**
      * The sentence an extension notice ends with, read once the extension
-     * is saved: the difference taken from the member's wallet when the
-     * booking is still paid (BookingExtensionService charged it), else what
-     * the booking now owes — at the desk for one booked for cash, otherwise
-     * in the app or at the desk. An extension that cost nothing has none.
+     * is saved: the difference taken from the wallet the member chose when
+     * the booking is still paid (BookingExtensionService charged it), else
+     * what the booking now owes — at the desk when cash was chosen,
+     * otherwise in the app or at the desk. An extension that cost nothing
+     * has none.
      */
     public function forExtension(Booking $booking, int $differencePoints): array
     {
@@ -69,7 +70,16 @@ class BookingPaymentLine
         }
 
         if ($booking->payment_state === PaymentState::Paid) {
-            return $this->line('wallet', ['points' => $differencePoints]);
+            $paid = $booking->payments()
+                ->with('wallet')
+                ->where('purpose', PaymentPurpose::BookingExtension)
+                ->where('status', PaymentStatus::Accepted)
+                ->latest('id')
+                ->first();
+
+            return $paid !== null
+                ? $this->fromPayment($paid, $differencePoints)
+                : $this->line('wallet', ['points' => $differencePoints]);
         }
 
         $owed = max(0, (int) $booking->price_points - $booking->pointsPaid());

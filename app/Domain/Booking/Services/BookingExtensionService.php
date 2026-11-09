@@ -3,22 +3,23 @@
 namespace App\Domain\Booking\Services;
 
 use App\Domain\Access\Services\PasscodeIssuanceService;
-use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Events\BookingExtended;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\ValueObjects\ExtensionOutcome;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
-use App\Domain\Membership\Enums\OwnerType;
-use App\Domain\Membership\Enums\WalletTransactionCategory;
-use App\Domain\Membership\Services\WalletService;
 use App\Domain\Pricing\Services\QuoteRecorder;
 use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
+use LogicException;
 
 /**
  * Used by both the member's own extend request and reception acting on the
@@ -29,14 +30,25 @@ use Illuminate\Support\Facades\DB;
  *
  * Whether, how far and at what price are BookingExtensionPlanner's, the
  * same definition the extension options are offered from.
+ *
+ * What the added time costs is paid by the method chosen for it, never one
+ * assumed from how the booking itself was paid:
+ *
+ * - `wallet`: spent with the extension, from the wallet named (or the only
+ *   one the member may spend from); short, nothing is extended.
+ * - a card: opened once the extension is saved (openCardPayment()); the
+ *   booking owes the difference until the bank pays it.
+ * - `cash` (reception only): owed, collected at the desk.
+ * - none (reception only): owed, paid at the desk, from the app or at
+ *   check-out, as any booking still owing.
  */
 class BookingExtensionService
 {
     public function __construct(
         private readonly AvailabilityService $availability,
         private readonly BookingExtensionPlanner $planner,
-        private readonly WalletService $wallets,
         private readonly PaymentService $payments,
+        private readonly PaymentMethodRegistry $methods,
         private readonly QuoteRecorder $recorder,
         private readonly RealtimeBroadcaster $realtime,
         private readonly BookingNotifier $notifier,
@@ -44,14 +56,24 @@ class BookingExtensionService
     ) {}
 
     /**
-     * Returns where the member sits from now on when the extension moved
-     * them — their lent room went back to being a room
-     * (docs/decisions/coworking-seat-pool.md, "Seating placement") — and
-     * null when they stay where they are.
+     * `$methodRequired`: an extension that costs anything is refused without
+     * a method (the member's own request); reception may leave it owed.
+     *
+     * The outcome says where the member sits from now on when the extension
+     * moved them — their lent room went back to being a room
+     * (docs/decisions/coworking-seat-pool.md, "Seating placement") — null
+     * when they stay where they are.
+     *
+     * @param  array{wallet_owner_type?: string|null, wallet_owner_id?: int|null}  $walletContext
      */
-    public function extend(Booking $booking, int $additionalMinutes): ?Space
-    {
-        return DB::transaction(function () use ($booking, $additionalMinutes) {
+    public function extend(
+        Booking $booking,
+        int $additionalMinutes,
+        ?string $method = null,
+        array $walletContext = [],
+        bool $methodRequired = false,
+    ): ExtensionOutcome {
+        return DB::transaction(function () use ($booking, $additionalMinutes, $method, $walletContext, $methodRequired) {
             $lockedBooking = Booking::query()->whereKey($booking->getKey())->lockForUpdate()->firstOrFail();
 
             $space = Space::query()->whereKey($lockedBooking->space_id)->with('building')->firstOrFail();
@@ -111,12 +133,35 @@ class BookingExtensionService
             $newPrice = ($lockedBooking->price_points ?? $price['total'] - $differencePoints) + $differencePoints;
 
             $paymentState = $lockedBooking->payment_state;
+            $chosenMethod = $lockedBooking->chosen_payment_method;
+            $payFromWallet = false;
+            $gateway = null;
 
-            if ($differencePoints > 0 && $paymentState === PaymentState::Paid && ! $this->chargeExtension($lockedBooking, $differencePoints)) {
-                // Owes the extension, and only the extension: what was paid
-                // stays paid, and reception, pay-now and check-out charge
-                // the difference.
-                $paymentState = PaymentState::Unpaid;
+            if ($differencePoints > 0) {
+                if ($method === null && $methodRequired) {
+                    throw new ReceptionActionException('api.booking.payment_method_required');
+                }
+
+                if ($method === WalletMethod::KEY) {
+                    // Spent below, once the booking carries its new price.
+                    $payFromWallet = true;
+                } else {
+                    // Owes the extension, and only the extension: what was
+                    // paid stays paid. A card opens once this is saved; cash
+                    // and no method at all leave it to the desk, pay-now and
+                    // check-out — by the method chosen here, when there is one.
+                    if ($paymentState === PaymentState::Paid) {
+                        $paymentState = PaymentState::Unpaid;
+                    }
+
+                    if ($method !== null) {
+                        $chosenMethod = $method;
+                    }
+
+                    if ($method !== null && in_array($method, $this->methods->gatewayKeys(), true)) {
+                        $gateway = $method;
+                    }
+                }
             }
 
             if ($redemption !== null) {
@@ -132,10 +177,23 @@ class BookingExtensionService
                 'end_at' => $newEndAt,
                 'seat_space_id' => $seatSpaceId,
                 'payment_state' => $paymentState,
+                'chosen_payment_method' => $chosenMethod,
                 'price_points' => $newPrice,
                 // The list price grows with it, so the breakdown still adds up.
                 'list_price_points' => ($lockedBooking->list_price_points ?? $price['undiscounted_total'] - $price['list_difference']) + $price['list_difference'],
             ])->save();
+
+            // From the wallet the member named, inside this transaction: a
+            // wallet that falls short refuses the whole extension, so nothing
+            // is extended that was not paid the way they chose.
+            $walletPayment = $payFromWallet
+                ? $this->payments->start(PaymentPurpose::BookingExtension, $lockedBooking->user, WalletMethod::KEY, [
+                    'payable' => $lockedBooking,
+                    'points' => $differencePoints,
+                    'wallet_owner_type' => $walletContext['wallet_owner_type'] ?? null,
+                    'wallet_owner_id' => $walletContext['wallet_owner_id'] ?? null,
+                ])['payment']
+                : null;
 
             $this->realtime->send(new BookingExtended($lockedBooking));
 
@@ -151,37 +209,38 @@ class BookingExtensionService
                 }
             });
 
-            return $moved ? $lockedBooking->fresh()->seatingSpace() : null;
+            return new ExtensionOutcome(
+                $moved ? $lockedBooking->fresh()->seatingSpace() : null,
+                $differencePoints,
+                $walletPayment,
+                $gateway,
+            );
         });
     }
 
     /**
-     * A booking paid from the wallet pays its extension from the member's
-     * own wallet, when that covers the difference — through a payment row,
-     * so cancelling or rejecting the booking later refunds these points
-     * with the rest. Any other paid booking (a card, the desk) is not
-     * charged behind the member's back: it is left owing the difference.
+     * The card payment for an extension the member chose to pay by card,
+     * opened once the extension is saved — never inside its transaction: a
+     * gateway's row must outlive a call that fails, as PaymentService opens
+     * every card payment. The extension stands whatever the bank says; until
+     * it pays, the booking owes the difference
+     * (BookingExtensionFulfiller marks it paid again).
+     *
+     * @return array{payment: Payment, start: PaymentStart}
      */
-    private function chargeExtension(Booking $booking, int $differencePoints): bool
+    public function openCardPayment(Booking $booking, ExtensionOutcome $outcome): array
     {
-        if ($booking->payment_source !== PaymentSource::Wallet) {
-            return false;
+        if ($outcome->gateway === null) {
+            throw new LogicException('Only an extension the member chose to pay by card opens a card payment.');
         }
 
-        $personalOption = collect($this->wallets->spendOptions($booking->user, WalletTransactionCategory::SpaceSpecific))
-            ->firstWhere('owner_type', OwnerType::User->value);
+        $locale = app()->getLocale();
 
-        if ($personalOption === null || $personalOption['usable_balance'] < $differencePoints) {
-            return false;
-        }
-
-        $this->payments->start(PaymentPurpose::BookingExtension, $booking->user, WalletMethod::KEY, [
+        return $this->payments->start(PaymentPurpose::BookingExtension, $booking->user, $outcome->gateway, array_filter([
             'payable' => $booking,
-            'points' => $differencePoints,
-            'wallet_owner_type' => OwnerType::User,
-            'wallet_owner_id' => $booking->user_id,
-        ]);
-
-        return true;
+            'points' => $outcome->differencePoints,
+            // The gateway page speaks the member's language.
+            'lang' => in_array($locale, ['ar', 'en'], true) ? $locale : null,
+        ], fn ($value) => $value !== null));
     }
 }

@@ -41,7 +41,7 @@ class PaymentMethodsController extends Controller
         CouponPreview $preview,
     ): JsonResponse {
         $validated = $request->validate([
-            'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'coworking_session', 'event_registration'])],
+            'purpose' => ['nullable', Rule::in(['wallet_top_up', 'plan_purchase', 'booking', 'booking_extension', 'coworking_session', 'event_registration'])],
             'payable_id' => ['nullable', 'integer'],
             'plan_id' => ['nullable', 'integer'],
             // A coupon the member is about to use: the methods are weighed

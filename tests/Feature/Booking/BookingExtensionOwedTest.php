@@ -147,12 +147,12 @@ class BookingExtensionOwedTest extends TestCase
         return $payment->refresh();
     }
 
-    private function checkInAndExtend(Booking $booking, int $minutes = 60): Booking
+    private function checkInAndExtend(Booking $booking, int $minutes = 60, ?string $method = null): Booking
     {
         $booking->forceFill(['checked_in_at' => Carbon::parse('2026-08-17 10:00', 'Asia/Damascus')->utc()])->save();
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus')->utc());
 
-        app(BookingExtensionService::class)->extend($booking, $minutes);
+        app(BookingExtensionService::class)->extend($booking, $minutes, $method);
 
         return $booking->refresh();
     }
@@ -254,7 +254,7 @@ class BookingExtensionOwedTest extends TestCase
         app(PaymentService::class)->start(PaymentPurpose::Booking, $member, 'wallet', ['payable' => $booking]);
         $this->assertSame(900, $this->balanceOf($member));
 
-        $booking = $this->checkInAndExtend($booking);
+        $booking = $this->checkInAndExtend($booking, method: 'wallet');
 
         $this->assertSame(PaymentState::Paid, $booking->payment_state);
         $this->assertSame(PaymentSource::Wallet, $booking->payment_source);

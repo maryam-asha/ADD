@@ -148,7 +148,7 @@ class CoworkingSeatPlacementTest extends TestCase
         [$booking] = $this->runningInLentRoom('11:00');
         $this->baseTaken('10:00', '11:00');
 
-        $movedTo = app(BookingExtensionService::class)->extend($booking, 60);
+        $movedTo = app(BookingExtensionService::class)->extend($booking, 60)->movedTo;
 
         $this->assertSame($this->coSpace->id, $movedTo?->id);
         $this->assertNull($booking->fresh()->seat_space_id);
@@ -159,7 +159,7 @@ class CoworkingSeatPlacementTest extends TestCase
     {
         [$booking, $room] = $this->runningInLentRoom('13:00');
 
-        $this->assertNull(app(BookingExtensionService::class)->extend($booking, 60));
+        $this->assertNull(app(BookingExtensionService::class)->extend($booking, 60)->movedTo);
         $this->assertSame($room->id, $booking->fresh()->seat_space_id);
     }
 

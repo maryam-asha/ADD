@@ -272,7 +272,7 @@ class PlanDiscountBookingTest extends TestCase
         // A booking extends only while it runs
         // (docs/decisions/booking-outcomes-and-extension.md).
         Carbon::setTestNow(Carbon::parse('2026-08-17 10:30:00', 'Asia/Damascus'));
-        app(BookingExtensionService::class)->extend($booking, 60);
+        app(BookingExtensionService::class)->extend($booking, 60, 'wallet');
 
         // New duration is 2 hours: raw 200, 30% off leaves 140. The
         // already-discounted 70 was charged, so only the 70-point
