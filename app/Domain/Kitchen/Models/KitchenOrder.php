@@ -28,6 +28,9 @@ class KitchenOrder extends Model
 {
     use HasFactory;
 
+    /** The stock movements' `source_type` for what accepting an order draws. */
+    public const SOURCE = 'kitchen_order';
+
     protected $fillable = [
         'user_id',
         'branch_id',

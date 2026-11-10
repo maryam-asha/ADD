@@ -2,7 +2,11 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use Add\Inventory\Stock\Enums\IssueReason;
+use Add\Inventory\Stock\Services\InsufficientStockException;
 use Add\Inventory\Stock\Services\StockService;
+use Add\Inventory\Support\Place;
+use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\SeatDesk;
@@ -17,11 +21,15 @@ use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Retail\Models\SaleItem;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 
 /**
  * A member sending an order to the kitchen, and taking it back while the
- * kitchen has not accepted it (spec "The order").
+ * kitchen has not accepted it; the kitchen accepting or rejecting it, and
+ * marking it ready and delivered (spec "The order"). Every change of status
+ * locks the order's row and re-reads its status first, so two screens
+ * acting on one order at once cannot both succeed.
  *
  * Sending checks the stock but draws none: stock is drawn when the kitchen
  * accepts (decision 7), and the order is not paid now — its total joins the
@@ -99,6 +107,130 @@ class KitchenOrderService
         });
 
         $order->refresh();
+    }
+
+    /**
+     * The kitchen takes the order on (spec "accept"): in one transaction,
+     * lock the order and then its bill, check the order is still pending
+     * and the bill still open, and draw every line from the kitchen store it
+     * was sent to. A shelf short of any line rolls the whole of it back —
+     * nothing drawn, the order still pending, so the kitchen can reject it.
+     *
+     * @throws KitchenOrderException not pending or the bill closed (409); a line short (422)
+     */
+    public function accept(KitchenOrder $order, User $staff): KitchenOrder
+    {
+        DB::transaction(function () use ($order, $staff) {
+            $locked = $this->locked($order, KitchenOrderStatus::Pending, 'api.kitchen.order_not_pending');
+
+            if (! $this->billIsOpen($locked)) {
+                throw new KitchenOrderException('api.kitchen.bill_closed', 409);
+            }
+
+            $store = Warehouse::query()->findOrFail($locked->warehouse_id)->asPlace();
+            $source = new Place(KitchenOrder::SOURCE, $locked->id);
+
+            foreach ($locked->lines()->with('item.category', 'item.unit')->get() as $line) {
+                try {
+                    $this->stock->issue($line->item, $store, $line->quantity, IssueReason::Sale, $source);
+                } catch (InsufficientStockException) {
+                    throw new KitchenOrderException('api.kitchen.out_of_stock', 422, [
+                        'item' => (string) $line->item->translate('name'),
+                    ]);
+                }
+            }
+
+            $locked->update([
+                'status' => KitchenOrderStatus::Preparing,
+                'accepted_by' => $staff->id,
+                'accepted_at' => now(),
+            ]);
+        });
+
+        return $order->refresh();
+    }
+
+    /**
+     * The kitchen turns a pending order down; the member sees the reason.
+     * Nothing was drawn, so nothing is returned.
+     *
+     * @throws KitchenOrderException not pending (409)
+     */
+    public function reject(KitchenOrder $order, User $staff, string $reason): KitchenOrder
+    {
+        DB::transaction(function () use ($order, $staff, $reason) {
+            $this->locked($order, KitchenOrderStatus::Pending, 'api.kitchen.order_not_pending')->update([
+                'status' => KitchenOrderStatus::Rejected,
+                'rejection_reason' => trim($reason),
+                'rejected_by' => $staff->id,
+                'rejected_at' => now(),
+            ]);
+        });
+
+        return $order->refresh();
+    }
+
+    /**
+     * @throws KitchenOrderException not preparing (409)
+     */
+    public function markReady(KitchenOrder $order, User $staff): KitchenOrder
+    {
+        DB::transaction(function () use ($order) {
+            $this->locked($order, KitchenOrderStatus::Preparing, 'api.kitchen.order_not_preparing')->update([
+                'status' => KitchenOrderStatus::Ready,
+                'ready_at' => now(),
+            ]);
+        });
+
+        return $order->refresh();
+    }
+
+    /**
+     * Handed over — from ready, or straight from preparing when the kitchen
+     * carries it to the member without calling it ready first.
+     *
+     * @throws KitchenOrderException neither preparing nor ready (409)
+     */
+    public function markDelivered(KitchenOrder $order, User $staff): KitchenOrder
+    {
+        DB::transaction(function () use ($order, $staff) {
+            $this->locked($order, [KitchenOrderStatus::Preparing, KitchenOrderStatus::Ready], 'api.kitchen.order_not_deliverable')->update([
+                'status' => KitchenOrderStatus::Delivered,
+                'delivered_by' => $staff->id,
+                'delivered_at' => now(),
+            ]);
+        });
+
+        return $order->refresh();
+    }
+
+    /**
+     * The order's row, locked and read afresh — a copy the caller loaded
+     * earlier may be stale — refused with `$key` (409) unless its status is
+     * one of `$allowed`.
+     *
+     * @param  KitchenOrderStatus|list<KitchenOrderStatus>  $allowed
+     */
+    private function locked(KitchenOrder $order, KitchenOrderStatus|array $allowed, string $key): KitchenOrder
+    {
+        $locked = KitchenOrder::query()->whereKey($order->getKey())->lockForUpdate()->firstOrFail();
+
+        if (! in_array($locked->status, is_array($allowed) ? $allowed : [$allowed], true)) {
+            throw new KitchenOrderException($key, 409);
+        }
+
+        return $locked;
+    }
+
+    /** Its session or booking, locked: checked in and not yet checked out. */
+    private function billIsOpen(KitchenOrder $order): bool
+    {
+        $class = Relation::getMorphedModel($order->billable_type) ?? $order->billable_type;
+
+        /** @var Booking|WalkinSession|null $bill */
+        $bill = $class::query()->whereKey($order->billable_id)->lockForUpdate()->first();
+
+        return $bill !== null && $bill->checked_in_at !== null && $bill->checked_out_at === null;
     }
 
     /**

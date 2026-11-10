@@ -46,6 +46,8 @@ use App\Http\Controllers\Api\V1\Admin\InvoicePaymentController;
 use App\Http\Controllers\Api\V1\Admin\ItemSaleController;
 use App\Http\Controllers\Api\V1\Admin\KioskController;
 use App\Http\Controllers\Api\V1\Admin\KioskPairingController;
+use App\Http\Controllers\Api\V1\Admin\KitchenOrderController;
+use App\Http\Controllers\Api\V1\Admin\KitchenStoreController;
 use App\Http\Controllers\Api\V1\Admin\MediaUploadController;
 use App\Http\Controllers\Api\V1\Admin\MemberProfileController;
 use App\Http\Controllers\Api\V1\Admin\MembershipController;
@@ -62,7 +64,6 @@ use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
-use App\Http\Controllers\Api\V1\Admin\KitchenStoreController;
 use App\Http\Controllers\Api\V1\Admin\QrPointController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
@@ -252,6 +253,15 @@ $permitted(Route::apiResource('qr-points', QrPointController::class)
 // The warehouse each branch's kitchen draws from; the menu is what it holds.
 Route::get('kitchen/stores', [KitchenStoreController::class, 'index'])->middleware('permission:kitchen-stores.view');
 Route::put('kitchen/stores/{branch}', [KitchenStoreController::class, 'update'])->middleware('permission:kitchen-stores.update');
+
+// The kitchen's queue and history of members' orders, and what it does
+// with each: accept (drawing the stock), reject with a reason, ready, delivered.
+Route::get('kitchen/orders', [KitchenOrderController::class, 'index'])->middleware('permission:kitchen-orders.view');
+Route::get('kitchen/orders/{order}', [KitchenOrderController::class, 'show'])->middleware('permission:kitchen-orders.view');
+Route::post('kitchen/orders/{order}/accept', [KitchenOrderController::class, 'accept'])->middleware('permission:kitchen-orders.manage');
+Route::post('kitchen/orders/{order}/reject', [KitchenOrderController::class, 'reject'])->middleware('permission:kitchen-orders.manage');
+Route::post('kitchen/orders/{order}/ready', [KitchenOrderController::class, 'ready'])->middleware('permission:kitchen-orders.manage');
+Route::post('kitchen/orders/{order}/deliver', [KitchenOrderController::class, 'deliver'])->middleware('permission:kitchen-orders.manage');
 
 // Selling stock at reception: what may be sold and its price in points
 // (the stock itself is the inventory's), and the sales made.
