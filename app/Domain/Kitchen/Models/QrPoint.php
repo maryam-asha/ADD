@@ -31,6 +31,7 @@ class QrPoint extends Model
     protected function casts(): array
     {
         return [
+            'branch_id' => 'integer',
             'place_type' => QrPointPlace::class,
             'place_id' => 'integer',
         ];
@@ -47,7 +48,10 @@ class QrPoint extends Model
         return self::PREFIX.':'.$this->qr_value;
     }
 
-    /** The point a scanned text names, or null for anything else. */
+    /**
+     * The point a scanned text names, or null for anything else — including a
+     * point left behind by a deleted desk or space, which is no QR at all.
+     */
     public static function fromScan(string $value): ?self
     {
         $prefix = self::PREFIX.':';
@@ -56,7 +60,9 @@ class QrPoint extends Model
             return null;
         }
 
-        return self::query()->where('qr_value', substr($value, strlen($prefix)))->first();
+        $point = self::query()->where('qr_value', substr($value, strlen($prefix)))->first();
+
+        return $point?->placeModel() === null ? null : $point;
     }
 
     /**

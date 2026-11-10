@@ -58,7 +58,7 @@ class BillLocator
 
         if ($qr?->place_type === QrPointPlace::Space) {
             foreach ($bookings as $booking) {
-                if ($booking->space_id === $qr->place_id) {
+                if ((int) $booking->space_id === (int) $qr->place_id) {
                     return $booking;
                 }
             }

@@ -119,9 +119,7 @@ class KitchenController extends Controller
      */
     private function qr(?string $value): ?QrPoint
     {
-        $qr = $value === null ? null : QrPoint::fromScan(trim($value));
-
-        return $qr?->placeModel() === null ? null : $qr;
+        return $value === null ? null : QrPoint::fromScan(trim($value));
     }
 
     private function notFound(): JsonResponse

@@ -30,11 +30,6 @@ class MenuAccess
      */
     public function for(User $member, ?QrPoint $qr, ?int $branchId): array
     {
-        // A point whose desk or space is gone is no QR at all.
-        if ($qr !== null && $qr->placeModel() === null) {
-            $qr = null;
-        }
-
         $bills = $this->bills->eligibleBills($member);
         $branchId = $qr?->branch_id
             ?? ($bills === [] ? null : (int) $bills[0]->space->building->branch_id)

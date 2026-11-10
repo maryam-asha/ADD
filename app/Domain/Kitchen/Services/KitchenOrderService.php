@@ -254,7 +254,7 @@ class KitchenOrderService
         ];
 
         if ($qr !== null) {
-            if ($qr->branch_id !== $branchId) {
+            if ((int) $qr->branch_id !== $branchId) {
                 throw new KitchenOrderException('api.kitchen.space_not_in_branch', 422);
             }
 

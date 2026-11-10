@@ -8,6 +8,8 @@ use App\Domain\Booking\Enums\CoworkingStartOutcome;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Kiosk;
 use App\Domain\Booking\Services\CoworkingSessionService;
+use App\Domain\Kitchen\Models\QrPoint;
+use App\Domain\Kitchen\Services\MenuAccess;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\ScanRequest;
 use App\Http\Resources\ArrivalRequestResource;
@@ -20,13 +22,14 @@ use Illuminate\Http\JsonResponse;
  * the coworking session or the coworking booking's check-in starts at that
  * confirmation, whatever room the member has booked later
  * (docs/decisions/coworking-self-service-sessions.md); anything else is
- * looked up as a lock's sticker and opens that door
+ * a desk or room code (`add-place:v1:…`) opens the kitchen menu; anything
+ * else is looked up as a lock's sticker and opens that door
  * (docs/decisions/qr-lock-unlock.md). Every answer that succeeds says which
  * in data.outcome.
  */
 class ScanController extends Controller
 {
-    public function scan(ScanRequest $request, CoworkingSessionService $sessions, UnlockService $locks): JsonResponse
+    public function scan(ScanRequest $request, CoworkingSessionService $sessions, UnlockService $locks, MenuAccess $menuAccess): JsonResponse
     {
         $qrValue = $request->validated('qr_value');
 
@@ -35,7 +38,36 @@ class ScanController extends Controller
             return $this->coworking($request, $sessions);
         }
 
+        if (str_starts_with(trim($qrValue), QrPoint::PREFIX.':')) {
+            return $this->menu($request, $menuAccess, trim($qrValue));
+        }
+
         return $this->unlock($request, $locks, $qrValue);
+    }
+
+    /** A desk or room code: the same can_order / reason the menu endpoint gives. */
+    private function menu(ScanRequest $request, MenuAccess $menuAccess, string $qrValue): JsonResponse
+    {
+        $qr = QrPoint::fromScan($qrValue);
+
+        if ($qr === null) {
+            return response()->json(['message' => __('api.scan.unknown_code')], 422);
+        }
+
+        $access = $menuAccess->for($request->user(), $qr, null);
+
+        return response()->json(['data' => [
+            'outcome' => 'menu',
+            'qr' => $qrValue,
+            'place' => [
+                'type' => $qr->place_type->value,
+                'id' => $qr->place_id,
+                'label' => $qr->placeLabel(),
+            ],
+            'branch_id' => $access['branch_id'],
+            'can_order' => $access['can_order'],
+            'reason' => $access['reason'],
+        ]]);
     }
 
     private function coworking(ScanRequest $request, CoworkingSessionService $sessions): JsonResponse
