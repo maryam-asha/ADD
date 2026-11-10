@@ -26,7 +26,7 @@ class SettleAtReceptionRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'purpose' => ['bail', 'required', Rule::in(['booking', 'coworking_session', 'event_registration', 'plan_purchase'])],
+            'purpose' => ['bail', 'required', Rule::in(['booking', 'coworking_session', 'event_registration', 'plan_purchase', 'kitchen_order'])],
             'payable_id' => ['required_unless:purpose,plan_purchase', 'nullable', 'integer'],
             'payment_id' => ['required_if:purpose,plan_purchase', 'nullable', 'integer'],
             'collected_via' => ['required', Rule::enum(PaymentMethod::class)->only(PaymentMethod::atReception())],

@@ -399,6 +399,7 @@ return [
             'coworking_session' => 'جلسة عمل مشترك',
             'booking_extension' => 'تمديد حجز',
             'item_sale' => 'مشتريات من الاستقبال',
+            'kitchen_order' => 'طلب من المطبخ',
         ],
     ],
 

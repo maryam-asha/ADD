@@ -46,6 +46,7 @@ return [
         // each row was, and the pool it moved.
         'kinds' => [
             'item_sale' => 'مشتريات من الاستقبال',
+            'kitchen_order' => 'طلب من المطبخ',
             'booking' => 'حجز',
             'booking_extension' => 'تمديد حجز',
             'coworking_session' => 'جلسة عمل مشترك',
@@ -846,6 +847,12 @@ return [
         'bill_closed' => 'أُغلقت الجلسة أو الحجز الذي أُضيف إليه هذا الطلب.',
         'order_not_found' => 'الطلب غير موجود.',
         'pickup_label' => 'كاونتر المطبخ',
+    ],
+
+    // دفع طلب المطبخ، كدفعة مستقلة (App\Domain\Kitchen).
+    'kitchen_order' => [
+        'description' => 'طلب المطبخ رقم :id',
+        'not_payable' => 'لا يُدفع إلا طلب قبله المطبخ.',
     ],
 
 ];

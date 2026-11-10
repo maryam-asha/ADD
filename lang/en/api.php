@@ -46,6 +46,7 @@ return [
         // each row was, and the pool it moved.
         'kinds' => [
             'item_sale' => 'Purchase at reception',
+            'kitchen_order' => 'Kitchen order',
             'booking' => 'Booking',
             'booking_extension' => 'Booking extension',
             'coworking_session' => 'Coworking session',
@@ -861,6 +862,12 @@ return [
         'bill_closed' => 'The session or booking this order is on has closed.',
         'order_not_found' => 'Order not found.',
         'pickup_label' => 'Kitchen counter',
+    ],
+
+    // Paying for a kitchen order, its own payable (App\Domain\Kitchen).
+    'kitchen_order' => [
+        'description' => 'Kitchen order #:id',
+        'not_payable' => 'Only an order the kitchen has accepted can be paid.',
     ],
 
 ];

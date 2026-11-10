@@ -26,6 +26,11 @@ namespace App\Domain\Finance\Enums;
  *
  * `ItemSale` pays for stock sold at the reception desk (App\Domain\Retail):
  * its payable is the sale, and paying it issues the stock.
+ *
+ * `KitchenOrder` pays for an order the kitchen accepted (App\Domain\Kitchen):
+ * owed beside its session or booking but paid on its own, from general
+ * points only, and recorded as a sale — never as the bill's revenue (kitchen
+ * orders spec, decision 11). Its stock was drawn when it was accepted.
  */
 enum PaymentPurpose: string
 {
@@ -36,4 +41,5 @@ enum PaymentPurpose: string
     case CoworkingSession = 'coworking_session';
     case BookingExtension = 'booking_extension';
     case ItemSale = 'item_sale';
+    case KitchenOrder = 'kitchen_order';
 }

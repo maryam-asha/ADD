@@ -13,6 +13,8 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
 use App\Domain\Finance\Services\ReceivedMoneyConverter;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Pricing\Services\PriceQuoteService;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -26,8 +28,11 @@ use Illuminate\Support\Collection;
  * Everything one member still owes, for the reception desk to settle in one
  * visit: unpaid bookings in a payable status (never cancelled, rejected or a
  * no-show — docs/decisions/booking-outcomes-and-extension.md), closed unpaid
- * coworking sessions, approved unpaid registrations for paid events, and
- * plans they chose to pay for in cash whose hold is still open.
+ * coworking sessions, approved unpaid registrations for paid events,
+ * plans they chose to pay for in cash whose hold is still open, and unpaid
+ * kitchen orders on a session or booking that has closed — each its own
+ * payable beside the bill (kitchen orders spec, decision 11); one on a bill
+ * still open is settled with it at checkout.
  *
  * Each item names what POST admin/reception/payments/settle takes to settle
  * it (`purpose` plus `payable_id`, or `payment_id` for a held plan) and what
@@ -96,6 +101,7 @@ class OutstandingItems
             ...$this->sessions($scope),
             ...$this->registrations($scope),
             ...$this->heldPlans($scope),
+            ...$this->kitchenOrders($scope),
         ];
     }
 
@@ -214,6 +220,31 @@ class OutstandingItems
     }
 
     /**
+     * Accepted, unpaid orders whose session or booking has closed, each
+     * settled on its own (`purpose` kitchen_order).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function kitchenOrders(Closure $scope): array
+    {
+        return $this->kitchenOrdersOwed()
+            ->with(['user:id,name,phone'])
+            ->where($scope)
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get()
+            ->map(fn (KitchenOrder $o) => [
+                'purpose' => PaymentPurpose::KitchenOrder->value,
+                'payable_id' => $o->id,
+                'member' => $this->member($o->user),
+                'title' => __('api.kitchen_order.description', ['id' => $o->id]),
+                'starts_at' => $o->created_at?->toIso8601String(),
+                'amount_points' => (int) $o->total_points,
+            ])
+            ->all();
+    }
+
+    /**
      * The member's walk-ins and bookings that have closed and still owe, by
      * the same rules the desk lists them by, newest close first — the home
      * screen's awaiting_payment cards come from it. Upcoming bookings not paid yet are not here:
@@ -250,7 +281,8 @@ class OutstandingItems
         return $this->bookingsOwed()->count()
             + $this->sessionsOwed()->count()
             + $this->registrationsOwed()->count()
-            + $this->plansHeld()->count();
+            + $this->plansHeld()->count()
+            + $this->kitchenOrdersOwed()->count();
     }
 
     /** @return Builder<Booking> */
@@ -278,6 +310,20 @@ class OutstandingItems
             ->where('status', EventRegistrationStatus::Approved)
             ->where('payment_state', EventPaymentState::Unpaid)
             ->where('price_points', '>', 0);
+    }
+
+    /**
+     * Accepted (so owed), unpaid, and on a bill that has closed.
+     *
+     * @return Builder<KitchenOrder>
+     */
+    private function kitchenOrdersOwed(): Builder
+    {
+        return KitchenOrder::query()
+            ->whereIn('status', KitchenOrderStatus::owedValues())
+            ->whereNull('paid_at')
+            ->where('total_points', '>', 0)
+            ->whereHasMorph('billable', [Booking::class, WalkinSession::class], fn (Builder $bill) => $bill->whereNotNull('checked_out_at'));
     }
 
     /** @return Builder<Payment> */

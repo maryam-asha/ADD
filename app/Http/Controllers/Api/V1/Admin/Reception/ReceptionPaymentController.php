@@ -13,6 +13,7 @@ use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Services\CurrencyConversionService;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Exceptions\SeatPoolExhaustedException;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\SettleAtReceptionRequest;
@@ -150,6 +151,7 @@ class ReceptionPaymentController extends Controller
             PaymentPurpose::Booking => Booking::query()->findOrFail($id),
             PaymentPurpose::CoworkingSession => WalkinSession::query()->findOrFail($id),
             PaymentPurpose::EventRegistration => EventAttendee::query()->findOrFail($id),
+            PaymentPurpose::KitchenOrder => KitchenOrder::query()->findOrFail($id),
             default => Payment::query()->findOrFail($id),
         };
     }

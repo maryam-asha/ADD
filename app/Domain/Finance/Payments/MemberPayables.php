@@ -7,6 +7,7 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 
@@ -26,6 +27,7 @@ class MemberPayables
             PaymentPurpose::Booking => Booking::query()->where('user_id', $member->id)->findOrFail($id),
             PaymentPurpose::CoworkingSession => WalkinSession::query()->where('user_id', $member->id)->findOrFail($id),
             PaymentPurpose::EventRegistration => EventAttendee::query()->where('user_id', $member->id)->findOrFail($id),
+            PaymentPurpose::KitchenOrder => KitchenOrder::query()->where('user_id', $member->id)->findOrFail($id),
             default => null,
         };
     }

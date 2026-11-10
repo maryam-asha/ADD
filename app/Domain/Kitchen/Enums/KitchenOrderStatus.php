@@ -36,4 +36,13 @@ enum KitchenOrderStatus: string
             array_filter(self::cases(), fn (self $status) => $status->isOpen()),
         ));
     }
+
+    /** @return list<string> */
+    public static function owedValues(): array
+    {
+        return array_values(array_map(
+            fn (self $status) => $status->value,
+            array_filter(self::cases(), fn (self $status) => $status->isOwed()),
+        ));
+    }
 }

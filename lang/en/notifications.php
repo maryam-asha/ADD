@@ -399,6 +399,7 @@ return [
             'coworking_session' => 'a coworking session',
             'booking_extension' => 'a booking extension',
             'item_sale' => 'a purchase at reception',
+            'kitchen_order' => 'a kitchen order',
         ],
     ],
 
