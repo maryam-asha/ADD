@@ -16,8 +16,10 @@ use App\Domain\Booking\Services\SessionEndService;
 use App\Domain\Booking\Services\SessionReportBuilder;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentStart;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\ListCoworkingSessionsRequest;
@@ -68,6 +70,12 @@ class CoworkingSessionController extends Controller
      * session at exactly that time — however long the member takes to press,
      * whatever reception does. Past `checkout_token_expires_at` the app shows
      * a fresh checkout.
+     *
+     * Its kitchen orders are a charge of their own (kitchen orders spec,
+     * decision 11): `closing.points` is the session alone, as sealed;
+     * `closing.orders_points` what its accepted orders still owe, and
+     * `closing.total_points` the two together — the true total the member
+     * sees before asking to end. `orders` counts them.
      */
     public function checkout(
         Request $request,
@@ -76,6 +84,7 @@ class CoworkingSessionController extends Controller
         SessionClosureService $closures,
         CheckoutTokenService $checkouts,
         PriceLabelPresenter $prices,
+        KitchenOrderSettlement $orders,
     ): JsonResponse {
         $member = $request->user();
         $session = $sessions->openSessionFor($member);
@@ -103,7 +112,10 @@ class CoworkingSessionController extends Controller
                 'covered_seconds' => $quote['covered_seconds'],
                 // A booking paid when it was made owes nothing more.
                 'already_paid' => $quote['already_paid'],
+                'orders_points' => $quote['orders_points'],
+                'total_points' => $points + $quote['orders_points'],
             ],
+            'orders' => $orders->summaryFor($session),
             'checkout_token' => $token->token,
             'checkout_token_expires_at' => $token->expiresAt->toIso8601String(),
         ]]);
@@ -180,8 +192,16 @@ class CoworkingSessionController extends Controller
      * session, so it has its own endpoint. A booking left without a method
      * is paid by the one it was booked with. Not the member's: 404, as for
      * the report.
+     *
+     * Its unpaid kitchen orders, each its own payable (kitchen orders spec,
+     * decision 11), are paid with it from the member's own general points
+     * once the session is paid from the wallet — as far as they go; one the
+     * wallet cannot cover stays owed. Paid by card (Paymera) or cash, the
+     * orders are not paid here in this version: they stay outstanding, on
+     * the desk's list, and are paid at the desk (settle-payment settles
+     * them with the session).
      */
-    public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout, RealtimeBroadcaster $realtime): JsonResponse
+    public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout, RealtimeBroadcaster $realtime, KitchenOrderSettlement $orders): JsonResponse
     {
         $session = $sessions->find($type, $id);
 
@@ -211,6 +231,10 @@ class CoworkingSessionController extends Controller
 
         if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
             $realtime->send(new CoworkingPaymentAtReception($session));
+        }
+
+        if ($method === WalletMethod::KEY && $outcome->start->kind === PaymentStart::DONE) {
+            $orders->payFromWallet($session);
         }
 
         return response()->json(

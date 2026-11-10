@@ -5,6 +5,7 @@ namespace App\Http\Resources;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\BookingPresentationService;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Http\Resources\Concerns\PreloadsAppliedDiscounts;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
@@ -55,6 +56,10 @@ class MemberCoworkingSessionResource extends JsonResource
             // What was taken off it — offer, coupon, plan discount — as it
             // was when the price was locked (AppliedDiscountPresenter).
             'discounts' => app(AppliedDiscountPresenter::class)->for($session),
+            // Its kitchen orders, a charge of their own beside `payment`
+            // (kitchen orders spec, decision 11): how many were accepted,
+            // what they come to, and what of that is unpaid.
+            'orders' => app(KitchenOrderSettlement::class)->summaryFor($session),
         ];
     }
 }

@@ -86,6 +86,9 @@ class ReceptionSessionsController extends Controller
                 'covered_seconds' => $quote['covered_seconds'],
                 'already_paid' => $quote['already_paid'],
                 'amounts' => $this->amountsFor($quote['points'], $converter),
+                // Its accepted kitchen orders still unpaid, a charge of their
+                // own beside `points` (kitchen orders spec, decision 11).
+                'orders_points' => $quote['orders_points'],
                 'end_request' => $endRequest === null ? null : new SessionEndRequestResource($endRequest),
             ];
         }

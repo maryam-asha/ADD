@@ -21,6 +21,7 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Pricing\Enums\PricingPurpose;
@@ -151,6 +152,11 @@ class SessionClosureService
      * and confirms it here. The money goes through the ledger like every
      * other payment (PaymentService::settleAtReception). The audit entry is
      * the caller's, via LogsSensitiveActions.
+     *
+     * Its unpaid kitchen orders are settled with it, by the same method, each
+     * its own payable (kitchen orders spec, decision 11): the session's own
+     * payment stays exactly its own price. All or nothing — an order refused
+     * leaves the session unpaid too.
      */
     public function settlePayment(Booking|WalkinSession $session, PaymentMethod $method, User $operator): void
     {
@@ -162,29 +168,31 @@ class SessionClosureService
             throw new ReceptionActionException('api.reception.already_paid', 409);
         }
 
-        // Nothing charged (a free space): nothing to put through the ledger.
-        if (bccomp((string) $session->amount_owed, '0', 2) <= 0) {
-            $session->forceFill([
-                'payment_state' => PaymentState::Paid,
-                'payment_method' => $method,
-                'paid_by' => $operator->id,
-                'paid_at' => now(),
-            ])->save();
+        DB::transaction(function () use ($session, $method, $operator) {
+            // Nothing charged (a free space): nothing to put through the ledger.
+            if (bccomp((string) $session->amount_owed, '0', 2) <= 0) {
+                $session->forceFill([
+                    'payment_state' => PaymentState::Paid,
+                    'payment_method' => $method,
+                    'paid_by' => $operator->id,
+                    'paid_at' => now(),
+                ])->save();
+            } else {
+                // Exactly what is owed, through the one settlement path: the money
+                // becomes points in the member's wallet and is spent on the session,
+                // leaving a ledger credit, a debit and a payment row.
+                app(PaymentService::class)->settleAtReception(
+                    $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
+                    $session,
+                    $method,
+                    null,
+                    null,
+                    $operator,
+                );
+            }
 
-            return;
-        }
-
-        // Exactly what is owed, through the one settlement path: the money
-        // becomes points in the member's wallet and is spent on the session,
-        // leaving a ledger credit, a debit and a payment row.
-        app(PaymentService::class)->settleAtReception(
-            $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
-            $session,
-            $method,
-            null,
-            null,
-            $operator,
-        );
+            app(KitchenOrderSettlement::class)->settleAtReception($session, $method, $operator);
+        });
 
         $session->refresh();
     }
@@ -224,9 +232,20 @@ class SessionClosureService
      * the same pricing. A booking already paid keeps the price it was paid
      * at, and owes only what it stays past its end (overstayPoints()).
      *
-     * @return array{points: int, covered_seconds: int, already_paid: bool}
+     * `orders_points` is what its accepted kitchen orders still owe: a figure
+     * of its own beside `points`, which an order never changes (kitchen
+     * orders spec, decision 11).
+     *
+     * @return array{points: int, covered_seconds: int, already_paid: bool, orders_points: int}
      */
     public function quote(Booking|WalkinSession $session, CarbonInterface $at): array
+    {
+        return $this->sessionQuote($session, $at)
+            + ['orders_points' => (int) app(KitchenOrderSettlement::class)->unpaidFor($session)->sum('total_points')];
+    }
+
+    /** @return array{points: int, covered_seconds: int, already_paid: bool} */
+    private function sessionQuote(Booking|WalkinSession $session, CarbonInterface $at): array
     {
         if ($session instanceof Booking && ! $session->isCoworking()) {
             return ['points' => $this->bookedPricePoints($session), 'covered_seconds' => 0, 'already_paid' => $session->payment_state === PaymentState::Paid];

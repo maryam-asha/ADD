@@ -4,6 +4,8 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\ResourceConsumption;
 use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Support\CoworkingPlanClassifier;
@@ -13,14 +15,16 @@ use App\Support\Presenters\PaymentStatePresenter;
 /**
  * The end-of-session report (docs/decisions/coworking-self-service-sessions.md):
  * time, then every transaction linked to the session. `lines` is a generic
- * list on purpose — café orders arrive later as kind "order", with no
- * redesign. Reads only; every figure comes from what closure stored.
+ * list on purpose — kitchen orders are lines of kind "order", one per
+ * accepted order, with no redesign. Reads only; every figure comes from what
+ * closure stored.
  */
 class SessionReportBuilder
 {
     public function __construct(
         private readonly AmountCalculator $amounts,
         private readonly PlanAllowanceService $allowances,
+        private readonly KitchenOrderSettlement $orders,
     ) {}
 
     /**
@@ -45,7 +49,7 @@ class SessionReportBuilder
                 'duration_seconds' => $duration,
                 'termination_source' => $session->termination_source?->value,
             ],
-            'lines' => [...$this->timeLines($session, $duration, $closed), ...$this->consumptionLines($session)],
+            'lines' => [...$this->timeLines($session, $duration, $closed), ...$this->consumptionLines($session), ...$this->orderLines($session)],
             'plan' => $this->planSection($session),
             'totals' => $closed ? [
                 'amount_owed' => (string) $session->amount_owed,
@@ -130,6 +134,32 @@ class SessionReportBuilder
                 'points' => null,
                 'amount' => null,
                 'recorded_at' => $c->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * One line per accepted kitchen order on it, oldest first: its own
+     * charge beside the session's (kitchen orders spec, decision 11), and
+     * whether it is paid yet.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function orderLines(Booking|WalkinSession $session): array
+    {
+        return $this->orders->owedOn($session)
+            ->map(fn (KitchenOrder $order) => [
+                'kind' => 'order',
+                'id' => $order->id,
+                'label' => __('api.kitchen_order.description', ['id' => $order->id]),
+                'quantity' => null,
+                'unit' => null,
+                'source' => null,
+                'points' => (int) $order->total_points,
+                'amount' => null,
+                'paid' => $order->paid_at !== null,
+                'recorded_at' => $order->created_at?->toIso8601String(),
             ])
             ->values()
             ->all();

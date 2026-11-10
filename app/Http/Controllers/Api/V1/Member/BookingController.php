@@ -22,10 +22,12 @@ use App\Domain\Booking\Services\SessionClosureService;
 use App\Domain\Booking\ValueObjects\PoolDemand;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PayableCheckout;
 use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Pricing\Services\CouponEligibility;
 use App\Domain\Pricing\Services\CouponLedger;
@@ -522,8 +524,16 @@ class BookingController extends Controller
      * `cash` answers `next: pay_at_reception` and tells the desk to collect
      * it. A booking still to close is paid through POST bookings instead.
      * Not the member's: 404, as for a coworking session's payment.
+     *
+     * Its unpaid kitchen orders, each its own payable (kitchen orders spec,
+     * decision 11), are paid with it from the member's own general points
+     * once the booking is paid from the wallet — as far as they go; one the
+     * wallet cannot cover stays owed. Paid by card (Paymera) or cash, the
+     * orders are not paid here in this version: they stay outstanding, on
+     * the desk's list, and are paid at the desk (settle-payment settles
+     * them with the booking).
      */
-    public function pay(PayBookingRequest $request, Booking $booking, PayableCheckout $checkout, RealtimeBroadcaster $realtime): JsonResponse
+    public function pay(PayBookingRequest $request, Booking $booking, PayableCheckout $checkout, RealtimeBroadcaster $realtime, KitchenOrderSettlement $orders): JsonResponse
     {
         $member = $request->user();
 
@@ -550,6 +560,10 @@ class BookingController extends Controller
 
         if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
             $realtime->send(new CoworkingPaymentAtReception($booking));
+        }
+
+        if ($method === WalletMethod::KEY && $outcome->start->kind === PaymentStart::DONE) {
+            $orders->payFromWallet($booking);
         }
 
         return response()->json([

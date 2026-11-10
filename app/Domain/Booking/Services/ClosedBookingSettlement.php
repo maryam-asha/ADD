@@ -8,6 +8,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Services\Realtime\RealtimeBroadcaster;
 use Illuminate\Support\Facades\DB;
@@ -30,24 +31,38 @@ use Throwable;
  * What is owed is the booking's price less what was paid for it
  * (Booking::pointsPaid) — the one figure anything added to a booking later
  * must add to.
+ *
+ * Kitchen orders on it are not part of that figure: each is its own payable
+ * (kitchen orders spec, decision 11). A booking paid from the wallet pays
+ * its unpaid orders from the member's general points at its close too —
+ * after itself, and even when it owed nothing more (paid, or covered by the
+ * plan). An order the wallet cannot cover stays owed, on the desk's
+ * outstanding items. By any other method they are paid at the desk.
  */
 class ClosedBookingSettlement
 {
-    public function __construct(private readonly RealtimeBroadcaster $realtime) {}
+    public function __construct(
+        private readonly RealtimeBroadcaster $realtime,
+        private readonly KitchenOrderSettlement $orders,
+    ) {}
 
     /** Called inside the closure's transaction, once the closed row is saved. */
     public function settle(Booking $booking): void
     {
-        if ($booking->payment_state === PaymentState::Paid
-            || max(0, (int) $booking->price_points - $booking->pointsPaid()) === 0) {
-            return;
+        $owes = $booking->payment_state !== PaymentState::Paid
+            && max(0, (int) $booking->price_points - $booking->pointsPaid()) > 0;
+
+        if ($owes) {
+            match ($booking->chosen_payment_method) {
+                WalletMethod::KEY => $this->payFromWallet($booking),
+                'cash' => $this->realtime->send(new CoworkingPaymentAtReception($booking)),
+                default => null,
+            };
         }
 
-        match ($booking->chosen_payment_method) {
-            WalletMethod::KEY => $this->payFromWallet($booking),
-            'cash' => $this->realtime->send(new CoworkingPaymentAtReception($booking)),
-            default => null,
-        };
+        if ($booking->chosen_payment_method === WalletMethod::KEY) {
+            $this->orders->payFromWallet($booking);
+        }
     }
 
     private function payFromWallet(Booking $booking): void

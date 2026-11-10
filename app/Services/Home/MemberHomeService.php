@@ -19,6 +19,7 @@ use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Services\Models\ServiceType;
 use App\Domain\Services\Services\ServiceCatalogService;
 use App\Support\Enums\EventRegistrationStatus;
@@ -50,6 +51,7 @@ class MemberHomeService
         private readonly PaymentStatePresenter $payments,
         private readonly LocalTime $time,
         private readonly BookingDoorService $doors,
+        private readonly KitchenOrderSettlement $orders,
     ) {}
 
     /**
@@ -157,6 +159,7 @@ class MemberHomeService
             'end_requested' => $session->pendingEndRequest !== null,
             'checked_out_at' => null,
             'payment' => null,
+            'orders' => $this->orders->summaryFor($session),
         ];
     }
 
@@ -189,6 +192,7 @@ class MemberHomeService
             'end_requested' => false,
             'checked_out_at' => null,
             'payment' => null,
+            'orders' => null,
         ];
     }
 
@@ -223,6 +227,10 @@ class MemberHomeService
             'end_requested' => false,
             'checked_out_at' => $this->time->toLocal($session->checked_out_at)?->toIso8601String(),
             'payment' => $this->payments->for($session, $member),
+            // Its kitchen orders, owed beside it (kitchen orders spec,
+            // decision 11): a session paid or covered by its plan is still
+            // this card while one of them is unpaid.
+            'orders' => $this->orders->summaryFor($session),
         ];
     }
 
@@ -259,6 +267,10 @@ class MemberHomeService
             'checked_in_via' => $booking->checked_in_via?->value,
             'checked_out_at' => $this->time->toLocal($booking->checked_out_at)?->toIso8601String(),
             'payment' => $state === 'awaiting_payment' ? $this->payments->for($booking, $member) : null,
+            // Its kitchen orders, owed beside it (kitchen orders spec,
+            // decision 11): a booking paid or covered by its plan is still
+            // awaiting_payment while one of them is unpaid.
+            'orders' => $this->orders->summaryFor($booking),
             // Whether to show the door buttons (POST member/bookings/{id}/door/unlock|lock):
             // only once checked in, and only for a room whose door code is live.
             'door' => ['available' => $state === 'active' && $this->doors->available($booking)],

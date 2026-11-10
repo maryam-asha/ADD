@@ -250,19 +250,29 @@ class OutstandingItems
      * screen's awaiting_payment cards come from it. Upcoming bookings not paid yet are not here:
      * they are still to happen.
      *
+     * One that owes nothing itself — paid, or covered by its plan — is here
+     * too while an accepted kitchen order on it is unpaid: it is not settled
+     * until they are (kitchen orders spec, "The bill").
+     *
      * @return Collection<int, Booking|WalkinSession>
      */
     public function closedFor(int $userId): Collection
     {
-        $bookings = $this->bookingsOwed()
+        $withOrders = $this->kitchenOrdersOwed()->where('user_id', $userId)->get(['billable_type', 'billable_id']);
+        $bookingIds = $withOrders->where('billable_type', (new Booking)->getMorphClass())->pluck('billable_id')->unique()->values()->all();
+        $sessionIds = $withOrders->where('billable_type', (new WalkinSession)->getMorphClass())->pluck('billable_id')->unique()->values()->all();
+
+        $bookings = Booking::query()
             ->where('user_id', $userId)
             ->whereNotNull('checked_out_at')
+            ->where(fn (Builder $owed) => $owed->whereIn('id', $this->bookingsOwed()->select('id'))->orWhereIn('id', $bookingIds))
             ->with(['space.building.branch', 'payments'])
             ->get()
-            ->filter(fn (Booking $booking) => (int) $booking->price_points > $booking->pointsPaid());
+            ->filter(fn (Booking $booking) => in_array($booking->id, $bookingIds, true) || (int) $booking->price_points > $booking->pointsPaid());
 
-        $sessions = $this->sessionsOwed()
+        $sessions = WalkinSession::query()
             ->where('user_id', $userId)
+            ->where(fn (Builder $owed) => $owed->whereIn('id', $this->sessionsOwed()->select('id'))->orWhereIn('id', $sessionIds))
             ->with(['space.building.branch', 'payments'])
             ->get();
 

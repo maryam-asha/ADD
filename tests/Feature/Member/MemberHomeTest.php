@@ -138,6 +138,7 @@ class MemberHomeTest extends TestCase
             'end_requested' => false,
             'checked_out_at' => null,
             'payment' => null,
+            'orders' => ['count' => 0, 'total_points' => 0, 'unpaid_points' => 0],
         ]);
     }
 
@@ -168,6 +169,8 @@ class MemberHomeTest extends TestCase
             'end_requested' => false,
             'checked_out_at' => null,
             'payment' => null,
+            // No session yet, so nothing ordered on one.
+            'orders' => null,
         ]);
     }
 

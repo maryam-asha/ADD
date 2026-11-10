@@ -11,6 +11,7 @@ use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Methods\CashMethod;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Services\Realtime\RealtimeBroadcaster;
 use App\Support\Enums\EventPaymentState;
 use App\Support\Enums\EventRegistrationStatus;
@@ -28,6 +29,12 @@ use Illuminate\Database\Eloquent\Model;
  * owes() restates OutstandingItems' rules on one row's attributes: keep the
  * two together. A booking's partial payments (an extension owed after a paid
  * booking) do not show on its own columns, so its payments are watched too.
+ *
+ * Kitchen orders join the list when their session or booking closes
+ * (OutstandingItems::kitchenOrdersOwed), and leave it when paid — a payment
+ * settling, watched above. So a bill closing is a change whenever an accepted
+ * order on it is unpaid, even when the bill itself owes nothing (paid, or
+ * covered by the plan).
  */
 class PendingPaymentsWatcher
 {
@@ -58,9 +65,19 @@ class PendingPaymentsWatcher
         $before = $this->owes($row, $row->getRawOriginal());
         $after = $this->owes($row, $row->getAttributes());
 
-        if ($before !== $after || ($after && $row->wasChanged('price_points'))) {
+        if ($before !== $after || ($after && $row->wasChanged('price_points')) || $this->closedWithUnpaidOrders($row)) {
             $this->changed($row);
         }
+    }
+
+    /** A session or booking just closed with accepted kitchen orders still unpaid: they are now on the desk's list. */
+    private function closedWithUnpaidOrders(Model $row): bool
+    {
+        return ($row instanceof Booking || $row instanceof WalkinSession)
+            && $row->wasChanged('checked_out_at')
+            && $row->getRawOriginal('checked_out_at') === null
+            && $row->getAttribute('checked_out_at') !== null
+            && app(KitchenOrderSettlement::class)->owesFor($row);
     }
 
     /**

@@ -12,6 +12,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -28,33 +29,66 @@ class KitchenOrderSettlement
     public function __construct(private readonly PaymentService $payments) {}
 
     /**
+     * The bill's accepted orders, paid or not, oldest first — the report's
+     * `order` lines.
+     *
+     * @return Collection<int, KitchenOrder>
+     */
+    public function owedOn(Booking|WalkinSession $bill): Collection
+    {
+        return $this->owed($bill)->orderBy('created_at')->orderBy('id')->get();
+    }
+
+    /**
      * The bill's accepted orders not yet paid, oldest first.
      *
      * @return Collection<int, KitchenOrder>
      */
     public function unpaidFor(Booking|WalkinSession $bill): Collection
     {
-        return KitchenOrder::query()
-            ->where('billable_type', $bill->getMorphClass())
-            ->where('billable_id', $bill->id)
-            ->whereIn('status', KitchenOrderStatus::owedValues())
-            ->whereNull('paid_at')
-            ->where('total_points', '>', 0)
-            ->orderBy('created_at')
-            ->orderBy('id')
-            ->get();
+        return $this->unpaid($bill)->orderBy('created_at')->orderBy('id')->get();
+    }
+
+    /**
+     * Whether the bill still owes for an accepted order. A bill that does
+     * is not settled, however its own payment stands — paid, or covered by
+     * the plan.
+     */
+    public function owesFor(Booking|WalkinSession $bill): bool
+    {
+        return $this->unpaid($bill)->exists();
+    }
+
+    /**
+     * The bill's orders as its cards show them beside its own price: how
+     * many were accepted, what they come to, and what of that is unpaid.
+     *
+     * @return array{count: int, total_points: int, unpaid_points: int}
+     */
+    public function summaryFor(Booking|WalkinSession $bill): array
+    {
+        $orders = $this->owedOn($bill);
+
+        return [
+            'count' => $orders->count(),
+            'total_points' => (int) $orders->sum('total_points'),
+            'unpaid_points' => (int) $orders->whereNull('paid_at')->sum('total_points'),
+        ];
     }
 
     /**
      * Each unpaid order paid at the desk with `$method`, exactly what it
-     * costs, as the bill is. Anything refused — an order paid meanwhile —
-     * throws, and the caller's transaction undoes the rest with it.
+     * costs, as the bill is. All or nothing: anything refused — an order
+     * paid meanwhile — throws, and undoes the orders settled before it (and,
+     * inside a caller's transaction, the rest with them).
      */
     public function settleAtReception(Booking|WalkinSession $bill, PaymentMethod $method, User $operator): void
     {
-        foreach ($this->unpaidFor($bill) as $order) {
-            $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $order, $method, null, null, $operator);
-        }
+        DB::transaction(function () use ($bill, $method, $operator) {
+            foreach ($this->unpaidFor($bill) as $order) {
+                $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $order, $method, null, null, $operator);
+            }
+        });
     }
 
     /**
@@ -87,5 +121,20 @@ class KitchenOrderSettlement
                 ]);
             }
         }
+    }
+
+    /** @return Builder<KitchenOrder> */
+    private function owed(Booking|WalkinSession $bill): Builder
+    {
+        return KitchenOrder::query()
+            ->where('billable_type', $bill->getMorphClass())
+            ->where('billable_id', $bill->id)
+            ->whereIn('status', KitchenOrderStatus::owedValues());
+    }
+
+    /** @return Builder<KitchenOrder> */
+    private function unpaid(Booking|WalkinSession $bill): Builder
+    {
+        return $this->owed($bill)->whereNull('paid_at')->where('total_points', '>', 0);
     }
 }

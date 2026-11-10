@@ -7,6 +7,7 @@ use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -27,6 +28,8 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class CurrentBookingLocator
 {
+    public function __construct(private readonly KitchenOrderSettlement $orders) {}
+
     /** @return list<array{0: string, 1: Booking}> */
     public function for(User $member): array
     {
@@ -59,6 +62,10 @@ class CurrentBookingLocator
      * paid, no-show, cancelled, or a coworking booking). Every member event
      * about a booking carries it, so the app updates or drops that booking's
      * card alone instead of guessing from the event's name.
+     *
+     * A closed booking still owes while an accepted kitchen order on it is
+     * unpaid, even once it is paid itself or its plan covered it (kitchen
+     * orders spec, "The bill").
      */
     public function stateOf(Booking $booking): ?string
     {
@@ -67,9 +74,10 @@ class CurrentBookingLocator
         }
 
         if ($booking->checked_out_at !== null) {
-            $owes = $booking->status->isPayable()
+            $owes = ($booking->status->isPayable()
                 && $booking->payment_state === PaymentState::Unpaid
-                && (int) $booking->price_points > $booking->pointsPaid();
+                && (int) $booking->price_points > $booking->pointsPaid())
+                || $this->orders->owesFor($booking);
 
             return $owes ? 'awaiting_payment' : null;
         }
