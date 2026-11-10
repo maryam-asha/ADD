@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
+use App\Http\Controllers\Api\V1\Admin\KitchenStoreController;
 use App\Http\Controllers\Api\V1\Admin\QrPointController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
@@ -247,6 +248,10 @@ $permitted(Route::apiResource('resource-types', ResourceTypeController::class)
 $permitted(Route::apiResource('qr-points', QrPointController::class)
     ->only(['index', 'store', 'destroy'])
     ->parameters(['qr-points' => 'qrPoint']), 'qr-points');
+
+// The warehouse each branch's kitchen draws from; the menu is what it holds.
+Route::get('kitchen/stores', [KitchenStoreController::class, 'index'])->middleware('permission:kitchen-stores.view');
+Route::put('kitchen/stores/{branch}', [KitchenStoreController::class, 'update'])->middleware('permission:kitchen-stores.update');
 
 // Selling stock at reception: what may be sold and its price in points
 // (the stock itself is the inventory's), and the sales made.

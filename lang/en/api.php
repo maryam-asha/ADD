@@ -844,4 +844,11 @@ return [
         'sale_item_updated' => 'Sale item updated.',
     ],
 
+    // The kitchen's orders (App\Domain\Kitchen).
+    'kitchen' => [
+        'store_not_in_branch' => 'The kitchen store must be a warehouse of this branch.',
+        'store_not_sellable' => 'The kitchen store must be a warehouse that allows sales.',
+        'store_is_primary' => 'The main store cannot be the kitchen store.',
+    ],
+
 ];
