@@ -849,6 +849,15 @@ return [
         'store_not_in_branch' => 'The kitchen store must be a warehouse of this branch.',
         'store_not_sellable' => 'The kitchen store must be a warehouse that allows sales.',
         'store_is_primary' => 'The main store cannot be the kitchen store.',
+        'no_open_session' => 'Check in first: orders go onto an open coworking session or a checked-in booking.',
+        'no_kitchen' => 'There is no kitchen taking orders at this branch.',
+        'choose_bill' => 'Choose which of your bookings this order goes on.',
+        'out_of_stock' => ':item is not available in that quantity right now.',
+        'delivery_required' => 'Choose to pick it up from the kitchen counter, or write where to bring it.',
+        'space_not_in_branch' => 'That place is not in the branch of your session or booking.',
+        'order_not_pending' => 'The kitchen has already handled this order.',
+        'order_not_found' => 'Order not found.',
+        'pickup_label' => 'Kitchen counter',
     ],
 
 ];

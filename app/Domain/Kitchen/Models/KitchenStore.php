@@ -31,6 +31,18 @@ class KitchenStore extends Model
         return static::query()->where('branch_id', $branchId)->first();
     }
 
+    /**
+     * The branch's kitchen store if its warehouse is still active — an
+     * inactive one is no kitchen: nothing on the menu, nothing can be sent.
+     */
+    public static function activeForBranch(int $branchId): ?self
+    {
+        return static::query()
+            ->where('branch_id', $branchId)
+            ->whereHas('warehouse', fn ($warehouse) => $warehouse->where('is_active', true))
+            ->first();
+    }
+
     public function branch(): BelongsTo
     {
         return $this->belongsTo(Branch::class);

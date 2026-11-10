@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\Member\CompanyWalletAllocationController;
 use App\Http\Controllers\Api\V1\Member\CouponPreviewController;
 use App\Http\Controllers\Api\V1\Member\CoworkingSessionController;
 use App\Http\Controllers\Api\V1\Member\EventController;
+use App\Http\Controllers\Api\V1\Member\KitchenController;
 use App\Http\Controllers\Api\V1\Member\MemberCouponController;
 use App\Http\Controllers\Api\V1\Member\MemberDeviceTokenController;
 use App\Http\Controllers\Api\V1\Member\MemberNotificationController;
@@ -107,6 +108,16 @@ Route::post('bookings/{booking}/door/lock', [BookingDoorController::class, 'lock
 // throttle's third argument is a key prefix: without it the scan would share
 // one per-user bucket with every other plainly throttled member route.
 Route::post('scan', [ScanController::class, 'scan'])->middleware('throttle:10,1,member-scan');
+
+// The kitchen (docs/superpowers/specs/2026-11-10-kitchen-orders-design.md):
+// the menu with whether the member may order now, sending an order onto
+// their open coworking session or checked-in booking (paid with it later,
+// once the kitchen accepts), their orders, and taking back a pending one.
+Route::get('kitchen/menu', [KitchenController::class, 'menu']);
+Route::post('kitchen-orders', [KitchenController::class, 'store'])->middleware('throttle:10,1,member-kitchen');
+Route::get('kitchen-orders', [KitchenController::class, 'index']);
+Route::get('kitchen-orders/{order}', [KitchenController::class, 'show'])->whereNumber('order');
+Route::post('kitchen-orders/{order}/cancel', [KitchenController::class, 'cancel'])->whereNumber('order');
 
 // The member's past coworking sessions (walk-ins and checked-in bookings on
 // a coworking space, newest first, `payment_state` to filter) and one

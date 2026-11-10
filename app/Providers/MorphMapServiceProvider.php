@@ -6,6 +6,7 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Ecosystem\Models\EventAttendee;
 use App\Domain\Experience\Models\Event;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Retail\Models\ItemSale;
 use App\Domain\Services\Models\ServiceRequest;
 use App\Domain\Services\Models\ServiceType;
@@ -44,6 +45,9 @@ class MorphMapServiceProvider extends ServiceProvider
             'walkin_session' => WalkinSession::class,
             // A reception sale, as the payable of its payment.
             ItemSale::SOURCE => ItemSale::class,
+            // A kitchen order, for the morph columns that point at one
+            // (its payment, the stock drawn for it).
+            'kitchen_order' => KitchenOrder::class,
         ]);
     }
 }

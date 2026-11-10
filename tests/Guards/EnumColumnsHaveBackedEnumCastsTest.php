@@ -62,7 +62,12 @@ use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
+use App\Domain\Kitchen\Enums\CancelledBy;
+use App\Domain\Kitchen\Enums\DeliveryType;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderSource;
 use App\Domain\Kitchen\Enums\QrPointPlace;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Leasing\Enums\LeasePeriodStatus;
 use App\Domain\Leasing\Enums\OfficeLeaseStatus;
@@ -158,6 +163,12 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         QrPoint::class => [
             'place_type' => QrPointPlace::class,
+        ],
+        KitchenOrder::class => [
+            'delivery_type' => DeliveryType::class,
+            'source' => OrderSource::class,
+            'status' => KitchenOrderStatus::class,
+            'cancelled_by' => CancelledBy::class,
         ],
         Space::class => [
             'space_type' => SpaceType::class,

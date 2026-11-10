@@ -59,6 +59,18 @@ class QrPoint extends Model
         return self::query()->where('qr_value', substr($value, strlen($prefix)))->first();
     }
 
+    /**
+     * The desk or space this point names, or null once that place is gone —
+     * a point left behind by a deleted desk or space counts as no QR at all.
+     */
+    public function placeModel(): SeatDesk|Space|null
+    {
+        return match ($this->place_type) {
+            QrPointPlace::SeatDesk => SeatDesk::query()->find($this->place_id),
+            QrPointPlace::Space => Space::query()->find($this->place_id),
+        };
+    }
+
     /** The desk's label or the space's name, in the request locale. */
     public function placeLabel(): string
     {

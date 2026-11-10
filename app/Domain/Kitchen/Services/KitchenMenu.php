@@ -8,7 +8,8 @@ use App\Domain\Retail\Models\SaleItem;
 
 /**
  * What a branch's kitchen can serve right now: the active sale items with
- * stock in its kitchen store, by name.
+ * stock in its kitchen store, by name. A store whose warehouse is inactive
+ * serves nothing.
  */
 class KitchenMenu
 {
@@ -19,7 +20,7 @@ class KitchenMenu
      */
     public function for(int $branchId): array
     {
-        $store = KitchenStore::forBranch($branchId);
+        $store = KitchenStore::activeForBranch($branchId);
 
         if ($store === null) {
             return [];
