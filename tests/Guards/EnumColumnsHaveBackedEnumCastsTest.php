@@ -62,6 +62,8 @@ use App\Domain\Invoicing\Enums\InvoicePaymentMethod;
 use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
+use App\Domain\Kitchen\Enums\QrPointPlace;
+use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Leasing\Enums\LeasePeriodStatus;
 use App\Domain\Leasing\Enums\OfficeLeaseStatus;
 use App\Domain\Leasing\Models\OfficeLease;
@@ -153,6 +155,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
         ],
         SessionEndRequest::class => [
             'status' => SessionEndRequestStatus::class,
+        ],
+        QrPoint::class => [
+            'place_type' => QrPointPlace::class,
         ],
         Space::class => [
             'space_type' => SpaceType::class,

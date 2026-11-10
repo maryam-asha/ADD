@@ -62,6 +62,7 @@ use App\Http\Controllers\Api\V1\Admin\PrivateOfficeRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderController;
 use App\Http\Controllers\Api\V1\Admin\ProviderRequestController;
 use App\Http\Controllers\Api\V1\Admin\ProviderUserController;
+use App\Http\Controllers\Api\V1\Admin\QrPointController;
 use App\Http\Controllers\Api\V1\Admin\Reception\AccessActivationController;
 use App\Http\Controllers\Api\V1\Admin\Reception\ArrivalRequestController as ReceptionArrivalRequestController;
 use App\Http\Controllers\Api\V1\Admin\Reception\BookingReceptionController;
@@ -241,6 +242,11 @@ Route::get('reports/providers', [ReportController::class, 'providers'])->middlew
 // reception records consumption.
 $permitted(Route::apiResource('resource-types', ResourceTypeController::class)
     ->parameters(['resource-types' => 'resourceType']), 'resource-types');
+
+// The QR a member scans at a desk or in a room to order from the kitchen.
+$permitted(Route::apiResource('qr-points', QrPointController::class)
+    ->only(['index', 'store', 'destroy'])
+    ->parameters(['qr-points' => 'qrPoint']), 'qr-points');
 
 // Selling stock at reception: what may be sold and its price in points
 // (the stock itself is the inventory's), and the sales made.

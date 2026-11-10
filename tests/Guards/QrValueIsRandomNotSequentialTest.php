@@ -4,7 +4,9 @@ namespace Tests\Guards;
 
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Device;
+use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\QrPoint;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Str;
@@ -65,5 +67,30 @@ class QrValueIsRandomNotSequentialTest extends TestCase
             ->all();
 
         $this->assertSame(20, count(array_unique($values)));
+    }
+
+    public function test_qr_points_are_not_sequential(): void
+    {
+        $admin = User::factory()->create();
+        $admin->assignRole('admin');
+        Sanctum::actingAs($admin, ['*']);
+
+        $values = SeatDesk::factory()->count(20)->create()
+            ->map(function (SeatDesk $desk) {
+                $response = $this->postJson('/api/v1/admin/qr-points', [
+                    'place_type' => 'seat_desk',
+                    'place_id' => $desk->id,
+                ])->assertCreated();
+
+                return QrPoint::find($response->json('data.id'))->qr_value;
+            })
+            ->all();
+
+        $this->assertSame(20, count(array_unique($values)));
+
+        sort($values);
+        for ($i = 1; $i < count($values); $i++) {
+            $this->assertNotSame(substr($values[$i - 1], 0, 39), substr($values[$i], 0, 39));
+        }
     }
 }
