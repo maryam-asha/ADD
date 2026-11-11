@@ -536,6 +536,10 @@ return [
             'title' => 'Warranty ending',
             'body' => 'The warranty of asset :asset ends on :date.',
         ],
+        'low_stock' => [
+            'title' => 'Stock running low',
+            'body' => ':item in :warehouse is down to :on_hand, below its minimum of :minimum.',
+        ],
     ],
 
     // A member's kitchen order, sent through

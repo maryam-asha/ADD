@@ -3,10 +3,12 @@
 namespace Add\Inventory\Stock\Services;
 
 use Add\Inventory\Catalog\Models\Item;
+use Add\Inventory\Events\StockFellBelowMinimum;
 use Add\Inventory\Inventory;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Enums\StockMovementType;
 use Add\Inventory\Stock\Models\StockBalance;
+use Add\Inventory\Stock\Models\StockMinimum;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\Decimal;
 use Add\Inventory\Support\InventoryException;
@@ -204,7 +206,7 @@ class StockService
 
         $balance->update(['quantity' => $after, 'average_cost' => $average]);
 
-        return StockMovement::query()->create([
+        $movement = StockMovement::query()->create([
             'item_id' => $item->id,
             'location_type' => $at->type,
             'location_id' => $at->id,
@@ -217,6 +219,40 @@ class StockService
             'actor_id' => Inventory::actorId(),
             ...$extra,
         ]);
+
+        $this->checkMinimum($item, $at, $after);
+
+        return $movement;
+    }
+
+    /**
+     * Warns once when a warehouse's balance drops below the minimum set for
+     * the item, and re-arms the warning once it is back at or above it.
+     */
+    private function checkMinimum(Item $item, Place $at, string $onHand): void
+    {
+        if ($at->type !== Warehouse::TYPE) {
+            return;
+        }
+
+        $minimum = StockMinimum::query()
+            ->where('warehouse_id', $at->id)
+            ->where('item_id', $item->id)
+            ->lockForUpdate()
+            ->first();
+
+        if ($minimum === null) {
+            return;
+        }
+
+        if (Decimal::cmp($onHand, $minimum->minimum) < 0) {
+            if ($minimum->alerted_at === null) {
+                $minimum->update(['alerted_at' => now()]);
+                StockFellBelowMinimum::dispatch($item, Warehouse::query()->findOrFail($at->id), Decimal::trim($onHand), Decimal::trim($minimum->minimum));
+            }
+        } elseif ($minimum->alerted_at !== null) {
+            $minimum->update(['alerted_at' => null]);
+        }
     }
 
     private function lockedBalance(Item $item, Place $at): StockBalance

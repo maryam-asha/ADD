@@ -17,6 +17,7 @@ use Add\Inventory\Settings\Http\ManageSettingsController;
 use Add\Inventory\Stock\Http\Controllers\StockController;
 use Add\Inventory\Support\Http\SettingsController;
 use Add\Inventory\Warehouses\Http\Controllers\WarehouseController;
+use Add\Inventory\Warehouses\Http\Controllers\WarehouseMinimumController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -108,10 +109,12 @@ Route::middleware('can:'.Abilities::SETTINGS_MANAGE)->group(function () {
 // Warehouses: where stock is kept
 Route::middleware('can:'.Abilities::WAREHOUSES_VIEW)->group(function () {
     Route::apiResource('warehouses', WarehouseController::class)->only(['index', 'show']);
+    Route::get('warehouses/{warehouse}/minimums', [WarehouseMinimumController::class, 'index'])->name('warehouses.minimums.index');
 });
 
 Route::middleware('can:'.Abilities::WAREHOUSES_MANAGE)->group(function () {
     Route::apiResource('warehouses', WarehouseController::class)->only(['store', 'update', 'destroy']);
+    Route::put('warehouses/{warehouse}/minimums', [WarehouseMinimumController::class, 'update'])->name('warehouses.minimums.update');
 });
 
 // Stock

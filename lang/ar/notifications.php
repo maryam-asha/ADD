@@ -536,6 +536,10 @@ return [
             'title' => 'ضمان على وشك الانتهاء',
             'body' => 'ينتهي ضمان الأصل :asset في :date.',
         ],
+        'low_stock' => [
+            'title' => 'المخزون على وشك النفاد',
+            'body' => 'وصل :item في :warehouse إلى :on_hand، أي دون حدّه الأدنى :minimum.',
+        ],
     ],
 
     // A member's kitchen order (Arabic), sent through
