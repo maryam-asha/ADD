@@ -134,9 +134,9 @@ class ServiceRequestValidationTest extends TestCase
 
         Sanctum::actingAs($this->member(), ['*']);
 
-        $shown = $this->getJson("/api/v1/member/services/{$type->slug}");
+        $shown = $this->getJson("/api/v1/member/services/{$type->id}/registration-form");
         $shown->assertOk();
-        $this->assertSame([], $shown->json('data.fields'));
+        $this->assertSame([], $shown->json('data.registration_form'));
 
         // It used to be rendered to the member and then dropped on submit.
         $this->postJson("/api/v1/member/services/{$type->id}/requests", ['fields' => []])

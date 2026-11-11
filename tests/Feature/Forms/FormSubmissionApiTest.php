@@ -131,10 +131,11 @@ class FormSubmissionApiTest extends TestCase
             ->assertJsonCount(1, 'data.registration_form')
             ->assertJsonPath('data.registration_form.0.key', 'details');
 
+        // The service's details leave the form to the endpoint above.
         $this->getJson("/api/v1/member/services/{$type->slug}")
             ->assertOk()
-            ->assertJsonCount(1, 'data.fields')
-            ->assertJsonPath('data.registration_form.0.key', 'details');
+            ->assertJsonMissingPath('data.fields')
+            ->assertJsonMissingPath('data.registration_form');
     }
 
     public function test_a_service_without_a_form_renders_an_empty_one(): void

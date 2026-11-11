@@ -101,7 +101,7 @@ class MemberServiceController extends Controller
             return response()->json(['message' => __('api.services.not_found')], Response::HTTP_NOT_FOUND);
         }
 
-        return new ServiceTypeResource($serviceType);
+        return (new ServiceTypeResource($serviceType))->detailed();
     }
 
     /**

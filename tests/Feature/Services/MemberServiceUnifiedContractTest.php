@@ -132,7 +132,7 @@ class MemberServiceUnifiedContractTest extends TestCase
         $this->assertTrue($firstType['can_request']);
     }
 
-    public function test_service_show_details_includes_form_fields_with_unified_keys(): void
+    public function test_service_show_details_leaves_the_form_fields_to_the_registration_form_endpoint(): void
     {
         [$axis, $service] = $this->createAxisAndService();
 
@@ -153,8 +153,21 @@ class MemberServiceUnifiedContractTest extends TestCase
         // The one view that says where the service's button leads (its
         // "Explore ADD" page); the catalog's lists still leave it out.
         $this->assertArrayHasKey('request_config', $data);
+        $this->assertArrayHasKey('about', $data);
+        $this->assertArrayNotHasKey('registration_form', $data);
+        $this->assertArrayNotHasKey('fields', $data);
+    }
+
+    public function test_service_registration_form_carries_the_fields_with_unified_keys(): void
+    {
+        [$axis, $service] = $this->createAxisAndService();
+
+        $response = $this->getJson("/api/v1/member/services/{$service->id}/registration-form", ['lang' => 'en']);
+
+        $response->assertStatus(200);
+
+        $data = $response->json('data');
         $this->assertCount(2, $data['registration_form']);
-        $this->assertCount(2, $data['fields']);
 
         $textField = $data['registration_form'][0];
         $this->assertSame('room_number', $textField['key']);
