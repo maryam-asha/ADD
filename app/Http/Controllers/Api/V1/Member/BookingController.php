@@ -533,8 +533,11 @@ class BookingController extends Controller
      * card (Paymera) or cash, the orders are not paid here in this version:
      * they stay outstanding, on the desk's list, and are paid by paying
      * again with `wallet` (once the booking is paid, that pays only its orders:
-     * payOwedOrdersOnly(), which takes no other method) or at the desk
-     * (payments/settle, one order at a time).
+     * payOwedOrdersOnly(), which takes no other method) or at the desk —
+     * settle-payment settles the booking with its orders (only its orders, once
+     * the booking itself is paid), payments/settle one order at a time.
+     * Which wallet pays the booking is decided before the orders spend
+     * anything (KitchenOrderSettlement::payFromWalletWithBill()).
      */
     public function pay(PayBookingRequest $request, Booking $booking, PayableCheckout $checkout, RealtimeBroadcaster $realtime, KitchenOrderSettlement $orders): JsonResponse
     {
@@ -552,17 +555,20 @@ class BookingController extends Controller
             return response()->json(['message' => __('api.booking.payment_method_required')], 422);
         }
 
-        if (($ordersOnly = $this->payOwedOrdersOnly($booking, $method, $orders)) !== null) {
-            return $ordersOnly;
-        }
-
-        $pay = fn () => $checkout->pay(PaymentPurpose::Booking, $booking, $member, $method, [
+        $walletOwner = [
             'wallet_owner_type' => $request->validated('wallet_owner_type'),
             'wallet_owner_id' => $request->validated('wallet_owner_id'),
-        ], $request->validated('coupon_code'));
+        ];
+        $pay = fn (array $walletOwner) => $checkout->pay(PaymentPurpose::Booking, $booking, $member, $method, $walletOwner, $request->validated('coupon_code'));
 
         try {
-            $outcome = $method === WalletMethod::KEY ? $orders->payFromWalletWithBill($booking, $pay) : $pay();
+            if (($ordersOnly = $this->payOwedOrdersOnly($booking, $method, $orders)) !== null) {
+                return $ordersOnly;
+            }
+
+            $outcome = $method === WalletMethod::KEY
+                ? $orders->payFromWalletWithBill($booking, PaymentPurpose::Booking, $walletOwner, $pay)
+                : $pay($walletOwner);
         } catch (Throwable $e) {
             return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
         }

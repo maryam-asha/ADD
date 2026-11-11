@@ -10,6 +10,7 @@ use App\Domain\Booking\Events\BookingPaid;
 use App\Domain\Booking\Events\CoworkingSessionEnded;
 use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Events\PendingPaymentsChanged;
+use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Booking\Services\CurrentBookingLocator;
@@ -26,6 +27,7 @@ use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
 use App\Domain\Foundation\Models\Space;
+use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
@@ -634,6 +636,8 @@ class OrdersOnTheBillTest extends TestCase
         $this->assertSame(10, $this->balanceOf($member));
         // The card stays, owing the order.
         $this->assertSame(['awaiting_payment'], $this->bookingPaidStates());
+        // Paid again after the rollback, the method chosen is kept as well.
+        $this->assertSame('wallet', Booking::query()->whereKey($booking->id)->value('chosen_payment_method'));
     }
 
     public function test_paying_an_order_alone_tells_the_members_card(): void
@@ -820,5 +824,66 @@ class OrdersOnTheBillTest extends TestCase
         $this->order($session, 30);
 
         $this->assertSame('unpaid', (new CoworkingSessionEnded($endRequest->refresh()))->paymentState);
+    }
+
+    public function test_paying_orders_first_never_leaves_a_company_wallet_paying_the_bill_unasked(): void
+    {
+        // The member's own points cover the order exactly; a company of
+        // theirs could pay the booking. Two wallets, none named: as before
+        // there were orders, the member is asked which — and nothing is spent.
+        $member = $this->member(30);
+        $company = Company::factory()->create();
+        $member->companies()->attach($company->id);
+        $companyWallet = Wallet::factory()->create(['owner_type' => OwnerType::Company, 'owner_id' => $company->id]);
+        app(WalletService::class)->creditGeneral($companyWallet, 500, WalletTransactionSource::TopUp);
+        [$booking, [$order]] = $this->unpaidClosedRoom($member, [30]);
+
+        Sanctum::actingAs($member, ['*']);
+        $response = $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])
+            ->assertStatus(422)
+            ->assertJsonPath('message', __('api.booking.wallet_choice_required', [], 'en'));
+
+        $this->assertCount(2, $response->json('wallet_options'));
+        $this->assertNull($order->refresh()->paid_at);
+        $this->assertSame(PaymentState::Unpaid, $booking->refresh()->payment_state);
+        $this->assertSame(30, $this->balanceOf($member));
+        $this->assertSame(500, app(WalletService::class)->generalBalance($companyWallet));
+        $this->assertSame(0, Payment::query()->where('status', PaymentStatus::Accepted)->count());
+
+        // Naming the company wallet: it pays the booking, the member's own points the order.
+        $this->postJson("/api/v1/member/bookings/{$booking->id}/pay", [
+            'payment_method' => 'wallet',
+            'wallet_owner_type' => 'company',
+            'wallet_owner_id' => $company->id,
+        ])->assertCreated();
+
+        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
+        $this->assertNotNull($order->refresh()->paid_at);
+        $this->assertSame(0, $this->balanceOf($member));
+        $this->assertSame(300, app(WalletService::class)->generalBalance($companyWallet));
+    }
+
+    public function test_an_order_paid_meanwhile_answers_409_not_500(): void
+    {
+        $member = $this->member(100);
+        $booking = $this->planCoveredRoom($member);
+        $this->order($booking, 30);
+
+        // Another request paid the order between the check and the payment.
+        $orders = Mockery::mock(KitchenOrderSettlement::class);
+        $orders->shouldReceive('owesFor')->andReturnTrue();
+        $orders->shouldReceive('payAllFromWallet')->andThrow(new ReceptionActionException('api.payment.already_paid', 409));
+        $this->app->instance(KitchenOrderSettlement::class, $orders);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])
+            ->assertStatus(409)
+            ->assertExactJson(['message' => 'This has already been paid.']);
+
+        $session = $this->walkIn($member, ['checked_out_at' => $this->at('09:00'), 'price_points' => 0, 'amount_owed' => '0.00', 'payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan]);
+
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'wallet'])
+            ->assertStatus(409)
+            ->assertExactJson(['message' => 'This has already been paid.']);
     }
 }

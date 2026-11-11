@@ -2,11 +2,13 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
+use App\Domain\Finance\Payments\FulfillerRegistry;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\User;
@@ -28,7 +30,10 @@ use Throwable;
  */
 class KitchenOrderSettlement
 {
-    public function __construct(private readonly PaymentService $payments) {}
+    public function __construct(
+        private readonly PaymentService $payments,
+        private readonly FulfillerRegistry $fulfillers,
+    ) {}
 
     /**
      * The bill's accepted orders, paid or not, oldest first — the report's
@@ -132,25 +137,67 @@ class KitchenOrderSettlement
      * comes first instead: it is paid alone, and the orders as far as what
      * is left goes. Whatever `$payBill` refuses undoes the orders with it.
      *
+     * Which wallet pays the bill is settled before the orders spend
+     * anything (billWallet()), and `$payBill` is handed it: the orders come
+     * from the member's own points, and emptying those must never leave a
+     * company wallet the only one left — paying the bill from it unasked.
+     *
      * @template T
      *
-     * @param  Closure(): T  $payBill
+     * @param  array{wallet_owner_type?: mixed, wallet_owner_id?: mixed}  $walletOwner  the wallet the member named, if any
+     * @param  Closure(array{wallet_owner_type: mixed, wallet_owner_id: int|null}): T  $payBill
      * @return T
+     *
+     * @throws WalletChoiceRequiredException when several wallets could pay the bill and none was named, before anything is spent
      */
-    public function payFromWalletWithBill(Booking|WalkinSession $bill, Closure $payBill): mixed
+    public function payFromWalletWithBill(Booking|WalkinSession $bill, PaymentPurpose $purpose, array $walletOwner, Closure $payBill): mixed
     {
+        $walletOwner = $this->billWallet($bill, $purpose, $walletOwner);
+
         try {
-            return DB::transaction(function () use ($bill, $payBill) {
+            return DB::transaction(function () use ($bill, $payBill, $walletOwner) {
                 $this->payFromWallet($bill);
 
-                return $payBill();
+                return $payBill($walletOwner);
             });
         } catch (InsufficientPointsException) {
-            $result = $payBill();
+            // Rolled back: read the bill as it now is again, so what paying
+            // it writes (the method chosen) is written again.
+            $bill->refresh();
+
+            $result = $payBill($walletOwner);
             $this->payFromWallet($bill);
 
             return $result;
         }
+    }
+
+    /**
+     * The wallet the bill is paid from, by the rules the wallet payment
+     * itself uses (WalletMethod::resolveWallet) as they stand before any
+     * order is paid: the one named; else the only one with points; else, with
+     * several, the member is asked to choose. With none holding points it is
+     * left unnamed, for the bill's own payment to refuse as it always has.
+     *
+     * @param  array{wallet_owner_type?: mixed, wallet_owner_id?: mixed}  $walletOwner
+     * @return array{wallet_owner_type: mixed, wallet_owner_id: int|null}
+     */
+    private function billWallet(Booking|WalkinSession $bill, PaymentPurpose $purpose, array $walletOwner): array
+    {
+        $type = $walletOwner['wallet_owner_type'] ?? null;
+        $id = $walletOwner['wallet_owner_id'] ?? null;
+
+        if ($type !== null && $id !== null) {
+            return ['wallet_owner_type' => $type, 'wallet_owner_id' => (int) $id];
+        }
+
+        try {
+            $wallet = app(WalletMethod::class)->resolveWallet($bill->user, $this->fulfillers->for($purpose)->walletCategory(), 0);
+        } catch (InsufficientPointsException) {
+            return ['wallet_owner_type' => null, 'wallet_owner_id' => null];
+        }
+
+        return ['wallet_owner_type' => $wallet->owner_type, 'wallet_owner_id' => (int) $wallet->owner_id];
     }
 
     /**
