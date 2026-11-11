@@ -21,6 +21,7 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanAllowanceService;
@@ -32,6 +33,7 @@ use App\Domain\Pricing\ValueObjects\PriceQuote;
 use App\Domain\Settings\Services\SettingService;
 use App\Services\Realtime\RealtimeBroadcaster;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -155,20 +157,34 @@ class SessionClosureService
      *
      * Its unpaid kitchen orders are settled with it, by the same method, each
      * its own payable (kitchen orders spec, decision 11): the session's own
-     * payment stays exactly its own price. All or nothing — an order refused
-     * leaves the session unpaid too.
+     * payment stays exactly its own price. The orders go first, so the
+     * session's paid event finds nothing left owing on it. All or nothing —
+     * an order refused leaves the session unpaid too. A session already paid
+     * (or covered by its plan) that still owes orders has only those
+     * settled; one owing nothing at all is 409.
+     *
+     * @return EloquentCollection<int, KitchenOrder> the orders it settled
      */
-    public function settlePayment(Booking|WalkinSession $session, PaymentMethod $method, User $operator): void
+    public function settlePayment(Booking|WalkinSession $session, PaymentMethod $method, User $operator): EloquentCollection
     {
         if ($session->checked_out_at === null || $session->amount_owed === null) {
             throw new ReceptionActionException('api.reception.not_yet_checked_out');
         }
 
-        if ($session->payment_state === PaymentState::Paid) {
+        $orders = app(KitchenOrderSettlement::class);
+        $paid = $session->payment_state === PaymentState::Paid;
+
+        if ($paid && ! $orders->owesFor($session)) {
             throw new ReceptionActionException('api.reception.already_paid', 409);
         }
 
-        DB::transaction(function () use ($session, $method, $operator) {
+        $settled = DB::transaction(function () use ($session, $method, $operator, $orders, $paid) {
+            $settled = $orders->settleAtReception($session, $method, $operator);
+
+            if ($paid) {
+                return $settled;
+            }
+
             // Nothing charged (a free space): nothing to put through the ledger.
             if (bccomp((string) $session->amount_owed, '0', 2) <= 0) {
                 $session->forceFill([
@@ -191,10 +207,12 @@ class SessionClosureService
                 );
             }
 
-            app(KitchenOrderSettlement::class)->settleAtReception($session, $method, $operator);
+            return $settled;
         });
 
         $session->refresh();
+
+        return $settled;
     }
 
     /**

@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers\Concerns;
 
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Payments\CheckoutOutcome;
 use App\Domain\Finance\Payments\Exceptions\UnknownPaymentMethodException;
+use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PayableCheckout;
+use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Http\Resources\Finance\PaymentResource;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\JsonResponse;
@@ -60,6 +66,30 @@ trait AnswersPayments
         }
 
         return $this->gatewayFailureResponse($e, $userId);
+    }
+
+    /**
+     * A closed session or booking already paid — or covered by its plan —
+     * whose accepted kitchen orders are still unpaid (kitchen orders spec,
+     * "The bill"): paying it from the app pays those orders, each its own
+     * payable. From the wallet, all of them or none (short, the
+     * insufficient-points answer every wallet payment gives); by any other
+     * method they are paid at the desk, and the member is told so. Null when
+     * the bill is not in that state: it is paid as itself.
+     */
+    protected function payOwedOrdersOnly(Booking|WalkinSession $bill, string $method, KitchenOrderSettlement $orders): ?JsonResponse
+    {
+        if ($bill->checked_out_at === null || $bill->payment_state !== PaymentState::Paid || ! $orders->owesFor($bill)) {
+            return null;
+        }
+
+        if ($method !== WalletMethod::KEY) {
+            return response()->json(['message' => __('api.kitchen_order.pay_from_wallet_or_desk')], 422);
+        }
+
+        $orders->payAllFromWallet($bill);
+
+        return response()->json(['data' => $this->checkoutFields(new CheckoutOutcome(null, PaymentStart::done()))], 201);
     }
 
     /**

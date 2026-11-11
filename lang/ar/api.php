@@ -853,6 +853,7 @@ return [
     'kitchen_order' => [
         'description' => 'طلب المطبخ رقم :id',
         'not_payable' => 'لا يُدفع إلا طلب قبله المطبخ.',
+        'pay_from_wallet_or_desk' => 'تُدفع طلبات هذه الفاتورة من نقاطك أو لدى الاستقبال.',
     ],
 
 ];

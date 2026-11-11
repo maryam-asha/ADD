@@ -10,6 +10,7 @@ use App\Domain\Booking\Services\WalkInCapacityService;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\Reception\CheckOutSessionRequest;
 use App\Http\Requests\Admin\Reception\SettlePaymentRequest;
@@ -72,13 +73,21 @@ class WalkInSessionController extends Controller
 
     public function settlePayment(SettlePaymentRequest $request, WalkinSession $walkinSession, SessionClosureService $closures): JsonResponse
     {
+        $method = PaymentMethod::from($request->validated('payment_method'));
+
         try {
-            $closures->settlePayment($walkinSession, PaymentMethod::from($request->validated('payment_method')), $request->user());
+            $orders = $closures->settlePayment($walkinSession, $method, $request->user());
         } catch (ReceptionActionException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
         }
 
-        $this->logSensitiveAction('payment_settled', $walkinSession, ['payment_method' => $walkinSession->payment_method->value]);
+        // The method taken, and the kitchen orders settled with it — each its
+        // own payable beside the bill (kitchen orders spec, decision 11). A
+        // bill already paid that owed only orders has no method of its own.
+        $this->logSensitiveAction('payment_settled', $walkinSession, [
+            'payment_method' => $method->value,
+            'kitchen_orders' => $orders->map(fn (KitchenOrder $order) => ['id' => $order->id, 'points' => (int) $order->total_points])->values()->all(),
+        ]);
 
         return response()->json(['message' => __('api.reception.payment_settled')]);
     }

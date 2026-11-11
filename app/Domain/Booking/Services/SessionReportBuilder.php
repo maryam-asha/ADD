@@ -4,6 +4,7 @@ namespace App\Domain\Booking\Services;
 
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\ResourceConsumption;
@@ -11,6 +12,7 @@ use App\Domain\Membership\Services\PlanAllowanceService;
 use App\Domain\Membership\Support\CoworkingPlanClassifier;
 use App\Support\Presenters\AppliedDiscountPresenter;
 use App\Support\Presenters\PaymentStatePresenter;
+use Illuminate\Database\Eloquent\Collection;
 
 /**
  * The end-of-session report (docs/decisions/coworking-self-service-sessions.md):
@@ -25,6 +27,7 @@ class SessionReportBuilder
         private readonly AmountCalculator $amounts,
         private readonly PlanAllowanceService $allowances,
         private readonly KitchenOrderSettlement $orders,
+        private readonly PointConversionService $points,
     ) {}
 
     /**
@@ -37,6 +40,7 @@ class SessionReportBuilder
         $closed = $session->checked_out_at !== null;
         $end = $session->checked_out_at ?? now();
         $duration = max(0, $end->getTimestamp() - $session->checked_in_at->getTimestamp());
+        $orders = $this->orders->owedOn($session);
 
         return [
             'session' => [
@@ -49,7 +53,7 @@ class SessionReportBuilder
                 'duration_seconds' => $duration,
                 'termination_source' => $session->termination_source?->value,
             ],
-            'lines' => [...$this->timeLines($session, $duration, $closed), ...$this->consumptionLines($session), ...$this->orderLines($session)],
+            'lines' => [...$this->timeLines($session, $duration, $closed), ...$this->consumptionLines($session), ...$this->orderLines($orders)],
             'plan' => $this->planSection($session),
             'totals' => $closed ? [
                 'amount_owed' => (string) $session->amount_owed,
@@ -61,6 +65,7 @@ class SessionReportBuilder
                 // What was taken off it — offer, coupon, plan discount — as
                 // closure locked it (AppliedDiscountPresenter).
                 'discounts' => app(AppliedDiscountPresenter::class)->for($session),
+                ...$this->orderTotals($session, $orders),
             ] : null,
         ];
     }
@@ -144,11 +149,12 @@ class SessionReportBuilder
      * charge beside the session's (kitchen orders spec, decision 11), and
      * whether it is paid yet.
      *
+     * @param  Collection<int, KitchenOrder>  $orders
      * @return list<array<string, mixed>>
      */
-    private function orderLines(Booking|WalkinSession $session): array
+    private function orderLines(Collection $orders): array
     {
-        return $this->orders->owedOn($session)
+        return $orders
             ->map(fn (KitchenOrder $order) => [
                 'kind' => 'order',
                 'id' => $order->id,
@@ -157,12 +163,35 @@ class SessionReportBuilder
                 'unit' => null,
                 'source' => null,
                 'points' => (int) $order->total_points,
-                'amount' => null,
+                'amount' => $this->points->pointsToUsd((int) $order->total_points),
                 'paid' => $order->paid_at !== null,
                 'recorded_at' => $order->created_at?->toIso8601String(),
             ])
             ->values()
             ->all();
+    }
+
+    /**
+     * The orders beside the session's own `amount_owed`, in the same
+     * currency: what they come to (`orders_points`, `orders_amount`), what
+     * of that is still unpaid — what the desk collects with the session —
+     * and the two charges together (`grand_total_amount`). The session's own
+     * figures are not changed by them (kitchen orders spec, decision 11).
+     *
+     * @param  Collection<int, KitchenOrder>  $orders
+     * @return array{orders_points: int, orders_unpaid_points: int, orders_amount: string, grand_total_amount: string}
+     */
+    private function orderTotals(Booking|WalkinSession $session, Collection $orders): array
+    {
+        $points = (int) $orders->sum('total_points');
+        $amount = $this->points->pointsToUsd($points);
+
+        return [
+            'orders_points' => $points,
+            'orders_unpaid_points' => (int) $orders->whereNull('paid_at')->sum('total_points'),
+            'orders_amount' => $amount,
+            'grand_total_amount' => bcadd((string) ($session->amount_owed ?? '0'), $amount, 2),
+        ];
     }
 
     /**

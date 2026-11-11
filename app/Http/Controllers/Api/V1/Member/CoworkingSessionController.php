@@ -75,7 +75,9 @@ class CoworkingSessionController extends Controller
      * decision 11): `closing.points` is the session alone, as sealed;
      * `closing.orders_points` what its accepted orders still owe, and
      * `closing.total_points` the two together — the true total the member
-     * sees before asking to end. `orders` counts them.
+     * sees before asking to end. `orders` counts them. Only orders the
+     * kitchen has accepted are in it: one still pending that is accepted
+     * later adds to it.
      */
     public function checkout(
         Request $request,
@@ -195,11 +197,14 @@ class CoworkingSessionController extends Controller
      *
      * Its unpaid kitchen orders, each its own payable (kitchen orders spec,
      * decision 11), are paid with it from the member's own general points
-     * once the session is paid from the wallet — as far as they go; one the
-     * wallet cannot cover stays owed. Paid by card (Paymera) or cash, the
-     * orders are not paid here in this version: they stay outstanding, on
-     * the desk's list, and are paid at the desk (settle-payment settles
-     * them with the session).
+     * when it is paid from the wallet: the orders first, or — should they
+     * take points the session needs — the session first and the orders as far as
+     * what is left goes; one the wallet cannot cover stays owed. Paid by
+     * card (Paymera) or cash, the orders are not paid here in this version:
+     * they stay outstanding, on the desk's list, and are paid by paying
+     * again with `wallet` (once the session is paid, that pays only its orders:
+     * payOwedOrdersOnly(), which takes no other method) or at the desk
+     * (payments/settle, one order at a time).
      */
     public function pay(PayCoworkingSessionRequest $request, string $type, int $id, CoworkingSessionService $sessions, PayableCheckout $checkout, RealtimeBroadcaster $realtime, KitchenOrderSettlement $orders): JsonResponse
     {
@@ -213,28 +218,30 @@ class CoworkingSessionController extends Controller
             return response()->json(['message' => __('api.booking.payment_method_required')], 422);
         }
 
+        if (($ordersOnly = $this->payOwedOrdersOnly($session, $method, $orders)) !== null) {
+            return $ordersOnly;
+        }
+
+        $pay = fn () => $checkout->pay(
+            $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
+            $session,
+            $request->user(),
+            $method,
+            [
+                'wallet_owner_type' => $request->validated('wallet_owner_type'),
+                'wallet_owner_id' => $request->validated('wallet_owner_id'),
+            ],
+            $request->validated('coupon_code'),
+        );
+
         try {
-            $outcome = $checkout->pay(
-                $session instanceof Booking ? PaymentPurpose::Booking : PaymentPurpose::CoworkingSession,
-                $session,
-                $request->user(),
-                $method,
-                [
-                    'wallet_owner_type' => $request->validated('wallet_owner_type'),
-                    'wallet_owner_id' => $request->validated('wallet_owner_id'),
-                ],
-                $request->validated('coupon_code'),
-            );
+            $outcome = $method === WalletMethod::KEY ? $orders->payFromWalletWithBill($session, $pay) : $pay();
         } catch (Throwable $e) {
             return $this->paymentFailureResponse($e, $request->user()->id) ?? throw $e;
         }
 
         if ($outcome->start->kind === PaymentStart::PAY_AT_RECEPTION) {
             $realtime->send(new CoworkingPaymentAtReception($session));
-        }
-
-        if ($method === WalletMethod::KEY && $outcome->start->kind === PaymentStart::DONE) {
-            $orders->payFromWallet($session);
         }
 
         return response()->json(

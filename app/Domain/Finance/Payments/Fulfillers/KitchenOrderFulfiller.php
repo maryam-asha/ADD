@@ -2,12 +2,18 @@
 
 namespace App\Domain\Finance\Payments\Fulfillers;
 
+use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Events\BookingPaid;
+use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
+use App\Domain\Booking\Models\Booking;
+use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
+use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
  * Paying for an order the kitchen accepted. It is owed beside the session
@@ -19,9 +25,20 @@ use App\Domain\Membership\Enums\WalletTransactionCategory;
  * Unlike a reception sale, delivering it issues nothing: accepting the
  * order already drew its stock (KitchenOrderService::accept), so paying it
  * only marks it paid.
+ *
+ * Once its session or booking has closed, the bill's home card stays
+ * awaiting_payment while an order on it is unpaid (CurrentBookingLocator,
+ * OutstandingItems::closedFor), so paying one tells the member's app as
+ * paying the bill does (SessionPaymentFulfiller): BookingPaid, with the
+ * card's state as it is now, for a room booking; CoworkingSessionPaid for
+ * a coworking session. On a bill still open, or one still owing itself,
+ * no card changes: the bill's own payment tells the app (settled after its
+ * orders, so it finds nothing left owing).
  */
 class KitchenOrderFulfiller implements PaymentFulfiller
 {
+    public function __construct(private readonly RealtimeBroadcaster $realtime) {}
+
     public function purpose(): PaymentPurpose
     {
         return PaymentPurpose::KitchenOrder;
@@ -67,7 +84,18 @@ class KitchenOrderFulfiller implements PaymentFulfiller
 
     public function fulfil(Payment $payment): void
     {
-        $this->order($payment)->forceFill(['paid_at' => now()])->save();
+        $order = $this->order($payment);
+        $order->forceFill(['paid_at' => now()])->save();
+
+        $bill = $order->billable;
+
+        if (($bill instanceof Booking || $bill instanceof WalkinSession)
+            && $bill->checked_out_at !== null
+            && $bill->payment_state === PaymentState::Paid) {
+            $this->realtime->send($bill instanceof Booking && ! $bill->isCoworking()
+                ? new BookingPaid($bill)
+                : new CoworkingSessionPaid($bill));
+        }
     }
 
     private function order(Payment $payment): KitchenOrder

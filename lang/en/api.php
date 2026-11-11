@@ -868,6 +868,7 @@ return [
     'kitchen_order' => [
         'description' => 'Kitchen order #:id',
         'not_payable' => 'Only an order the kitchen has accepted can be paid.',
+        'pay_from_wallet_or_desk' => 'The orders on this bill are paid from your points or at reception.',
     ],
 
 ];

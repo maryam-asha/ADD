@@ -5,6 +5,10 @@ namespace Tests\Feature\Kitchen;
 use App\Domain\Booking\Enums\BookingStatus;
 use App\Domain\Booking\Enums\PaymentSource;
 use App\Domain\Booking\Enums\PaymentState;
+use App\Domain\Booking\Enums\SessionEndRequestStatus;
+use App\Domain\Booking\Events\BookingPaid;
+use App\Domain\Booking\Events\CoworkingSessionEnded;
+use App\Domain\Booking\Events\CoworkingSessionPaid;
 use App\Domain\Booking\Events\PendingPaymentsChanged;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -17,6 +21,7 @@ use App\Domain\Finance\Enums\PaymentStatus;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\OutstandingItems;
 use App\Domain\Finance\Payments\PaymentService;
+use App\Domain\Finance\Services\PointConversionService;
 use App\Domain\Foundation\Enums\DayOfWeek;
 use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\BusinessHour;
@@ -24,6 +29,7 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Enums\OwnerType;
 use App\Domain\Membership\Enums\WalletTransactionSource;
 use App\Domain\Membership\Models\Wallet;
@@ -32,10 +38,12 @@ use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Event;
 use Laravel\Sanctum\Sanctum;
 use Mockery;
 use RuntimeException;
+use Spatie\Activitylog\Models\Activity;
 use Tests\Support\InteractsWithCoworking;
 use Tests\TestCase;
 
@@ -205,8 +213,8 @@ class OrdersOnTheBillTest extends TestCase
         $second = $this->order($session, 20);
         $this->closures()->closeOut($session, $this->at('10:00'));
 
-        // The second order's payment is refused, after the session and the
-        // first order went through.
+        // The orders go first; the session's own payment, third, is refused
+        // after both of them went through.
         $real = app(PaymentService::class);
         $calls = 0;
         $payments = Mockery::mock(PaymentService::class);
@@ -528,5 +536,289 @@ class OrdersOnTheBillTest extends TestCase
             ->assertOk()
             ->assertJsonPath('data.0.id', $session->id)
             ->assertJsonPath('data.0.orders', ['count' => 2, 'total_points' => 50, 'unpaid_points' => 30]);
+    }
+
+    /** A room 08:00–09:00, closed, its price covered by the plan. */
+    private function planCoveredRoom(User $member): Booking
+    {
+        return Booking::factory()->create([
+            'space_id' => $this->roomSpace()->id,
+            'user_id' => $member->id,
+            'start_at' => $this->at('08:00'),
+            'end_at' => $this->at('09:00'),
+            'checked_in_at' => $this->at('08:00'),
+            'checked_out_at' => $this->at('09:00'),
+            'status' => BookingStatus::Completed,
+            'price_points' => 0,
+            'amount_owed' => '0.00',
+            'payment_state' => PaymentState::Paid,
+            'payment_source' => PaymentSource::Plan,
+            'paid_at' => $this->at('09:00'),
+        ]);
+    }
+
+    /** A room 08:00–10:00 at 200 points, booked to be paid in cash, closed unpaid at 10:00. */
+    private function unpaidClosedRoom(User $member, array $orderPoints = []): array
+    {
+        $booking = Booking::factory()->create([
+            'space_id' => $this->roomSpace()->id,
+            'user_id' => $member->id,
+            'start_at' => $this->at('08:00'),
+            'end_at' => $this->at('10:00'),
+            'checked_in_at' => $this->at('08:00'),
+            'price_points' => 200,
+            'payment_state' => PaymentState::Unpaid,
+            'chosen_payment_method' => 'cash',
+        ]);
+        $orders = array_map(fn (int $points) => $this->order($booking, $points), $orderPoints);
+        $this->closures()->closeOut($booking, $this->at('10:00'));
+
+        return [$booking->refresh(), $orders];
+    }
+
+    /** @return list<?string> the `state` of every BookingPaid broadcast, in order */
+    private function bookingPaidStates(): array
+    {
+        return array_values(array_map(fn (BookingPaid $e) => $e->state, Event::dispatched(BookingPaid::class)->map(fn (array $args) => $args[0])->all()));
+    }
+
+    public function test_desk_settlement_broadcasts_the_card_as_gone_once_bill_and_orders_are_paid(): void
+    {
+        [$booking, [$order]] = $this->unpaidClosedRoom($this->member(), [30]);
+        Event::fake([BookingPaid::class]);
+
+        $this->actingAsOperations();
+        $this->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", ['payment_method' => 'cash'])->assertOk();
+
+        $this->assertNotNull($order->refresh()->paid_at);
+        // One event, sent by the booking's own payment, after its order was paid.
+        $this->assertSame([null], $this->bookingPaidStates());
+    }
+
+    public function test_wallet_pay_broadcasts_the_card_as_gone_once_bill_and_orders_are_paid(): void
+    {
+        $member = $this->member(300);
+        [$booking, [$order]] = $this->unpaidClosedRoom($member, [30]);
+        Event::fake([BookingPaid::class, CoworkingSessionPaid::class]);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])->assertCreated();
+
+        $this->assertNotNull($order->refresh()->paid_at);
+        $this->assertSame([null], $this->bookingPaidStates());
+
+        // A walk-in: its paid event is sent once its order is paid too.
+        $session = $this->walkIn($member);
+        $sessionOrder = $this->order($session, 20);
+        $this->closures()->closeOut($session, $this->at('10:00'));
+        app(WalletService::class)->creditGeneral(Wallet::where('owner_type', OwnerType::User)->where('owner_id', $member->id)->firstOrFail(), 200, WalletTransactionSource::TopUp);
+
+        $this->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'wallet'])->assertCreated();
+
+        $this->assertNotNull($sessionOrder->refresh()->paid_at);
+        Event::assertDispatchedTimes(CoworkingSessionPaid::class, 1);
+    }
+
+    public function test_wallet_pay_puts_the_bill_first_when_the_orders_would_leave_it_short(): void
+    {
+        // 210 points: the booking's 200, but not the booking and its 30-point order.
+        $member = $this->member(210);
+        [$booking, [$order]] = $this->unpaidClosedRoom($member, [30]);
+        Event::fake([BookingPaid::class]);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])->assertCreated();
+
+        $this->assertSame(PaymentState::Paid, $booking->refresh()->payment_state);
+        $this->assertNull($order->refresh()->paid_at);
+        $this->assertSame(10, $this->balanceOf($member));
+        // The card stays, owing the order.
+        $this->assertSame(['awaiting_payment'], $this->bookingPaidStates());
+    }
+
+    public function test_paying_an_order_alone_tells_the_members_card(): void
+    {
+        $member = $this->member();
+        $booking = $this->planCoveredRoom($member);
+        $first = $this->order($booking, 30);
+        $second = $this->order($booking, 20);
+        $session = $this->walkIn($member, ['checked_out_at' => $this->at('09:00'), 'price_points' => 0, 'amount_owed' => '0.00', 'payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan]);
+        $sessionOrder = $this->order($session, 15);
+        Event::fake([BookingPaid::class, CoworkingSessionPaid::class]);
+
+        $this->actingAsOperations();
+        $settle = fn (KitchenOrder $order) => $this->postJson('/api/v1/admin/reception/payments/settle', [
+            'purpose' => 'kitchen_order', 'payable_id' => $order->id, 'collected_via' => 'cash',
+        ])->assertCreated();
+
+        $settle($first);
+        $settle($second);
+        $settle($sessionOrder);
+
+        // Still owing the second after the first; nothing after the second.
+        $this->assertSame(['awaiting_payment', null], $this->bookingPaidStates());
+        Event::assertDispatched(CoworkingSessionPaid::class, fn (CoworkingSessionPaid $e) => $e->sessionId === $session->id);
+    }
+
+    public function test_a_paid_bill_owing_orders_is_paid_from_the_wallet_from_the_app(): void
+    {
+        $member = $this->member(100);
+        $booking = $this->planCoveredRoom($member);
+        $first = $this->order($booking, 30);
+        $second = $this->order($booking, 20);
+        Event::fake([BookingPaid::class]);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])
+            ->assertCreated()
+            ->assertJsonPath('data.next', 'done')
+            ->assertJsonPath('data.payment', null);
+
+        $this->assertNotNull($first->refresh()->paid_at);
+        $this->assertNotNull($second->refresh()->paid_at);
+        $this->assertSame(50, $this->balanceOf($member));
+        $this->assertNull(Arr::last($this->bookingPaidStates()));
+
+        // The walk-in endpoint does the same.
+        $session = $this->walkIn($member, ['checked_out_at' => $this->at('09:00'), 'price_points' => 0, 'amount_owed' => '0.00', 'payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan]);
+        $sessionOrder = $this->order($session, 20);
+
+        $this->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'wallet'])
+            ->assertCreated()
+            ->assertJsonPath('data.next', 'done');
+
+        $this->assertNotNull($sessionOrder->refresh()->paid_at);
+        $this->assertSame(30, $this->balanceOf($member));
+    }
+
+    public function test_a_paid_bill_owing_orders_the_wallet_cannot_cover_pays_none(): void
+    {
+        $member = $this->member(40);
+        $booking = $this->planCoveredRoom($member);
+        $first = $this->order($booking, 30);
+        $second = $this->order($booking, 20);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'wallet'])
+            ->assertStatus(422)
+            ->assertJsonPath('current', 40)
+            ->assertJsonPath('required', 50)
+            ->assertJsonPath('shortage', 10);
+
+        $this->assertNull($first->refresh()->paid_at);
+        $this->assertNull($second->refresh()->paid_at);
+        $this->assertSame(40, $this->balanceOf($member));
+    }
+
+    public function test_a_paid_bill_owing_orders_takes_only_the_wallet_from_the_app(): void
+    {
+        $member = $this->member(100);
+        $booking = $this->planCoveredRoom($member);
+        $order = $this->order($booking, 30);
+
+        Sanctum::actingAs($member, ['*']);
+
+        foreach (['cash', 'paymera'] as $method) {
+            $this->withHeader('lang', 'en')->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => $method])
+                ->assertStatus(422)
+                ->assertExactJson(['message' => 'The orders on this bill are paid from your points or at reception.']);
+        }
+
+        $this->withHeader('lang', 'ar')->postJson("/api/v1/member/bookings/{$booking->id}/pay", ['payment_method' => 'cash'])
+            ->assertStatus(422)
+            ->assertExactJson(['message' => 'تُدفع طلبات هذه الفاتورة من نقاطك أو لدى الاستقبال.']);
+
+        $this->assertNull($order->refresh()->paid_at);
+        $this->assertSame(0, Payment::count());
+    }
+
+    public function test_desk_settlement_of_a_paid_bill_settles_only_its_orders(): void
+    {
+        $member = $this->member();
+        $booking = $this->planCoveredRoom($member);
+        $order = $this->order($booking, 30);
+        $this->actingAsOperations();
+
+        $this->withHeader('lang', 'en')
+            ->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", ['payment_method' => 'cash'])
+            ->assertOk();
+
+        $this->assertNotNull($order->refresh()->paid_at);
+        $booking->refresh();
+        $this->assertSame(PaymentSource::Plan, $booking->payment_source);
+        $this->assertSame(0, (int) $booking->price_points);
+        $this->assertSame(0, Payment::query()->forPayable($booking)->count());
+        $this->assertSame(1, $this->orderPayments());
+
+        // Nothing at all owed now: 409, as before.
+        $this->withHeader('lang', 'en')
+            ->postJson("/api/v1/admin/reception/bookings/{$booking->id}/settle-payment", ['payment_method' => 'cash'])
+            ->assertStatus(409);
+    }
+
+    public function test_the_settle_payment_audit_names_the_orders_it_settled(): void
+    {
+        $session = $this->walkIn($this->member());
+        $first = $this->order($session, 30);
+        $second = $this->order($session, 20);
+        $this->closures()->closeOut($session, $this->at('10:00'));
+
+        $this->actingAsOperations();
+        $this->postJson("/api/v1/admin/reception/walk-ins/{$session->id}/settle-payment", ['payment_method' => 'cash'])->assertOk();
+
+        $properties = Activity::where('description', 'payment_settled')->sole()->properties;
+        $this->assertSame('cash', $properties->get('payment_method'));
+        $this->assertSame([['id' => $first->id, 'points' => 30], ['id' => $second->id, 'points' => 20]], $properties->get('kitchen_orders'));
+    }
+
+    public function test_a_closed_bills_totals_show_its_orders_beside_its_own_amount(): void
+    {
+        $session = $this->walkIn($this->member());
+        $this->order($session, 30);
+        $this->order($session, 20, KitchenOrderStatus::Delivered, paid: true);
+        $this->order($session, 0);
+        $this->closures()->closeOut($session, $this->at('10:00'));
+        $session->refresh();
+
+        $report = app(SessionReportBuilder::class)->build($session);
+        $conversion = app(PointConversionService::class);
+
+        $this->assertSame((string) $session->amount_owed, $report['totals']['amount_owed']);
+        $this->assertSame(50, $report['totals']['orders_points']);
+        $this->assertSame(30, $report['totals']['orders_unpaid_points']);
+        $this->assertSame($conversion->pointsToUsd(50), $report['totals']['orders_amount']);
+        $this->assertSame(bcadd((string) $session->amount_owed, $conversion->pointsToUsd(50), 2), $report['totals']['grand_total_amount']);
+
+        // Each order line carries its amount; the 0-point order is no line.
+        $lines = collect($report['lines'])->where('kind', 'order')->values();
+        $this->assertSame([30, 20], $lines->pluck('points')->all());
+        $this->assertSame([$conversion->pointsToUsd(30), $conversion->pointsToUsd(20)], $lines->pluck('amount')->all());
+    }
+
+    public function test_a_zero_point_order_is_owed_nothing(): void
+    {
+        $member = $this->member();
+        $booking = $this->planCoveredRoom($member);
+        $this->order($booking, 0);
+
+        $this->assertNull(app(CurrentBookingLocator::class)->stateOf($booking));
+        $this->assertSame(['count' => 0, 'total_points' => 0, 'unpaid_points' => 0], app(KitchenOrderSettlement::class)->summaryFor($booking));
+    }
+
+    public function test_a_plan_covered_session_owing_orders_ends_unpaid(): void
+    {
+        $member = $this->member();
+        $session = $this->walkIn($member, ['checked_out_at' => $this->at('09:00'), 'price_points' => 0, 'amount_owed' => '0.00', 'payment_state' => PaymentState::Paid, 'payment_source' => PaymentSource::Plan]);
+        $endRequest = $session->endRequests()->create([
+            'user_id' => $member->id,
+            'requested_at' => $this->at('09:00'),
+            'status' => SessionEndRequestStatus::Confirmed,
+        ]);
+
+        $this->assertSame('paid', (new CoworkingSessionEnded($endRequest))->paymentState);
+
+        $this->order($session, 30);
+
+        $this->assertSame('unpaid', (new CoworkingSessionEnded($endRequest->refresh()))->paymentState);
     }
 }

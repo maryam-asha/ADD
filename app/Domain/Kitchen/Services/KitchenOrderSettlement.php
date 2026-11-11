@@ -6,12 +6,14 @@ use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentMethod;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Exceptions\InsufficientPointsException;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Membership\Enums\OwnerType;
+use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +32,8 @@ class KitchenOrderSettlement
 
     /**
      * The bill's accepted orders, paid or not, oldest first — the report's
-     * `order` lines.
+     * `order` lines. An order that costs nothing is owed nothing and is not
+     * among them.
      *
      * @return Collection<int, KitchenOrder>
      */
@@ -81,14 +84,73 @@ class KitchenOrderSettlement
      * costs, as the bill is. All or nothing: anything refused — an order
      * paid meanwhile — throws, and undoes the orders settled before it (and,
      * inside a caller's transaction, the rest with them).
+     *
+     * @return Collection<int, KitchenOrder> the orders it settled
      */
-    public function settleAtReception(Booking|WalkinSession $bill, PaymentMethod $method, User $operator): void
+    public function settleAtReception(Booking|WalkinSession $bill, PaymentMethod $method, User $operator): Collection
     {
-        DB::transaction(function () use ($bill, $method, $operator) {
-            foreach ($this->unpaidFor($bill) as $order) {
+        return DB::transaction(function () use ($bill, $method, $operator) {
+            $orders = $this->unpaidFor($bill);
+
+            foreach ($orders as $order) {
                 $this->payments->settleAtReception(PaymentPurpose::KitchenOrder, $order, $method, null, null, $operator);
             }
+
+            return $orders;
         });
+    }
+
+    /**
+     * Every unpaid order paid from the member's own general points, or none:
+     * what the member asks for when only the orders are left to pay on a
+     * bill. Short, it throws InsufficientPointsException for all of them
+     * together — what the wallet held, and what they come to — and nothing
+     * is paid.
+     */
+    public function payAllFromWallet(Booking|WalkinSession $bill): void
+    {
+        $orders = $this->unpaidFor($bill);
+        $total = (int) $orders->sum('total_points');
+        $paid = 0;
+
+        try {
+            DB::transaction(function () use ($bill, $orders, &$paid) {
+                foreach ($orders as $order) {
+                    $this->startWalletPayment($bill, $order);
+                    $paid += (int) $order->total_points;
+                }
+            });
+        } catch (InsufficientPointsException $e) {
+            throw InsufficientPointsException::for($e->current + $paid, $total);
+        }
+    }
+
+    /**
+     * The bill paid by `$payBill` from the wallet together with its unpaid
+     * orders, the orders first — so the bill's paid event finds nothing
+     * owing on it. Should the orders take points the bill needed, the bill
+     * comes first instead: it is paid alone, and the orders as far as what
+     * is left goes. Whatever `$payBill` refuses undoes the orders with it.
+     *
+     * @template T
+     *
+     * @param  Closure(): T  $payBill
+     * @return T
+     */
+    public function payFromWalletWithBill(Booking|WalkinSession $bill, Closure $payBill): mixed
+    {
+        try {
+            return DB::transaction(function () use ($bill, $payBill) {
+                $this->payFromWallet($bill);
+
+                return $payBill();
+            });
+        } catch (InsufficientPointsException) {
+            $result = $payBill();
+            $this->payFromWallet($bill);
+
+            return $result;
+        }
     }
 
     /**
@@ -109,11 +171,7 @@ class KitchenOrderSettlement
             try {
                 // A savepoint: a wallet that falls short undoes only this
                 // order's payment, never the bill's closure around it.
-                DB::transaction(fn () => $this->payments->start(PaymentPurpose::KitchenOrder, $member, WalletMethod::KEY, [
-                    'payable' => $order,
-                    'wallet_owner_type' => OwnerType::User,
-                    'wallet_owner_id' => $bill->user_id,
-                ]));
+                DB::transaction(fn () => $this->startWalletPayment($bill, $order));
             } catch (Throwable $e) {
                 Log::info('[Kitchen] an order could not be paid from the wallet', [
                     'kitchen_order_id' => $order->id,
@@ -123,18 +181,34 @@ class KitchenOrderSettlement
         }
     }
 
-    /** @return Builder<KitchenOrder> */
+    /** The member's own wallet, never a company's they can spend — as for the bill's close (ClosedBookingSettlement). */
+    private function startWalletPayment(Booking|WalkinSession $bill, KitchenOrder $order): void
+    {
+        $this->payments->start(PaymentPurpose::KitchenOrder, $bill->user, WalletMethod::KEY, [
+            'payable' => $order,
+            'wallet_owner_type' => OwnerType::User,
+            'wallet_owner_id' => $bill->user_id,
+        ]);
+    }
+
+    /**
+     * Accepted, and costing something: an order that costs nothing is owed
+     * nothing, as the fulfiller refuses to charge it.
+     *
+     * @return Builder<KitchenOrder>
+     */
     private function owed(Booking|WalkinSession $bill): Builder
     {
         return KitchenOrder::query()
             ->where('billable_type', $bill->getMorphClass())
             ->where('billable_id', $bill->id)
-            ->whereIn('status', KitchenOrderStatus::owedValues());
+            ->whereIn('status', KitchenOrderStatus::owedValues())
+            ->where('total_points', '>', 0);
     }
 
     /** @return Builder<KitchenOrder> */
     private function unpaid(Booking|WalkinSession $bill): Builder
     {
-        return $this->owed($bill)->whereNull('paid_at')->where('total_points', '>', 0);
+        return $this->owed($bill)->whereNull('paid_at');
     }
 }
