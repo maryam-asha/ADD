@@ -10,10 +10,14 @@ use Add\Inventory\Stock\Models\StockBalance;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Support\Decimal;
 use Add\Inventory\Warehouses\Models\Warehouse;
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Identity\Models\User;
+use App\Domain\Kitchen\Models\QrPoint;
+use App\Domain\Kitchen\Services\KitchenMenu;
 use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Retail\Models\SaleItem;
 use Database\Seeders\CurrencySeeder;
+use Database\Seeders\DatabaseSeeder;
 use Database\Seeders\InventoryDemoSeeder;
 use Database\Seeders\PermissionSeeder;
 use Database\Seeders\RoleSeeder;
@@ -71,5 +75,21 @@ class InventoryDemoSeederTest extends TestCase
         $items = Item::query()->count();
         $this->seed(InventoryDemoSeeder::class);
         $this->assertSame($items, Item::query()->count());
+    }
+
+    public function test_demo_kitchen_has_a_menu(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->seed(InventoryDemoSeeder::class);
+
+        $branchId = (int) Branch::query()->value('id');
+        $menu = app(KitchenMenu::class)->for($branchId);
+
+        $this->assertNotEmpty($menu);
+        $this->assertEqualsCanonicalizing(
+            [10, 12, 15],
+            array_map(fn (array $line) => (int) $line['sale_item']->price_points, $menu),
+        );
+        $this->assertTrue(QrPoint::query()->where('place_type', 'seat_desk')->exists());
     }
 }

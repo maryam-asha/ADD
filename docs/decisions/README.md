@@ -43,6 +43,7 @@ minimal version that gets reworked later.
 - [booking-outcomes-and-extension.md](booking-outcomes-and-extension.md) — `completed`/`no_show` and the lapse of undecided requests once a booking's time passes, the app's status catalog and tabs, and per-space extension rules with one planner behind the options and the POST
 - [pricing-offers-and-coupons.md](pricing-offers-and-coupons.md) — sale prices on spaces and plans, discount coupons (scope, audience, limits counted live), and one `PriceQuoteService` composing every price; phase 1 of 3 (gift codes and referrals follow)
 - [prepayment-all-or-nothing.md](prepayment-all-or-nothing.md) — a booking or registration is made first, then paid through the same create request sent again with its id; each operation pays through its own endpoint and `POST member/payments` is gone; reverses "a failed card leaves it for the desk"
+- [kitchen-orders.md](kitchen-orders.md) — members order from the branch kitchen onto their session or booking; D1-D12, orders as their own payables from general points, and what guards what
 
 **PRD §7.1 decision map** — every locked decision, traced to the guard test
 (if one exists yet) or the phase that will add it. "—" means the decision has

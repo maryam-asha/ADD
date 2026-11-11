@@ -17,6 +17,7 @@ use Add\Inventory\Catalog\Models\Unit;
 use Add\Inventory\Catalog\Services\CatalogService;
 use Add\Inventory\Stock\Enums\IssueReason;
 use Add\Inventory\Stock\Models\StockBalance;
+use Add\Inventory\Stock\Models\StockMinimum;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Support\Place;
 use Add\Inventory\Warehouses\Services\WarehouseService;
@@ -24,17 +25,22 @@ use App\Domain\Foundation\Enums\SpaceType;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
 use App\Domain\Foundation\Models\Floor;
+use App\Domain\Foundation\Models\SeatDesk;
 use App\Domain\Foundation\Models\Space;
 use App\Domain\Foundation\Models\Zone;
 use App\Domain\Identity\Models\Company;
 use App\Domain\Identity\Models\User;
 use App\Domain\Identity\Services\AccountCreationService;
+use App\Domain\Kitchen\Enums\QrPointPlace;
+use App\Domain\Kitchen\Models\KitchenStore;
+use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Membership\Models\ResourceType;
 use App\Domain\Retail\Models\SaleItem;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use RuntimeException;
 use Spatie\Permission\Models\Permission;
 use Spatie\Permission\Models\Role;
@@ -117,6 +123,7 @@ class InventoryDemoSeeder extends Seeder
                 $this->seedWarehouses();
                 $this->seedStock();
                 $this->seedSales();
+                $this->seedKitchen();
                 $this->seedAccounts();
             });
         } finally {
@@ -448,6 +455,44 @@ class InventoryDemoSeeder extends Seeder
             'inventory_item_id' => $this->items['paper']->id,
             'stock_units_per_unit' => 1,
         ]);
+    }
+
+    // ── Kitchen ─────────────────────────────────────────────────────────────
+
+    /**
+     * The café store is the branch's kitchen: water, cola and chocolate move
+     * over from the main warehouse (so the menu has something on it, and the
+     * notebook, which stays at reception, is not served), each with a minimum
+     * of 5; every demo desk and space gets its QR point.
+     */
+    private function seedKitchen(): void
+    {
+        $stock = app(StockService::class);
+        $cafe = $this->warehouses['cafe'];
+        $branchId = $this->places['reception']->id;
+
+        $this->at($this->today->subDays(1));
+        foreach (['water' => 30, 'cola' => 20, 'chocolate' => 20] as $key => $quantity) {
+            $stock->transfer($this->items[$key], $this->warehouses['reception'], $cafe, $quantity, 'To the kitchen');
+            StockMinimum::query()->create(['warehouse_id' => $cafe->id, 'item_id' => $this->items[$key]->id, 'minimum' => 5]);
+        }
+        $this->at(null);
+
+        KitchenStore::query()->updateOrCreate(['branch_id' => $branchId], ['warehouse_id' => $cafe->id]);
+
+        $points = [];
+        foreach (SeatDesk::query()->pluck('id') as $id) {
+            $points[] = [QrPointPlace::SeatDesk, (int) $id];
+        }
+        foreach (Space::query()->pluck('id') as $id) {
+            $points[] = [QrPointPlace::Space, (int) $id];
+        }
+        foreach ($points as [$type, $id]) {
+            QrPoint::query()->firstOrCreate(
+                ['place_type' => $type->value, 'place_id' => $id],
+                ['branch_id' => $branchId, 'qr_value' => Str::random(40)],
+            );
+        }
     }
 
     // ── Accounts ────────────────────────────────────────────────────────────
