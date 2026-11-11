@@ -121,9 +121,12 @@ class KitchenOrderService
     public function accept(KitchenOrder $order, User $staff): KitchenOrder
     {
         DB::transaction(function () use ($order, $staff) {
+            // One lock order everywhere: the bill, then the order — the same
+            // as a closing bill cancelling its pending orders.
+            $bill = $this->lockedBill($order);
             $locked = $this->locked($order, KitchenOrderStatus::Pending, 'api.kitchen.order_not_pending');
 
-            if (! $this->billIsOpen($locked)) {
+            if (! $bill?->checked_in_at || $bill->checked_out_at !== null) {
                 throw new KitchenOrderException('api.kitchen.bill_closed', 409);
             }
 
@@ -148,6 +151,26 @@ class KitchenOrderService
         });
 
         return $order->refresh();
+    }
+
+    /**
+     * A bill closing takes its unaccepted orders with it: every pending order
+     * on it is cancelled by the system. Called with the bill's row already
+     * locked (lock order: bill, then order). Orders the kitchen accepted stay.
+     *
+     * @return int how many it cancelled
+     */
+    public function cancelPendingFor(Booking|WalkinSession $bill): int
+    {
+        return KitchenOrder::query()
+            ->where('billable_type', $bill->getMorphClass())
+            ->where('billable_id', $bill->getKey())
+            ->where('status', KitchenOrderStatus::Pending)
+            ->update([
+                'status' => KitchenOrderStatus::Cancelled,
+                'cancelled_by' => CancelledBy::System,
+                'cancelled_at' => now(),
+            ]);
     }
 
     /**
@@ -222,15 +245,13 @@ class KitchenOrderService
         return $locked;
     }
 
-    /** Its session or booking, locked: checked in and not yet checked out. */
-    private function billIsOpen(KitchenOrder $order): bool
+    /** The order's session or booking, locked and read afresh; null when it is gone. */
+    private function lockedBill(KitchenOrder $order): Booking|WalkinSession|null
     {
         $class = Relation::getMorphedModel($order->billable_type) ?? $order->billable_type;
 
-        /** @var Booking|WalkinSession|null $bill */
-        $bill = $class::query()->whereKey($order->billable_id)->lockForUpdate()->first();
-
-        return $bill !== null && $bill->checked_in_at !== null && $bill->checked_out_at === null;
+        /** @var Booking|WalkinSession|null */
+        return $class::query()->whereKey($order->billable_id)->lockForUpdate()->first();
     }
 
     /**

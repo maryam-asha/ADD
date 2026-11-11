@@ -22,6 +22,7 @@ use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Services\BusinessHoursService;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\KitchenOrderService;
 use App\Domain\Kitchen\Services\KitchenOrderSettlement;
 use App\Domain\Membership\Models\Membership;
 use App\Domain\Membership\Services\PlanAllowanceService;
@@ -143,6 +144,7 @@ class SessionClosureService
 
             $this->assertOpenForClosure($locked);
 
+            app(KitchenOrderService::class)->cancelPendingFor($locked);
             $this->finalizeRoomClosure($locked, now()->min($locked->end_at), TerminationSource::Member);
         });
 
@@ -401,6 +403,8 @@ class SessionClosureService
 
     private function finalizeClosure(Booking|WalkinSession $session, CarbonInterface $checkedOutAt, TerminationSource $source): void
     {
+        app(KitchenOrderService::class)->cancelPendingFor($session);
+
         if ($session instanceof Booking && ! $session->isCoworking()) {
             $this->finalizeRoomClosure($session, $checkedOutAt, $source);
 

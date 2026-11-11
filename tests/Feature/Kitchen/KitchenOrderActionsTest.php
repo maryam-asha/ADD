@@ -5,6 +5,7 @@ namespace Tests\Feature\Kitchen;
 use Add\Inventory\Stock\Models\StockMovement;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Warehouses\Models\Warehouse;
+use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Branch;
 use App\Domain\Foundation\Models\Building;
@@ -74,7 +75,7 @@ class KitchenOrderActionsTest extends TestCase
     }
 
     /** A pending order of `$quantity` colas on a fresh open coworking session of the member. */
-    private function order(int $quantity = 2, DeliveryType $delivery = DeliveryType::Pickup, ?WalkinSession $bill = null): KitchenOrder
+    private function order(int $quantity = 2, DeliveryType $delivery = DeliveryType::Pickup, Booking|WalkinSession|null $bill = null): KitchenOrder
     {
         $bill ??= WalkinSession::factory()->create(['user_id' => $this->member->id, 'space_id' => $this->cospace->id]);
 
@@ -213,6 +214,39 @@ class KitchenOrderActionsTest extends TestCase
         $bill = WalkinSession::factory()->create(['user_id' => $this->member->id, 'space_id' => $this->cospace->id]);
         $order = $this->order(2, bill: $bill);
         $bill->update(['checked_out_at' => now()]);
+
+        $this->act($order, 'accept')
+            ->assertStatus(409)
+            ->assertJsonPath('message', __('api.kitchen.bill_closed', [], 'en'));
+
+        $this->assertSame(0, bccomp('10', $this->onHand(), 4));
+        $this->assertSame(KitchenOrderStatus::Pending, $order->refresh()->status);
+    }
+
+    public function test_accept_works_on_a_checked_in_booking_bill(): void
+    {
+        $bill = Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $this->cospace->id,
+            'checked_in_at' => now()->subHour(),
+            'checked_out_at' => null,
+        ]);
+        $order = $this->order(2, bill: $bill);
+
+        $this->act($order, 'accept')->assertOk()->assertJsonPath('data.status', 'preparing');
+
+        $this->assertSame(0, bccomp('8', $this->onHand(), 4));
+    }
+
+    public function test_accept_refuses_a_checked_out_booking_bill(): void
+    {
+        $bill = Booking::factory()->create([
+            'user_id' => $this->member->id,
+            'space_id' => $this->cospace->id,
+            'checked_in_at' => now()->subHours(2),
+            'checked_out_at' => now()->subHour(),
+        ]);
+        $order = $this->order(2, bill: $bill);
 
         $this->act($order, 'accept')
             ->assertStatus(409)
