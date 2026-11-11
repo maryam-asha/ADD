@@ -23,3 +23,8 @@ Broadcast::channel('member.{id}', fn (User $user, string $id) => (int) $user->id
 // admin route group holds (TokenPairService::MEMBER_APP_ABILITY). The
 // dashboard's own session carries a TransientToken, which passes it.
 Broadcast::channel('reception', fn (User $user) => $user->can('reception.view') && $user->tokenCan('dashboard'));
+
+// The kitchen board: whoever may see the kitchen's orders
+// (`kitchen-orders.view`), by permission, signed in to the dashboard. The
+// ability check keeps a member-app token out, as for the desk above.
+Broadcast::channel('kitchen', fn (User $user) => $user->can('kitchen-orders.view') && $user->tokenCan('dashboard'));

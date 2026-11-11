@@ -538,4 +538,29 @@ return [
         ],
     ],
 
+    // A member's kitchen order, sent through
+    // App\Domain\Kitchen\Services\KitchenOrderNotifier.
+    'kitchen_order' => [
+        'accepted' => [
+            'title' => 'The kitchen accepted your order',
+            'body' => 'Order :order is being prepared.',
+        ],
+        'ready' => [
+            'title' => 'Your order is ready',
+            'body' => 'Order :order is ready. Come and collect it from the kitchen.',
+        ],
+        'rejected' => [
+            'title' => 'The kitchen could not take your order',
+            'body' => 'Order :order was declined: :reason',
+        ],
+        'delivered' => [
+            'title' => 'Your order was delivered',
+            'body' => 'Order :order has been handed over. Enjoy.',
+        ],
+        'cancelled_by_system' => [
+            'title' => 'Your order was cancelled',
+            'body' => 'Order :order was cancelled because your session or booking ended before the kitchen accepted it.',
+        ],
+    ],
+
 ];

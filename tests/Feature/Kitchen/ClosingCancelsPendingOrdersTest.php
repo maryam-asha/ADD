@@ -13,6 +13,7 @@ use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\CancelledBy;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\KitchenOrderService;
 use Carbon\Carbon;
 use Database\Seeders\ResourceTypeSeeder;
 use Database\Seeders\RoleSeeder;
@@ -128,6 +129,19 @@ class ClosingCancelsPendingOrdersTest extends TestCase
             ->postJson("/api/v1/admin/kitchen/orders/{$first->id}/accept")
             ->assertStatus(409)
             ->assertJsonPath('message', __('api.kitchen.order_not_pending', [], 'en'));
+    }
+
+    public function test_it_returns_the_orders_it_cancelled(): void
+    {
+        $session = $this->walkIn();
+        $pending = $this->order($session);
+        $this->order($session, KitchenOrderStatus::Preparing);
+
+        $cancelled = app(KitchenOrderService::class)->cancelPendingFor($session);
+
+        $this->assertSame([$pending->id], $cancelled->pluck('id')->all());
+        $this->assertSame(KitchenOrderStatus::Cancelled, $cancelled->first()->status);
+        $this->assertCount(0, app(KitchenOrderService::class)->cancelPendingFor($this->walkIn()));
     }
 
     public function test_preparing_orders_are_untouched(): void

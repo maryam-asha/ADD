@@ -538,4 +538,29 @@ return [
         ],
     ],
 
+    // A member's kitchen order (Arabic), sent through
+    // App\Domain\Kitchen\Services\KitchenOrderNotifier.
+    'kitchen_order' => [
+        'accepted' => [
+            'title' => 'قبل المطبخ طلبك',
+            'body' => 'الطلب :order قيد التحضير.',
+        ],
+        'ready' => [
+            'title' => 'طلبك جاهز',
+            'body' => 'الطلب :order جاهز. تفضّل باستلامه من المطبخ.',
+        ],
+        'rejected' => [
+            'title' => 'تعذّر على المطبخ تنفيذ طلبك',
+            'body' => 'رُفض الطلب :order: :reason',
+        ],
+        'delivered' => [
+            'title' => 'تم تسليم طلبك',
+            'body' => 'سُلّم الطلب :order. نتمنى لك وقتاً طيباً.',
+        ],
+        'cancelled_by_system' => [
+            'title' => 'أُلغي طلبك',
+            'body' => 'أُلغي الطلب :order لأن جلستك أو حجزك انتهى قبل أن يقبله المطبخ.',
+        ],
+    ],
+
 ];

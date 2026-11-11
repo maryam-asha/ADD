@@ -21,6 +21,7 @@ use App\Domain\Kitchen\Models\KitchenOrder;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Retail\Models\SaleItem;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 
@@ -41,6 +42,7 @@ class KitchenOrderService
     public function __construct(
         private readonly BillLocator $bills,
         private readonly StockService $stock,
+        private readonly KitchenOrderNotifier $notifier,
     ) {}
 
     /**
@@ -79,6 +81,7 @@ class KitchenOrderService
             ]);
 
             $order->lines()->createMany($priced);
+            $this->notifier->placed($order);
 
             return $order;
         });
@@ -104,6 +107,8 @@ class KitchenOrderService
                 'cancelled_by' => CancelledBy::Member,
                 'cancelled_at' => now(),
             ]);
+
+            $this->notifier->cancelledByMember($locked);
         });
 
         $order->refresh();
@@ -111,7 +116,7 @@ class KitchenOrderService
 
     /**
      * The kitchen takes the order on (spec "accept"): in one transaction,
-     * lock the order and then its bill, check the order is still pending
+     * lock the bill and then the order, check the order is still pending
      * and the bill still open, and draw every line from the kitchen store it
      * was sent to. A shelf short of any line rolls the whole of it back —
      * nothing drawn, the order still pending, so the kitchen can reject it.
@@ -148,6 +153,8 @@ class KitchenOrderService
                 'accepted_by' => $staff->id,
                 'accepted_at' => now(),
             ]);
+
+            $this->notifier->accepted($locked);
         });
 
         return $order->refresh();
@@ -158,19 +165,34 @@ class KitchenOrderService
      * on it is cancelled by the system. Called with the bill's row already
      * locked (lock order: bill, then order). Orders the kitchen accepted stay.
      *
-     * @return int how many it cancelled
+     * Each order cancelled is announced to the kitchen board and its member
+     * is told, once the surrounding transaction commits.
+     *
+     * @return Collection<int, KitchenOrder> the orders it cancelled
      */
-    public function cancelPendingFor(Booking|WalkinSession $bill): int
+    public function cancelPendingFor(Booking|WalkinSession $bill): Collection
     {
-        return KitchenOrder::query()
+        $ids = KitchenOrder::query()
             ->where('billable_type', $bill->getMorphClass())
             ->where('billable_id', $bill->getKey())
             ->where('status', KitchenOrderStatus::Pending)
-            ->update([
-                'status' => KitchenOrderStatus::Cancelled,
-                'cancelled_by' => CancelledBy::System,
-                'cancelled_at' => now(),
-            ]);
+            ->lockForUpdate()
+            ->pluck('id');
+
+        if ($ids->isEmpty()) {
+            return new Collection;
+        }
+
+        KitchenOrder::query()->whereKey($ids)->update([
+            'status' => KitchenOrderStatus::Cancelled,
+            'cancelled_by' => CancelledBy::System,
+            'cancelled_at' => now(),
+        ]);
+
+        $cancelled = KitchenOrder::query()->with('user')->whereKey($ids)->get();
+        $cancelled->each(fn (KitchenOrder $order) => $this->notifier->cancelledBySystem($order));
+
+        return $cancelled;
     }
 
     /**
@@ -182,12 +204,15 @@ class KitchenOrderService
     public function reject(KitchenOrder $order, User $staff, string $reason): KitchenOrder
     {
         DB::transaction(function () use ($order, $staff, $reason) {
-            $this->locked($order, KitchenOrderStatus::Pending, 'api.kitchen.order_not_pending')->update([
+            $locked = $this->locked($order, KitchenOrderStatus::Pending, 'api.kitchen.order_not_pending');
+            $locked->update([
                 'status' => KitchenOrderStatus::Rejected,
                 'rejection_reason' => trim($reason),
                 'rejected_by' => $staff->id,
                 'rejected_at' => now(),
             ]);
+
+            $this->notifier->rejected($locked);
         });
 
         return $order->refresh();
@@ -199,10 +224,13 @@ class KitchenOrderService
     public function markReady(KitchenOrder $order, User $staff): KitchenOrder
     {
         DB::transaction(function () use ($order) {
-            $this->locked($order, KitchenOrderStatus::Preparing, 'api.kitchen.order_not_preparing')->update([
+            $locked = $this->locked($order, KitchenOrderStatus::Preparing, 'api.kitchen.order_not_preparing');
+            $locked->update([
                 'status' => KitchenOrderStatus::Ready,
                 'ready_at' => now(),
             ]);
+
+            $this->notifier->ready($locked);
         });
 
         return $order->refresh();
@@ -217,11 +245,14 @@ class KitchenOrderService
     public function markDelivered(KitchenOrder $order, User $staff): KitchenOrder
     {
         DB::transaction(function () use ($order, $staff) {
-            $this->locked($order, [KitchenOrderStatus::Preparing, KitchenOrderStatus::Ready], 'api.kitchen.order_not_deliverable')->update([
+            $locked = $this->locked($order, [KitchenOrderStatus::Preparing, KitchenOrderStatus::Ready], 'api.kitchen.order_not_deliverable');
+            $locked->update([
                 'status' => KitchenOrderStatus::Delivered,
                 'delivered_by' => $staff->id,
                 'delivered_at' => now(),
             ]);
+
+            $this->notifier->delivered($locked);
         });
 
         return $order->refresh();
