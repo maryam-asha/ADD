@@ -10,6 +10,16 @@ use Illuminate\Http\Resources\Json\JsonResource;
 /** @mixin ServiceType */
 class ServiceTypeResource extends JsonResource
 {
+    /** A single-service view: carries `about` and `request_config`, which the lists leave out. */
+    private bool $detailed = false;
+
+    public function detailed(): static
+    {
+        $this->detailed = true;
+
+        return $this;
+    }
+
     public function toArray(Request $request): array
     {
         $locale = app()->getLocale();
@@ -21,10 +31,10 @@ class ServiceTypeResource extends JsonResource
             'description' => $this->translate('description', $locale),
             'icon' => $this->icon,
             'image_url' => $this->image_url,
-            // The "Explore ADD" page's explanation, HTML in the requested
-            // language: only on the single-service views (they load the
-            // request form), so a list does not carry every page.
-            'about' => $this->when($this->resource->relationLoaded('requestForm'), fn () => $this->translate('about', $locale)),
+            // The "Explore ADD" page's explanation, Markdown in the requested
+            // language: only on the single-service views, so a list does not
+            // carry every page.
+            'about' => $this->when($this->detailed, fn () => $this->translate('about', $locale)),
             'is_active' => (bool) $this->is_active,
             'is_coming_soon' => (bool) $this->is_coming_soon,
             'show_on_home' => (bool) $this->show_on_home,
@@ -35,15 +45,16 @@ class ServiceTypeResource extends JsonResource
             // opens, the number a phone call dials, the link, the text — on
             // the single-service views alone, like `about`: the catalog's
             // lists keep their slim contract.
-            'request_config' => $this->when($this->resource->relationLoaded('requestForm'), fn () => $this->request_config),
+            'request_config' => $this->when($this->detailed, fn () => $this->request_config),
             'axis' => $this->whenLoaded('axis', fn () => [
                 'id' => $this->axis->id,
                 'slug' => $this->axis->slug,
                 'name' => $this->axis->translate('name', $locale),
                 'color' => $this->axis->color,
             ]),
-            // Form fields: only on the single-service views, which load the
-            // request form. `[]` when the type asks nothing.
+            // Form fields: only where the request form is loaded — the admin
+            // view. The member reads them from services/{id}/registration-form,
+            // not from the service's details. `[]` when the type asks nothing.
             'registration_form' => $this->whenLoaded('requestForm', fn () => $this->formFields()),
             'fields' => $this->whenLoaded('requestForm', fn () => $this->formFields()),
         ];

@@ -46,7 +46,7 @@ class AdminServiceTypeController extends Controller
      */
     public function show(ServiceType $serviceType): ServiceTypeResource
     {
-        return new ServiceTypeResource($serviceType->load('axis', 'requestForm.activeFields'));
+        return (new ServiceTypeResource($serviceType->load('axis', 'requestForm.activeFields')))->detailed();
     }
 
     /**

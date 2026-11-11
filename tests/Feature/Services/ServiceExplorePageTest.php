@@ -42,7 +42,7 @@ class ServiceExplorePageTest extends TestCase
             'service_axis_id' => $this->core->id,
             'slug' => 'rooms',
             'name' => ['en' => 'ADD Rooms', 'ar' => 'ADD Rooms'],
-            'about' => ['en' => '<h2>Rooms</h2><p>Book one.</p>', 'ar' => '<h2>القاعات</h2><p>احجز واحدة.</p>'],
+            'about' => ['en' => "## Rooms\n\nBook one.", 'ar' => "## القاعات\n\nاحجز **واحدة**."],
             'image_url' => 'https://cdn.example.com/rooms.jpg',
             'is_active' => true,
             'show_on_home' => true,
@@ -62,7 +62,7 @@ class ServiceExplorePageTest extends TestCase
         $this->withHeader('lang', 'ar')
             ->getJson('/api/v1/member/services/rooms')
             ->assertOk()
-            ->assertJsonPath('data.about', '<h2>القاعات</h2><p>احجز واحدة.</p>')
+            ->assertJsonPath('data.about', "## القاعات\n\nاحجز **واحدة**.")
             ->assertJsonPath('data.image_url', 'https://cdn.example.com/rooms.jpg')
             ->assertJsonPath('data.request_method', 'internal_redirect')
             ->assertJsonPath('data.request_config', ['route' => 'spaces', 'params' => ['space_type' => 'room']]);
@@ -87,13 +87,13 @@ class ServiceExplorePageTest extends TestCase
         $this->signIn('admin');
 
         $this->patchJson("/api/v1/admin/service-types/{$rooms->id}", [
-            'about' => ['en' => '<p>New</p>', 'ar' => '<p>جديد</p>'],
+            'about' => ['en' => '**New**', 'ar' => '**جديد**'],
             'image_url' => 'https://cdn.example.com/new.jpg',
             'show_on_home' => true,
         ])->assertOk();
 
         $rooms->refresh();
-        $this->assertSame(['en' => '<p>New</p>', 'ar' => '<p>جديد</p>'], $rooms->about);
+        $this->assertSame(['en' => '**New**', 'ar' => '**جديد**'], $rooms->about);
         $this->assertSame('https://cdn.example.com/new.jpg', $rooms->image_url);
         $this->assertTrue($rooms->show_on_home);
     }
@@ -112,5 +112,21 @@ class ServiceExplorePageTest extends TestCase
         $this->seed(BrandServiceSeeder::class);
 
         $this->assertSame('Edited', ServiceType::query()->where('slug', 'rooms')->sole()->description['en']);
+        $this->assertSame("## ADD Rooms\n\nMeeting, workshop and training rooms.", ServiceType::query()->where('slug', 'rooms')->sole()->about['en']);
+    }
+
+    public function test_a_page_stored_as_html_is_rewritten_as_markdown(): void
+    {
+        $html = $this->rooms(['about' => [
+            'en' => '<h2>Rooms</h2><p>Book <strong>one</strong> &amp; <a href="https://add.sy">see</a>.<br>Today</p><ul><li>Quiet</li><li>Bright</li></ul><ol><li>Pick</li><li>Pay</li></ol>',
+            'ar' => "## القاعات\n\nاحجز واحدة.",
+        ]]);
+
+        (require database_path('migrations/2026_11_11_100003_convert_service_types_about_to_markdown.php'))->up();
+
+        $this->assertSame([
+            'en' => "## Rooms\n\nBook **one** & [see](https://add.sy).  \nToday\n\n- Quiet\n- Bright\n\n1. Pick\n2. Pay",
+            'ar' => "## القاعات\n\nاحجز واحدة.",
+        ], $html->refresh()->about);
     }
 }

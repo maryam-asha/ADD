@@ -65,8 +65,8 @@ class BrandServiceSeeder extends Seeder
                     'name' => ['en' => $name, 'ar' => $name],
                     'description' => ['en' => $en, 'ar' => $ar],
                     'about' => [
-                        'en' => "<h2>{$name}</h2><p>{$en}</p>",
-                        'ar' => "<h2>{$name}</h2><p>{$ar}</p>",
+                        'en' => "## {$name}\n\n{$en}",
+                        'ar' => "## {$name}\n\n{$ar}",
                     ],
                     'is_active' => $active,
                     'is_coming_soon' => false,
