@@ -321,6 +321,18 @@ class KitchenOrderActionsTest extends TestCase
         $this->assertNotNull($order->delivered_at);
     }
 
+    public function test_an_order_of_a_deleted_member_still_lists(): void
+    {
+        $order = $this->order(1);
+        $this->member->delete();
+
+        $this->getJson('/api/v1/admin/kitchen/orders')
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $order->id)
+            ->assertJsonPath('data.0.member.id', $this->member->id)
+            ->assertJsonPath('data.0.member.phone', '+963900000001');
+    }
+
     public function test_queue_lists_open_orders_oldest_first(): void
     {
         $this->travelTo(now()->subMinutes(30));

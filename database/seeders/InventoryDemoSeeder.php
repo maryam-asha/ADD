@@ -480,17 +480,18 @@ class InventoryDemoSeeder extends Seeder
 
         KitchenStore::query()->updateOrCreate(['branch_id' => $branchId], ['warehouse_id' => $cafe->id]);
 
+        // Each point belongs to the branch of the place it names, as QrPointController files it.
         $points = [];
-        foreach (SeatDesk::query()->pluck('id') as $id) {
-            $points[] = [QrPointPlace::SeatDesk, (int) $id];
+        foreach (SeatDesk::query()->with('space.building')->get() as $desk) {
+            $points[] = [QrPointPlace::SeatDesk, (int) $desk->id, (int) $desk->space->building->branch_id];
         }
-        foreach (Space::query()->pluck('id') as $id) {
-            $points[] = [QrPointPlace::Space, (int) $id];
+        foreach (Space::query()->with('building')->get() as $space) {
+            $points[] = [QrPointPlace::Space, (int) $space->id, (int) $space->building->branch_id];
         }
-        foreach ($points as [$type, $id]) {
+        foreach ($points as [$type, $id, $pointBranchId]) {
             QrPoint::query()->firstOrCreate(
                 ['place_type' => $type->value, 'place_id' => $id],
-                ['branch_id' => $branchId, 'qr_value' => Str::random(40)],
+                ['branch_id' => $pointBranchId, 'qr_value' => Str::random(40)],
             );
         }
     }

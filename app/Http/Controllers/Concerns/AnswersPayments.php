@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\Concerns;
 
-use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\ReceptionActionException;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
@@ -69,7 +68,7 @@ trait AnswersPayments
     }
 
     /**
-     * A closed session or booking already paid — or covered by its plan —
+     * A closed session or booking that owes nothing itself — paid, covered by its plan, or free —
      * whose accepted kitchen orders are still unpaid (kitchen orders spec,
      * "The bill"): paying it from the app pays those orders, each its own
      * payable. From the wallet, all of them or none (short, the
@@ -79,7 +78,7 @@ trait AnswersPayments
      */
     protected function payOwedOrdersOnly(Booking|WalkinSession $bill, string $method, KitchenOrderSettlement $orders): ?JsonResponse
     {
-        if ($bill->checked_out_at === null || $bill->payment_state !== PaymentState::Paid || ! $orders->owesFor($bill)) {
+        if ($bill->checked_out_at === null || ! $orders->owesNothingItself($bill) || ! $orders->owesFor($bill)) {
             return null;
         }
 

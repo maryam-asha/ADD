@@ -2,6 +2,7 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use App\Domain\Booking\Enums\PaymentState;
 use App\Domain\Booking\Exceptions\WalletChoiceRequiredException;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
@@ -65,6 +66,22 @@ class KitchenOrderSettlement
     public function owesFor(Booking|WalkinSession $bill): bool
     {
         return $this->unpaid($bill)->exists();
+    }
+
+    /**
+     * Whether the bill owes nothing for itself: paid, covered by its plan,
+     * or free. What is left on it, if anything, is its orders — the one
+     * rule closing, listing and paying a bill all agree on.
+     */
+    public function owesNothingItself(Booking|WalkinSession $bill): bool
+    {
+        if ($bill->payment_state === PaymentState::Paid) {
+            return true;
+        }
+
+        return $bill instanceof Booking
+            ? (int) $bill->price_points <= $bill->pointsPaid()
+            : (float) $bill->amount_owed <= 0;
     }
 
     /**
@@ -220,7 +237,8 @@ class KitchenOrderSettlement
                 // order's payment, never the bill's closure around it.
                 DB::transaction(fn () => $this->startWalletPayment($bill, $order));
             } catch (Throwable $e) {
-                Log::info('[Kitchen] an order could not be paid from the wallet', [
+                // Short of points is expected; anything else is not.
+                Log::log($e instanceof InsufficientPointsException ? 'info' : 'warning', '[Kitchen] an order could not be paid from the wallet', [
                     'kitchen_order_id' => $order->id,
                     'error' => $e->getMessage(),
                 ]);

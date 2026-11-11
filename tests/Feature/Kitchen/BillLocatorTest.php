@@ -88,6 +88,17 @@ class BillLocatorTest extends TestCase
         $this->assertSame($walkin->id, $noQrBill->id);
     }
 
+    public function test_a_chosen_bill_wins_over_the_open_session(): void
+    {
+        $this->walkin();
+        $booking = $this->roomBooking();
+
+        $bill = $this->resolve(null, ['type' => 'booking', 'id' => $booking->id]);
+
+        $this->assertInstanceOf(Booking::class, $bill);
+        $this->assertSame($booking->id, $bill->id);
+    }
+
     public function test_single_room_booking_is_used(): void
     {
         $booking = $this->roomBooking();

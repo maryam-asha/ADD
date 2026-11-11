@@ -68,6 +68,13 @@ class KitchenOrderService
         $priced = $this->price($lines, $store);
 
         return DB::transaction(function () use ($member, $branchId, $store, $billable, $where, $qr, $priced) {
+            // The bill first, then the order — the order every closing takes.
+            $locked = $billable::query()->whereKey($billable->getKey())->lockForUpdate()->first();
+
+            if ($locked === null || $locked->checked_out_at !== null) {
+                throw new KitchenOrderException('api.kitchen.bill_closed', 409);
+            }
+
             $order = KitchenOrder::query()->create([
                 'user_id' => $member->id,
                 'branch_id' => $branchId,

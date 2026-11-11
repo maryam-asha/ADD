@@ -466,6 +466,23 @@ class OrdersOnTheBillTest extends TestCase
         $this->assertSame(50, $this->balanceOf($member));
     }
 
+    public function test_a_free_closed_session_owing_orders_is_paid_from_the_wallet_as_orders_only(): void
+    {
+        $member = $this->member(100);
+        $session = $this->walkIn($member);
+        $order = $this->order($session, 30);
+        $this->closures()->closeOut($session, $this->at('10:00'));
+        $session->refresh()->update(['price_points' => 0, 'amount_owed' => '0.00', 'payment_state' => PaymentState::Unpaid]);
+
+        Sanctum::actingAs($member, ['*']);
+        $this->withHeader('lang', 'en')
+            ->postJson("/api/v1/member/coworking-sessions/walkin/{$session->id}/pay", ['payment_method' => 'wallet'])
+            ->assertCreated();
+
+        $this->assertNotNull($order->refresh()->paid_at);
+        $this->assertSame(70, $this->balanceOf($member));
+    }
+
     public function test_paying_a_booking_from_the_wallet_pays_its_orders(): void
     {
         $member = $this->member(300);
@@ -872,6 +889,7 @@ class OrdersOnTheBillTest extends TestCase
         // Another request paid the order between the check and the payment.
         $orders = Mockery::mock(KitchenOrderSettlement::class);
         $orders->shouldReceive('owesFor')->andReturnTrue();
+        $orders->shouldReceive('owesNothingItself')->andReturnTrue();
         $orders->shouldReceive('payAllFromWallet')->andThrow(new ReceptionActionException('api.payment.already_paid', 409));
         $this->app->instance(KitchenOrderSettlement::class, $orders);
 

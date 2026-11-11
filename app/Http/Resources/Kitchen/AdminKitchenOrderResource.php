@@ -25,7 +25,7 @@ class AdminKitchenOrderResource extends KitchenOrderResource
 
         return [
             ...parent::toArray($request),
-            'member' => [
+            'member' => $this->user === null ? null : [
                 'id' => $this->user->id,
                 'name' => $this->user->name,
                 'phone' => $this->user->phone,

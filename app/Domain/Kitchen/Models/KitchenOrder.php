@@ -91,9 +91,10 @@ class KitchenOrder extends Model
         return $this->morphTo();
     }
 
+    /** The member who ordered — still read once they are deleted: the kitchen needs the name. */
     public function user(): BelongsTo
     {
-        return $this->belongsTo(User::class);
+        return $this->belongsTo(User::class)->withTrashed();
     }
 
     public function branch(): BelongsTo

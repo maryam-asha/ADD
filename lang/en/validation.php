@@ -164,6 +164,7 @@ return [
     ],
 
     'attributes' => [
+        'branch_id' => 'branch',
         'privacy_policy_accepted' => 'privacy policy acceptance',
     ],
 

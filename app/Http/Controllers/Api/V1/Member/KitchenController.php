@@ -41,7 +41,7 @@ class KitchenController extends Controller
         $result = $access->for($request->user(), $qr, isset($validated['branch_id']) ? (int) $validated['branch_id'] : null);
 
         if ($result['branch_id'] === null) {
-            throw ValidationException::withMessages(['branch_id' => __('validation.required', ['attribute' => 'branch id'])]);
+            throw ValidationException::withMessages(['branch_id' => __('validation.required', ['attribute' => __('validation.attributes.branch_id')])]);
         }
 
         return response()->json(['data' => new KitchenMenuResource([

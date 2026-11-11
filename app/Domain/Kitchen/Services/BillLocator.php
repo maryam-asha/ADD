@@ -15,9 +15,11 @@ use App\Domain\Kitchen\Models\QrPoint;
  * Which bill a kitchen order joins (spec "Which bill an order joins"):
  *
  * 1. the QR names a space the member holds a checked-in booking on → that booking;
- * 2. otherwise their open coworking session;
- * 3. otherwise their one checked-in room, office or hall booking;
- * 4. otherwise the bill they chose among those.
+ * 2. otherwise the bill they chose, when it is one of eligibleBills();
+ * 3. otherwise their open coworking session;
+ * 4. otherwise their one checked-in room, office or hall booking.
+ *
+ * Several bookings and no valid choice is asked of them (422).
  *
  * Only the member's own sessions and bookings: who else on a booking may
  * order onto it is deferred (spec, "Who on a booking may order").
@@ -64,20 +66,20 @@ class BillLocator
             }
         }
 
+        if ($chosen !== null) {
+            foreach ($this->eligibleBills($member) as $bill) {
+                if ($chosen['type'] === $bill->coworkingType() && (int) $chosen['id'] === $bill->id) {
+                    return $bill;
+                }
+            }
+        }
+
         if ($open !== null) {
             return $open;
         }
 
         if (count($bookings) === 1) {
             return $bookings[0];
-        }
-
-        foreach ($bookings as $booking) {
-            if ($chosen !== null
-                && $chosen['type'] === $booking->coworkingType()
-                && (int) $chosen['id'] === $booking->id) {
-                return $booking;
-            }
         }
 
         throw new KitchenOrderException('api.kitchen.choose_bill', 422);

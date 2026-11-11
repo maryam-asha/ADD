@@ -179,16 +179,18 @@ class SessionReportBuilder
      * figures are not changed by them (kitchen orders spec, decision 11).
      *
      * @param  Collection<int, KitchenOrder>  $orders
-     * @return array{orders_points: int, orders_unpaid_points: int, orders_amount: string, grand_total_amount: string}
+     * @return array{orders_points: int, orders_unpaid_points: int, orders_unpaid_amount: string, orders_amount: string, grand_total_amount: string}
      */
     private function orderTotals(Booking|WalkinSession $session, Collection $orders): array
     {
         $points = (int) $orders->sum('total_points');
         $amount = $this->points->pointsToUsd($points);
+        $unpaidPoints = (int) $orders->whereNull('paid_at')->sum('total_points');
 
         return [
             'orders_points' => $points,
-            'orders_unpaid_points' => (int) $orders->whereNull('paid_at')->sum('total_points'),
+            'orders_unpaid_points' => $unpaidPoints,
+            'orders_unpaid_amount' => $this->points->pointsToUsd($unpaidPoints),
             'orders_amount' => $amount,
             'grand_total_amount' => bcadd((string) ($session->amount_owed ?? '0'), $amount, 2),
         ];
