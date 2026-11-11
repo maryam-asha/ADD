@@ -27,8 +27,9 @@ class KitchenOrderController extends Controller
     /**
      * GET admin/kitchen/orders — filters `branch_id`, `status` (comma
      * separated; the open ones — pending, preparing, ready — when absent),
-     * `from` / `to` (days sent), `user_id`. Oldest first: the queue is
-     * worked from its head.
+     * `from` / `to` (days sent), `user_id`, `sort` (`oldest` — the
+     * default, the live queue worked from its head — or `newest`, latest
+     * submitted first, for the history).
      */
     public function index(Request $request): AnonymousResourceCollection
     {
@@ -38,6 +39,7 @@ class KitchenOrderController extends Controller
             'from' => ['nullable', 'date'],
             'to' => ['nullable', 'date'],
             'user_id' => ['nullable', 'integer'],
+            'sort' => ['nullable', 'in:oldest,newest'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
@@ -52,8 +54,11 @@ class KitchenOrderController extends Controller
             ->when(isset($validated['user_id']), fn ($query) => $query->where('user_id', (int) $validated['user_id']))
             ->when(isset($validated['from']), fn ($query) => $query->where('created_at', '>=', $request->date('from')->startOfDay()))
             ->when(isset($validated['to']), fn ($query) => $query->where('created_at', '<=', $request->date('to')->endOfDay()))
-            ->oldest()
-            ->oldest('id')
+            ->when(
+                ($validated['sort'] ?? 'oldest') === 'newest',
+                fn ($query) => $query->latest()->latest('id'),
+                fn ($query) => $query->oldest()->oldest('id'),
+            )
             ->paginate((int) ($validated['per_page'] ?? 25));
 
         return AdminKitchenOrderResource::collection($orders);

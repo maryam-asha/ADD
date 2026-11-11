@@ -32519,7 +32519,7 @@
                                         }
                                     ]
                                 },
-                                "description": "The kitchen's queue, oldest first (worked from its head). Paginated (`per_page` 1-100, default 25). Filters: `branch_id`, `status` (comma separated; the open ones - pending, preparing, ready - when absent), `from` / `to` (days sent), `user_id`. Permission `kitchen-orders.view`.\n\nReal-time: `kitchen_order.created` / `kitchen_order.updated` on the kitchen's private channel (ids and status only; refetch this list)."
+                                "description": "The kitchen's queue, oldest first (worked from its head). Paginated (`per_page` 1-100, default 25). Filters: `branch_id`, `status` (comma separated; the open ones - pending, preparing, ready - when absent), `from` / `to` (days sent), `user_id`, `sort` (`oldest` - the default, the live queue - or `newest`, latest submitted first, for the history). Permission `kitchen-orders.view`.\n\nReal-time: `kitchen_order.created` / `kitchen_order.updated` on the kitchen's private channel (ids and status only; refetch this list)."
                             },
                             "response": [
                                 {
@@ -32561,7 +32561,7 @@
                                                 }
                                             ]
                                         },
-                                        "description": "The kitchen's queue, oldest first (worked from its head). Paginated (`per_page` 1-100, default 25). Filters: `branch_id`, `status` (comma separated; the open ones - pending, preparing, ready - when absent), `from` / `to` (days sent), `user_id`. Permission `kitchen-orders.view`.\n\nReal-time: `kitchen_order.created` / `kitchen_order.updated` on the kitchen's private channel (ids and status only; refetch this list)."
+                                        "description": "The kitchen's queue, oldest first (worked from its head). Paginated (`per_page` 1-100, default 25). Filters: `branch_id`, `status` (comma separated; the open ones - pending, preparing, ready - when absent), `from` / `to` (days sent), `user_id`, `sort` (`oldest` - the default, the live queue - or `newest`, latest submitted first, for the history). Permission `kitchen-orders.view`.\n\nReal-time: `kitchen_order.created` / `kitchen_order.updated` on the kitchen's private channel (ids and status only; refetch this list)."
                                     },
                                     "status": "OK",
                                     "code": 200,

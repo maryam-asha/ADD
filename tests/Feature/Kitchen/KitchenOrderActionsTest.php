@@ -391,6 +391,28 @@ class KitchenOrderActionsTest extends TestCase
             ->assertJsonPath('data.member.id', $this->member->id);
     }
 
+    public function test_history_can_list_newest_first(): void
+    {
+        $this->travelTo(now()->subMinutes(30));
+        $oldest = $this->order(1);
+        $this->travelBack();
+
+        $this->travelTo(now()->subMinutes(5));
+        $newest = $this->order(1);
+        $this->travelBack();
+
+        $this->travelTo(now()->subMinutes(20));
+        $middle = $this->order(1);
+        $this->travelBack();
+
+        $ids = fn (string $query) => array_column($this->getJson("/api/v1/admin/kitchen/orders?{$query}")->assertOk()->json('data'), 'id');
+
+        $this->assertSame([$newest->id, $middle->id, $oldest->id], $ids('sort=newest'));
+        $this->assertSame([$oldest->id, $middle->id, $newest->id], $ids('sort=oldest'));
+        $this->assertSame([$oldest->id, $middle->id, $newest->id], $ids(''));
+        $this->getJson('/api/v1/admin/kitchen/orders?sort=sideways')->assertUnprocessable()->assertJsonValidationErrors('sort');
+    }
+
     public function test_actions_need_kitchen_orders_manage(): void
     {
         Role::create(['name' => 'kitchen-viewer', 'guard_name' => 'web'])->givePermissionTo('kitchen-orders.view');
