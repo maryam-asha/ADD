@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1\Admin;
 
+use App\Domain\Foundation\Models\Branch;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Exceptions\KitchenOrderException;
 use App\Domain\Kitchen\Models\KitchenOrder;
@@ -50,7 +51,8 @@ class KitchenOrderController extends Controller
         $orders = KitchenOrder::query()
             ->with(self::RELATIONS)
             ->whereIn('status', $statuses)
-            ->when(isset($validated['branch_id']), fn ($query) => $query->where('branch_id', (int) $validated['branch_id']))
+            // The request's branch (X-Branch-Id or branch_id, ResolveDefaultBranch), else the default one.
+            ->where('branch_id', (int) ($validated['branch_id'] ?? Branch::defaultId()))
             ->when(isset($validated['user_id']), fn ($query) => $query->where('user_id', (int) $validated['user_id']))
             ->when(isset($validated['from']), fn ($query) => $query->where('created_at', '>=', $request->date('from')->startOfDay()))
             ->when(isset($validated['to']), fn ($query) => $query->where('created_at', '<=', $request->date('to')->endOfDay()))

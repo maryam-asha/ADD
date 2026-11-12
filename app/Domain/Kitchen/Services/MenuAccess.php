@@ -2,6 +2,8 @@
 
 namespace App\Domain\Kitchen\Services;
 
+use App\Domain\Foundation\Models\Branch;
+
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Identity\Models\User;
@@ -33,7 +35,9 @@ class MenuAccess
         $bills = $this->bills->eligibleBills($member);
         $branchId = $qr?->branch_id
             ?? ($bills === [] ? null : (int) $bills[0]->space->building->branch_id)
-            ?? $branchId;
+            ?? $branchId
+            // The branch the request names (X-Branch-Id, via ResolveDefaultBranch), else the default one.
+            ?? Branch::defaultId();
 
         $reason = match (true) {
             $branchId !== null && KitchenStore::activeForBranch($branchId) === null => self::NO_KITCHEN,

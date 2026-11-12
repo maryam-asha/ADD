@@ -27,7 +27,8 @@ class KitchenController extends Controller
 {
     /**
      * GET member/kitchen/menu?qr=&branch_id= — the branch is the QR's, else
-     * the member's first open bill's, else `branch_id` (required then).
+     * the member's first open bill's, else the request's (`X-Branch-Id` or
+     * `branch_id`, ResolveDefaultBranch), else the default branch.
      * Anyone may browse; `can_order` and `reason` say whether they may send.
      */
     public function menu(Request $request, MenuAccess $access, KitchenMenu $menu): JsonResponse
@@ -40,9 +41,6 @@ class KitchenController extends Controller
         $qr = $this->qr($validated['qr'] ?? null);
         $result = $access->for($request->user(), $qr, isset($validated['branch_id']) ? (int) $validated['branch_id'] : null);
 
-        if ($result['branch_id'] === null) {
-            throw ValidationException::withMessages(['branch_id' => __('validation.required', ['attribute' => __('validation.attributes.branch_id')])]);
-        }
 
         return response()->json(['data' => new KitchenMenuResource([
             'access' => $result,
