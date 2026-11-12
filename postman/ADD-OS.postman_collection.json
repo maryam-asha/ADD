@@ -14646,7 +14646,7 @@
                                     }
                                 ],
                                 "url": {
-                                    "raw": "{{base_url}}/api/v1/member/kitchen/menu?qr={{kitchen_qr_value}}",
+                                    "raw": "{{base_url}}/api/v1/member/kitchen/menu",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -14659,10 +14659,6 @@
                                     ],
                                     "query": [
                                         {
-                                            "key": "qr",
-                                            "value": "{{kitchen_qr_value}}"
-                                        },
-                                        {
                                             "key": "branch_id",
                                             "value": "{{branch_id}}",
                                             "disabled": true,
@@ -14670,7 +14666,7 @@
                                         }
                                     ]
                                 },
-                                "description": "The branch kitchen's menu and whether the member may order now. Anyone may browse; `can_order` and `reason` say whether they may send (`reason`: `no_open_session` when they have no open coworking session or checked-in booking, `no_kitchen` when the branch has no active kitchen store, else null).\n\nThe branch is the QR's, else the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the default branch - never a 422 for a missing branch (2026-11-12). `qr` is the scanned text (`add-place:v1:...`); one that names no desk or space is treated as no QR. `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`); `place` is what the QR names, else null.\n\n### Cases - see this request's saved examples\n- **Can Order** - 200.\n- **No Open Session** - 200, `can_order` false.",
+                                "description": "The branch kitchen's menu and whether the member may order now. Anyone may browse; `can_order` and `reason` say whether they may send (`reason`: `no_open_session` when they have no open coworking session or checked-in booking, `no_kitchen` when the branch has no active kitchen store, else null).\n\nThe branch is the member's first open bill's, else the request's branch (`X-Branch-Id` header or `branch_id`, ResolveDefaultBranch), else the default branch - never a 422 for a missing branch (2026-11-12). `items` are the active sale items with stock in the kitchen store, by name; `available_quantity` is whole units. `bills` are what an order could go on (`type` booking | walkin, as in `coworking-sessions/{type}/{id}`); `place` is what the QR names, else null.\n\n### Cases - see this request's saved examples\n- **Can Order** - 200.\n- **No Open Session** - 200, `can_order` false.\n\nNo `qr` here (2026-11-12): the scan (10. Scan) already answers the place, and the QR goes with the order (Send Order). The response has no `place`.",
                                 "auth": {
                                     "type": "bearer",
                                     "bearer": [
@@ -14699,7 +14695,7 @@
                                             }
                                         ],
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu?qr={{kitchen_qr_value}}&branch_id={{branch_id}}",
+                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -14711,10 +14707,6 @@
                                                 "menu"
                                             ],
                                             "query": [
-                                                {
-                                                    "key": "qr",
-                                                    "value": "{{kitchen_qr_value}}"
-                                                },
                                                 {
                                                     "key": "branch_id",
                                                     "value": "{{branch_id}}"
@@ -14742,7 +14734,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"place\": {\n            \"type\": \"seat_desk\",\n            \"id\": 3,\n            \"label\": \"Desk 03\"\n        },\n        \"bills\": [\n            {\n                \"type\": \"walkin\",\n                \"id\": 17,\n                \"label\": \"Co-working Hall\"\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ]\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": true,\n        \"reason\": null,\n        \"bills\": [\n            {\n                \"type\": \"walkin\",\n                \"id\": 17,\n                \"label\": \"Co-working Hall\"\n            }\n        ],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            },\n            {\n                \"sale_item_id\": 3,\n                \"name\": \"Chocolate bar\",\n                \"image_url\": null,\n                \"price_points\": 12,\n                \"available_quantity\": 20\n            }\n        ]\n    }\n}"
                                 },
                                 {
                                     "name": "No Open Session",
@@ -14761,7 +14753,7 @@
                                             }
                                         ],
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu?qr={{kitchen_qr_value}}&branch_id={{branch_id}}",
+                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -14773,10 +14765,6 @@
                                                 "menu"
                                             ],
                                             "query": [
-                                                {
-                                                    "key": "qr",
-                                                    "value": "{{kitchen_qr_value}}"
-                                                },
                                                 {
                                                     "key": "branch_id",
                                                     "value": "{{branch_id}}"
@@ -14804,7 +14792,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_open_session\",\n        \"place\": null,\n        \"bills\": [],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            }\n        ]\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_open_session\",\n        \"bills\": [],\n        \"items\": [\n            {\n                \"sale_item_id\": 1,\n                \"name\": \"Bottled water\",\n                \"image_url\": null,\n                \"price_points\": 10,\n                \"available_quantity\": 30\n            }\n        ]\n    }\n}"
                                 },
                                 {
                                     "name": "No Kitchen in the Branch",
@@ -14823,7 +14811,7 @@
                                             }
                                         ],
                                         "url": {
-                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu?qr={{kitchen_qr_value}}&branch_id={{branch_id}}",
+                                            "raw": "{{base_url}}/api/v1/member/kitchen/menu",
                                             "host": [
                                                 "{{base_url}}"
                                             ],
@@ -14835,10 +14823,6 @@
                                                 "menu"
                                             ],
                                             "query": [
-                                                {
-                                                    "key": "qr",
-                                                    "value": "{{kitchen_qr_value}}"
-                                                },
                                                 {
                                                     "key": "branch_id",
                                                     "value": "{{branch_id}}"
@@ -14866,7 +14850,7 @@
                                         }
                                     ],
                                     "cookie": [],
-                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_kitchen\",\n        \"place\": null,\n        \"bills\": [],\n        \"items\": []\n    }\n}"
+                                    "body": "{\n    \"data\": {\n        \"branch\": {\n            \"id\": 1,\n            \"name\": \"Aleppo Digital District\"\n        },\n        \"can_order\": false,\n        \"reason\": \"no_kitchen\",\n        \"bills\": [],\n        \"items\": []\n    }\n}"
                                 }
                             ]
                         },

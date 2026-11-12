@@ -5,18 +5,17 @@ namespace App\Http\Resources\Kitchen;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Foundation\Models\Branch;
-use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Retail\Models\SaleItem;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * The member's kitchen menu: the branch, whether they may order now (and
- * why not), the place a scanned QR names, the bills they could order onto,
- * and what the kitchen holds. Built from an array:
- * `{access: MenuAccess::for(), qr: ?QrPoint, items: KitchenMenu::for()}`.
+ * why not), the bills they could order onto, and what the kitchen holds.
+ * The place comes from the scan (POST member/scan), not from here. Built from
+ * an array: `{access: MenuAccess::for(), items: KitchenMenu::for()}`.
  *
- * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>}, qr: ?QrPoint, items: list<array{sale_item: SaleItem, available: string}>} $resource
+ * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>}, items: list<array{sale_item: SaleItem, available: string}>} $resource
  */
 class KitchenMenuResource extends JsonResource
 {
@@ -25,18 +24,13 @@ class KitchenMenuResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        ['access' => $access, 'qr' => $qr, 'items' => $items] = $this->resource;
+        ['access' => $access, 'items' => $items] = $this->resource;
         $branch = $access['branch_id'] === null ? null : Branch::query()->find($access['branch_id']);
 
         return [
             'branch' => $branch === null ? null : ['id' => $branch->id, 'name' => $branch->translate('name')],
             'can_order' => $access['can_order'],
             'reason' => $access['reason'],
-            'place' => $qr === null ? null : [
-                'type' => $qr->place_type->value,
-                'id' => $qr->place_id,
-                'label' => $qr->placeLabel(),
-            ],
             'bills' => array_map(fn (Booking|WalkinSession $bill) => [
                 'type' => $bill->coworkingType(),
                 'id' => $bill->id,

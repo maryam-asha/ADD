@@ -26,25 +26,22 @@ use Illuminate\Validation\ValidationException;
 class KitchenController extends Controller
 {
     /**
-     * GET member/kitchen/menu?qr=&branch_id= — the branch is the QR's, else
-     * the member's first open bill's, else the request's (`X-Branch-Id` or
-     * `branch_id`, ResolveDefaultBranch), else the default branch.
+     * GET member/kitchen/menu — the branch is the member's first open
+     * bill's, else the request's (`X-Branch-Id` or `branch_id`,
+     * ResolveDefaultBranch), else the default branch. No `qr` here: the scan
+     * already answered the place, and the QR goes with the order (2026-11-12).
      * Anyone may browse; `can_order` and `reason` say whether they may send.
      */
     public function menu(Request $request, MenuAccess $access, KitchenMenu $menu): JsonResponse
     {
         $validated = $request->validate([
-            'qr' => ['nullable', 'string', 'max:255'],
             'branch_id' => ['nullable', 'integer', 'exists:branches,id'],
         ]);
 
-        $qr = $this->qr($validated['qr'] ?? null);
-        $result = $access->for($request->user(), $qr, isset($validated['branch_id']) ? (int) $validated['branch_id'] : null);
-
+        $result = $access->for($request->user(), null, isset($validated['branch_id']) ? (int) $validated['branch_id'] : null);
 
         return response()->json(['data' => new KitchenMenuResource([
             'access' => $result,
-            'qr' => $qr,
             'items' => $menu->for($result['branch_id']),
         ])]);
     }
