@@ -3,6 +3,7 @@
 namespace App\Domain\Foundation\Models;
 
 use App\Domain\Foundation\Enums\SpaceType;
+use App\Domain\Kitchen\Models\QrPoint;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -18,8 +19,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * (DedicatedDeskService) so Foundation depends on nothing above it;
  * walk-ins and co_space bookings never pick a desk.
  *
- * `qr_point_id` has no relation yet — `qr_points` doesn't exist until
- * Phase 7, which wires up both the FK constraint and the relation.
+ * `qr_point_id` is the desk's kitchen ordering code (Kitchen's `qr_points`),
+ * set when staff make the point and cleared when it is deleted (FK, null on
+ * delete); it is never typed in by hand.
  */
 class SeatDesk extends Model
 {
@@ -60,6 +62,11 @@ class SeatDesk extends Model
             ->whereKey($spaceId)
             ->where('space_type', SpaceType::CoSpace->value)
             ->update(['capacity' => self::query()->where('space_id', $spaceId)->count()]);
+    }
+
+    public function qrPoint(): BelongsTo
+    {
+        return $this->belongsTo(QrPoint::class);
     }
 
     public function space(): BelongsTo

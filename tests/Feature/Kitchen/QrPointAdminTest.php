@@ -45,6 +45,25 @@ class QrPointAdminTest extends TestCase
         $this->assertSame($desk->id, QrPoint::fromScan($scan)->place_id);
     }
 
+    public function test_a_desks_qr_point_is_its_ordering_code(): void
+    {
+        $desk = SeatDesk::factory()->create();
+
+        $listed = fn () => collect($this->getJson('/api/v1/admin/seats-desks')->assertOk()->json('data'))->firstWhere('id', $desk->id);
+        $this->assertNull($listed()['qr_scan_value']);
+
+        $point = $this->postJson('/api/v1/admin/qr-points', ['place_type' => 'seat_desk', 'place_id' => $desk->id])
+            ->assertCreated();
+
+        $this->assertSame($point->json('data.id'), $desk->fresh()->qr_point_id);
+        $this->assertSame($point->json('data.scan_value'), $listed()['qr_scan_value']);
+
+        $this->deleteJson('/api/v1/admin/qr-points/'.$point->json('data.id'))->assertNoContent();
+
+        $this->assertNull($desk->fresh()->qr_point_id);
+        $this->assertNull($listed()['qr_scan_value']);
+    }
+
     public function test_store_is_idempotent_per_place(): void
     {
         $desk = SeatDesk::factory()->create();

@@ -18,6 +18,8 @@ class SeatDeskResource extends JsonResource
             'code' => $this->code,
             'label' => $this->label,
             'qr_point_id' => $this->qr_point_id,
+            // What the desk's printed QR encodes, or null before one is made.
+            'qr_scan_value' => $this->qrPoint?->scanValue(),
             // The Dedicated Desk subscription holding it now; only on reads
             // that ask DedicatedDeskService for it.
             'membership_id' => $this->when(

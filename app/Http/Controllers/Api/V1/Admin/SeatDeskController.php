@@ -58,6 +58,7 @@ class SeatDeskController extends AdminResourceController
             ->when($request->filled('free_for_membership'), fn (Builder $q) => $q->whereKeyNot($this->takenForMembership($request->integer('free_for_membership'))))
             ->orderBy('seats_desks.id');
 
+        $query->with('qrPoint');
         $this->desks->withHolder($query);
     }
 

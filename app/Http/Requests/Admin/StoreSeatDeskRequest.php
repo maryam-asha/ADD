@@ -29,7 +29,6 @@ class StoreSeatDeskRequest extends FormRequest
             'space_id' => ['required', 'integer', 'exists:spaces,id'],
             'code' => ['required', 'string', 'max:20'],
             'label' => ['required', 'string', 'max:50'],
-            'qr_point_id' => ['nullable', 'integer'],
         ];
     }
 

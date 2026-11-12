@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -58,9 +59,26 @@ class QrPointController extends AdminResourceController
             ['branch_id' => $this->branchIdOf($type, $placeId), 'qr_value' => Str::random(40)],
         );
 
+        if ($type === QrPointPlace::SeatDesk) {
+            SeatDesk::query()->whereKey($placeId)->update(['qr_point_id' => $point->id]);
+        }
+
         return (new QrPointResource($point))
             ->response()
             ->setStatusCode($point->wasRecentlyCreated ? Response::HTTP_CREATED : Response::HTTP_OK);
+    }
+
+    /** The desk loses its code with the point (the FK does the same on MySQL; SQLite cannot add one). */
+    public function destroy(int $id): Response
+    {
+        $point = QrPoint::query()->findOrFail($id);
+
+        DB::transaction(function () use ($point) {
+            SeatDesk::query()->where('qr_point_id', $point->id)->update(['qr_point_id' => null]);
+            $point->delete();
+        });
+
+        return response()->noContent();
     }
 
     private function branchIdOf(QrPointPlace $type, int $placeId): int
