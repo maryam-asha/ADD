@@ -146,7 +146,8 @@ class KitchenRealtimeTest extends TestCase
             null,
             ['type' => 'pickup'],
             $this->billRef($session),
-        );
+            ['method' => 'bill'],
+        )->order;
 
         Event::assertDispatchedTimes(KitchenOrderChanged::class, 1);
         Event::assertDispatched(KitchenOrderChanged::class, fn (KitchenOrderChanged $e) => $this->onChannel($e, 'private-kitchen')
@@ -168,6 +169,7 @@ class KitchenRealtimeTest extends TestCase
                     null,
                     ['type' => 'pickup'],
                     $this->billRef($session),
+                    ['method' => 'bill'],
                 );
 
                 throw new \RuntimeException('rolled back');

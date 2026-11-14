@@ -158,6 +158,32 @@ class KitchenOrder extends Model
         return $this->billable_type === (new WalkinSession)->getMorphClass() ? 'walkin' : 'booking';
     }
 
+    /**
+     * Where the order is first seen once nothing holds it: the kitchen board
+     * on the kitchen route, reception's queue on the reception route.
+     */
+    public function arrivalStatus(): KitchenOrderStatus
+    {
+        return $this->route === OrderRoute::Reception ? KitchenOrderStatus::AwaitingReception : KitchenOrderStatus::Pending;
+    }
+
+    /**
+     * Out of its card hold (2026-11-14 spec, decision 3) — paid, or another
+     * method chosen: on to its route's first stage, the deadline gone. On a
+     * row the caller has locked and found still `awaiting_payment`; the
+     * caller tells whoever now sees it (KitchenOrderNotifier::arrived()).
+     */
+    public function releaseFromHold(): void
+    {
+        $status = $this->arrivalStatus();
+
+        $this->forceFill([
+            'status' => $status,
+            'payment_due_at' => null,
+            'reached_kitchen_at' => $status === KitchenOrderStatus::Pending ? now() : null,
+        ])->save();
+    }
+
     /** Orders that sit on a bill. */
     public function scopeOnABill(Builder $query): Builder
     {

@@ -565,6 +565,11 @@ return [
             'title' => 'Your order was cancelled',
             'body' => 'Order :order was cancelled because your session or booking ended before the kitchen accepted it.',
         ],
+        // Staff: whoever reviews kitchen orders (kitchen-orders.review).
+        'awaiting_reception' => [
+            'title' => 'A kitchen order to confirm',
+            'body' => 'Order :order from :member waits for reception before the kitchen sees it.',
+        ],
     ],
 
 ];

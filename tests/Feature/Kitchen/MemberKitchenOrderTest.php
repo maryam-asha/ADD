@@ -101,6 +101,8 @@ class MemberKitchenOrderTest extends TestCase
     {
         return $this->postJson('/api/v1/member/kitchen-orders', [
             'lines' => [['sale_item_id' => ($item ?? $this->cola)->id, 'quantity' => $quantity]],
+            // On the bill, as every order was before paying at send.
+            'payment' => ['method' => 'bill'],
             ...$extra,
         ]);
     }
@@ -309,11 +311,16 @@ class MemberKitchenOrderTest extends TestCase
         $this->assertSame(0, KitchenOrder::query()->count());
     }
 
-    public function test_without_a_session_nothing_is_sent(): void
+    public function test_without_a_session_the_order_goes_through_reception(): void
     {
-        $this->send(1, ['delivery' => ['type' => 'pickup']])
-            ->assertForbidden()
-            ->assertJsonPath('message', __('api.kitchen.no_open_session'));
+        $this->send(1, ['delivery' => ['type' => 'pickup'], 'payment' => ['method' => 'cash']])
+            ->assertCreated()
+            ->assertJsonPath('data.status', 'awaiting_reception')
+            ->assertJsonPath('data.bill.id', null);
+
+        $order = KitchenOrder::query()->sole();
+        $this->assertNull($order->billable_type);
+        $this->assertSame($this->branch->id, $order->branch_id);
     }
 
     public function test_member_cancels_a_pending_order(): void

@@ -11,20 +11,25 @@ use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
 use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\Contracts\PaymentFulfiller;
+use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Models\KitchenOrder;
+use App\Domain\Kitchen\Services\KitchenOrderNotifier;
 use App\Domain\Membership\Enums\WalletTransactionCategory;
 use App\Services\Realtime\RealtimeBroadcaster;
 
 /**
- * Paying for an order the kitchen accepted. It is owed beside the session
- * or booking it was sent from, but paid on its own (kitchen orders spec,
- * decision 11): from general points only — points granted for a space never
- * pay for the kitchen — and recorded as this purpose's sale, never as the
- * bill's revenue. Its price was fixed when it was sent.
+ * Paying for a kitchen order: one the kitchen accepted, owed beside the
+ * session or booking it was sent from, or one paid when it is sent
+ * (2026-11-14 spec, decision 3). Either way it is paid on its own (kitchen
+ * orders spec, decision 11): from general points only — points granted for
+ * a space never pay for the kitchen — and recorded as this purpose's sale,
+ * never as the bill's revenue. Its price was fixed when it was sent.
  *
  * Unlike a reception sale, delivering it issues nothing: accepting the
- * order already drew its stock (KitchenOrderService::accept), so paying it
- * only marks it paid.
+ * order draws its stock (KitchenOrderService::accept), so paying it only
+ * marks it paid — and, for an order held for its card, lets it go on to
+ * its route (KitchenOrder::releaseFromHold()), announced to whoever now
+ * sees it.
  *
  * Once its session or booking has closed, the bill's home card stays
  * awaiting_payment while an order on it is unpaid (CurrentBookingLocator,
@@ -37,7 +42,17 @@ use App\Services\Realtime\RealtimeBroadcaster;
  */
 class KitchenOrderFulfiller implements PaymentFulfiller
 {
-    public function __construct(private readonly RealtimeBroadcaster $realtime) {}
+    /** Not yet accepted, and still payable: paying at send. */
+    private const PAYABLE_BEFORE_ACCEPTED = [
+        KitchenOrderStatus::AwaitingPayment,
+        KitchenOrderStatus::AwaitingReception,
+        KitchenOrderStatus::Pending,
+    ];
+
+    public function __construct(
+        private readonly RealtimeBroadcaster $realtime,
+        private readonly KitchenOrderNotifier $notifier,
+    ) {}
 
     public function purpose(): PaymentPurpose
     {
@@ -68,8 +83,11 @@ class KitchenOrderFulfiller implements PaymentFulfiller
     {
         $order = $this->order($payment);
 
-        // Pending, rejected or cancelled: it never reached the bill.
-        if (! $order->status->isOwed()) {
+        // Accepted and owed on its bill; or paid when it is sent, before the
+        // kitchen has it — held for its card, waiting for reception (cash
+        // taken there), or pending (2026-11-14 spec, decision 3). Rejected
+        // or cancelled, it is never made.
+        if (! $order->status->isOwed() && ! in_array($order->status, self::PAYABLE_BEFORE_ACCEPTED, true)) {
             throw new ReceptionActionException('api.kitchen_order.not_payable');
         }
 
@@ -86,6 +104,12 @@ class KitchenOrderFulfiller implements PaymentFulfiller
     {
         $order = $this->order($payment);
         $order->forceFill(['paid_at' => now()])->save();
+
+        // Its card went through: out of the hold, on to its route.
+        if ($order->status === KitchenOrderStatus::AwaitingPayment) {
+            $order->releaseFromHold();
+            $this->notifier->arrived($order);
+        }
 
         $bill = $order->billable;
 

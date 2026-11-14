@@ -236,12 +236,17 @@ class KitchenOrderPaymentTest extends TestCase
         $this->assertArrayHasKey('amount', $items[0]);
     }
 
-    public function test_pending_or_rejected_orders_are_not_payable(): void
+    /**
+     * Rejected or cancelled, it is never made. A pending order may now be
+     * paid — at send, before the kitchen accepts it (2026-11-14 spec,
+     * decision 3) — so it is not among them.
+     */
+    public function test_rejected_or_cancelled_orders_are_not_payable(): void
     {
         $this->credit(general: 100);
         $bill = $this->walkIn(closed: true);
 
-        foreach ([KitchenOrderStatus::Pending, KitchenOrderStatus::Rejected, KitchenOrderStatus::Cancelled] as $status) {
+        foreach ([KitchenOrderStatus::Rejected, KitchenOrderStatus::Cancelled] as $status) {
             $order = $this->order($bill, 40, $status);
 
             try {
@@ -255,7 +260,7 @@ class KitchenOrderPaymentTest extends TestCase
                 'purpose' => 'kitchen_order',
                 'payable_id' => $order->id,
                 'collected_via' => 'cash',
-            ])->assertStatus(422)->assertJsonPath('message', 'Only an order the kitchen has accepted can be paid.');
+            ])->assertStatus(422)->assertJsonPath('message', 'This order was rejected or cancelled, so it cannot be paid.');
 
             $this->assertNull($order->refresh()->paid_at);
         }

@@ -65,7 +65,7 @@ class BillLocatorTest extends TestCase
         ]);
     }
 
-    private function resolve(?QrPoint $qr = null, ?array $chosen = null): Booking|WalkinSession
+    private function resolve(?QrPoint $qr = null, ?array $chosen = null): Booking|WalkinSession|null
     {
         return app(BillLocator::class)->resolve($this->member, $qr, $chosen);
     }
@@ -129,19 +129,13 @@ class BillLocatorTest extends TestCase
         $this->resolve(null, ['type' => 'walkin', 'id' => $second->id]);
     }
 
-    public function test_no_session_or_booking_is_refused(): void
+    public function test_no_session_or_booking_is_no_bill(): void
     {
         // A booking not yet checked in is not a bill.
         Booking::factory()->create(['user_id' => $this->member->id, 'start_at' => now()->subMinutes(5), 'end_at' => now()->addHour()]);
 
-        try {
-            $this->resolve();
-            $this->fail('Found a bill for a member with no open session or booking');
-        } catch (KitchenOrderException $e) {
-            $this->assertSame('api.kitchen.no_open_session', $e->messageKey);
-            $this->assertSame(403, $e->status);
-        }
-
+        // No bill is no refusal: the order is paid when sent (2026-11-14 spec).
+        $this->assertNull($this->resolve());
         $this->assertSame([], app(BillLocator::class)->eligibleBills($this->member));
     }
 }

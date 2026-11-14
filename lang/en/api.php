@@ -850,7 +850,6 @@ return [
         'store_not_in_branch' => 'The kitchen store must be a warehouse of this branch.',
         'store_not_sellable' => 'The kitchen store must be a warehouse that allows sales.',
         'store_is_primary' => 'The main store cannot be the kitchen store.',
-        'no_open_session' => 'Check in first: orders go onto an open coworking session or a checked-in booking.',
         'no_kitchen' => 'There is no kitchen taking orders at this branch.',
         'choose_bill' => 'Choose which of your bookings this order goes on.',
         'out_of_stock' => ':item is not available in that quantity right now.',
@@ -862,12 +861,14 @@ return [
         'bill_closed' => 'The session or booking this order is on has closed.',
         'order_not_found' => 'Order not found.',
         'pickup_label' => 'Kitchen counter',
+        'payment_method_not_offered' => 'That way of paying is not offered for this order.',
+        'order_not_awaiting_payment' => 'This order is no longer waiting for its payment.',
     ],
 
     // Paying for a kitchen order, its own payable (App\Domain\Kitchen).
     'kitchen_order' => [
         'description' => 'Kitchen order #:id',
-        'not_payable' => 'Only an order the kitchen has accepted can be paid.',
+        'not_payable' => 'This order was rejected or cancelled, so it cannot be paid.',
         'pay_from_wallet_or_desk' => 'The orders on this bill are paid from your points or at reception.',
     ],
 

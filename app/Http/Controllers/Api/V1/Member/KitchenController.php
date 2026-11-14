@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers\Api\V1\Member;
 
+use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Payments\Methods\PaymeraGateway;
+use App\Domain\Finance\Payments\PayableCheckout;
+use App\Domain\Finance\Payments\PaymentStart;
+use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
 use App\Domain\Kitchen\Exceptions\KitchenOrderException;
 use App\Domain\Kitchen\Models\KitchenOrder;
@@ -9,22 +14,26 @@ use App\Domain\Kitchen\Models\QrPoint;
 use App\Domain\Kitchen\Services\KitchenMenu;
 use App\Domain\Kitchen\Services\KitchenOrderService;
 use App\Domain\Kitchen\Services\MenuAccess;
+use App\Http\Controllers\Concerns\AnswersPayments;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Member\StoreKitchenOrderRequest;
 use App\Http\Resources\Kitchen\KitchenMenuResource;
 use App\Http\Resources\Kitchen\KitchenOrderResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Validation\ValidationException;
+use Throwable;
 
 /**
- * The member's side of the kitchen (docs/superpowers/specs/2026-11-10-kitchen-orders-design.md):
- * the menu and whether they may order now, sending an order onto their open
- * session or checked-in booking, their orders, and taking back one the
- * kitchen has not accepted.
+ * The member's side of the kitchen (docs/superpowers/specs/2026-11-10-kitchen-orders-design.md,
+ * amended by 2026-11-14-kitchen-orders-without-a-bill-design.md): the menu
+ * and whether they may order now, sending an order — onto their open
+ * session or checked-in booking, or paid when sent — their orders, and
+ * taking back one the kitchen has not accepted.
  */
 class KitchenController extends Controller
 {
+    use AnswersPayments;
+
     /**
      * GET member/kitchen/menu — the branch is the member's first open
      * bill's, else the request's (`X-Branch-Id` or `branch_id`,
@@ -46,25 +55,57 @@ class KitchenController extends Controller
         ])]);
     }
 
-    /** POST member/kitchen-orders — 201 with the order, pending the kitchen. */
-    public function store(StoreKitchenOrderRequest $request, KitchenOrderService $orders): JsonResponse
+    /**
+     * POST member/kitchen-orders — 201 with the order in `data`, and beside
+     * it how paying went: `payment`, `redirect_url`, `next` (`done` |
+     * `redirect` | `pay_at_reception`), and `payment_error` when the card
+     * page could not be opened (the order stands, held for its card, and
+     * may be sent again with another method).
+     *
+     * With `order_id`, an order of the member's held for its card is sent
+     * again to switch how it is paid: nothing is created, 200.
+     *
+     * A wallet that is short, or one the member may not spend from, refuses
+     * the whole send — nothing is written — with the answer every wallet
+     * payment gives.
+     */
+    public function store(StoreKitchenOrderRequest $request, KitchenOrderService $orders, PayableCheckout $checkout): JsonResponse
     {
+        $member = $request->user();
+        $payment = $request->validated('payment');
+        $resent = $request->validated('order_id') !== null;
+
         try {
-            $order = $orders->place(
-                $request->user(),
-                array_map(fn (array $line) => [
-                    'sale_item_id' => (int) $line['sale_item_id'],
-                    'quantity' => (int) $line['quantity'],
-                ], $request->validated('lines')),
-                $this->qr($request->validated('qr')),
-                $request->validated('delivery'),
-                $request->validated('bill'),
-            );
+            $placed = $resent
+                ? $orders->repay($member, (int) $request->validated('order_id'), $payment)
+                : $orders->place(
+                    $member,
+                    array_map(fn (array $line) => [
+                        'sale_item_id' => (int) $line['sale_item_id'],
+                        'quantity' => (int) $line['quantity'],
+                    ], $request->validated('lines')),
+                    $this->qr($request->validated('qr')),
+                    $request->validated('delivery'),
+                    $request->validated('bill'),
+                    $payment,
+                    // Only the header: the default branch that ResolveDefaultBranch
+                    // puts on every POST would hide the office's branch.
+                    $request->hasHeader('X-Branch-Id') ? (int) $request->header('X-Branch-Id') : null,
+                );
         } catch (KitchenOrderException $e) {
             return response()->json(['message' => __($e->messageKey, $e->params)], $e->status);
+        } catch (Throwable $e) {
+            return $this->paymentFailureResponse($e, $member->id) ?? throw $e;
         }
 
-        return (new KitchenOrderResource($order))->response()->setStatusCode(201);
+        $paid = $placed->checkout !== null
+            ? $this->checkoutFields($placed->checkout)
+            : $this->openCard($checkout, $placed->order, $member);
+
+        return response()->json(
+            ['data' => (new KitchenOrderResource($placed->order->refresh()))->resolve($request)] + $paid,
+            $resent ? 200 : 201,
+        );
     }
 
     /** GET member/kitchen-orders — the open orders, then the last 20 closed, newest first in each. */
@@ -106,6 +147,21 @@ class KitchenController extends Controller
         }
 
         return new KitchenOrderResource($order);
+    }
+
+    /**
+     * The card payment of an order held for it, opened once the order is
+     * committed (a gateway never runs inside a transaction). The order
+     * stands whatever the gateway says: one that could not be opened is
+     * answered as `payment_error` beside it, the hold left to its deadline.
+     *
+     * @return array{payment: mixed, redirect_url: string|null, next: string, payment_error?: string}
+     */
+    private function openCard(PayableCheckout $checkout, KitchenOrder $order, User $member): array
+    {
+        $card = $this->payBesideNewRecord($checkout, PaymentPurpose::KitchenOrder, $order, $member, PaymeraGateway::KEY);
+
+        return $card + ['next' => $card['redirect_url'] !== null ? PaymentStart::REDIRECT : PaymentStart::DONE];
     }
 
     /**

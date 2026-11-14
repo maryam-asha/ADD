@@ -19,7 +19,9 @@ use App\Domain\Kitchen\Models\QrPoint;
  * 3. otherwise their open coworking session;
  * 4. otherwise their one checked-in room, office or hall booking.
  *
- * Several bookings and no valid choice is asked of them (422).
+ * Several bookings and no valid choice is asked of them (422). No session
+ * or booking at all is no bill (null): the order is paid when it is sent
+ * (2026-11-14 spec, decision 2).
  *
  * Only the member's own sessions and bookings: who else on a booking may
  * order onto it is deferred (spec, "Who on a booking may order").
@@ -47,15 +49,15 @@ class BillLocator
     /**
      * @param  array{type: string, id: int|string}|null  $chosen  the bill the member picked, by the API's coworking names ('booking' | 'walkin')
      *
-     * @throws KitchenOrderException no bill at all (403), or several and no valid choice (422)
+     * @throws KitchenOrderException several and no valid choice (422)
      */
-    public function resolve(User $member, ?QrPoint $qr, ?array $chosen): Booking|WalkinSession
+    public function resolve(User $member, ?QrPoint $qr, ?array $chosen): Booking|WalkinSession|null
     {
         $open = $this->openSessions->for($member);
         $bookings = $this->checkedInBookings($member);
 
         if ($open === null && $bookings === []) {
-            throw new KitchenOrderException('api.kitchen.no_open_session', 403);
+            return null;
         }
 
         if ($qr?->place_type === QrPointPlace::Space) {
