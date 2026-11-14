@@ -33,6 +33,9 @@ abstract class TestCase extends Orchestra
     protected function defineEnvironment($app): void
     {
         $app['config']->set('database.default', 'testing');
+        // SQLite ignores foreign keys unless asked, and the cascades in the
+        // schema are part of what the tests check.
+        $app['config']->set('database.connections.testing.foreign_key_constraints', true);
     }
 
     /**
