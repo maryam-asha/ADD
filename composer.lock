@@ -4,11 +4,11 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0741f3b88ea9635b6ffcb5d121a0d009",
+    "content-hash": "8513a71b77e54c4408ba1fe6cd20f338",
     "packages": [
         {
             "name": "add/hr",
-            "version": "dev-feat/hr-person-linking",
+            "version": "dev-feat/pm-module",
             "dist": {
                 "type": "path",
                 "url": "packages/add/hr",
@@ -58,7 +58,7 @@
         },
         {
             "name": "add/inventory",
-            "version": "dev-feat/hr-person-linking",
+            "version": "dev-feat/pm-module",
             "dist": {
                 "type": "path",
                 "url": "packages/add/inventory",
@@ -101,6 +101,53 @@
                 "proprietary"
             ],
             "description": "Inventory for Laravel: a catalog of items in nested categories with their own fields, fixed assets tracked one by one (location, custody, maintenance, depreciation, disposal) and consumable stock kept per location (receipts, issues, transfers, counts at weighted average cost), exposed as a JSON API the host mounts.",
+            "transport-options": {
+                "relative": true
+            }
+        },
+        {
+            "name": "add/pm",
+            "version": "dev-feat/pm-module",
+            "dist": {
+                "type": "path",
+                "url": "packages/add/pm",
+                "reference": "22636cdcfe6674f83a78f7b2e63f78286d483db4"
+            },
+            "require": {
+                "illuminate/console": "^12.0",
+                "illuminate/contracts": "^12.0",
+                "illuminate/database": "^12.0",
+                "illuminate/http": "^12.0",
+                "illuminate/routing": "^12.0",
+                "illuminate/support": "^12.0",
+                "illuminate/validation": "^12.0",
+                "php": "^8.3"
+            },
+            "require-dev": {
+                "orchestra/testbench": "^10.0"
+            },
+            "type": "library",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Add\\Pm\\PmServiceProvider"
+                    ]
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Add\\Pm\\": "src/"
+                }
+            },
+            "autoload-dev": {
+                "psr-4": {
+                    "Add\\Pm\\Tests\\": "tests/"
+                }
+            },
+            "license": [
+                "proprietary"
+            ],
+            "description": "Project management for Laravel: projects with their members, tasks and the work around them, exposed as a JSON API the host mounts.",
             "transport-options": {
                 "relative": true
             }
@@ -12379,7 +12426,8 @@
     "minimum-stability": "stable",
     "stability-flags": {
         "add/hr": 20,
-        "add/inventory": 20
+        "add/inventory": 20,
+        "add/pm": 20
     },
     "prefer-stable": true,
     "prefer-lowest": false,
