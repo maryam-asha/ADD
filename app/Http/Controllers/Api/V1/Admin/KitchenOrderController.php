@@ -46,7 +46,7 @@ class KitchenOrderController extends Controller
 
         $statuses = isset($validated['status'])
             ? array_map('trim', explode(',', $validated['status']))
-            : KitchenOrderStatus::openValues();
+            : KitchenOrderStatus::kitchenBoardValues();
 
         $orders = KitchenOrder::query()
             ->with(self::RELATIONS)

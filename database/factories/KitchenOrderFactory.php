@@ -39,6 +39,13 @@ class KitchenOrderFactory extends Factory
             'source' => OrderSource::App,
             'status' => KitchenOrderStatus::Pending,
             'total_points' => 0,
+            'reached_kitchen_at' => now(),
         ];
+    }
+
+    /** An order that stands on no bill (paid at send, or waiting for reception). */
+    public function withoutBill(): static
+    {
+        return $this->state(fn () => ['billable_type' => null, 'billable_id' => null]);
     }
 }

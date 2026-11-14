@@ -10,7 +10,10 @@ use App\Domain\Foundation\Models\Space;
 use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Enums\CancelledBy;
 use App\Domain\Kitchen\Enums\DeliveryType;
+use App\Domain\Kitchen\Enums\CashReturn;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderPaymentChoice;
+use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Enums\OrderSource;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -22,7 +25,8 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 /**
  * A member's order to the kitchen, billed to the coworking session or
  * checked-in booking it was sent from (spec "The order"). Its lines carry
- * the prices of the moment it was sent.
+ * the prices of the moment it was sent. An order may instead stand with no
+ * bill, paid at send or waiting for reception, so `billable` can be null.
  */
 class KitchenOrder extends Model
 {
@@ -55,6 +59,15 @@ class KitchenOrder extends Model
         'rejected_at',
         'cancelled_at',
         'paid_at',
+        'route',
+        'payment_choice',
+        'payment_due_at',
+        'reached_kitchen_at',
+        'reception_decided_by',
+        'reception_decided_at',
+        'cash_return',
+        'cash_return_resolved_by',
+        'cash_return_resolved_at',
     ];
 
     protected function casts(): array
@@ -77,6 +90,15 @@ class KitchenOrder extends Model
             'rejected_at' => 'datetime',
             'cancelled_at' => 'datetime',
             'paid_at' => 'datetime',
+            'route' => OrderRoute::class,
+            'payment_choice' => OrderPaymentChoice::class,
+            'payment_due_at' => 'datetime',
+            'reached_kitchen_at' => 'datetime',
+            'reception_decided_by' => 'integer',
+            'reception_decided_at' => 'datetime',
+            'cash_return' => CashReturn::class,
+            'cash_return_resolved_by' => 'integer',
+            'cash_return_resolved_at' => 'datetime',
         ];
     }
 
@@ -117,16 +139,32 @@ class KitchenOrder extends Model
         return $this->belongsTo(Space::class);
     }
 
+    /** Whether the order is on a coworking bill (an order paid at send has none). */
+    public function hasBill(): bool
+    {
+        return $this->billable_type !== null;
+    }
+
     /**
      * The bill's type by the API's coworking names ('booking' | 'walkin'),
-     * as `coworking-sessions/{type}/{id}` takes them.
+     * as `coworking-sessions/{type}/{id}` takes them; null with no bill.
      */
-    public function billType(): string
+    public function billType(): ?string
     {
+        if (! $this->hasBill()) {
+            return null;
+        }
+
         return $this->billable_type === (new WalkinSession)->getMorphClass() ? 'walkin' : 'booking';
     }
 
-    /** Pending, preparing or ready: still on its way to the member. */
+    /** Orders that sit on a bill. */
+    public function scopeOnABill(Builder $query): Builder
+    {
+        return $query->whereNotNull('billable_type');
+    }
+
+    /** Waiting, pending, preparing or ready: still on its way to the member. */
     public function scopeOpen(Builder $query): Builder
     {
         return $query->whereIn('status', KitchenOrderStatus::openValues());

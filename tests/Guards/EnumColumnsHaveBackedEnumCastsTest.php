@@ -63,8 +63,11 @@ use App\Domain\Invoicing\Enums\InvoiceStatus;
 use App\Domain\Invoicing\Models\Invoice;
 use App\Domain\Invoicing\Models\InvoicePayment;
 use App\Domain\Kitchen\Enums\CancelledBy;
+use App\Domain\Kitchen\Enums\CashReturn;
 use App\Domain\Kitchen\Enums\DeliveryType;
 use App\Domain\Kitchen\Enums\KitchenOrderStatus;
+use App\Domain\Kitchen\Enums\OrderPaymentChoice;
+use App\Domain\Kitchen\Enums\OrderRoute;
 use App\Domain\Kitchen\Enums\OrderSource;
 use App\Domain\Kitchen\Enums\QrPointPlace;
 use App\Domain\Kitchen\Models\KitchenOrder;
@@ -169,6 +172,9 @@ class EnumColumnsHaveBackedEnumCastsTest extends TestCase
             'source' => OrderSource::class,
             'status' => KitchenOrderStatus::class,
             'cancelled_by' => CancelledBy::class,
+            'route' => OrderRoute::class,
+            'payment_choice' => OrderPaymentChoice::class,
+            'cash_return' => CashReturn::class,
         ],
         Space::class => [
             'space_type' => SpaceType::class,
