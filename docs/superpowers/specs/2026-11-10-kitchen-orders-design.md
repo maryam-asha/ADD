@@ -252,3 +252,21 @@ restocked above the minimum). Restocking is the existing transfer.
 Table and column names, endpoint paths, resource shapes, the kitchen-store setting's
 storage, notification wording, the kitchen screen's layout within the design system,
 and test layout — within the decisions above.
+
+## Changed 2026-11-14 — orders without a bill, and paying when sending
+
+Amended by `2026-11-14-kitchen-orders-without-a-bill-design.md` (draft). Kept
+above as it was decided; what changes:
+
+- **Decision 8** (only someone with a bill may order): anyone signed in may now
+  order. Office-lease staff go straight to the kitchen, and anyone else without
+  a bill goes through a reception presence check first. *Given up:* the
+  guarantee that every order sits on a bill reception already knows about.
+- **Decision 9** (not paid when sent): the member now chooses. "On my bill" is
+  today's rule and is offered only where a bill exists. Wallet or card is paid
+  at send, and cash is taken by reception on the reception route.
+- **Anti-goal "A refund flow"**: reversed. A paid order that is not made is
+  refunded as points to the wallet that paid. *Given up:* charging only for
+  orders certain to be made.
+- **Non-goal "Private-office employees" / open question 1**: settled. They pay
+  at send, from their own wallet or a company wallet they may spend from.
