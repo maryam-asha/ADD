@@ -14,8 +14,9 @@ use Illuminate\Http\Resources\Json\JsonResource;
  * A task as the board and the drawer show it. Built through `forMany` so a
  * whole list costs a fixed number of queries: related rows are loaded once,
  * subtask totals come from one grouped query, and every name is fetched from
- * the people directory in one go. `detail` is the single-task form, whose
- * `subtasks` is the list itself (the totals move to `subtask_counts`).
+ * the people directory in one go. `detail` is the single-task form, which adds
+ * `subtasks`, the list itself; the `{total, done}` counts are always
+ * `subtask_counts`.
  */
 class TaskResource extends JsonResource
 {
@@ -97,12 +98,11 @@ class TaskResource extends JsonResource
             'assignees' => $task->assignees->sortBy('user_id')
                 ->map(fn ($a) => $people[(int) $a->user_id] ?? null)->filter()->values()->all(),
             'tags' => $task->tags->sortBy('name')->map(fn ($t) => (new TagResource($t))->toArray($request))->values()->all(),
-            'subtasks' => $counts,
+            'subtask_counts' => $counts,
             'can' => ($this->access ?? app(TaskAccess::class))->can($task, $userId),
         ];
 
         if ($this->children !== null) {
-            $body['subtask_counts'] = $counts;
             $body['subtasks'] = array_map(fn (self $child) => $child->toArray($request), $this->children);
         }
 

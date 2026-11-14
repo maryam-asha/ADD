@@ -77,6 +77,9 @@ class MyTasksTest extends TestCase
             [$assigned->id, $subtask->id, $created->id, $neither->id],
             $this->ids('scope=all'),
         );
+        $row = collect($this->getJson('/api/pm/tasks')->json('data'))->firstWhere('id', $assigned->id);
+        $this->assertSame(['total' => 1, 'done' => 0], $row['subtask_counts']);
+        $this->assertArrayNotHasKey('subtasks', $row);
         $this->getJson('/api/pm/tasks?scope=bogus')->assertUnprocessable();
     }
 

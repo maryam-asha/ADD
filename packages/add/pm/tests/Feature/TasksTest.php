@@ -89,7 +89,7 @@ class TasksTest extends TestCase
             ->assertJsonPath('data.project.id', $project->id)
             ->assertJsonPath('data.project.tone', $project->tone->value)
             ->assertJsonPath('data.tags.0.name', 'Design')
-            ->assertJsonPath('data.subtasks', ['total' => 0, 'done' => 0])
+            ->assertJsonPath('data.subtask_counts', ['total' => 0, 'done' => 0])
             ->assertJsonPath('data.can', ['edit' => true, 'move' => true, 'delete' => true, 'assign' => true]);
         $this->assertEqualsCanonicalizing(['Layla', 'Omar'], array_column($response->json('data.assignees'), 'name'));
     }
@@ -308,7 +308,7 @@ class TasksTest extends TestCase
 
         $list = $this->getJson("/api/pm/projects/{$project->id}/tasks")->assertOk();
         $this->assertSame([$parent->id], array_column($list->json('data'), 'id'));
-        $list->assertJsonPath('data.0.subtasks', ['total' => 2, 'done' => 1]);
+        $list->assertJsonPath('data.0.subtask_counts', ['total' => 2, 'done' => 1]);
 
         $detail = $this->getJson("/api/pm/tasks/{$parent->id}")->assertOk();
         $this->assertCount(2, $detail->json('data.subtasks'));
