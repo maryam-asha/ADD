@@ -75,15 +75,15 @@ class ScanOpensMenuTest extends TestCase
             ->assertJsonPath('data.reason', 'no_kitchen');
     }
 
-    public function test_a_kitchen_and_no_session_says_no_open_session(): void
+    public function test_a_kitchen_and_no_session_may_still_order(): void
     {
         $kitchen = Warehouse::factory()->create(['place_type' => 'branch', 'place_id' => $this->branch->id]);
         KitchenStore::create(['branch_id' => $this->branch->id, 'warehouse_id' => $kitchen->id]);
 
         $this->postJson('/api/v1/member/scan', ['qr_value' => $this->deskQr()->scanValue()])
             ->assertOk()
-            ->assertJsonPath('data.can_order', false)
-            ->assertJsonPath('data.reason', 'no_open_session');
+            ->assertJsonPath('data.can_order', true)
+            ->assertJsonPath('data.reason', null);
     }
 
     public function test_unknown_place_code_is_422(): void

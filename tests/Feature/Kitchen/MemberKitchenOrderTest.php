@@ -105,14 +105,15 @@ class MemberKitchenOrderTest extends TestCase
         ]);
     }
 
-    public function test_menu_says_why_ordering_is_closed(): void
+    public function test_menu_with_no_bill_still_opens_ordering_through_reception(): void
     {
         $response = $this->getJson('/api/v1/member/kitchen/menu?branch_id='.$this->branch->id);
 
         $response->assertOk()
             ->assertJsonPath('data.branch.id', $this->branch->id)
-            ->assertJsonPath('data.can_order', false)
-            ->assertJsonPath('data.reason', 'no_open_session')
+            ->assertJsonPath('data.can_order', true)
+            ->assertJsonPath('data.reason', null)
+            ->assertJsonPath('data.route', 'reception')
             ->assertJsonPath('data.bills', [])
             ->assertJsonCount(1, 'data.items')
             ->assertJsonPath('data.items.0.sale_item_id', $this->cola->id)

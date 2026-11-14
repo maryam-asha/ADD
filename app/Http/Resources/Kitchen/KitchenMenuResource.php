@@ -11,11 +11,12 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 /**
  * The member's kitchen menu: the branch, whether they may order now (and
- * why not), the bills they could order onto, and what the kitchen holds.
+ * why not), the bills they could order onto, the route their order takes,
+ * how they may pay (and from which wallets), and what the kitchen holds.
  * The place comes from the scan (POST member/scan), not from here. Built from
  * an array: `{access: MenuAccess::for(), items: KitchenMenu::for()}`.
  *
- * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>}, items: list<array{sale_item: SaleItem, available: string}>} $resource
+ * @property array{access: array{branch_id: ?int, can_order: bool, reason: ?string, bills: list<Booking|WalkinSession>, route: string, payment_methods: list<string>, wallets: list<array<string, mixed>>}, items: list<array{sale_item: SaleItem, available: string}>} $resource
  */
 class KitchenMenuResource extends JsonResource
 {
@@ -36,6 +37,9 @@ class KitchenMenuResource extends JsonResource
                 'id' => $bill->id,
                 'label' => $bill->space->displayTitle(),
             ], $access['bills']),
+            'route' => $access['route'],
+            'payment_methods' => $access['payment_methods'],
+            'wallets' => $access['wallets'],
             'items' => array_map(fn (array $entry) => [
                 'sale_item_id' => $entry['sale_item']->id,
                 'name' => $entry['sale_item']->item->translate('name'),

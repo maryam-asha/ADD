@@ -5,10 +5,13 @@ namespace Tests\Feature\Kitchen;
 use Add\Inventory\Stock\Services\StockService;
 use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Foundation\Models\Branch;
+use App\Domain\Identity\Models\User;
 use App\Domain\Kitchen\Models\KitchenStore;
 use App\Domain\Kitchen\Services\KitchenMenu;
 use App\Domain\Retail\Models\SaleItem;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
 /**
@@ -62,5 +65,35 @@ class KitchenMenuTest extends TestCase
         app(StockService::class)->receive($cola->item, $this->main->asPlace(), 3, 0.5);
 
         $this->assertSame([], app(KitchenMenu::class)->for(Branch::factory()->create()->id));
+    }
+
+    private function actAsMember(): void
+    {
+        $this->seed(RoleSeeder::class);
+        $member = User::factory()->create();
+        $member->assignRole('member');
+        Sanctum::actingAs($member, ['*']);
+    }
+
+    public function test_member_without_a_bill_may_order(): void
+    {
+        $this->actAsMember();
+
+        $this->getJson('/api/v1/member/kitchen/menu?branch_id='.$this->branch->id)
+            ->assertOk()
+            ->assertJsonPath('data.can_order', true)
+            ->assertJsonPath('data.reason', null)
+            ->assertJsonPath('data.route', 'reception')
+            ->assertJsonPath('data.payment_methods', ['wallet', 'card', 'cash']);
+    }
+
+    public function test_no_kitchen_still_refuses(): void
+    {
+        $this->actAsMember();
+
+        $this->getJson('/api/v1/member/kitchen/menu?branch_id='.Branch::factory()->create()->id)
+            ->assertOk()
+            ->assertJsonPath('data.can_order', false)
+            ->assertJsonPath('data.reason', 'no_kitchen');
     }
 }
