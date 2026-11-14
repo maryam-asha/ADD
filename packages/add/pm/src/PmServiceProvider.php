@@ -2,6 +2,8 @@
 
 namespace Add\Pm;
 
+use Add\Pm\Contracts\PeopleDirectory;
+use Add\Pm\Integrations\UserTablePeopleDirectory;
 use Illuminate\Support\ServiceProvider;
 
 /**
@@ -11,6 +13,13 @@ use Illuminate\Support\ServiceProvider;
  */
 class PmServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        // Every user, by name; a host with its own notion of "person" binds
+        // its directory with singleton and wins.
+        $this->app->singletonIf(PeopleDirectory::class, UserTablePeopleDirectory::class);
+    }
+
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
