@@ -124,26 +124,41 @@ class MemberKitchenOrderTest extends TestCase
             ->assertJsonPath('data.items.0.available_quantity', 10);
     }
 
-    public function test_menu_from_a_qr_names_the_place_and_the_bill(): void
+    /**
+     * The menu names the member's bill, its branch and how they may pay. The
+     * place is the scan's to name (POST member/scan, ScanOpensMenuTest), not
+     * the menu's: the menu takes no `qr` since 2026-11-12.
+     */
+    public function test_menu_names_the_bill_and_how_to_pay(): void
     {
         $walkin = $this->walkin();
-        $qr = $this->deskQr();
 
-        $this->getJson('/api/v1/member/kitchen/menu?qr='.urlencode($qr->scanValue()))
+        $this->getJson('/api/v1/member/kitchen/menu')
             ->assertOk()
             ->assertJsonPath('data.branch.id', $this->branch->id)
             ->assertJsonPath('data.can_order', true)
             ->assertJsonPath('data.reason', null)
-            ->assertJsonPath('data.place.type', 'seat_desk')
-            ->assertJsonPath('data.place.id', $this->desk->id)
-            ->assertJsonPath('data.place.label', 'Desk 7')
+            ->assertJsonMissingPath('data.place')
             ->assertJsonPath('data.bills.0.type', 'walkin')
-            ->assertJsonPath('data.bills.0.id', $walkin->id);
+            ->assertJsonPath('data.bills.0.id', $walkin->id)
+            ->assertJsonPath('data.route', 'kitchen')
+            ->assertJsonPath('data.payment_methods', ['bill', 'wallet', 'card']);
     }
 
-    public function test_menu_needs_a_branch_when_nothing_names_one(): void
+    /**
+     * Nothing names a branch — no bill, no office, no `branch_id` — and the
+     * menu is the default branch's (OrderRouting, 2026-11-14): anyone may
+     * order now, so it is no longer refused.
+     */
+    public function test_menu_with_nothing_naming_a_branch_is_the_default_branchs(): void
     {
-        $this->getJson('/api/v1/member/kitchen/menu')->assertStatus(422)->assertJsonValidationErrors('branch_id');
+        $this->getJson('/api/v1/member/kitchen/menu')
+            ->assertOk()
+            ->assertJsonPath('data.branch.id', Branch::defaultId())
+            ->assertJsonPath('data.branch.id', $this->branch->id)
+            ->assertJsonPath('data.can_order', true)
+            ->assertJsonPath('data.route', 'reception')
+            ->assertJsonPath('data.payment_methods', ['wallet', 'card', 'cash']);
     }
 
     public function test_an_inactive_kitchen_store_is_no_kitchen(): void

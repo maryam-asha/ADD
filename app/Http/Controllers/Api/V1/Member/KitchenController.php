@@ -35,6 +35,13 @@ class KitchenController extends Controller
     use AnswersPayments;
 
     /**
+     * `next` for an order held for a card whose page could not be opened:
+     * still unpaid, so the app offers the methods again (resend with
+     * `order_id`). Beside PaymentStart's `done`, `redirect`, `pay_at_reception`.
+     */
+    public const NEXT_PAY_AGAIN = 'pay_again';
+
+    /**
      * GET member/kitchen/menu — the branch is the member's first open
      * bill's, else the request's (`X-Branch-Id` or `branch_id`,
      * ResolveDefaultBranch), else the default branch. No `qr` here: the scan
@@ -58,12 +65,15 @@ class KitchenController extends Controller
     /**
      * POST member/kitchen-orders — 201 with the order in `data`, and beside
      * it how paying went: `payment`, `redirect_url`, `next` (`done` |
-     * `redirect` | `pay_at_reception`), and `payment_error` when the card
-     * page could not be opened (the order stands, held for its card, and
-     * may be sent again with another method).
+     * `redirect` | `pay_at_reception` | `pay_again`), and `payment_error`
+     * with `next` = `pay_again` when the card page could not be opened (the
+     * order stands, held for its card, and may be sent again with another
+     * method).
      *
      * With `order_id`, an order of the member's held for its card is sent
-     * again to switch how it is paid: nothing is created, 200.
+     * again to switch how it is paid: nothing is created, 200. The card
+     * payment it had open is canceled at the gateway once the new method
+     * has taken, so one order never has two card payments open.
      *
      * A wallet that is short, or one the member may not spend from, refuses
      * the whole send — nothing is written — with the answer every wallet
@@ -74,6 +84,8 @@ class KitchenController extends Controller
         $member = $request->user();
         $payment = $request->validated('payment');
         $resent = $request->validated('order_id') !== null;
+        // The card payments the held order had open, let go once the new method has taken.
+        $staleCards = $resent ? $orders->openCardPayments($member, (int) $request->validated('order_id')) : [];
 
         try {
             $placed = $resent
@@ -101,6 +113,8 @@ class KitchenController extends Controller
         $paid = $placed->checkout !== null
             ? $this->checkoutFields($placed->checkout)
             : $this->openCard($checkout, $placed->order, $member);
+
+        $orders->cancelOpenCards($staleCards);
 
         return response()->json(
             ['data' => (new KitchenOrderResource($placed->order->refresh()))->resolve($request)] + $paid,
@@ -153,7 +167,9 @@ class KitchenController extends Controller
      * The card payment of an order held for it, opened once the order is
      * committed (a gateway never runs inside a transaction). The order
      * stands whatever the gateway says: one that could not be opened is
-     * answered as `payment_error` beside it, the hold left to its deadline.
+     * answered as `payment_error` beside it, the hold left to its deadline,
+     * and `next` = `pay_again` — the order is held and unpaid, so neither
+     * `done` nor a `redirect` with nowhere to go.
      *
      * @return array{payment: mixed, redirect_url: string|null, next: string, payment_error?: string}
      */
@@ -161,7 +177,11 @@ class KitchenController extends Controller
     {
         $card = $this->payBesideNewRecord($checkout, PaymentPurpose::KitchenOrder, $order, $member, PaymeraGateway::KEY);
 
-        return $card + ['next' => $card['redirect_url'] !== null ? PaymentStart::REDIRECT : PaymentStart::DONE];
+        return $card + ['next' => match (true) {
+            isset($card['payment_error']) => self::NEXT_PAY_AGAIN,
+            $card['redirect_url'] !== null => PaymentStart::REDIRECT,
+            default => PaymentStart::DONE,
+        }];
     }
 
     /**

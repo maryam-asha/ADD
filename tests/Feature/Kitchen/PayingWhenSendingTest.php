@@ -236,6 +236,7 @@ class PayingWhenSendingTest extends TestCase
 
     public function test_card_order_is_held_and_unseen(): void
     {
+        $this->freezeTime();
         $this->officeStaff();
         $this->personalWallet();
         $this->cardOpens();
@@ -318,8 +319,18 @@ class PayingWhenSendingTest extends TestCase
             ->assertCreated()
             ->assertJsonPath('data.status', 'awaiting_payment')
             ->assertJsonPath('redirect_url', null)
+            // Held and unpaid: never `done`.
+            ->assertJsonPath('next', 'pay_again')
             ->assertJsonStructure(['payment_error'])
             ->json('data.id');
+
+        // Sent again by card, the page still cannot be opened.
+        $this->send(['method' => 'card'], ['order_id' => $id])
+            ->assertOk()
+            ->assertJsonPath('data.status', 'awaiting_payment')
+            ->assertJsonPath('redirect_url', null)
+            ->assertJsonPath('next', 'pay_again')
+            ->assertJsonStructure(['payment_error']);
 
         $this->send(['method' => 'wallet'], ['order_id' => $id])
             ->assertOk()
@@ -339,6 +350,40 @@ class PayingWhenSendingTest extends TestCase
         $this->send(['method' => 'wallet'], ['order_id' => $id])
             ->assertStatus(409)
             ->assertJsonPath('message', __('api.kitchen.order_not_awaiting_payment', [], 'en'));
+    }
+
+    public function test_switching_a_held_order_cancels_its_open_card_payment(): void
+    {
+        $this->officeStaff();
+        $wallet = $this->personalWallet(100);
+        Http::fake([
+            '*/api/create-payment' => Http::sequence()
+                ->push(['ErrorMessage' => 'Success', 'ErrorCode' => 0, 'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-1/en', 'paymentId' => 'pay-1']])
+                ->push(['ErrorMessage' => 'Success', 'ErrorCode' => 0, 'Data' => ['url' => 'https://egate-t.paymera.test/start/pay-2/en', 'paymentId' => 'pay-2']]),
+            '*/api/cancel-payment' => Http::response(['ErrorMessage' => 'Success', 'ErrorCode' => 0]),
+        ]);
+
+        $id = $this->send(['method' => 'card'])->assertCreated()->json('data.id');
+        $first = Payment::query()->where('payment_id', 'pay-1')->sole();
+
+        // A new card: the first is let go, the second stays open.
+        $this->send(['method' => 'card'], ['order_id' => $id])
+            ->assertOk()
+            ->assertJsonPath('next', 'redirect')
+            ->assertJsonPath('redirect_url', 'https://egate-t.paymera.test/start/pay-2/en');
+
+        $this->assertSame(PaymentStatus::Canceled, $first->refresh()->status);
+        $second = Payment::query()->where('payment_id', 'pay-2')->sole();
+        $this->assertSame(PaymentStatus::Pending, $second->status);
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/cancel-payment') && $request['payment_id'] === 'pay-1');
+
+        // The wallet instead: the second card is let go too.
+        $this->send(['method' => 'wallet'], ['order_id' => $id])->assertOk()->assertJsonPath('data.paid', true);
+
+        $this->assertSame(PaymentStatus::Canceled, $second->refresh()->status);
+        Http::assertSent(fn ($request) => str_ends_with($request->url(), '/api/cancel-payment') && $request['payment_id'] === 'pay-2');
+        $this->assertSame(0, Payment::query()->where('status', PaymentStatus::Pending)->count());
+        $this->assertSame(60, $this->balance($wallet));
     }
 
     public function test_held_order_switched_to_cash_goes_to_reception(): void

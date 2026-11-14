@@ -10,8 +10,11 @@ use Add\Inventory\Warehouses\Models\Warehouse;
 use App\Domain\Booking\Models\Booking;
 use App\Domain\Booking\Models\WalkinSession;
 use App\Domain\Finance\Enums\PaymentPurpose;
+use App\Domain\Finance\Enums\PaymentStatus;
+use App\Domain\Finance\Models\Payment;
 use App\Domain\Finance\Payments\CheckoutOutcome;
 use App\Domain\Finance\Payments\Methods\WalletMethod;
+use App\Domain\Finance\Payments\PaymentMethodRegistry;
 use App\Domain\Finance\Payments\PaymentService;
 use App\Domain\Finance\Payments\PaymentStart;
 use App\Domain\Foundation\Models\SeatDesk;
@@ -31,7 +34,10 @@ use App\Domain\Leasing\Models\OfficeLease;
 use App\Domain\Retail\Models\SaleItem;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * A member sending an order to the kitchen, and taking it back while the
@@ -58,6 +64,7 @@ class KitchenOrderService
         private readonly KitchenOrderNotifier $notifier,
         private readonly OrderRouting $routing,
         private readonly PaymentService $payments,
+        private readonly PaymentMethodRegistry $methods,
     ) {}
 
     /**
@@ -183,6 +190,71 @@ class KitchenOrderService
 
             return new PlacedOrder($locked->refresh(), $checkout);
         });
+    }
+
+    /**
+     * The card payments still open on the member's held order — read before
+     * it is sent again with another method, so that cancelOpenCards() can
+     * let them go once the new method has taken (one card payment open on
+     * one order at a time). Empty for anything else.
+     *
+     * @return list<int>
+     */
+    public function openCardPayments(User $member, int $orderId): array
+    {
+        $order = KitchenOrder::query()->where('user_id', $member->id)->find($orderId);
+
+        if ($order === null || $order->status !== KitchenOrderStatus::AwaitingPayment) {
+            return [];
+        }
+
+        return Payment::query()
+            ->forPayable($order)
+            ->where('status', PaymentStatus::Pending)
+            ->whereIn('method', $this->methods->gatewayKeys())
+            ->whereNotNull('payment_id')
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Cancels each of these card payments at its gateway (PaymentGateway::cancel)
+     * and marks it canceled — outside any transaction, as every gateway call
+     * is. Only one still pending is touched, re-read under the lock a status
+     * sync takes (payments:payment:{id}), so a payment the bank settled
+     * meanwhile is left to its sync. A gateway that cannot be reached leaves
+     * it pending for the reconciler; a card accepted later then finds the
+     * order already paid or moved on, as a booking's does.
+     *
+     * @param  list<int>  $paymentIds
+     */
+    public function cancelOpenCards(array $paymentIds): void
+    {
+        foreach ($paymentIds as $id) {
+            $lock = Cache::lock("payments:payment:{$id}", 30);
+
+            if (! $lock->get()) {
+                continue;
+            }
+
+            try {
+                $payment = Payment::query()->find($id);
+
+                if ($payment === null || $payment->status !== PaymentStatus::Pending) {
+                    continue;
+                }
+
+                $this->methods->gatewayFor($payment)->cancel($payment);
+                $payment->forceFill(['status' => PaymentStatus::Canceled])->save();
+            } catch (Throwable $e) {
+                Log::warning('kitchen order: an open card payment could not be canceled', [
+                    'payment_id' => $id,
+                    'error' => $e->getMessage(),
+                ]);
+            } finally {
+                $lock->release();
+            }
+        }
     }
 
     /**
