@@ -60,7 +60,8 @@ class ProjectAccess
         return $this->holds($userId, Abilities::PROJECTS_VIEW) || $this->holds($userId, Abilities::PROJECTS_MANAGE);
     }
 
-    private function isMember(int $userId, Project $project): bool
+    /** Whether the person is on the project's team (the view ability does not count). */
+    public function isMember(int $userId, Project $project): bool
     {
         return $project->members()->where('user_id', $userId)->exists();
     }

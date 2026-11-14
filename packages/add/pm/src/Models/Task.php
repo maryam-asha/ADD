@@ -28,6 +28,9 @@ class Task extends Model
         'estimate_hours', 'sort_order', 'completed_at', 'created_by',
     ];
 
+    /** A new task starts in the first column, in memory as well as in the table. */
+    protected $attributes = ['status' => 'todo'];
+
     protected function casts(): array
     {
         return [
