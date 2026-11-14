@@ -111,7 +111,7 @@
             "dist": {
                 "type": "path",
                 "url": "packages/add/pm",
-                "reference": "22636cdcfe6674f83a78f7b2e63f78286d483db4"
+                "reference": "f9f3ae00def5a0317589d3ae0de3c419d7e32a14"
             },
             "require": {
                 "illuminate/console": "^12.0",
@@ -136,7 +136,8 @@
             },
             "autoload": {
                 "psr-4": {
-                    "Add\\Pm\\": "src/"
+                    "Add\\Pm\\": "src/",
+                    "Add\\Pm\\Database\\Factories\\": "database/factories/"
                 }
             },
             "autoload-dev": {
