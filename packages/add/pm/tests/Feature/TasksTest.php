@@ -284,7 +284,8 @@ class TasksTest extends TestCase
         $this->postJson("/api/pm/tasks/{$task->id}/move", ['status' => 'done'])->assertStatus(409);
         $this->deleteJson("/api/pm/tasks/{$task->id}")->assertStatus(409);
         $this->assertCount(0, $this->getJson('/api/pm/tasks?scope=assigned')->assertOk()->json('data'));
-        $this->getJson("/api/pm/projects/{$project->id}/tasks")->assertOk()->assertJsonCount(1, 'data');
+        $board = $this->getJson("/api/pm/projects/{$project->id}/tasks")->assertOk()->assertJsonCount(1, 'data');
+        $this->assertSame(['edit' => false, 'move' => false, 'delete' => false, 'assign' => false], $board->json('data.0.can'));
     }
 
     public function test_subtasks_stay_one_level_deep_and_are_counted_on_the_parent(): void
@@ -302,7 +303,8 @@ class TasksTest extends TestCase
             ->assertUnprocessable()->assertJsonValidationErrors('parent_id');
         $elsewhere = $this->task($this->projectWith());
         $this->postJson("/api/pm/projects/{$project->id}/tasks", ['title' => 'Lost', 'parent_id' => $elsewhere->id])
-            ->assertUnprocessable()->assertJsonValidationErrors('parent_id');
+            ->assertUnprocessable()->assertJsonValidationErrors('parent_id')
+            ->assertJsonPath('errors.parent_id.0', __('pm::pm.subtask_depth'));
         $this->patchJson("/api/pm/tasks/{$parent->id}", ['parent_id' => $child])
             ->assertUnprocessable()->assertJsonValidationErrors('parent_id');
 

@@ -72,7 +72,8 @@ class TaskQuery
 
     /**
      * Today is the calendar day; "week" runs from tomorrow through seven days
-     * ahead; an overdue task is an unfinished one due before today.
+     * ahead; today, week and overdue count unfinished tasks only, so the
+     * buckets never overlap with "completed".
      *
      * @param  Builder<Task>  $query
      * @return Builder<Task>
@@ -83,8 +84,8 @@ class TaskQuery
 
         return match ($due) {
             'overdue' => $query->where('due_on', '<', $today->toDateString())->where('status', '!=', TaskStatus::Done->value),
-            'today' => $query->where('due_on', $today->toDateString()),
-            'week' => $query->whereBetween('due_on', [$today->copy()->addDay()->toDateString(), $today->copy()->addDays(7)->toDateString()]),
+            'today' => $query->where('due_on', $today->toDateString())->where('status', '!=', TaskStatus::Done->value),
+            'week' => $query->whereBetween('due_on', [$today->copy()->addDay()->toDateString(), $today->copy()->addDays(7)->toDateString()])->where('status', '!=', TaskStatus::Done->value),
             default => $query->whereNull('due_on'),
         };
     }

@@ -43,6 +43,10 @@ class TaskAccess
     {
         $task->loadMissing('project', 'assignees');
 
+        if ($task->project->is_archived) {
+            return ['edit' => false, 'move' => false, 'delete' => false, 'assign' => false];
+        }
+
         switch ($this->role($task->project, $userId)) {
             case 'lead':
                 return ['edit' => true, 'move' => true, 'delete' => true, 'assign' => true];

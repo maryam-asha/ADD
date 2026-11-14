@@ -95,7 +95,7 @@ class SaveTaskRequest extends FormRequest
         $parent = Task::query()->where('project_id', $project->id)->find($parentId);
 
         if ($parent === null || ($existing !== null && $existing->id === $parent->id)) {
-            $validator->errors()->add('parent_id', __('validation.exists', ['attribute' => 'parent id']));
+            $validator->errors()->add('parent_id', __('pm::pm.subtask_depth'));
         } elseif ($parent->parent_id !== null || ($existing !== null && $existing->subtasks()->exists())) {
             $validator->errors()->add('parent_id', __('pm::pm.subtask_depth'));
         }

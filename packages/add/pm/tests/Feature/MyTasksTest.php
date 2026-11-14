@@ -113,11 +113,13 @@ class MyTasksTest extends TestCase
         $this->task($project, [$me->id], ['due_on' => '2026-03-11']);                                        // week (today + 7)
         $this->task($project, [$me->id], ['due_on' => '2026-03-12']);                                        // later
         $this->task($project, [$me->id], ['due_on' => null, 'status' => TaskStatus::Done]);                  // completed
+        $this->task($project, [$me->id], ['due_on' => '2026-03-04', 'status' => TaskStatus::Done]);          // completed, not today
+        $this->task($project, [$me->id], ['due_on' => '2026-03-07', 'status' => TaskStatus::Done]);          // completed, not week
         $this->task($project, [$other->id], ['due_on' => '2026-03-03']);                                     // someone else's
         $this->task($archived, [$me->id], ['due_on' => '2026-03-03']);                                       // archived project
 
         $this->getJson('/api/pm/tasks/counts')->assertOk()
-            ->assertExactJson(['data' => ['overdue' => 2, 'today' => 1, 'week' => 2, 'completed' => 2]]);
+            ->assertExactJson(['data' => ['overdue' => 2, 'today' => 1, 'week' => 2, 'completed' => 4]]);
     }
 
     public function test_the_due_filter_applies_to_my_tasks_too(): void
