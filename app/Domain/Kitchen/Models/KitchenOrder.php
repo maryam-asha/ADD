@@ -24,6 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Support\Carbon;
 
 /**
  * A member's order to the kitchen, billed to the coworking session or
@@ -191,7 +192,7 @@ class KitchenOrder extends Model
      * order on its route's first stage writes both (sending, and leaving a
      * card hold), so neither window ever counts time spent waiting for a card.
      *
-     * @return array{reached_kitchen_at: \Illuminate\Support\Carbon|null, reached_reception_at: \Illuminate\Support\Carbon|null}
+     * @return array{reached_kitchen_at: Carbon|null, reached_reception_at: Carbon|null}
      */
     public static function arrivedAt(KitchenOrderStatus $status): array
     {
