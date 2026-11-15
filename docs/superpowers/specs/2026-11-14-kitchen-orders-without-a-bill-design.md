@@ -10,6 +10,7 @@ end of that spec.
 **Scope:** ADD Core (API) + ADD OS dashboard (the reception queue). The member
 app's cart screen is the app team's. This spec recommends its layout (§ The cart)
 and the API gives it everything that layout needs.
+**Built** on branch `feat/kitchen-orders-without-a-bill`, commits `c5434069..676cb0bb` (status appended 2026-11-15; the approval above stands).
 
 ## Intent
 
